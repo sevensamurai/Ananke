@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>Ananke</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Description>Reserved package name for upcoming project.</Description>
     <Authors>J Patricio Gonzalez S</Authors>
     <Copyright>Copyright © 2026 J Patricio Gonzalez S</Copyright>
