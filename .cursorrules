@@ -1,0 +1,45 @@
+You are working on Ananke, a C# .NET 10.0 library project.
+
+## Project Context
+- **Purpose**: NuGet package name reservation (placeholder implementation)
+- **Framework**: .NET 10.0
+- **License**: Apache 2.0
+- **CI/CD**: Automated NuGet publishing via GitHub Actions on main branch merges
+
+## Code Style
+- Use modern C# features and idiomatic patterns
+- Follow Microsoft C# conventions
+- Use XML documentation for public APIs
+- Keep code minimal and maintainable
+- Prefer nullable reference types
+
+## Key Configuration
+- Project file: `src/Ananke.csproj` (contains all NuGet metadata)
+- Version management: Update `<Version>` in .csproj before releasing
+- Current version: 0.0.1 (placeholder)
+- Semantic versioning: MAJOR.MINOR.PATCH
+
+## Automated Publishing
+- Triggered on push to `main` branch
+- Workflow: `.github/workflows/publish.yml`
+- Requires `NUGET_API_KEY` secret configured in GitHub
+
+## Common Commands
+```bash
+# Build
+dotnet build src/Ananke.csproj
+
+# Create package
+dotnet pack src/Ananke.csproj --configuration Release --output ./packages
+
+# Restore dependencies
+dotnet restore src/Ananke.csproj
+```
+
+## Development Guidelines
+- Make changes in feature branches
+- Update version in .csproj for new releases
+- Test with local build/pack before merging
+- Merge to main triggers automatic NuGet publish
+- Keep dependencies minimal
+- Maintain backward compatibility
