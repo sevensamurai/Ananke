@@ -9,5 +9,5 @@ public static class Placeholder
     /// <summary>
     /// Gets the package version.
     /// </summary>
-    public static string Version => "0.0.1";
+    public static string Version => "0.0.2";
 }
