@@ -1,17 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>Ananke</PackageId>
     <Version>0.0.1</Version>
     <Description>Reserved package name for upcoming project.</Description>
     <Authors>J Patricio Gonzalez S</Authors>
+    <Copyright>Copyright © 2026 J Patricio Gonzalez S</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/ABBACCA/Ananke</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/sevensamurai/Ananke</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/ABBACCA/Ananke</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/sevensamurai/Ananke</PackageProjectUrl>
     <PackageTags>placeholder;reserved</PackageTags>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
