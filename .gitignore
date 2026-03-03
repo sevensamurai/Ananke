@@ -376,8 +376,8 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-# VS Code directories
-.vscode/
+# VS Code directories — use /* not / so negations below take effect
+.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -400,3 +400,18 @@ Thumbs.db
 
 # Package outputs
 packages/
+
+# Ananke 
+## Research, experimental, design
+internals/
+
+## Demo secrets
+secrets.json
+
+## Demo: MCP server - include VS Code workspace files
+## (settings.json is already un-ignored by the general .vscode/* rule above;
+##  mcp.json is MCP-specific so it needs an explicit negation here)
+!src/demos/McpServerDemo/open_in_vscode/.vscode/mcp.json
+
+## Demo: Distributed services - exclude Mosquitto directory
+src/demos/DistributedServicesDemo/mosquitto/

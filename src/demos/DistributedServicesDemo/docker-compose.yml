@@ -1,0 +1,24 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: ananke-mqtt
+    ports:
+      - "1883:1883"   # MQTT
+      - "9001:9001"   # WebSocket (optional)
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  redis:
+    image: redis:7-alpine
+    container_name: ananke-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  redis-data:

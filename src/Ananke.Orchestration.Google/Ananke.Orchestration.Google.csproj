@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Orchestration.Google</PackageId>
+    <Description>Google Gemini provider for Ananke.Orchestration — IStreamingAgentModel implementation with tool calling, structured output, and streaming via the official Google GenAI SDK. Supports both the Gemini Developer API and Vertex AI.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.GenAI" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

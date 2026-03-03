@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke</PackageId>
+    <Description>Ananke — distributed state machine + workflow orchestration for .NET. Install this meta-package to get StateMachine, Orchestration, and the Bridge integration layer in one step.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.StateMachine\Ananke.StateMachine.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

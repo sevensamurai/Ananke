@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.MCP</PackageId>
+    <Description>MCP (Model Context Protocol) integration for Ananke — expose ToolKit tools and Workflow executions as MCP server capabilities, and import tools from external MCP servers into ToolKit for agent use. Supports stdio and HTTP transports via the official C# MCP SDK.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

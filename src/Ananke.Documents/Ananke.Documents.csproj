@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Documents</PackageId>
+    <Description>Document extractors for the Ananke knowledge pipeline. Implements IDocumentExtractor for PDF, Markdown, and plain text content.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.0.1" />
+    <PackageReference Include="PdfPig" Version="0.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

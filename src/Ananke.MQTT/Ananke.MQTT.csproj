@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.MQTT</PackageId>
+    <Description>MQTT infrastructure for Ananke — IChannelReader and IChannelWriter backed by MQTTnet. Provides services.AddAnankeMqtt() for DI registration.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
+    <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

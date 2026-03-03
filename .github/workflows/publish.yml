@@ -9,26 +9,29 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      
+
       - name: Restore dependencies
-        run: dotnet restore src/Ananke.csproj
-      
+        run: dotnet restore src/Ananke.sln
+
       - name: Build
-        run: dotnet build src/Ananke.csproj --configuration Release --no-restore
-      
+        run: dotnet build src/Ananke.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test src/Ananke.sln --configuration Release --no-build --verbosity normal
+
       - name: Pack
-        run: dotnet pack src/Ananke.csproj --configuration Release --no-build --output ./packages
-      
+        run: dotnet pack src/Ananke.sln --configuration Release --no-build --output ./packages
+
       - name: Publish to NuGet
-        run: dotnet nuget push ./packages/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push ./packages/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
