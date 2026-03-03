@@ -11,7 +11,7 @@
     <None Update="refactoring.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="secrets.json">
+    <None Update="secrets.json" Condition="Exists('secrets.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

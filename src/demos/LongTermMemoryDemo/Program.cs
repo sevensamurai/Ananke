@@ -33,7 +33,7 @@ var useCatalog = args.Contains("--catalog", StringComparer.OrdinalIgnoreCase);
 
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
-    .AddJsonFile("secrets.json", optional: false)
+    .AddJsonFile("secrets.json", optional: true)
     .Build();
 
 var apiKey = config["OpenAI:ApiKey"]

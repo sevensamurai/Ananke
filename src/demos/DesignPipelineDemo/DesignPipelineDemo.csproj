@@ -23,7 +23,7 @@
     <Content Include="etl-pipeline.ananke.yml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="Exists('secrets.json')">
     <None Update="secrets.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

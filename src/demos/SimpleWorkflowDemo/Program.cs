@@ -12,7 +12,7 @@ using System.ClientModel;
 // --- 1. Config ---
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
-    .AddJsonFile("secrets.json", optional: false)
+    .AddJsonFile("secrets.json", optional: true)
     .Build();
 
 var otlpEndpoint = config["BetterStack:OtlpEndpoint"]
