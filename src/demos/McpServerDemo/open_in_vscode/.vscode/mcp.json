@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "ananke-demo": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "../McpServerDemo.csproj"
+      ]
+    }
+  }
+}

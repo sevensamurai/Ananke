@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Chat — Ananke Demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --chat-max-height: calc(100dvh - 260px);
+        }
+
+        body > main {
+            padding-top: 1rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        header nav a {
+            font-size: 0.85rem;
+        }
+
+        /* Mode tabs */
+        .mode-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0.75rem;
+            border-bottom: 2px solid var(--pico-muted-border-color);
+        }
+
+        .mode-tabs button {
+            flex: 1;
+            border: none;
+            border-bottom: 3px solid transparent;
+            background: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            color: var(--pico-muted-color);
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .mode-tabs button.active {
+            color: var(--pico-primary);
+            border-bottom-color: var(--pico-primary);
+            font-weight: 600;
+        }
+
+        .mode-tabs button:hover:not(.active) {
+            color: var(--pico-color);
+        }
+
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            max-height: var(--chat-max-height);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+
+        .msg {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            max-width: 85%;
+            line-height: 1.5;
+        }
+
+        .msg p:last-child {
+            margin-bottom: 0;
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            background: var(--pico-primary-background);
+            color: var(--pico-primary-inverse);
+        }
+
+        .msg.assistant {
+            align-self: flex-start;
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+        }
+
+        .msg.assistant table {
+            margin: 0.5rem 0;
+            font-size: 0.9em;
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.78rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            background: var(--pico-muted-border-color);
+            color: var(--pico-muted-color);
+            align-self: flex-start;
+        }
+
+        .tool-badge details {
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .tool-badge summary {
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .tool-badge summary::marker,
+        .tool-badge summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .tool-badge pre {
+            margin: 0.4rem 0 0;
+            padding: 0.4rem;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: var(--pico-card-background-color);
+            border-radius: 0.3rem;
+        }
+
+        /* Interrupt / HITL card */
+        .interrupt-card {
+            align-self: flex-start;
+            max-width: 85%;
+            border: 2px solid #f59e0b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background: #fffbeb;
+        }
+
+        [data-theme="dark"] .interrupt-card {
+            background: #422006;
+            border-color: #d97706;
+        }
+
+        .interrupt-card .interrupt-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: #b45309;
+        }
+
+        [data-theme="dark"] .interrupt-card .interrupt-header {
+            color: #fbbf24;
+        }
+
+        .interrupt-card .interrupt-body {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            color: var(--pico-color);
+        }
+
+        .interrupt-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .interrupt-actions button {
+            flex: 1;
+            margin: 0;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-approve {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: white;
+        }
+
+        .btn-reject {
+            background: #dc2626;
+            border-color: #dc2626;
+            color: white;
+        }
+
+        .interrupt-card.resolved {
+            opacity: 0.6;
+            border-style: dashed;
+        }
+
+        .interrupt-card.resolved .interrupt-actions {
+            display: none;
+        }
+
+        .interrupt-card.resolved .interrupt-body::after {
+            display: block;
+            margin-top: 0.4rem;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        .interrupt-card.approved .interrupt-body::after {
+            content: "✅ Approved — executing trade…";
+            color: #16a34a;
+        }
+
+        .interrupt-card.rejected .interrupt-body::after {
+            content: "❌ Rejected by reviewer.";
+            color: #dc2626;
+        }
+
+        #form {
+            margin-top: 0.75rem;
+        }
+
+        #form fieldset {
+            margin-bottom: 0;
+        }
+
+        #input {
+            margin-bottom: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--pico-muted-color);
+            padding: 3rem 1rem;
+        }
+
+        .empty-state p {
+            margin: 0.25rem 0;
+        }
+
+        .typing-indicator::after {
+            content: "▊";
+            animation: blink 0.7s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <header>
+        <h1>📊 Stock Chat</h1>
+        <nav>
+            <a href="/scalar/v1" target="_blank">API Docs</a>
+        </nav>
+    </header>
+
+    <div class="mode-tabs">
+        <button class="active" data-mode="chat">💬 Chat</button>
+        <button data-mode="trade">🔒 Trade Approval (HITL)</button>
+    </div>
+
+    <div id="chat">
+        <div class="empty-state" id="empty-chat">
+            <p><strong>Ask about stocks</strong></p>
+            <p>Try: "What's the price of AAPL?" or "Compare NVDA and MSFT fundamentals"</p>
+        </div>
+        <div class="empty-state" id="empty-trade" style="display:none">
+            <p><strong>Human-in-the-Loop Trade Approval</strong></p>
+            <p>The agent analyzes the trade, then <em>pauses for your approval</em> before executing.</p>
+            <p>Try: "Buy 10 shares of NVDA" or "Sell 5 shares of AAPL"</p>
+        </div>
+    </div>
+
+    <form id="form">
+        <fieldset role="group">
+            <input type="text" id="input" placeholder="Ask about stocks…" autocomplete="off" autofocus>
+            <button type="submit" id="send">Send</button>
+        </fieldset>
+    </form>
+</main>
+
+<script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const modeTabs = document.querySelectorAll('.mode-tabs button');
+
+    const history = [];
+    let busy = false;
+    let mode = 'chat'; // 'chat' or 'trade'
+
+    marked.setOptions({ breaks: true, gfm: true });
+
+    // --- Mode switching ---
+    modeTabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (busy) return;
+            mode = btn.dataset.mode;
+            modeTabs.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update placeholder
+            input.placeholder = mode === 'trade'
+                ? 'Describe a trade… e.g. "Buy 10 shares of NVDA"'
+                : 'Ask about stocks…';
+
+            // Clear conversation and reset state for the new mode
+            history.length = 0;
+            chat.innerHTML = '';
+            const emptyChat = document.createElement('div');
+            emptyChat.className = 'empty-state';
+            if (mode === 'trade') {
+                emptyChat.innerHTML = '<p><strong>Human-in-the-Loop Trade Approval</strong></p>' +
+                    '<p>The agent analyzes the trade, then <em>pauses for your approval</em> before executing.</p>' +
+                    '<p>Try: "Buy 10 shares of NVDA" or "Sell 5 shares of AAPL"</p>';
+            } else {
+                emptyChat.innerHTML = '<p><strong>Ask about stocks</strong></p>' +
+                    '<p>Try: "What\'s the price of AAPL?" or "Compare NVDA and MSFT fundamentals"</p>';
+            }
+            chat.appendChild(emptyChat);
+        });
+    });
+
+    // --- Form submission ---
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || busy) return;
+
+        // Clear empty states
+        chat.querySelectorAll('.empty-state').forEach(el => el.remove());
+
+        appendMessage('user', text);
+        input.value = '';
+        setBusy(true);
+
+        if (mode === 'trade') {
+            await handleTradeFlow(text);
+        } else {
+            await handleChatFlow(text);
+        }
+
+        setBusy(false);
+        input.focus();
+    });
+
+    // --- Regular chat flow ---
+    async function handleChatFlow(text) {
+        history.push({ role: 'user', content: text });
+        const bubble = appendMessage('assistant', '');
+        let accumulated = '';
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, history: history.slice(0, -1) })
+            });
+
+            accumulated = await streamSse(response, bubble);
+            bubble.innerHTML = marked.parse(accumulated);
+            bubble.classList.remove('typing-indicator');
+            history.push({ role: 'assistant', content: accumulated });
+        } catch (err) {
+            bubble.textContent = `Error: ${err.message}`;
+            bubble.classList.remove('typing-indicator');
+        }
+    }
+
+    // --- Trade approval (HITL) flow ---
+    async function handleTradeFlow(text) {
+        const bubble = appendMessage('assistant', '');
+        let accumulated = '';
+
+        try {
+            const response = await fetch('/api/trade/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+
+            let interruptData = null;
+            accumulated = await streamSse(response, bubble, (event, data) => {
+                if (event === 'interrupted') interruptData = data;
+            });
+
+            bubble.innerHTML = marked.parse(accumulated);
+            bubble.classList.remove('typing-indicator');
+
+            if (interruptData) {
+                showInterruptCard(interruptData, bubble);
+            }
+        } catch (err) {
+            bubble.textContent = `Error: ${err.message}`;
+            bubble.classList.remove('typing-indicator');
+        }
+    }
+
+    // --- Interrupt card ---
+    function showInterruptCard(data, analysisBubble) {
+        const card = document.createElement('div');
+        card.className = 'interrupt-card';
+        card.innerHTML = `
+            <div class="interrupt-header">⏸️ Workflow Paused — Awaiting Your Decision</div>
+            <div class="interrupt-body">${escapeHtml(data.message)}</div>
+            <div class="interrupt-actions">
+                <button class="btn-approve" onclick="resolveInterrupt('${data.executionId}', true, this)">✅ Approve Trade</button>
+                <button class="btn-reject"  onclick="resolveInterrupt('${data.executionId}', false, this)">❌ Reject</button>
+            </div>`;
+        chat.appendChild(card);
+        scrollToBottom();
+    }
+
+    // Called when user clicks approve/reject
+    window.resolveInterrupt = async function(executionId, approved, btn) {
+        const card = btn.closest('.interrupt-card');
+        card.classList.add('resolved', approved ? 'approved' : 'rejected');
+        setBusy(true);
+
+        const bubble = appendMessage('assistant', '');
+        let accumulated = '';
+
+        try {
+            const response = await fetch('/api/trade/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ executionId, approved })
+            });
+
+            accumulated = await streamSse(response, bubble);
+            bubble.innerHTML = marked.parse(accumulated);
+            bubble.classList.remove('typing-indicator');
+        } catch (err) {
+            bubble.textContent = `Error: ${err.message}`;
+            bubble.classList.remove('typing-indicator');
+        }
+
+        setBusy(false);
+        input.focus();
+    };
+
+    // --- Shared SSE reader ---
+    async function streamSse(response, bubble, onSpecialEvent) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEvent = '';
+        let accumulated = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    currentEvent = line.slice(7);
+                } else if (line.startsWith('data: ')) {
+                    const data = JSON.parse(line.slice(6));
+
+                    switch (currentEvent) {
+                        case 'delta':
+                            accumulated += data.text;
+                            bubble.innerHTML = marked.parse(accumulated);
+                            bubble.classList.add('typing-indicator');
+                            scrollToBottom();
+                            break;
+                        case 'tool': {
+                            const badge = document.createElement('div');
+                            badge.className = 'tool-badge';
+                            badge.innerHTML = `
+                                <details>
+                                    <summary>🔧 ${escapeHtml(data.name)}</summary>
+                                    <pre>${escapeHtml(data.result)}</pre>
+                                </details>`;
+                            chat.insertBefore(badge, bubble);
+                            scrollToBottom();
+                            break;
+                        }
+                        case 'done':
+                            accumulated = data.text || accumulated;
+                            break;
+                        case 'error':
+                            bubble.textContent = `⚠️ ${data.message}`;
+                            bubble.classList.remove('typing-indicator');
+                            break;
+                        default:
+                            if (onSpecialEvent) onSpecialEvent(currentEvent, data);
+                            break;
+                    }
+                }
+            }
+        }
+        return accumulated;
+    }
+
+    function appendMessage(role, content) {
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        if (role === 'user') {
+            div.textContent = content;
+        } else {
+            div.innerHTML = content ? marked.parse(content) : '';
+        }
+        chat.appendChild(div);
+        scrollToBottom();
+        return div;
+    }
+
+    function scrollToBottom() {
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function setBusy(state) {
+        busy = state;
+        input.disabled = state;
+        sendBtn.disabled = state;
+        sendBtn.ariaBusy = state;
+    }
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+</script>
+</body>
+</html>
+</html>

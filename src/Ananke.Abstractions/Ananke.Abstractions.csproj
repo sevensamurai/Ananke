@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Abstractions</PackageId>
+    <Description>Shared interfaces and contracts for the Ananke distributed framework — IDistributedLock, IKeyValueDataAdapter, IChannelReader/Writer, and configuration types.</Description>
+  </PropertyGroup>
+
+</Project>

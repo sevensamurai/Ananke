@@ -1,0 +1,41 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Coordinated version across all packages -->
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata (applies when IsPackable=true in individual csproj) -->
+  <PropertyGroup>
+    <Authors>sevensamurai</Authors>
+    <Company>sevensamurai</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/sevensamurai/Ananke</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sevensamurai/Ananke</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageTags>state-machine;orchestration;workflow;agents;distributed;llm;ai;mcp;dotnet</PackageTags>
+    <Copyright>Copyright © sevensamurai</Copyright>
+  </PropertyGroup>
+
+  <!-- Include per-project README if present, otherwise fall back to repo-root README -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="README.md" Pack="true" PackagePath="\" Condition="Exists('README.md')" />
+    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Condition="!Exists('README.md')" />
+  </ItemGroup>
+
+</Project>
