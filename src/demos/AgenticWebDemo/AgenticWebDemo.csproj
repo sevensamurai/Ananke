@@ -2,11 +2,8 @@
 
   <PropertyGroup />
 
-  <ItemGroup>
+  <ItemGroup Condition="Exists('secrets.json')">
     <Content Remove="secrets.json" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="secrets.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
