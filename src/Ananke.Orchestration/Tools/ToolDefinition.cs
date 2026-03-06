@@ -15,13 +15,40 @@ public readonly record struct ToolResult(string Value, bool IsError)
     public static implicit operator ToolResult(string value) => Ok(value);
 }
 
-public record ToolParameter(string Name, string Description, string JsonType = "string");
+/// <summary>
+/// Describes a single parameter accepted by a <see cref="ToolDefinition"/>.
+/// </summary>
+/// <param name="Name">Parameter name (used as the JSON property key).</param>
+/// <param name="Description">Human-readable description sent to the LLM.</param>
+/// <param name="JsonType">JSON Schema type (e.g. <c>"string"</c>, <c>"integer"</c>, <c>"number"</c>, <c>"boolean"</c>).</param>
+/// <param name="Examples">
+/// Sample values for this parameter. Emitted as the JSON Schema <c>examples</c> annotation,
+/// which helps the LLM produce correct values — especially for ambiguous, format-sensitive,
+/// or enum-like parameters.
+/// </param>
+public record ToolParameter(
+    string Name,
+    string Description,
+    string JsonType = "string",
+    IReadOnlyList<string>? Examples = null);
 
 public record ToolDefinition
 {
     public required string Name { get; init; }
     public required string Description { get; init; }
     public required IReadOnlyList<ToolParameter> Parameters { get; init; }
+
+    /// <summary>
+    /// Keywords for categorisation, filtering, and discovery.
+    /// Used by <c>AgentCardBuilder</c> when mapping tools to A2A skills.
+    /// </summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+
+    /// <summary>
+    /// Sample invocations or usage descriptions. Included in the tool description
+    /// sent to the LLM to improve tool-calling accuracy.
+    /// </summary>
+    public IReadOnlyList<string> Examples { get; init; } = [];
 
     public required Func<IReadOnlyDictionary<string, object?>, CancellationToken, Task<ToolResult>> Execute { get; init; }
 
@@ -37,11 +64,16 @@ public record ToolDefinition
 
             foreach (var param in Parameters)
             {
-                properties[param.Name] = new Dictionary<string, string>
+                var prop = new Dictionary<string, object>
                 {
                     ["type"] = param.JsonType,
                     ["description"] = param.Description
                 };
+
+                if (param.Examples is { Count: > 0 })
+                    prop["examples"] = param.Examples;
+
+                properties[param.Name] = prop;
                 required.Add(param.Name);
             }
 

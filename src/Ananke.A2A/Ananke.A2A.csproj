@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<IsPackable>true</IsPackable>
+	<PackageId>Ananke.A2A</PackageId>
+	<Description>A2A (Agent-to-Agent) protocol integration for Ananke — call remote A2A agents as IAgentModel implementations and expose Ananke workflows as A2A-compliant endpoints. Enables cross-framework agent interoperability alongside MCP tool connectivity.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<PackageReference Include="A2A" Version="0.3.3-preview" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

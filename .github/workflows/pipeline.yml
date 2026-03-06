@@ -1,0 +1,108 @@
+name: Build and Deployment Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Ananke.slnx
+
+      - name: Build
+        run: dotnet build src/Ananke.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test src/Ananke.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Check release notes
+        run: |
+          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' src/Directory.Build.props)
+          NOTES="releases/v${VERSION}.md"
+          if [ ! -f "$NOTES" ]; then
+            echo "::error::Version is $VERSION but $NOTES is missing. Add release notes for this version (see releases/TEMPLATE.md)."
+            exit 1
+          fi
+          echo "✓ Release notes found: $NOTES"
+
+  publish:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: |
+          dotnet restore src/Ananke.slnx
+          dotnet build src/Ananke.slnx --configuration Release --no-restore
+          dotnet pack src/Ananke.slnx --configuration Release --no-build --output ./packages
+
+      - name: Publish to NuGet
+        run: dotnet nuget push ./packages/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+      - name: Read version from Directory.Build.props
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' src/Directory.Build.props)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          NOTES="releases/v${VERSION}.md"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — skipping release."
+          elif [ ! -f "$NOTES" ]; then
+            echo "::warning::$NOTES not found — creating release with default notes."
+            git tag "$TAG"
+            git push origin "$TAG"
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes "Released version $VERSION to NuGet." \
+              --latest \
+              ./packages/*.nupkg ./packages/*.snupkg
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file "$NOTES" \
+              --latest \
+              ./packages/*.nupkg ./packages/*.snupkg
+          fi
