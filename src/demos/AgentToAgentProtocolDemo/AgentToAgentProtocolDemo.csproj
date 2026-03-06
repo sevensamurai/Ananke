@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ananke.A2A\Ananke.A2A.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

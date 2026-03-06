@@ -60,7 +60,7 @@ Checkpointing (InMemory / File) · distributed locking · MQTT pub/sub · OpenTe
 ### 🧑‍💻 Developer experience
 Idiomatic C# (async/await, DI, generics) · design-time DSL with Mermaid export · full in-memory test mode for every infrastructure contract · 14 focused NuGet packages
 
-→ **[How does Ananke compare to LangGraph, Agent Framework, CrewAI, and others?](docs/framework-comparison.md)**
+→ **[How does Ananke compare to LangGraph, Agent Framework, CrewAI, and others?](docs/about/framework-comparison.md)**
 
 ---
 
@@ -110,9 +110,9 @@ var agentJob = AgentJobFactory
     .Build();
 ```
 
-Providers: **OpenAI** (`Ananke.Orchestration.OpenAI`), **Anthropic / Claude** (`Ananke.Orchestration.Anthropic`), and **Google Gemini** (`Ananke.Orchestration.Google`). Any OpenAI-compatible endpoint works too — Ollama, LM Studio, vLLM, Azure OpenAI, Groq, and others — via the `endpoint` parameter. Bring your own provider by implementing `IStreamingAgentModel`. → [Advanced Agent Features](docs/advanced-agent-features.md)
+Providers: **OpenAI** (`Ananke.Orchestration.OpenAI`), **Anthropic / Claude** (`Ananke.Orchestration.Anthropic`), and **Google Gemini** (`Ananke.Orchestration.Google`). Any OpenAI-compatible endpoint works too — Ollama, LM Studio, vLLM, Azure OpenAI, Groq, and others — via the `endpoint` parameter. Bring your own provider by implementing `IStreamingAgentModel`. → [Advanced Agent Features](docs/reference/advanced-agent-features.md)
 
-**Production decorators** — wrap any model with `ResilientAgentModel` for automatic 429 retry with OTel reporting, and `CachingAgentModel` for LLM response caching via any `IKeyValueDataAdapter` (e.g. Redis). Both compose and require no additional packages. → [Advanced Agent Features](docs/advanced-agent-features.md)
+**Production decorators** — wrap any model with `ResilientAgentModel` for automatic 429 retry with OTel reporting, and `CachingAgentModel` for LLM response caching via any `IKeyValueDataAdapter` (e.g. Redis). Both compose and require no additional packages. → [Advanced Agent Features](docs/reference/advanced-agent-features.md)
 
 ---
 
@@ -278,7 +278,7 @@ var workflow  = scaffold
 Console.WriteLine(workflow.ToMermaid());
 ```
 
-→ [Workflow DSL Reference](docs/workflow-dsl.md)
+→ [Workflow DSL Reference](docs/reference/workflow-dsl.md)
 
 ---
 
@@ -371,11 +371,12 @@ dotnet add package Ananke.OpenTelemetry            # distributed tracing
 
 | Guide | What it covers |
 |---|---|
-| [Advanced Agent Features](docs/advanced-agent-features.md) | Local/custom endpoints (Ollama, LM Studio, vLLM, Azure OpenAI), response caching, resilient retries, decorator composition |
-| [Workflow DSL Reference](docs/workflow-dsl.md) | Text DSL syntax, scaffold binding, router/fork/join patterns, Mermaid export |
-| [Framework Comparison](docs/framework-comparison.md) | Side-by-side comparison with LangGraph, Agent Framework, Semantic Kernel, CrewAI, Smolagents, and Agno |
-| [Design Decisions](docs/design-decisions.md) | Architecture Decision Records — `IAgentModel` vs `IChatClient`, and other trade-offs |
-| [Background & Philosophy](docs/background.md) | The story and design philosophy behind Ananke |
+| [Advanced Agent Features](docs/reference/advanced-agent-features.md) | Local/custom endpoints (Ollama, LM Studio, vLLM, Azure OpenAI), response caching, resilient retries, decorator composition |
+| [Tools & ToolKit Reference](docs/reference/tools-reference.md) | ToolDefinition, ToolParameter, ToolKit API, parameter examples for LLM accuracy, MCP/A2A integration |
+| [Workflow DSL Reference](docs/reference/workflow-dsl.md) | Text DSL syntax, scaffold binding, router/fork/join patterns, Mermaid export |
+| [Framework Comparison](docs/about/framework-comparison.md) | Side-by-side comparison with LangGraph, Agent Framework, Semantic Kernel, CrewAI, Smolagents, and Agno |
+| [Design Decisions](docs/reference/design-decisions.md) | Architecture Decision Records — `IAgentModel` vs `IChatClient`, and other trade-offs |
+| [Background & Philosophy](docs/about/background.md) | The story and design philosophy behind Ananke |
 
 ---
 
@@ -385,7 +386,7 @@ Ananke takes its name from the Greek primordial goddess of necessity — the for
 
 Software is no different. Before agents can act, before workflows can run, the rules must be stable.
 
-→ [Read the full backstory and philosophy](docs/background.md)
+→ [Read the full backstory and philosophy](docs/about/background.md)
 
 ---
 

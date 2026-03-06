@@ -1,0 +1,47 @@
+<Solution>
+
+  <!-- Demos -->
+  <Folder Name="/demos/">
+    <Project Path="demos/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" Id="7acad539-35f2-41fb-933b-fb8b8348a6e8" />
+    <Project Path="demos\AgenticWebDemo\AgenticWebDemo.csproj" />
+    <Project Path="demos\BasicAgentDemo\BasicAgentDemo.csproj" />
+    <Project Path="demos\DesignPipelineDemo\DesignPipelineDemo.csproj" />
+    <Project Path="demos\DistributedServicesDemo\DistributedServicesDemo.csproj" />
+    <Project Path="demos\ExtendedFlowDemo\ExtendedFlowDemo.csproj" />
+    <Project Path="demos\LongTermMemoryDemo\LongTermMemoryDemo.csproj" />
+    <Project Path="demos\McpServerDemo\McpServerDemo.csproj" />
+    <Project Path="demos\SimpleWorkflowDemo\SimpleWorkflowDemo.csproj" />
+    <Project Path="demos\StateMachineDemo\StateMachineDemo.csproj" />
+  </Folder>
+
+  <!-- Tests -->
+  <Folder Name="/tests/">
+    <Project Path="tests\Ananke.Design.Tests\Ananke.Design.Tests.csproj" />
+    <Project Path="tests\Ananke.Documents.Tests\Ananke.Documents.Tests.csproj" />
+    <Project Path="tests\Ananke.Orchestration.Tests\Ananke.Orchestration.Tests.csproj" />
+    <Project Path="tests\Ananke.StateMachine.Tests\Ananke.StateMachine.Tests.csproj" />
+  </Folder>
+
+  <!-- Pipeline / build configuration -->
+  <Folder Name="/.pipeline/">
+    <File Path="Directory.Build.props" />
+    <File Path="..\.github\workflows\pipeline.yml" />
+  </Folder>
+  <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
+  <Project Path="Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  <Project Path="Ananke.Design\Ananke.Design.csproj" />
+  <Project Path="Ananke.Documents\Ananke.Documents.csproj" />
+  <Project Path="Ananke.MCP\Ananke.MCP.csproj" />
+  <Project Path="Ananke.MQTT\Ananke.MQTT.csproj" />
+  <Project Path="Ananke.OpenTelemetry\Ananke.OpenTelemetry.csproj" />
+  <Project Path="Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
+  <Project Path="Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+  <Project Path="Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+  <Project Path="Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  <Project Path="Ananke.Qdrant\Ananke.Qdrant.csproj" />
+  <Project Path="Ananke.Redis\Ananke.Redis.csproj" />
+  <Project Path="Ananke.StateMachine\Ananke.StateMachine.csproj" />
+  <Project Path="Ananke\Ananke.csproj" />
+  <Project Path="wiki/wiki.csproj" />
+
+</Solution>

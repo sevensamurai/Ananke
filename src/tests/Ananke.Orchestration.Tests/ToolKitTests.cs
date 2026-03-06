@@ -319,4 +319,101 @@ public class ToolKitTests
         var kit = new ToolKit("test");
         Should.Throw<ArgumentNullException>(() => kit.AddTool((ToolDefinition)null!));
     }
+
+    [Test]
+    public void ToolDefinition_Tags_DefaultsToEmpty()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "test", Description = "desc", Parameters = [],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.Tags.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void ToolDefinition_Examples_DefaultsToEmpty()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "test", Description = "desc", Parameters = [],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.Examples.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void ToolDefinition_Tags_CanBeSet()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "search", Description = "Searches", Parameters = [],
+            Tags = ["retrieval", "web"],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.Tags.ShouldBe(["retrieval", "web"]);
+    }
+
+    [Test]
+    public void ToolDefinition_Examples_CanBeSet()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "search", Description = "Searches", Parameters = [],
+            Examples = ["search for cats", "find documents about AI"],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.Examples.ShouldBe(["search for cats", "find documents about AI"]);
+    }
+
+    [Test]
+    public void ToolParameter_Examples_DefaultsToNull()
+    {
+        var param = new ToolParameter("query", "Search query");
+        param.Examples.ShouldBeNull();
+    }
+
+    [Test]
+    public void ToolParameter_Examples_CanBeSet()
+    {
+        var param = new ToolParameter("query", "Search query",
+            Examples: ["distributed consensus", "Raft vs Paxos"]);
+
+        param.Examples.ShouldBe(["distributed consensus", "Raft vs Paxos"]);
+    }
+
+    [Test]
+    public void ParametersJsonSchema_WithExamples_EmitsExamplesAnnotation()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "search", Description = "Searches",
+            Parameters = [new ToolParameter("query", "Search query",
+                Examples: ["distributed consensus", "Raft vs Paxos"])],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        var schema = tool.ParametersJsonSchema;
+        schema.ShouldContain("\"examples\"");
+        schema.ShouldContain("distributed consensus");
+        schema.ShouldContain("Raft vs Paxos");
+    }
+
+    [Test]
+    public void ParametersJsonSchema_WithoutExamples_OmitsExamplesKey()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "search", Description = "Searches",
+            Parameters = [new ToolParameter("query", "Search query")],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        var schema = tool.ParametersJsonSchema;
+        schema.ShouldNotContain("\"examples\"");
+    }
 }

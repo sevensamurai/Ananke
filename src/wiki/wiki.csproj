@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.56">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+		<CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+		<CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
+		<SkipCopyBuildProduct>true</SkipCopyBuildProduct>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<IsSkipScriptGenerator>true</IsSkipScriptGenerator>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="..\..\README.md" />
+		<None Include="..\..\docs\**\*.md" LinkBase="docs" />
+		<None Include="..\..\internals\**\*.md" LinkBase="internals" />
+		<None Include="..\..\releases\**\*.md" LinkBase="releases" />
+	</ItemGroup>
+</Project>
