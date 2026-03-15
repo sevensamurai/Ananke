@@ -532,3 +532,25 @@ discrimination exists for **framework observability**, not for the model.
   *when* the agent should reach for it. Mention return format if non-obvious.
 - **Parameter description**: Include example values, units, or constraints.
   The LLM uses this to decide what to pass — treat it like API documentation.
+
+---
+
+## Empirical Memory Observability
+
+`InMemoryEmpiricalMemory` and `QdrantEmpiricalMemory` emit counters, traces, and
+structured logs through `System.Diagnostics.Metrics`, `ActivitySource`, and
+`ILogger` under the `Ananke.EmpiricalMemory` namespace.
+
+Key metrics for monitoring whether learning is working:
+
+| Metric | Question it answers |
+|---|---|
+| `empirical.commits` | Is the agent discovering patterns? |
+| `empirical.recall_hits / empirical.recalls` | Is stored knowledge being found when needed? |
+| `empirical.reinforcements` | Is knowledge being validated by experience? |
+| `empirical.contradictions` | Are bad hypotheses being pruned? |
+| `empirical.dedup_merges` | Is semantic dedup preventing entry bloat? |
+
+Wire into OTLP by subscribing to the `Ananke.EmpiricalMemory` meter and activity
+source. Full details, ratios, and production health checks:
+**[Guide 15 — Empirical Memory: Observability](../guides/15-empirical-memory.md#observability--monitoring-whether-learning-works)**.

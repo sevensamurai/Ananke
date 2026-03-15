@@ -82,6 +82,30 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
                 }
             }
 
+#pragma warning disable OPENAI001 // OutputAudioUpdate is experimental
+            if (update.OutputAudioUpdate is { } audioUpdate)
+            {
+                if (audioUpdate.AudioBytesUpdate is { Length: > 0 } audioBytes)
+                {
+                    yield return new AgentStreamChunk
+                    {
+                        AudioDelta = audioBytes.ToArray(),
+                        AudioMimeType = "audio/pcm",
+                        TranscriptDelta = audioUpdate.TranscriptUpdate
+                    };
+                }
+                else if (audioUpdate.TranscriptUpdate is { Length: > 0 })
+                {
+                    fullText.Append(audioUpdate.TranscriptUpdate);
+                    yield return new AgentStreamChunk
+                    {
+                        TextDelta = audioUpdate.TranscriptUpdate,
+                        TranscriptDelta = audioUpdate.TranscriptUpdate
+                    };
+                }
+            }
+#pragma warning restore OPENAI001
+
             foreach (var tc in update.ToolCallUpdates)
             {
                 if (tc.ToolCallId is not null)
@@ -121,7 +145,37 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             switch (msg.Role)
             {
                 case AgentRole.User:
-                    messages.Add(ChatMessage.CreateUserMessage(msg.Content!));
+                    if (msg.Parts is { Count: > 0 })
+                    {
+                        var contentParts = new List<ChatMessageContentPart>(msg.Parts.Count);
+                        foreach (var part in msg.Parts)
+                        {
+                            switch (part)
+                            {
+                                case TextPart text:
+                                    contentParts.Add(ChatMessageContentPart.CreateTextPart(text.Text));
+                                    break;
+                                case ImagePart image when image.Data is not null:
+                                    contentParts.Add(ChatMessageContentPart.CreateImagePart(
+                                        BinaryData.FromBytes(image.Data), image.MimeType));
+                                    break;
+                                case ImagePart image when image.Uri is not null:
+                                    contentParts.Add(ChatMessageContentPart.CreateImagePart(image.Uri));
+                                    break;
+#pragma warning disable OPENAI001 // ChatInputAudioFormat is experimental
+                                case AudioPart audio:
+                                    contentParts.Add(ChatMessageContentPart.CreateInputAudioPart(
+                                        BinaryData.FromBytes(audio.Data), MapAudioFormat(audio.MimeType)));
+                                    break;
+#pragma warning restore OPENAI001
+                            }
+                        }
+                        messages.Add(ChatMessage.CreateUserMessage(contentParts));
+                    }
+                    else
+                    {
+                        messages.Add(ChatMessage.CreateUserMessage(msg.Content!));
+                    }
                     break;
 
                 case AgentRole.Assistant when msg.ToolCalls is { Count: > 0 }:
@@ -177,4 +231,13 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
 
         return options;
     }
+
+#pragma warning disable OPENAI001 // ChatInputAudioFormat is experimental
+    private static ChatInputAudioFormat MapAudioFormat(string mimeType) => mimeType.ToLowerInvariant() switch
+    {
+        "audio/wav" or "audio/x-wav" or "audio/wave" => ChatInputAudioFormat.Wav,
+        "audio/mp3" or "audio/mpeg" => ChatInputAudioFormat.Mp3,
+        _ => new ChatInputAudioFormat(mimeType.Replace("audio/", string.Empty))
+    };
+#pragma warning restore OPENAI001
 }

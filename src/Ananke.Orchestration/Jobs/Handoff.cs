@@ -3,7 +3,8 @@ using Ananke.Abstractions.Channels;
 namespace Ananke.Orchestration.Jobs;
 
 /// <summary>
-/// Factory methods for creating <see cref="HandoffJob{TState, TMessage, TResponse}"/> instances.
+/// Factory methods for creating <see cref="HandoffJob{TState, TMessage, TResponse}"/> (workflow-level)
+/// and <see cref="HandoffProxy{TMessage, TResponse}"/> (service-level) handoff instances.
 /// </summary>
 /// <example>
 /// <code>
@@ -53,5 +54,35 @@ public static class Handoff
             createMessage,
             mapResult,
             timeout ?? DefaultTimeout);
+    }
+
+    /// <summary>
+    /// Creates a typed handoff proxy for sending messages to an external service.
+    /// Unlike <see cref="To{TState, TMessage, TResponse}"/>, the proxy is not tied to
+    /// a workflow and can be used in endpoints, background services, or any
+    /// application code that needs request-response handoff.
+    /// </summary>
+    /// <typeparam name="TMessage">The outgoing message type.</typeparam>
+    /// <typeparam name="TResponse">The expected response type.</typeparam>
+    /// <param name="topic">The destination topic (e.g. a queue name or agent identifier).</param>
+    /// <param name="channel">
+    /// The handoff channel implementation — use <see cref="InMemoryHandoffChannel"/>
+    /// for tests or <c>MqttHandoffChannel</c> for production.
+    /// </param>
+    /// <param name="timeout">
+    /// Maximum time to wait for a response. Defaults to <see cref="DefaultTimeout"/> (5 minutes).
+    /// </param>
+    public static HandoffProxy<TMessage, TResponse> Proxy<TMessage, TResponse>(
+        string topic,
+        IHandoffChannel channel,
+        TimeSpan? timeout = null)
+        where TMessage : class
+        where TResponse : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+        ArgumentNullException.ThrowIfNull(channel);
+
+        return new HandoffProxy<TMessage, TResponse>(
+            topic, channel, timeout ?? DefaultTimeout);
     }
 }

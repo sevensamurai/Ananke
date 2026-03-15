@@ -73,6 +73,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
 
         var fullText = new StringBuilder();
         var toolCalls = new List<AgentToolCall>();
+        var responseParts = new List<ContentPart>();
 
         await foreach (var chunk in _client.Models.GenerateContentStreamAsync(
             model: _model,
@@ -95,6 +96,17 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                     yield return new AgentStreamChunk { TextDelta = part.Text };
                 }
 
+                if (part.InlineData is { Data: not null, MimeType: not null } blob &&
+                    blob.MimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+                {
+                    responseParts.Add(new AudioPart(blob.Data, blob.MimeType));
+                    yield return new AgentStreamChunk
+                    {
+                        AudioDelta = blob.Data,
+                        AudioMimeType = blob.MimeType
+                    };
+                }
+
                 if (part.FunctionCall is not null)
                 {
                     toolCalls.Add(new AgentToolCall(
@@ -105,11 +117,15 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
             }
         }
 
+        if (fullText.Length > 0)
+            responseParts.Insert(0, new TextPart(fullText.ToString()));
+
         yield return new AgentStreamChunk
         {
             CompletedResponse = new AgentResponse
             {
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
+                Parts = responseParts.Count > 0 ? responseParts : null,
                 ToolCalls = toolCalls.Count > 0 ? toolCalls : null
             }
         };
@@ -145,6 +161,24 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
             config.ResponseSchema = JsonSchemaConverter.Convert(request.ResponseFormat.JsonSchema);
         }
 
+        if (request.Metadata is not null &&
+            request.Metadata.TryGetValue("response_modalities", out var modalities))
+        {
+            config.ResponseModalities = modalities
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(m => m.ToUpperInvariant())
+                .ToList();
+        }
+
+        if (request.Metadata is not null &&
+            request.Metadata.TryGetValue("speech_voice", out var voice))
+        {
+            config.SpeechConfig = new SpeechConfig
+            {
+                VoiceConfig = new VoiceConfig { PrebuiltVoiceConfig = new PrebuiltVoiceConfig { VoiceName = voice } }
+            };
+        }
+
         return config;
     }
 
@@ -160,7 +194,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                     contents.Add(new Content
                     {
                         Role = "user",
-                        Parts = [new Part { Text = msg.Content! }]
+                        Parts = MapParts(msg)
                     });
                     break;
 
@@ -220,7 +254,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                     contents.Add(new Content
                     {
                         Role = "user",
-                        Parts = [new Part { Text = msg.Content! }]
+                        Parts = MapParts(msg)
                     });
                     break;
             }
@@ -229,10 +263,39 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         return contents;
     }
 
+    private static List<Part> MapParts(AgentMessage msg)
+    {
+        if (msg.Parts is not { Count: > 0 })
+            return [new Part { Text = msg.Content ?? string.Empty }];
+
+        var parts = new List<Part>(msg.Parts.Count);
+        foreach (var contentPart in msg.Parts)
+        {
+            switch (contentPart)
+            {
+                case TextPart text:
+                    parts.Add(new Part { Text = text.Text });
+                    break;
+                case AudioPart audio:
+                    parts.Add(new Part { InlineData = new Blob { MimeType = audio.MimeType, Data = audio.Data } });
+                    break;
+                case ImagePart image when image.Data is not null:
+                    parts.Add(new Part { InlineData = new Blob { MimeType = image.MimeType, Data = image.Data } });
+                    break;
+                case ImagePart image when image.Uri is not null:
+                    parts.Add(new Part { FileData = new FileData { MimeType = image.MimeType, FileUri = image.Uri.ToString() } });
+                    break;
+            }
+        }
+
+        return parts;
+    }
+
     private static AgentResponse MapResponse(GenerateContentResponse response)
     {
         string? text = null;
         var toolCalls = new List<AgentToolCall>();
+        var responseParts = new List<ContentPart>();
 
         if (response.Candidates is { Count: > 0 })
         {
@@ -242,7 +305,16 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 foreach (var part in parts)
                 {
                     if (part.Text is { Length: > 0 })
+                    {
                         text = part.Text;
+                        responseParts.Add(new TextPart(part.Text));
+                    }
+
+                    if (part.InlineData is { Data: not null, MimeType: not null } blob &&
+                        blob.MimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        responseParts.Add(new AudioPart(blob.Data, blob.MimeType));
+                    }
 
                     if (part.FunctionCall is not null)
                     {
@@ -258,6 +330,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         return new AgentResponse
         {
             Text = text,
+            Parts = responseParts.Count > 0 ? responseParts : null,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null
         };
     }

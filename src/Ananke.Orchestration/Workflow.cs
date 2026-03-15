@@ -4,7 +4,7 @@ using Ananke.Orchestration.Execution;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Routing;
 using Ananke.Orchestration.Streaming;
-using Ananke.Orchestration.Tracing;
+using Ananke.Abstractions.Tracing;
 
 namespace Ananke.Orchestration;
 
@@ -72,6 +72,7 @@ public sealed class Workflow<TState>
     private IWorkflowTracer? _tracer;
     private bool _storeCompletions = true;
     private Dictionary<string, string>? _metadata;
+    private WorkflowDefinition<TState>? _cachedDefinition;
 
     public Workflow(string name)
     {
@@ -297,14 +298,31 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>
+    /// Eagerly validates the workflow definition, throwing on any configuration errors.
+    /// Call after defining all jobs and connections to fail fast at startup rather than
+    /// deferring validation to the first <see cref="RunAsync"/> call.
+    /// </summary>
+    /// <returns>The builder, for fluent chaining.</returns>
+    /// <exception cref="InvalidOperationException">The workflow definition is invalid.</exception>
+    public Workflow<TState> Validate()
+    {
+        Build();
+        return this;
+    }
+
     public WorkflowDefinition<TState> Build()
     {
+        if (_cachedDefinition is not null)
+            return _cachedDefinition;
+
         if (_entryJob is null)
             throw new InvalidOperationException("Workflow must have at least one job.");
 
         ApplyLifecycleActions();
 
-        return new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins);
+        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins);
+        return _cachedDefinition;
     }
 
     public async Task<WorkflowExecution<TState>> RunAsync(
@@ -385,26 +403,30 @@ public sealed class Workflow<TState>
     {
         foreach (var (jobName, action) in _onEnterActions)
         {
-            if (_jobs.TryGetValue(jobName, out var descriptor))
-                _jobs[jobName] = descriptor with { OnEnter = action };
+            if (!_jobs.TryGetValue(jobName, out var descriptor))
+                throw new InvalidOperationException($"OnEnter references undefined job '{jobName}'.");
+            _jobs[jobName] = descriptor with { OnEnter = action };
         }
 
         foreach (var (jobName, action) in _onExitActions)
         {
-            if (_jobs.TryGetValue(jobName, out var descriptor))
-                _jobs[jobName] = descriptor with { OnExit = action };
+            if (!_jobs.TryGetValue(jobName, out var descriptor))
+                throw new InvalidOperationException($"OnExit references undefined job '{jobName}'.");
+            _jobs[jobName] = descriptor with { OnExit = action };
         }
 
         foreach (var (jobName, timeout) in _timeouts)
         {
-            if (_jobs.TryGetValue(jobName, out var descriptor))
-                _jobs[jobName] = descriptor with { Timeout = timeout };
+            if (!_jobs.TryGetValue(jobName, out var descriptor))
+                throw new InvalidOperationException($"Timeout references undefined job '{jobName}'.");
+            _jobs[jobName] = descriptor with { Timeout = timeout };
         }
 
         foreach (var (jobName, mode) in _interrupts)
         {
-            if (_jobs.TryGetValue(jobName, out var descriptor))
-                _jobs[jobName] = descriptor with { Interrupt = mode };
+            if (!_jobs.TryGetValue(jobName, out var descriptor))
+                throw new InvalidOperationException($"Interrupt references undefined job '{jobName}'.");
+            _jobs[jobName] = descriptor with { Interrupt = mode };
         }
 
         foreach (var (_, descriptor) in _jobs)

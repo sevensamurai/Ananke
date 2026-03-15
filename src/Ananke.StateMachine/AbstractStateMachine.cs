@@ -101,6 +101,9 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// </summary>
     public string? OperationalStatusReason { get; private set; }
 
+    /// <inheritdoc />
+    public bool IsInterrupted { get; private set; }
+
     #region Internal Types
 
     public class PersistedContext<X>
@@ -109,6 +112,13 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         public required int Step { get; set; }
         public OperationalStatus OperationalStatus { get; set; } = OperationalStatus.Operative;
         public string? OperationalStatusReason { get; set; }
+        public List<X> InterruptStack { get; set; } = [];
+
+        /// <summary>
+        /// Optional payload associated with the most recent interrupt transition.
+        /// Cleared on resume.
+        /// </summary>
+        public object? InterruptPayload { get; set; }
     }
 
     #endregion
@@ -234,12 +244,16 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             // Restore operational status from persisted state
             OperationalStatus = context.OperationalStatus;
             OperationalStatusReason = context.OperationalStatusReason;
+            IsInterrupted = context.InterruptStack.Count > 0;
         }
 
         return context ?? new PersistedContext<S> { State = _initialState, Step = 0 };
     }
 
-    internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(long id, T transition)
+    internal Task<TransitionResult<S>> TryExecuteTransitionAsync(long id, T transition)
+        => TryExecuteTransitionAsync(id, transition, payload: null);
+
+    internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(long id, T transition, object? payload)
     {
         try
         {
@@ -261,7 +275,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                     // Self-transition: state stays the same, just increment step
                     persistedContext.Step += 1;
                     await _locker.SetValueAsync(id.ToString(), persistedContext);
-                    
+
                     Log.LogDebug("SELF-TRANSITION: {State} (implicit)", CurrentState);
                     return TransitionResult<S>.Succeeded(previousState, CurrentState);
                 }
@@ -281,6 +295,36 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 }
             }
 
+            // ── Interrupt / Resume stack management ──────────────────────
+            S resolvedFinalState = config.FinalState;
+
+            if (config.IsInterrupt)
+            {
+                if (persistedContext.InterruptStack.Count >= _options.MaxInterruptDepth)
+                {
+                    Log.LogWarning("Max interrupt depth ({Depth}) exceeded for context {Id}",
+                        _options.MaxInterruptDepth, id);
+                    return TransitionResult<S>.Failed(CurrentState,
+                        $"Maximum interrupt depth ({_options.MaxInterruptDepth}) exceeded");
+                }
+
+                persistedContext.InterruptStack.Add(CurrentState);
+                persistedContext.InterruptPayload = payload;
+            }
+            else if (config.IsResume)
+            {
+                if (persistedContext.InterruptStack.Count == 0)
+                {
+                    Log.LogWarning("Resume attempted with empty interrupt stack for context {Id}", id);
+                    return TransitionResult<S>.Failed(CurrentState,
+                        "Cannot resume: interrupt stack is empty");
+                }
+
+                resolvedFinalState = persistedContext.InterruptStack[^1];
+                persistedContext.InterruptStack.RemoveAt(persistedContext.InterruptStack.Count - 1);
+                persistedContext.InterruptPayload = null;
+            }
+
             // Execute state exit action
             var stateConfigs = Builder.StateConfigs;
             if (stateConfigs.TryGetValue(previousState, out var exitStateConfig) && exitStateConfig.OnExitAction is not null)
@@ -290,36 +334,58 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 
             // Perform transition
             persistedContext.Step += 1;
-            persistedContext.State = config.FinalState;
-            CurrentState = config.FinalState;
+            persistedContext.State = resolvedFinalState;
+            CurrentState = resolvedFinalState;
+            IsInterrupted = persistedContext.InterruptStack.Count > 0;
 
             await _locker.SetValueAsync(id.ToString(), persistedContext);
-            Log.LogDebug("OK: {PreviousState} --({Transition})--> {NewState}", previousState, transition, config.FinalState);
+            Log.LogDebug("OK: {PreviousState} --({Transition})--> {NewState}", previousState, transition, resolvedFinalState);
 
             // Execute state entry action
-            if (stateConfigs.TryGetValue(config.FinalState, out var entryStateConfig) && entryStateConfig.OnEnterAction is not null)
+            if (stateConfigs.TryGetValue(resolvedFinalState, out var entryStateConfig) && entryStateConfig.OnEnterAction is not null)
             {
                 await entryStateConfig.OnEnterAction();
             }
+
+            // Resolve interrupt payload for the result
+            var resultPayload = config.IsInterrupt ? payload : null;
 
             // Execute after-transition action
             if (config.AfterTransitionAction is not null)
             {
                 var actionResult = await config.AfterTransitionAction();
                 Log.LogDebug("After-action returned state: {State}", actionResult);
-                
+
                 // If action modifies state, update it
-                if (!EqualityComparer<S>.Default.Equals(actionResult, config.FinalState))
+                if (!EqualityComparer<S>.Default.Equals(actionResult, resolvedFinalState))
                 {
                     persistedContext.State = actionResult;
                     CurrentState = actionResult;
                     await _locker.SetValueAsync(id.ToString(), persistedContext);
                 }
-                
-                return TransitionResult<S>.Succeeded(previousState, actionResult);
+
+                return new TransitionResult<S>
+                {
+                    Success = true,
+                    PreviousState = previousState,
+                    CurrentState = actionResult,
+                    WasInterrupt = config.IsInterrupt,
+                    WasResume = config.IsResume,
+                    ResumedFromState = config.IsResume ? previousState : default,
+                    InterruptPayload = resultPayload
+                };
             }
 
-            return TransitionResult<S>.Succeeded(previousState, config.FinalState);
+            return new TransitionResult<S>
+            {
+                Success = true,
+                PreviousState = previousState,
+                CurrentState = resolvedFinalState,
+                WasInterrupt = config.IsInterrupt,
+                WasResume = config.IsResume,
+                ResumedFromState = config.IsResume ? previousState : default,
+                InterruptPayload = resultPayload
+            };
         }
         catch (Exception ex)
         {
@@ -332,7 +398,15 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// Executes a transition with distributed locking and middleware pipeline.
     /// Blocked when OperationalStatus is Faulted.
     /// </summary>
-    protected async Task<TransitionResult<S>> InternalTransitionAsync(C context, T transition)
+    protected Task<TransitionResult<S>> InternalTransitionAsync(C context, T transition)
+        => InternalTransitionAsync(context, transition, payload: null);
+
+    /// <summary>
+    /// Executes a transition with distributed locking and middleware pipeline,
+    /// carrying an optional payload for interrupt transitions.
+    /// Blocked when OperationalStatus is Faulted.
+    /// </summary>
+    protected async Task<TransitionResult<S>> InternalTransitionAsync(C context, T transition, object? payload)
     {
         // Gate: Block transitions if Faulted
         if (OperationalStatus == OperationalStatus.Faulted)
@@ -350,7 +424,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         activity?.SetTag("Ananke.from_state", CurrentState.ToString());
 
         // Build the middleware pipeline
-        Func<Task<TransitionResult<S>>> pipeline = () => ExecuteLockedTransitionAsync(context.Id, transition);
+        Func<Task<TransitionResult<S>>> pipeline = () => ExecuteLockedTransitionAsync(context.Id, transition, payload);
 
         // Wrap with middlewares (in reverse order so first registered runs first)
         for (int i = _middlewares.Count - 1; i >= 0; i--)
@@ -381,11 +455,14 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         return result;
     }
 
-    private async Task<TransitionResult<S>> ExecuteLockedTransitionAsync(long id, T transition)
+    private Task<TransitionResult<S>> ExecuteLockedTransitionAsync(long id, T transition)
+        => ExecuteLockedTransitionAsync(id, transition, payload: null);
+
+    private async Task<TransitionResult<S>> ExecuteLockedTransitionAsync(long id, T transition, object? payload)
     {
         var result = await _locker.RunCoordinatedActionWithRetryAsync(
             id.ToString(),
-            () => TryExecuteTransitionAsync(id, transition),
+            () => TryExecuteTransitionAsync(id, transition, payload),
             _options.LockRetryCount,
             _options.LockRetryDelayMs);
 
@@ -406,6 +483,14 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// Performs a state transition. Override to add custom behavior like publishing events.
     /// </summary>
     public abstract Task<TransitionResult<S>> TransitionAsync(C context, T transition);
+
+    /// <summary>
+    /// Performs a state transition with an optional payload.
+    /// Override to add custom behavior. Default delegates to
+    /// <see cref="InternalTransitionAsync(C, T, object?)"/>.
+    /// </summary>
+    public virtual Task<TransitionResult<S>> TransitionAsync(C context, T transition, object? payload)
+        => InternalTransitionAsync(context, transition, payload);
 
     /// <summary>
     /// Sends a notification without changing state. Override to add custom behavior.

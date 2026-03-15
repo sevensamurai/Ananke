@@ -28,7 +28,6 @@ See [`secrets.json.template`](./secrets.json.template) for the full key referenc
 | [SimpleWorkflowDemo](#simpleworkflowdemo) | Linear `Workflow<T>` pipeline · OpenTelemetry tracing | OpenAI · BetterStack (optional) |
 | [ExtendedFlowDemo](#extendedflowdemo) | Fork / join · sub-flows · best-effort · interrupt / approval · streaming | None (all simulated) |
 | [StateMachineDemo](#statefsmachinedemo) | `AbstractStateMachine` · guards · lifecycle hooks · fault / reset | None |
-| [DistributedServicesDemo](#distributedservicesdemo) | Workflow + handoff + conversation memory + FSM bridge in one pipeline | Optional: MQTT, Redis |
 | [LongTermMemoryDemo](#longtermmemorydemo) | Document ingestion · vector search · agent Q&A · knowledge catalog | OpenAI · Qdrant (optional) |
 | [DesignPipelineDemo](#designpipelinedemo) | YAML-declared ETL pipeline · fork / join · model aliases | OpenAI |
 | [AgenticWebDemo](#agenticwebdemo) | ASP.NET Core chat API · tool-calling agent · trade approval workflow | OpenAI · BetterStack (optional) |
@@ -95,30 +94,6 @@ Explores `AbstractStateMachine` with a support-ticket lifecycle (`Open → InPro
 - Fault / reset — circuit-breaker pattern that freezes all transitions
 
 **Secrets required:** None
-
----
-
-### DistributedServicesDemo
-
-**[`demos/DistributedServicesDemo`](./DistributedServicesDemo)** · [`README`](./DistributedServicesDemo/README.md)
-
-A support-ticket triage pipeline that wires five Ananke subsystems together:
-
-1. `Workflow<T>` graph-as-code orchestration
-2. `Handoff.To<>()` agent-to-agent handoff (in-memory or MQTT)
-3. `IConversationMemory` per-customer history (in-memory or Redis)
-4. `AbstractStateMachine` ticket lifecycle (`New → Triaging → Resolved → Closed`)
-5. `.StateMachineJob()` Bridge extension — zero-boilerplate FSM wiring
-
-Runs fully in-memory with zero configuration, or against real MQTT + Redis brokers
-by editing `appsettings.json`.
-
-```bash
-dotnet run                    # triage workflow (in-memory everything)
-dotnet run -- --specialist    # specialist listener (requires MQTT configured)
-```
-
-**Secrets required:** None (infrastructure configured via `appsettings.json`)
 
 ---
 

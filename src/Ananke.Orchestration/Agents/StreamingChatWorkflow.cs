@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using Ananke.Orchestration.Memory;
 using Ananke.Orchestration.Tools;
 
@@ -29,6 +31,15 @@ public sealed record StreamingChatState
     /// Typically set to a workflow execution ID or a user/conversation identifier.
     /// </summary>
     public string? SessionId { get; init; }
+
+    /// <summary>Number of history messages loaded from memory (used to persist only new messages).</summary>
+    internal int HistoryBaseline { get; init; }
+
+    /// <summary>When <c>true</c>, the last generation was interrupted and the agent will be re-invoked.</summary>
+    public bool WasInterrupted { get; init; }
+
+    /// <summary>Partial text captured when the generation was interrupted.</summary>
+    public string? PartialText { get; init; }
 }
 
 /// <summary>
@@ -62,6 +73,7 @@ public static class StreamingChatWorkflow
         private ToolKit? _toolKit;
         private int _maxToolRounds = 10;
         private Func<string, Task>? _onTextDelta;
+        private Func<byte[], string, Task>? _onAudioDelta;
         private Func<string, string, Task>? _onToolCall;
         private Func<string, string, Task>? _onToolResult;
         private IConversationMemory? _memory;
@@ -116,6 +128,13 @@ public static class StreamingChatWorkflow
             return this;
         }
 
+        /// <summary>Called for each audio delta streamed from the model, with raw bytes and MIME type.</summary>
+        public Builder OnAudioDelta(Func<byte[], string, Task> handler)
+        {
+            _onAudioDelta = handler;
+            return this;
+        }
+
         /// <summary>Called before each tool execution with the tool name and raw JSON arguments.</summary>
         public Builder OnToolCall(Func<string, string, Task> handler)
         {
@@ -146,12 +165,10 @@ public static class StreamingChatWorkflow
             var toolKit = _toolKit;
             var maxRounds = _maxToolRounds;
             var onDelta = _onTextDelta;
+            var onAudioDelta = _onAudioDelta;
             var onToolCall = _onToolCall;
             var onTool = _onToolResult;
             var memory = _memory;
-
-            // Track where new messages start so we only persist the delta
-            var historyBaseline = 0;
 
             return new Workflow<StreamingChatState>(_name)
                 .Job("agent", async (state, ct) =>
@@ -165,8 +182,7 @@ public static class StreamingChatWorkflow
                             var merged = new List<AgentMessage>(history.Count + state.Messages.Count);
                             merged.AddRange(history);
                             merged.AddRange(state.Messages);
-                            historyBaseline = history.Count;
-                            state = state with { Messages = merged };
+                            state = state with { Messages = merged, HistoryBaseline = history.Count };
                         }
                     }
 
@@ -188,6 +204,8 @@ public static class StreamingChatWorkflow
                             if (onDelta is not null)
                                 await onDelta(chunk.TextDelta);
                         }
+                        if (chunk.AudioDelta is not null && onAudioDelta is not null)
+                            await onAudioDelta(chunk.AudioDelta, chunk.AudioMimeType ?? "audio/pcm");
                         if (chunk.CompletedResponse is not null)
                             completed = chunk.CompletedResponse;
                     }
@@ -234,18 +252,23 @@ public static class StreamingChatWorkflow
                 .Then("tools", "agent")
                 .OnExit("agent", async state =>
                 {
+                    // Append the final assistant response to the message list so the
+                    // full turn (including tool calls and the closing reply) is preserved
+                    // for subsequent turns, regardless of memory configuration.
+                    if (state.LastResponse?.RequiresAction != true)
+                    {
+                        var responseText = state.LastResponse?.Text ?? state.FullText;
+                        if (!string.IsNullOrEmpty(responseText))
+                            state.Messages.Add(AgentMessage.Assistant(responseText));
+                    }
+
                     // Persist only new messages (skip the loaded history) when the workflow completes
                     if (memory is not null && state.SessionId is not null
                         && state.LastResponse?.RequiresAction != true)
                     {
-                        // Add the final assistant response so the full turn is in memory
-                        var responseText = state.LastResponse?.Text ?? state.FullText;
-                        if (!string.IsNullOrEmpty(responseText))
-                            state.Messages.Add(AgentMessage.Assistant(responseText));
-
-                        if (historyBaseline < state.Messages.Count)
+                        if (state.HistoryBaseline < state.Messages.Count)
                         {
-                            var newMessages = state.Messages.Skip(historyBaseline).ToList();
+                            var newMessages = state.Messages.Skip(state.HistoryBaseline).ToList();
                             await memory.AddAsync(state.SessionId, newMessages, CancellationToken.None);
                         }
                     }
@@ -279,6 +302,100 @@ public static class StreamingChatWorkflow
             var workflow = Build();
             return await workflow.RunAsync(
                 new StreamingChatState { Messages = messages, SessionId = sessionId }, ct);
+        }
+
+        /// <summary>
+        /// Builds the workflow and streams <see cref="ChatSessionEvent"/> instances as they occur.
+        /// No handle, no interrupt channel — just an event stream. Interrupts are the caller's
+        /// concern (e.g. via a state machine that cancels the <paramref name="ct"/>).
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// await foreach (var evt in StreamingChatWorkflow.Create("chat", model)
+        ///     .WithTools(tools)
+        ///     .BuildStream([AgentMessage.User("hello")], ct))
+        /// {
+        ///     switch (evt) { case TextDeltaEvent d: Console.Write(d.Text); break; ... }
+        /// }
+        /// </code>
+        /// </example>
+        public async IAsyncEnumerable<ChatSessionEvent> BuildStream(
+            List<AgentMessage> messages,
+            [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(messages);
+
+            var channel = Channel.CreateUnbounded<ChatSessionEvent>();
+            var writer = channel.Writer;
+
+            // Wire callbacks to write events into the channel
+            var origDelta = _onTextDelta;
+            var origAudioDelta = _onAudioDelta;
+            var origToolCall = _onToolCall;
+            var origToolResult = _onToolResult;
+
+            _onTextDelta = async delta =>
+            {
+                await writer.WriteAsync(new TextDeltaEvent(delta), ct);
+                if (origDelta is not null) await origDelta(delta);
+            };
+            _onAudioDelta = async (data, mimeType) =>
+            {
+                await writer.WriteAsync(new AudioDeltaEvent(data, mimeType), ct);
+                if (origAudioDelta is not null) await origAudioDelta(data, mimeType);
+            };
+            _onToolCall = async (name, args) =>
+            {
+                await writer.WriteAsync(new ToolCallEvent(name, args), ct);
+                if (origToolCall is not null) await origToolCall(name, args);
+            };
+            _onToolResult = async (name, result) =>
+            {
+                await writer.WriteAsync(new ToolResultEvent(name, result), ct);
+                if (origToolResult is not null) await origToolResult(name, result);
+            };
+
+            var workflow = Build();
+            var initialState = new StreamingChatState { Messages = messages };
+
+            // Restore original callbacks so builder is reusable
+            _onTextDelta = origDelta;
+            _onAudioDelta = origAudioDelta;
+            _onToolCall = origToolCall;
+            _onToolResult = origToolResult;
+
+            var runTask = Task.Run(async () =>
+            {
+                try
+                {
+                    var execution = await workflow.RunAsync(initialState, ct);
+                    if (execution.Result?.Success == true)
+                        await writer.WriteAsync(new CompletedEvent(execution.State.FullText), CancellationToken.None);
+                    else
+                        await writer.WriteAsync(
+                            new ErrorEvent(execution.Result?.Error ?? "Workflow failed"), CancellationToken.None);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Cancelled by the caller (e.g. SM interrupt) — not an error
+                }
+                catch (Exception ex)
+                {
+                    try { await writer.WriteAsync(new ErrorEvent(ex.Message), CancellationToken.None); } catch { }
+                }
+                finally
+                {
+                    writer.TryComplete();
+                }
+            }, CancellationToken.None);
+
+            await foreach (var evt in channel.Reader.ReadAllAsync(ct))
+            {
+                yield return evt;
+            }
+
+            // Observe the background task to surface exceptions
+            await runTask;
         }
     }
 

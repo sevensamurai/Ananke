@@ -134,7 +134,7 @@ public sealed class A2AAgentModel : IStreamingAgentModel
         {
             Role = MessageRole.User,
             MessageId = Guid.NewGuid().ToString(),
-            Parts = [new TextPart { Text = textContent }]
+            Parts = [new global::A2A.TextPart { Text = textContent }]
         };
 
         return new MessageSendParams
@@ -164,7 +164,7 @@ public sealed class A2AAgentModel : IStreamingAgentModel
             var texts = task.Artifacts
                 .Where(a => a.Parts is { Count: > 0 })
                 .SelectMany(a => a.Parts!)
-                .OfType<TextPart>()
+                .OfType<global::A2A.TextPart>()
                 .Select(p => p.Text);
 
             var combined = string.Join("\n", texts);
@@ -186,7 +186,7 @@ public sealed class A2AAgentModel : IStreamingAgentModel
         if (parts is null or { Count: 0 })
             return null;
 
-        var texts = parts.OfType<TextPart>().Select(p => p.Text);
+        var texts = parts.OfType<global::A2A.TextPart>().Select(p => p.Text);
         return string.Join("", texts);
     }
 }

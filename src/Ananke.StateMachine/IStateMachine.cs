@@ -56,6 +56,17 @@ public interface IActionStateMachine<C, S, T, N>
     Task<TransitionResult<S>> TransitionAsync(C context, T transition);
 
     /// <summary>
+    /// Transitions the state machine to a new state, carrying an optional payload.
+    /// For interrupt transitions, the payload is stored alongside the interrupt stack
+    /// and surfaced in <see cref="TransitionResult{S}.InterruptPayload"/>.
+    /// </summary>
+    /// <param name="context">The context identifying the state machine instance</param>
+    /// <param name="transition">The transition to execute</param>
+    /// <param name="payload">Arbitrary data to associate with the transition (e.g. an interrupt reason)</param>
+    /// <returns>Result containing transition outcome and state information</returns>
+    Task<TransitionResult<S>> TransitionAsync(C context, T transition, object? payload);
+
+    /// <summary>
     /// Sends a notification without changing state.
     /// Use for events that don't affect state but need to be broadcast.
     /// </summary>
@@ -77,6 +88,12 @@ public interface IActionStateMachine<C, S, T, N>
     /// Reason for current status (populated when Faulted)
     /// </summary>
     string? OperationalStatusReason { get; }
+
+    /// <summary>
+    /// <c>true</c> while the interrupt stack is non-empty — i.e. the machine is servicing
+    /// an interrupt and can later resume to the prior state via a <c>ToResume</c> transition.
+    /// </summary>
+    bool IsInterrupted { get; }
     
     /// <summary>
     /// Marks the state machine as Faulted. Blocks all transitions until Reset.

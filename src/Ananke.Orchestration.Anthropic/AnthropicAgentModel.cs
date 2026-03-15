@@ -163,11 +163,44 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
             switch (msg.Role)
             {
                 case AgentRole.User:
-                    messages.Add(new MessageParam
+                    if (msg.Parts is { Count: > 0 })
                     {
-                        Role = "user",
-                        Content = msg.Content!
-                    });
+                        var contentBlocks = new List<ContentBlockParam>(msg.Parts.Count);
+                        foreach (var part in msg.Parts)
+                        {
+                            switch (part)
+                            {
+                                case TextPart text:
+                                    contentBlocks.Add(new TextBlockParam(text.Text));
+                                    break;
+                                case ImagePart image when image.Data is not null:
+                                    contentBlocks.Add(new ImageBlockParam(
+                                        new Base64ImageSource
+                                        {
+                                            Data = Convert.ToBase64String(image.Data),
+                                            MediaType = image.MimeType
+                                        }));
+                                    break;
+                                case ImagePart image when image.Uri is not null:
+                                    contentBlocks.Add(new ImageBlockParam(
+                                        new UrlImageSource { Url = image.Uri.ToString() }));
+                                    break;
+                            }
+                        }
+                        messages.Add(new MessageParam
+                        {
+                            Role = "user",
+                            Content = contentBlocks
+                        });
+                    }
+                    else
+                    {
+                        messages.Add(new MessageParam
+                        {
+                            Role = "user",
+                            Content = msg.Content!
+                        });
+                    }
                     break;
 
                 case AgentRole.Assistant when msg.ToolCalls is { Count: > 0 }:

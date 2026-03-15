@@ -15,11 +15,18 @@
 
 ---
 
-**Ananke** is a vendor-agnostic workflow orchestration framework for .NET.
-It gives your AI agents and automated pipelines a production-grade backbone:
-typed state, distributed coordination, checkpointing, resilience, long-term memory
-and first-class human-in-the-loop support — from a single streaming chat agent
-to distributed, state-machine-coordinated multi-service pipelines.
+**Ananke** is a vendor-agnostic .NET framework that gives AI agents and automated pipelines
+everything they need to run in production — typed state, workflow orchestration, tool calling,
+long-term memory, human-in-the-loop approval, distributed coordination, and observability —
+so you can focus on agent logic instead of infrastructure.
+
+Beyond orchestration, Ananke makes agents *smarter over time*:
+they accumulate knowledge from documents, recognize patterns across interactions,
+and build reusable skills and heuristics — turning raw LLM capability into
+compounding operational intelligence.
+
+From a streaming chat agent to state-machine-coordinated multi-service pipelines:
+`dotnet add package Ananke` and [start building](#demos).
 
 ---
 
@@ -40,274 +47,43 @@ Ananke starts from a different question:
 
 > *What does the infrastructure need to look like so that building any agentic system — at any scale — is straightforward for .NET developers?*
 
-The answer is a typed, testable, composable foundation where the infrastructure comes first and LLM providers are pluggable:
-
-### 🔀 Workflow orchestration
-Fluent graph-as-code builder · conditional & LLM-driven routing · fork/join parallelism · nested sub-workflows · human-in-the-loop interrupts · typed `IAsyncEnumerable` event streaming
-
-### 🤖 AI agents
-`AgentJob` with tool calling + structured output · token-level streaming · multi-provider (OpenAI, Anthropic, Google Gemini + any OpenAI-compatible endpoint) · capability-based model routing · production decorators (429 retry with OTel, LLM response caching)
-
-### 🧠 Long-term memory
-Agents build knowledge through conversation — "index this PDF" → indexed → searchable immediately · batch import via `DocumentProcessor` (extract → chunk → embed → store) · knowledge catalog with LLM-enriched metadata + time-decay reranking · in-memory and Qdrant backends
-
-### 🏭 Distributed state machine
-Production FSM with RedLock coordination · composable middleware pipeline · guard conditions · circuit breaking (fault/reset)
-
-### 🗄️ Infrastructure
-Checkpointing (InMemory / File) · distributed locking · MQTT pub/sub · OpenTelemetry tracing · MCP server integration
-
-### 🧑‍💻 Developer experience
-Idiomatic C# (async/await, DI, generics) · design-time DSL with Mermaid export · full in-memory test mode for every infrastructure contract · 14 focused NuGet packages
+The answer is a typed, testable, composable foundation where the infrastructure comes first and LLM providers are pluggable.
 
 → **[How does Ananke compare to LangGraph, Agent Framework, CrewAI, and others?](docs/about/framework-comparison.md)**
 
 ---
 
-## Features
+## Capabilities
 
 ### 🔀 Workflow Orchestration
+Fluent graph-as-code builder · conditional & LLM-driven routing · fork/join parallelism · nested sub-workflows · human-in-the-loop interrupts · typed `IAsyncEnumerable` event streaming
 
-A fluent, type-safe builder that reads like English.
-
-```csharp
-var workflow = new Workflow<ResearchState>("research-pipeline")
-    .Job("plan",       planJob)
-    .Job("search_web", searchWebJob)
-    .Job("search_db",  searchDbJob)
-    .Job("synthesize", synthesizeJob)
-    .Then("plan", Workflow.Fork("search_web", "search_db"))
-    .Join(["search_web", "search_db"], "synthesize", Merge)
-    .Then("synthesize", Workflow.End);
-
-var result = await workflow.RunAsync(new ResearchState { Query = "distributed systems" });
-```
-
-**Routing primitives**
-
-| Primitive | What it does |
-|---|---|
-| `.Then("a", "b")` | Direct edge: job `a` routes to `b` |
-| `.Then("a", Workflow.Decide<S>(s => ...))` | Conditional routing via lambda |
-| `.Then("a", Workflow.DecideWithAgent<S>(model).Build())` | LLM-driven routing |
-| `.Then("a", Workflow.Fork("b", "c"))` | Fan-out to parallel branches |
-| `.Join(["b", "c"], "d", merge)` | Fan-in with explicit merge function |
-| `.SubFlow("name", inner, mapIn, mapOut)` | Nest a workflow inside another |
-
----
-
-### 🤖 AI Agent Integration
-
-Drop any LLM into a workflow job with tool calling, structured output, and token-level streaming.
-
-```csharp
-var agentJob = AgentJobFactory
-    .Create<MyState, MyResponse>("analyze", model)
-    .WithSystemPrompt("You are a research analyst.")
-    .WithTools(searchTools)
-    .WithPrompt(state => $"Analyze: {state.Query}")
-    .MapResult((state, response) => state with { Analysis = response.Text })
-    .Build();
-```
-
-Providers: **OpenAI** (`Ananke.Orchestration.OpenAI`), **Anthropic / Claude** (`Ananke.Orchestration.Anthropic`), and **Google Gemini** (`Ananke.Orchestration.Google`). Any OpenAI-compatible endpoint works too — Ollama, LM Studio, vLLM, Azure OpenAI, Groq, and others — via the `endpoint` parameter. Bring your own provider by implementing `IStreamingAgentModel`. → [Advanced Agent Features](docs/reference/advanced-agent-features.md)
-
-**Production decorators** — wrap any model with `ResilientAgentModel` for automatic 429 retry with OTel reporting, and `CachingAgentModel` for LLM response caching via any `IKeyValueDataAdapter` (e.g. Redis). Both compose and require no additional packages. → [Advanced Agent Features](docs/reference/advanced-agent-features.md)
-
----
+### 🤖 AI Agents
+`AgentJob` with tool calling + structured output · token-level streaming · multimodal messages (text, image, audio) · `ChatSessionEvent` async stream · multi-provider (OpenAI, Anthropic, Google Gemini + any OpenAI-compatible endpoint) · capability-based model routing · production decorators (429 retry with OTel, LLM response caching)
 
 ### 🧠 Long-Term Memory
-
-Knowledge in Ananke works two ways: **agents build it through conversation**, or you **import it in bulk** from code.
-
-**Conversational** — give an agent `KnowledgeTools` and it can index documents and search them in the same chat session. A user says *"index this PDF"*, the agent processes it, and it's immediately searchable — no admin panel, no batch job, no separate workflow.
-
-```csharp
-// One toolkit with both process_document and search_knowledge tools
-// Pass describeModel to auto-generate LLM summaries on ingest
-var tools = KnowledgeTools.Create(processor, knowledgeStore,
-    searchDescription: "Search indexed engineering reference materials.",
-    describeModel: model);
-
-await StreamingChatWorkflow.Create("chat", model)
-    .WithSystemPrompt("You can index documents and search them for the user.")
-    .WithTools(tools)
-    .OnTextDelta(async delta => Console.Write(delta))
-    .RunAsync([AgentMessage.User("Index https://example.com/design-patterns.pdf and tell me about the factory pattern")]);
-```
-
-**Programmatic** — the same `DocumentProcessor` works from admin endpoints, batch scripts, or background jobs.
-
-```csharp
-var embeddingModel = OpenAIEmbeddingModel.Create(apiKey);
-var knowledgeStore = new InMemoryKnowledgeStore(embeddingModel);
-var processor = new DocumentProcessor(
-    new HttpClient(), [new PdfExtractor(), new MarkdownExtractor()], new SlidingWindowChunker(), knowledgeStore);
-
-await using var pdf = File.OpenRead("onboarding-policy.pdf");
-var result = await processor.ProcessAsync(pdf, "application/pdf", "onboarding-policy");
-// → "12 sections, 34 chunks stored"
-
-// Give the agent a search-only tool — it decides when to use it
-var tools = KnowledgeSearchTool.Create("knowledge", knowledgeStore);
-
-await StreamingChatWorkflow.Create("chat", model)
-    .WithSystemPrompt("Use search_knowledge to find information from indexed documents.")
-    .WithTools(tools)
-    .OnTextDelta(async delta => Console.Write(delta))
-    .RunAsync([AgentMessage.User("What's the onboarding process for new engineers?")]);
-```
-
-**The pipeline is composable:** same extract → chunk → embed → store path whether triggered by an agent tool call, an admin endpoint, or a batch script.
-
-| Component | What it does |
-|---|---|
-| `IDocumentExtractor` | Pluggable per-format extraction (PDF, HTML, etc.) → Markdown |
-| `IDocumentChunker` | Splits documents at heading boundaries with configurable overlap |
-| `IEmbeddingModel` | Abstraction over any embedding provider (OpenAI, Google, local) |
-| `IKnowledgeStore` | Vector-indexed storage with semantic search and metadata filtering |
-| `DocumentProcessor` | Orchestrates the full pipeline: fetch/stream → extract → chunk → store |
-| `KnowledgeSearchTool` / `KnowledgeTools` | Ready-made `ToolKit` factories for agent integration |
-| `IKnowledgeCatalog` | Document-level catalog with LLM-enriched metadata for cross-document discovery |
-| `CatalogAwareKnowledgeStore` | `IKnowledgeStore` decorator that auto-maintains the catalog + time-decay reranking |
-| `KnowledgeCatalogTools` | Agent tools for browsing and discovering sources in the catalog |
-
-Built-in implementations: `InMemoryKnowledgeStore` (dev/test), `QdrantKnowledgeStore` (persistent, distributed — via `Ananke.Qdrant`), `OpenAIEmbeddingModel` (text-embedding-3-*), `PdfExtractor` (PDF → Markdown with heading/link/image detection), `MarkdownExtractor` (Markdown structural parsing), `SlidingWindowChunker` (Markdown-heading-aware).
-
-#### Knowledge Catalog
-
-Wrap any knowledge store with a catalog layer — document-level metadata (keywords, categories, timestamps) is maintained automatically as documents are ingested. Agents get two-phase discovery: find relevant sources first, then deep-search within them. Older documents are gradually deprioritized via configurable time decay.
-
-```csharp
-// Wrap the store with catalog + time decay
-var catalog = new InMemoryKnowledgeCatalog(embeddingModel);     // or QdrantKnowledgeCatalog
-var extractor = new CatalogKeywordExtractor(chatModel);          // LLM extracts keywords/category/summary
-var catalogStore = new CatalogAwareKnowledgeStore(
-    knowledgeStore, catalog, extractor,
-    new TimeDecayOptions { HalfLifeDays = 90, FloorWeight = 0.3f });
-
-// Upserts now auto-maintain the catalog. Searches apply time-decay reranking.
-// Give agents catalog discovery tools alongside chunk search:
-var tools = KnowledgeSearchTool.Create("knowledge", catalogStore, description: "...")
-    .Merge(KnowledgeCatalogTools.Create(catalog));
-```
-
----
+Document ingestion pipeline (extract → chunk → embed → store) · vector-indexed semantic search · knowledge catalog with LLM-enriched metadata and time-decay reranking · empirical memory (patterns, skills, heuristics learned over time)
 
 ### 🛑 Human-in-the-Loop
+Pause execution at any step · checkpoint full workflow state · resume with optional human input · interrupt stack for state machines
 
-Pause execution at any step, checkpoint the full state, and resume with optional human input.
+### 🏭 State Machine
+Simplified `IStateMachine<S,T>` with interrupt stack for in-process scenarios · production `AbstractStateMachine` with RedLock coordination · composable middleware pipeline · guard conditions · circuit breaking (fault/reset)
 
-```csharp
-var workflow = new Workflow<ApprovalState>("trade-approval")
-    .Chain("analyze", "review", "execute")
-    .Then("execute", Workflow.End)
-    .InterruptBefore("execute")        // pause here for human approval
-    .UseCheckpointing(checkpointStore);
+### 🌐 ASP.NET Core
+SSE streaming · state-machine-driven chat sessions · in-memory session management · provider configuration helpers
 
-// First run: pauses before "execute"
-var execution = await workflow.RunAsync(initialState);
-// execution.Status == Interrupted
-
-// After the human approves:
-var resumed = await workflow.ResumeAsync(execution.Id,
-    state => state with { Approved = true });
-```
-
----
-
-### 🏭 Distributed State Machine
-
-A production-grade FSM with distributed locking, composable middleware, and built-in circuit breaking (`OperationalStatus.Fault` / `Reset`). Designed for long-running services where multiple instances must coordinate safely.
-
-```csharp
-public class OrderMachine : AbstractStateMachine<OrderContext, OrderState, OrderTransition, OrderEvent>
-{
-    protected override void Transitions(ITransitionBuilder<OrderState, OrderTransition> builder)
-    {
-        builder
-            .From(OrderState.Pending)
-                .On(OrderTransition.Reserve).GoTo(OrderState.Reserved)
-                .On(OrderTransition.Cancel).GoTo(OrderState.Cancelled)
-            .From(OrderState.Reserved)
-                .On(OrderTransition.Confirm).GoTo(OrderState.Confirmed)
-                .On(OrderTransition.Cancel).GoTo(OrderState.Cancelled);
-    }
-}
-```
-
----
-
-### 🔌 MCP Server Integration
-
-Expose any workflow or tool kit as an [MCP](https://modelcontextprotocol.io/) server capability with a single call.
-
-```csharp
-builder.Services.AddMcpServer(o => { ... })
-    .WithAnankeTools(myToolKit)
-    .WithAnankeWorkflow(
-        name:         "run_pipeline",
-        description:  "Runs the ETL pipeline and returns results",
-        workflow:     etlWorkflow,
-        stateFactory: args => new PipelineState { Input = args["input"].GetString()! });
-```
-
----
+### 🔌 MCP Server
+Expose any workflow or tool kit as an [MCP](https://modelcontextprotocol.io/) server capability
 
 ### 🎨 Design Tooling
-
-Define workflow topologies in a plain-text DSL, then bind your code to each job at runtime. Export any validated workflow as a [Mermaid](https://mermaid.js.org/) diagram for documentation or visual debugging.
-
-```
-plan -> fork(fetch_a, fetch_b)
-join(fetch_a, fetch_b) -> combine
-combine -> End
-```
-
-```csharp
-var scaffold = WorkflowScaffold.Parse<MyState>("etl-pipeline", dsl);
-var workflow  = scaffold
-    .Bind("plan",    planJob)
-    .Bind("fetch_a", fetchAJob)
-    .Bind("fetch_b", fetchBJob)
-    .Bind("combine", combineJob)
-    .BindMerge("combine", branches => Merge(branches))
-    .Build();
-
-// Visualize the validated graph
-Console.WriteLine(workflow.ToMermaid());
-```
-
-→ [Workflow DSL Reference](docs/reference/workflow-dsl.md)
-
----
+Plain-text DSL for workflow topology · runtime binding · Mermaid diagram export
 
 ### 🗄️ Infrastructure
+Checkpointing (InMemory / File) · distributed locking (Redis) · MQTT pub/sub · OpenTelemetry tracing
 
-| Package | What it provides |
-|---|---|
-| `Ananke.Redis` | `IDistributedLock` via RedLock.net · `IKeyValueDataAdapter` via StackExchange.Redis |
-| `Ananke.MQTT` | `IChannelReader` / `IChannelWriter` via MQTTnet · MessagePack serialization |
-
-```csharp
-services.AddRedis(o => { o.Host = "localhost"; o.Port = 6379; });
-services.AddMqtt<MyContext, MyAction>(o => { o.Host = "localhost"; });
-```
-
----
-
-### 📡 OpenTelemetry Tracing
-
-One call wires up distributed tracing with OTLP export to BetterStack, Jaeger, Grafana Tempo, or any compatible backend.
-
-```csharp
-services.AddTracingPipeline(o =>
-{
-    o.ServiceName    = "my-service";
-    o.ServiceVersion = "1.0.0";
-    o.UseOtlp(endpoint, $"Authorization=Bearer {token}");
-});
-```
+### 🧑‍💻 Developer Experience
+Idiomatic C# (async/await, DI, generics) · full in-memory test mode for every infrastructure contract · 15 focused NuGet packages
 
 ---
 
@@ -328,6 +104,28 @@ dotnet add package Ananke.Documents              # PDF + Markdown extraction for
 dotnet add package Ananke.OpenTelemetry            # distributed tracing
 ```
 
+Then explore the [demos](#demos) to see each capability in action.
+
+---
+
+## Demos
+
+Each demo is a self-contained project you can run to see a specific capability end to end.
+
+| Demo | What it shows |
+|---|---|
+| [`BasicAgentDemo`](demos/BasicAgentDemo/) | Direct model calls, capability-based model routing, and routed `AgentJob`s in a workflow |
+| [`SimpleWorkflowDemo`](demos/SimpleWorkflowDemo/) | Interactive streaming chat agent with tool calling and OpenTelemetry tracing |
+| [`AgenticWebDemo`](demos/AgenticWebDemo/) | HTTP SSE streaming with human-in-the-loop trade approval (analyze → interrupt → resume) |
+| [`PetAdoptionDemo`](demos/PetAdoptionDemo/) | Multi-phase state-machine chat with `KnowledgeBase`, payment interrupts, and SSE streaming — full JS frontend included |
+| [`Connect4Demo`](demos/Connect4Demo/) | Two `StreamingChatWorkflow` agents play Connect 4; a third agent provides live commentary |
+| [`ExtendedFlowDemo`](demos/ExtendedFlowDemo/) | Fork/Join, SubFlow, Interrupt, streaming — all advanced routing patterns in one console app |
+| [`DesignPipelineDemo`](demos/DesignPipelineDemo/) | YAML-defined workflow topology bound to OpenAI and Anthropic agents at runtime |
+| [`LongTermMemoryDemo`](demos/LongTermMemoryDemo/) | PDF ingestion → vector store → knowledge catalog → agent Q&A with time-decay reranking |
+| [`DistributedServicesDemo`](demos/DistributedServicesDemo/) | State machine + MQTT pub/sub + handoff channels + conversation memory in one pipeline |
+| [`StateMachineDemo`](demos/StateMachineDemo/) | Standalone `AbstractStateMachine` walkthrough with guard conditions and middleware |
+| [`McpServerDemo`](demos/McpServerDemo/) | Expose Ananke tools and a workflow as an MCP server for VS Code Copilot and Claude Desktop |
+
 ---
 
 ## Packages
@@ -343,27 +141,12 @@ dotnet add package Ananke.OpenTelemetry            # distributed tracing
 | [`Ananke.Orchestration.Google`](Ananke.Orchestration.Google/) | Google Gemini provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Google.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Google) |
 | [`Ananke.MCP`](Ananke.MCP/) | Expose workflows and tools as MCP server capabilities | [![NuGet](https://img.shields.io/nuget/v/Ananke.MCP.svg)](https://www.nuget.org/packages/Ananke.MCP) |
 | [`Ananke.Documents`](Ananke.Documents/) | Document extractors for the knowledge pipeline (PDF, Markdown) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Documents.svg)](https://www.nuget.org/packages/Ananke.Documents) |
-| [`Ananke.Qdrant`](Ananke.Qdrant/) | Qdrant vector database provider for `IKnowledgeStore` + `IKnowledgeCatalog` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Qdrant.svg)](https://www.nuget.org/packages/Ananke.Qdrant) |
+| [`Ananke.Qdrant`](Ananke.Qdrant/) | Qdrant vector database provider for `IKnowledgeStore`, `IKnowledgeCatalog`, and `IEmpiricalMemory` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Qdrant.svg)](https://www.nuget.org/packages/Ananke.Qdrant) |
 | [`Ananke.Redis`](Ananke.Redis/) | Distributed lock and key-value store via Redis | [![NuGet](https://img.shields.io/nuget/v/Ananke.Redis.svg)](https://www.nuget.org/packages/Ananke.Redis) |
 | [`Ananke.MQTT`](Ananke.MQTT/) | Pub/sub channels via MQTTnet | [![NuGet](https://img.shields.io/nuget/v/Ananke.MQTT.svg)](https://www.nuget.org/packages/Ananke.MQTT) |
 | [`Ananke.OpenTelemetry`](Ananke.OpenTelemetry/) | One-liner OTLP tracing export | [![NuGet](https://img.shields.io/nuget/v/Ananke.OpenTelemetry.svg)](https://www.nuget.org/packages/Ananke.OpenTelemetry) |
+| [`Ananke.AspNetCore`](Ananke.AspNetCore/) | SSE streaming, provider configuration, and session management for ASP.NET Core | [![NuGet](https://img.shields.io/nuget/v/Ananke.AspNetCore.svg)](https://www.nuget.org/packages/Ananke.AspNetCore) |
 | [`Ananke.Design`](Ananke.Design/) | YAML manifest import and Mermaid diagram export | [![NuGet](https://img.shields.io/nuget/v/Ananke.Design.svg)](https://www.nuget.org/packages/Ananke.Design) |
-
----
-
-## Demos
-
-| Demo | What it shows |
-|---|---|
-| [`BasicAgentDemo`](demos/BasicAgentDemo/) | Direct model calls, capability-based model routing, and routed `AgentJob`s in a workflow |
-| [`SimpleWorkflowDemo`](demos/SimpleWorkflowDemo/) | Interactive streaming chat agent with tool calling and OpenTelemetry tracing |
-| [`AgenticWebDemo`](demos/AgenticWebDemo/) | HTTP SSE streaming with human-in-the-loop trade approval (analyze → interrupt → resume) |
-| [`ExtendedFlowDemo`](demos/ExtendedFlowDemo/) | Fork/Join, SubFlow, Interrupt, streaming — all advanced routing patterns in one console app |
-| [`DesignPipelineDemo`](demos/DesignPipelineDemo/) | YAML-defined workflow topology bound to OpenAI and Anthropic agents at runtime |
-| [`LongTermMemoryDemo`](demos/LongTermMemoryDemo/) | PDF ingestion → vector store → knowledge catalog → agent Q&A with time-decay reranking |
-| [`DistributedServicesDemo`](demos/DistributedServicesDemo/) | State machine + MQTT pub/sub + handoff channels + conversation memory in one pipeline |
-| [`StateMachineDemo`](demos/StateMachineDemo/) | Standalone `AbstractStateMachine` walkthrough with guard conditions and middleware |
-| [`McpServerDemo`](demos/McpServerDemo/) | Expose Ananke tools and a workflow as an MCP server for VS Code Copilot and Claude Desktop |
 
 ---
 

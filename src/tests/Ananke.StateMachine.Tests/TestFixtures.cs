@@ -14,10 +14,7 @@ enum DoorState { Locked, Closed, Open }
 enum DoorAction { Unlock, Lock, OpenDoor, CloseDoor }
 enum DoorNotify { None }
 
-sealed record TestContext(long Id) : IBaseContext
-{
-    public string? Command { get; set; }
-}
+sealed record TestContext(long Id) : IBaseContext;
 
 // ── Minimal concrete state machine for testing ───────────────────
 //  Off ──[TurnOn]──► On ──[TurnOff]──► Off

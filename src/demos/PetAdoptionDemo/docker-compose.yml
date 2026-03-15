@@ -1,0 +1,97 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: petdemo-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333' 2>/dev/null && echo 'qdrant ok' || { echo 'qdrant not ready'; exit 1; }"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: petdemo-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping", "-q", "0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: petdemo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  petadoption-web:
+    build:
+      context: ../..
+      dockerfile: demos/PetAdoptionDemo/Dockerfile
+    image: petdemo-app:latest
+    container_name: petdemo-web
+    ports:
+      - "5033:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Mqtt__Host=mqtt
+      - Mqtt__Port=1883
+      - Mqtt__Namespace=handoff
+      - Redis__Host=redis
+      - Redis__Port=6379
+      - Qdrant__Host=qdrant
+      - Qdrant__Port=6334
+      - Provider=${PROVIDER:-OpenAI}
+      - OpenAI__ApiKey=${OPENAI_API_KEY:-}
+      - OpenAI__Model=${OPENAI_MODEL:-gpt-4.1-mini}
+      - OpenAI__EmbeddingModel=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - Google__ApiKey=${GOOGLE_API_KEY:-}
+      - Google__Model=${GOOGLE_MODEL:-gemini-2.5-flash}
+      - Google__EmbeddingModel=${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  petadoption-payments:
+    build:
+      context: ../..
+      dockerfile: demos/PetAdoptionDemo/Dockerfile
+    image: petdemo-app:latest
+    container_name: petdemo-payments
+    command: ["--payment-service"]
+    environment:
+      - Mqtt__Host=mqtt
+      - Mqtt__Port=1883
+      - Mqtt__Namespace=handoff
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  qdrant_data:

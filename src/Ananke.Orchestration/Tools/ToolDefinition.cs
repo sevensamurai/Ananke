@@ -10,8 +10,21 @@ namespace Ananke.Orchestration.Tools;
 /// </summary>
 public readonly record struct ToolResult(string Value, bool IsError)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public static ToolResult Ok(string value) => new(value, IsError: false);
     public static ToolResult Error(string error) => new(error, IsError: true);
+
+    /// <summary>
+    /// Serializes <paramref name="value"/> to JSON and wraps it as a successful result.
+    /// Use this to return structured data from tools without manual string formatting.
+    /// </summary>
+    public static ToolResult Json<T>(T value) =>
+        new(JsonSerializer.Serialize(value, JsonOptions), IsError: false);
+
     public static implicit operator ToolResult(string value) => Ok(value);
 }
 

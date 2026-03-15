@@ -1,3 +1,4 @@
+using Ananke.AspNetCore.Sse;
 using Ananke.OpenTelemetry;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
@@ -24,8 +25,7 @@ internal static class TradeApprovalWorkflow
         TracingPipeline? tracing,
         CancellationToken ct)
     {
-        context.Response.ContentType = "text/event-stream";
-        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.EnableSse();
         var httpResponse = context.Response;
 
         var workflow = BuildWorkflow(agentModel, stockTools, httpResponse, tracing);
@@ -35,7 +35,7 @@ internal static class TradeApprovalWorkflow
 
         if (execution.Status == ExecutionStatus.Interrupted)
         {
-            await WriteSse(httpResponse, "interrupted", new
+            await httpResponse.WriteSseAsync("interrupted", new
             {
                 executionId = execution.Id,
                 analysis = execution.State.Analysis,
@@ -44,11 +44,11 @@ internal static class TradeApprovalWorkflow
         }
         else if (execution.Status == ExecutionStatus.Completed)
         {
-            await WriteSse(httpResponse, "done", new { text = execution.State.Result });
+            await httpResponse.WriteSseAsync("done", new { text = execution.State.Result });
         }
         else if (execution.Status == ExecutionStatus.Faulted)
         {
-            await WriteSse(httpResponse, "error", new { message = execution.Result?.Error ?? "Workflow failed" });
+            await httpResponse.WriteSseAsync("error", new { message = execution.Result?.Error ?? "Workflow failed" });
         }
     }
 
@@ -60,8 +60,7 @@ internal static class TradeApprovalWorkflow
         HttpContext context,
         CancellationToken ct)
     {
-        context.Response.ContentType = "text/event-stream";
-        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.EnableSse();
         var httpResponse = context.Response;
 
         // Rebuild the workflow with the fresh HTTP response for SSE streaming.
@@ -85,11 +84,11 @@ internal static class TradeApprovalWorkflow
 
         if (execution.Status == ExecutionStatus.Completed)
         {
-            await WriteSse(httpResponse, "done", new { text = execution.State.Result });
+            await httpResponse.WriteSseAsync("done", new { text = execution.State.Result });
         }
         else if (execution.Status == ExecutionStatus.Faulted)
         {
-            await WriteSse(httpResponse, "error", new { message = execution.Result?.Error ?? "Workflow failed" });
+            await httpResponse.WriteSseAsync("error", new { message = execution.Result?.Error ?? "Workflow failed" });
         }
     }
 
@@ -138,7 +137,7 @@ internal static class TradeApprovalWorkflow
                         if (chunk.TextDelta is not null)
                         {
                             fullText.Append(chunk.TextDelta);
-                            await WriteSse(httpResponse, "delta", new { text = chunk.TextDelta });
+                            await httpResponse.WriteSseAsync("delta", new { text = chunk.TextDelta });
                         }
                         if (chunk.CompletedResponse is not null)
                             completed = chunk.CompletedResponse;
@@ -155,7 +154,7 @@ internal static class TradeApprovalWorkflow
                         var toolResult = stockTools.Tools.TryGetValue(call.FunctionName, out var tool)
                             ? await tool.ExecuteAsync(args, jobCt)
                             : ToolResult.Error($"Unknown tool: {call.FunctionName}");
-                        await WriteSse(httpResponse, "tool", new { name = call.FunctionName, result = toolResult.Value });
+                        await httpResponse.WriteSseAsync("tool", new { name = call.FunctionName, result = toolResult.Value });
                         messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
                     }
                 }
@@ -200,7 +199,7 @@ internal static class TradeApprovalWorkflow
                         if (chunk.TextDelta is not null)
                         {
                             executeText.Append(chunk.TextDelta);
-                            await WriteSse(httpResponse, "delta", new { text = chunk.TextDelta });
+                            await httpResponse.WriteSseAsync("delta", new { text = chunk.TextDelta });
                         }
                         if (chunk.CompletedResponse is not null)
                             completed = chunk.CompletedResponse;
@@ -216,7 +215,7 @@ internal static class TradeApprovalWorkflow
                         var toolResult = stockTools.Tools.TryGetValue(call.FunctionName, out var tool)
                             ? await tool.ExecuteAsync(args, jobCt)
                             : ToolResult.Error($"Unknown tool: {call.FunctionName}");
-                        await WriteSse(httpResponse, "tool", new { name = call.FunctionName, result = toolResult.Value });
+                        await httpResponse.WriteSseAsync("tool", new { name = call.FunctionName, result = toolResult.Value });
                         messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
                     }
                 }
@@ -241,12 +240,5 @@ internal static class TradeApprovalWorkflow
         foreach (var prop in doc.RootElement.EnumerateObject())
             dict[prop.Name] = prop.Value.Clone();
         return dict;
-    }
-
-    private static async Task WriteSse(HttpResponse response, string eventName, object data)
-    {
-        var json = JsonSerializer.Serialize(data);
-        await response.WriteAsync($"event: {eventName}\ndata: {json}\n\n");
-        await response.Body.FlushAsync();
     }
 }

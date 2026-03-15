@@ -1,0 +1,37 @@
+# ingestion.ananke.yml
+# ────────────────────────────────────────────────
+# Declarative workflow: topology + prompts.
+# Job implementations are bound in code via Bind().
+# ────────────────────────────────────────────────
+
+name: knowledge-ingestion
+
+# All jobs are code-bound — no LLM agent jobs in this pipeline.
+# The ingest_pets job uses a system_prompt for inline LLM classification.
+jobs:
+  scan_files:
+    type: code
+
+  ingest_pets:
+    type: code
+    system_prompt: |
+      Extract the pet's name and animal category from the paragraph.
+      Return JSON only. Category must be a general animal type (e.g. dog, cat, rabbit, bird, reptile, fish).
+      If the paragraph is not about a specific adoptable pet, return {"pet_name":null,"pet_category":null}.
+
+  ingest_knowledge:
+    type: code
+
+  summarize:
+    type: code
+
+# Topology — DSL syntax.
+connections:
+  - scan_files -> fork(ingest_pets, ingest_knowledge)
+  - join(ingest_pets, ingest_knowledge) -> summarize
+  - summarize -> End
+
+# Classification response format (used by ingest_pets for structured output).
+classification:
+  format_name: PetClassification
+  format_schema: {"type":"object","properties":{"pet_name":{"type":["string","null"]},"pet_category":{"type":["string","null"]}},"required":["pet_name","pet_category"],"additionalProperties":false}

@@ -11,20 +11,15 @@ namespace Ananke.MQTT;
 /// Publishes messages to MQTT topics derived from the action enum.
 /// </summary>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
-public sealed class MqttChannelWriter<A> : IChannelWriter<A> where A : Enum
+public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger = null) : IChannelWriter<A> where A : Enum
 {
-    private readonly ILogger<MqttChannelWriter<A>> _logger;
+    private readonly ILogger<MqttChannelWriter<A>> _logger = logger ?? NullLogger<MqttChannelWriter<A>>.Instance;
 
     private IMqttClient? _client;
     private MqttClientOptions? _options;
     private string _namespace = string.Empty;
     private bool _linked;
     private bool _disposed;
-
-    public MqttChannelWriter(ILogger<MqttChannelWriter<A>>? logger = null)
-    {
-        _logger = logger ?? NullLogger<MqttChannelWriter<A>>.Instance;
-    }
 
     public bool IsConnected => _linked && _client?.IsConnected == true;
 

@@ -40,11 +40,11 @@ public sealed class WorkflowDefinition<TState>
         List<JoinDescriptor<TState>>? joins = null)
     {
         Name = name;
-        Jobs = jobs;
-        Connections = connections;
+        Jobs = new Dictionary<string, JobDescriptor<TState>>(jobs);
+        Connections = [.. connections];
         EntryJob = entryJob;
         Metadata = metadata ?? new Dictionary<string, string>();
-        Joins = joins ?? [];
+        Joins = joins is not null ? [.. joins] : [];
 
         Validate();
     }

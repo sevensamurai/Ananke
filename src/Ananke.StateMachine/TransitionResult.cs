@@ -38,6 +38,27 @@ public record TransitionResult<S> where S : Enum
     public bool IsSelfTransition => EqualityComparer<S>.Default.Equals(PreviousState, CurrentState);
 
     /// <summary>
+    /// Whether this transition pushed the previous state onto the interrupt stack.
+    /// </summary>
+    public bool WasInterrupt { get; init; }
+
+    /// <summary>
+    /// Whether this transition popped a state from the interrupt stack.
+    /// </summary>
+    public bool WasResume { get; init; }
+
+    /// <summary>
+    /// When <see cref="WasResume"/> is <c>true</c>, the interrupt state that was exited.
+    /// </summary>
+    public S? ResumedFromState { get; init; }
+
+    /// <summary>
+    /// Optional payload supplied with an interrupt transition.
+    /// Populated when <see cref="WasInterrupt"/> is <c>true</c> and a payload was provided.
+    /// </summary>
+    public object? InterruptPayload { get; init; }
+
+    /// <summary>
     /// Creates a successful transition result
     /// </summary>
     public static TransitionResult<S> Succeeded(S previousState, S currentState) => new()

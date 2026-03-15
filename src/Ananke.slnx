@@ -3,10 +3,11 @@
   <!-- Demos -->
   <Folder Name="/demos/">
     <Project Path="demos/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" Id="7acad539-35f2-41fb-933b-fb8b8348a6e8" />
+    <Project Path="demos/Connect4Demo/Connect4Demo.csproj" />
+    <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad" />
     <Project Path="demos\AgenticWebDemo\AgenticWebDemo.csproj" />
     <Project Path="demos\BasicAgentDemo\BasicAgentDemo.csproj" />
     <Project Path="demos\DesignPipelineDemo\DesignPipelineDemo.csproj" />
-    <Project Path="demos\DistributedServicesDemo\DistributedServicesDemo.csproj" />
     <Project Path="demos\ExtendedFlowDemo\ExtendedFlowDemo.csproj" />
     <Project Path="demos\LongTermMemoryDemo\LongTermMemoryDemo.csproj" />
     <Project Path="demos\McpServerDemo\McpServerDemo.csproj" />
@@ -16,6 +17,7 @@
 
   <!-- Tests -->
   <Folder Name="/tests/">
+    <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests\Ananke.Design.Tests\Ananke.Design.Tests.csproj" />
     <Project Path="tests\Ananke.Documents.Tests\Ananke.Documents.Tests.csproj" />
     <Project Path="tests\Ananke.Orchestration.Tests\Ananke.Orchestration.Tests.csproj" />
@@ -29,6 +31,7 @@
   </Folder>
   <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
   <Project Path="Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85" />
   <Project Path="Ananke.Design\Ananke.Design.csproj" />
   <Project Path="Ananke.Documents\Ananke.Documents.csproj" />
   <Project Path="Ananke.MCP\Ananke.MCP.csproj" />

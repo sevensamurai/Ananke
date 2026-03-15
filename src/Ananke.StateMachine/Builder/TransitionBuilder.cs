@@ -4,7 +4,6 @@ namespace Ananke.StateMachine.Builder;
 /// Implementation of the fluent transition builder
 /// </summary>
 public class TransitionBuilder<S, T> : 
-    ITransitionBuilder<S, T>,
     IFromStateBuilder<S, T>,
     IToStateBuilder<S, T>,
     ITransitionConfigBuilder<S, T>,
@@ -22,6 +21,8 @@ public class TransitionBuilder<S, T> :
     private S? _currentConfigState;
     private Func<Task<bool>>? _currentGuard;
     private Func<Task<S>>? _currentAction;
+    private bool _isInterrupt;
+    private bool _isResume;
 
     /// <summary>
     /// Gets all configured transitions
@@ -56,6 +57,19 @@ public class TransitionBuilder<S, T> :
     public ITransitionConfigBuilder<S, T> To(S targetState)
     {
         _currentTargetState = targetState;
+        return this;
+    }
+
+    public ITransitionConfigBuilder<S, T> ToInterrupt(S interruptState)
+    {
+        _currentTargetState = interruptState;
+        _isInterrupt = true;
+        return this;
+    }
+
+    public ITransitionConfigBuilder<S, T> ToResume()
+    {
+        _isResume = true;
         return this;
     }
 
@@ -129,7 +143,7 @@ public class TransitionBuilder<S, T> :
 
     private void FinalizeCurrentTransition()
     {
-        if (_currentFromStates is null || _currentTransition is null || _currentTargetState is null)
+        if (_currentFromStates is null || _currentTransition is null || (_currentTargetState is null && !_isResume))
         {
             // Reset state for next chain
             _currentFromStates = null;
@@ -138,8 +152,13 @@ public class TransitionBuilder<S, T> :
             _currentConfigState = default;
             _currentGuard = null;
             _currentAction = null;
+            _isInterrupt = false;
+            _isResume = false;
             return;
         }
+
+        // For resume transitions, use default(S) as a placeholder — resolved at runtime from the interrupt stack
+        var finalState = _currentTargetState ?? default(S)!;
 
         foreach (var fromState in _currentFromStates)
         {
@@ -150,9 +169,11 @@ public class TransitionBuilder<S, T> :
                 {
                     InitialState = fromState,
                     Transition = _currentTransition,
-                    FinalState = _currentTargetState,
+                    FinalState = finalState,
                     GuardCondition = _currentGuard,
-                    AfterTransitionAction = _currentAction
+                    AfterTransitionAction = _currentAction,
+                    IsInterrupt = _isInterrupt,
+                    IsResume = _isResume
                 };
             }
         }
@@ -163,6 +184,8 @@ public class TransitionBuilder<S, T> :
         _currentTargetState = default;
         _currentGuard = null;
         _currentAction = null;
+        _isInterrupt = false;
+        _isResume = false;
     }
 
     internal static string GetKey(S state, T transition) => $"{state}-{transition}";
