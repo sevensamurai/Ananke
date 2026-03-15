@@ -28,6 +28,18 @@ Not even Zeus could override necessity. In every Greek source that mentions her,
 Ananke is the one force that is non-negotiable. She doesn't act — she defines the
 boundaries within which everything else acts.
 
+But Ananke is not the whole story. In Orphic cosmology, once the ordered cosmos burst
+from the split egg, the bright upper air — **Aether** (Αἰθήρ) — filled the space
+between the heavens. Where Ananke is the constraint that makes existence possible,
+Aether is the medium through which existence *reveals itself*. Celestial bodies move
+through Aether. Patterns become visible through it. Correspondences — cause and
+effect, recurrence, structure — take shape in Aether's luminous space.
+
+In Aristotelian philosophy, Aether is the **fifth element**: incorruptible yet
+ceaselessly in motion, the substance from which the stars and their eternal cycles
+are made. It appears only after the cosmos exists. It has nothing to do with the
+laws — but it depends on them entirely.
+
 ---
 
 ## The Parallel
@@ -43,7 +55,9 @@ Ananke the framework starts from the same principle as Ananke the goddess:
 
 > **Fix the rules first. Then let everything else move.**
 
-This isn't a metaphor bolted on after the fact. It's the actual design sequence:
+This isn't a metaphor bolted on after the fact. It's the actual design sequence.
+
+### Ananke — the foundation
 
 | Mythological concept | Framework principle | Where it shows up |
 |---|---|---|
@@ -53,6 +67,22 @@ This isn't a metaphor bolted on after the fact. It's the actual design sequence:
 | **Ananke + Chronos encircle creation** | State machine + workflow together | `AbstractStateMachine` (the rules) and `Workflow<T>` (the flow) are the two pillars; Bridge connects them |
 | **The cosmos emerges from the egg** | Complex systems compose from simple parts | Fork/join, sub-workflows, agent handoff — all built from the same `IJob<T>` primitive |
 | **Gods cannot override necessity** | No escape hatches | State is typed end-to-end. If the compiler doesn't accept it, the workflow won't run it |
+
+### Aether — the learning layer
+
+The stable foundation is the precondition, not the destination. Once the rules are
+fixed, a second principle takes over: connections form, patterns emerge, and the
+system begins to learn. That is Aether's role — and the framework has the same
+second act.
+
+| Mythological concept | Framework principle | Where it shows up |
+|---|---|---|
+| **Aether fills the cosmos after creation** | Learning emerges from experience | `IEmpiricalMemory` accumulates patterns, skills, and heuristics from every agent interaction, building on top of the typed foundation |
+| **Aether as connective medium** | Connections form across observations | `SemanticDescription` decomposes each entry into weighted causal tags; `IPredictionSource` links entries through prediction-error signals, not just embedding similarity |
+| **Aether makes patterns visible** | Hidden structure surfaces over time | `IOfflineLearner` runs background cycles — decay, curiosity walks, consolidation — discovering correspondences that no single conversation could reveal |
+| **The fifth element is incorruptible yet in motion** | Confidence derives from variance, not assertion | Each pattern's stability is earned: contradiction reduces it, repeated confirmation raises it — circular self-reporting is not allowed |
+| **Imagination before action** | Hypotheses tested without real-world cost | `ISimulationSource` runs self-play, Monte Carlo rollouts, or scenario replays to validate patterns before committing |
+| **Mature patterns crystallize into eternal law** | Empirical knowledge becomes canonical | `IConsolidationSummarizer` promotes confident, high-strength entries into `IKnowledgeStore` — closing the loop back to Ananke's domain |
 
 ---
 
@@ -82,6 +112,17 @@ State machines wire into workflow jobs via the Bridge layer. Agent tools trigger
 document ingestion pipelines. Everything speaks the same typed contracts, so
 composition is mechanical, not architectural.
 
+**Agents compound intelligence over time.** `IEmpiricalMemory` records three kinds
+of empirical knowledge — patterns (*"when X, Y follows"*), skills (*"how to investigate X"*),
+and heuristics (*"prefer X over Y in situation Z"*). `IOfflineLearner` runs background
+cycles between active sessions: decaying stale beliefs, wandering through low-confidence
+entries to validate or contradict them, discovering connections across the full memory
+corpus. With `ISimulationSource`, the system can rehearse scenarios in imagination —
+self-play, Monte Carlo rollouts, or replay — before committing. When a pattern becomes
+stable enough, `IConsolidationSummarizer` promotes it into `IKnowledgeStore`, where it
+becomes part of the permanent knowledge available to every future agent. Raw LLM
+capability is the starting point; every deployment gets smarter.
+
 ---
 
 ## The Short Version
@@ -92,6 +133,13 @@ else follows.*
 That's also the framework's design philosophy. Fix the contracts. Type the state.
 Make the infrastructure swappable. Then let agents, workflows, and state machines
 do their work — knowing the ground beneath them won't shift.
+
+Aether is named after what comes next: the luminous medium that fills the ordered
+cosmos and makes patterns visible across it. In the framework, that is the empirical
+memory and offline learning layer — the part that watches, connects, and remembers,
+so the system does not start from zero every time.
+
+Ananke sets the rules. Aether learns them.
 
 ---
 

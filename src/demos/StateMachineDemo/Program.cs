@@ -215,7 +215,6 @@ enum TicketNotification { Escalated }
 sealed class TicketContext(long id) : IBaseContext
 {
     public long Id { get; } = id;
-    public string? Command { get; set; }
     public string Title { get; init; } = string.Empty;
 }
 

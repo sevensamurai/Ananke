@@ -1,0 +1,42 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# IDE and tooling
+.vs/
+.idea/
+*.user
+*.suo
+
+# Secrets — pass API keys via environment variables instead
+**/secrets.json
+
+# Test projects
+tests/
+
+# Demos not needed for PetAdoptionDemo build
+demos/StateMachineDemo/
+demos/SimpleWorkflowDemo/
+demos/BasicAgentDemo/
+demos/ExtendedFlowDemo/
+demos/LongTermMemoryDemo/
+demos/DistributedServicesDemo/
+demos/McpServerDemo/
+demos/AgentToAgentProtocolDemo/
+demos/AgenticWebDemo/
+demos/DesignPipelineDemo/
+demos/Connect4Demo/
+
+# Unrelated library projects
+Ananke.MCP/
+Ananke.A2A/
+Ananke.OpenTelemetry/
+wiki/
+
+# Git
+.git/
+.github/
+
+# Docker files themselves (not needed in build context)
+**/Dockerfile*
+**/docker-compose*.yml

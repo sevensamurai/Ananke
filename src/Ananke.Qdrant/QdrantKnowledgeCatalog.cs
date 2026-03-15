@@ -81,11 +81,11 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             [KeywordsPayloadKey] = string.Join(",", entry.Keywords),
             [CategoryPayloadKey] = entry.Category,
             [IndexedAtPayloadKey] = entry.IndexedAt.ToUnixTimeSeconds(),
-            [ChunkCountPayloadKey] = entry.ChunkCount.ToString()
+            [ChunkCountPayloadKey] = entry.ChunkCount.ToString(),
+            [SupersededByPayloadKey] = entry.SupersededBy is not null
+                ? new Value { StringValue = entry.SupersededBy }
+                : new Value { NullValue = default }
         };
-
-        if (entry.SupersededBy is not null)
-            payload[SupersededByPayloadKey] = entry.SupersededBy;
 
         var point = new PointStruct
         {
@@ -293,6 +293,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             ? count
             : 0;
         var supersededBy = payload.TryGetValue(SupersededByPayloadKey, out var sb)
+                           && sb.KindCase == Value.KindOneofCase.StringValue
                            && sb.StringValue.Length > 0
             ? sb.StringValue
             : null;

@@ -20,4 +20,9 @@ public class StateMachineOptions
     /// Delay between lock retry attempts in milliseconds. Default is 100.
     /// </summary>
     public int LockRetryDelayMs { get; set; } = 100;
+
+    /// <summary>
+    /// Maximum depth of nested interrupt transitions. Exceeding this rejects the transition. Default is 5.
+    /// </summary>
+    public int MaxInterruptDepth { get; set; } = 5;
 }

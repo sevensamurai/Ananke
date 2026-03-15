@@ -7,23 +7,18 @@ namespace Ananke.Orchestration.Memory;
 /// In-memory <see cref="IConversationMemory"/> for testing and single-process scenarios.
 /// Supports optional TTL-based expiry aligned with checkpoint TTLs.
 /// </summary>
-public sealed class InMemoryConversationMemory : IConversationMemory
+/// <remarks>
+/// Creates a new in-memory conversation memory store.
+/// </remarks>
+/// <param name="ttl">
+/// Optional time-to-live for sessions. When set, sessions that have not been
+/// written to within this duration are eligible for cleanup via
+/// <see cref="CleanupExpiredAsync"/>. When <see langword="null"/>, sessions never expire.
+/// </param>
+public sealed class InMemoryConversationMemory(TimeSpan? ttl = null) : IConversationMemory
 {
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
-    private readonly TimeSpan? _ttl;
-
-    /// <summary>
-    /// Creates a new in-memory conversation memory store.
-    /// </summary>
-    /// <param name="ttl">
-    /// Optional time-to-live for sessions. When set, sessions that have not been
-    /// written to within this duration are eligible for cleanup via
-    /// <see cref="CleanupExpiredAsync"/>. When <see langword="null"/>, sessions never expire.
-    /// </param>
-    public InMemoryConversationMemory(TimeSpan? ttl = null)
-    {
-        _ttl = ttl;
-    }
+    private readonly TimeSpan? _ttl = ttl;
 
     /// <inheritdoc />
     public Task AddAsync(string sessionId, IEnumerable<AgentMessage> messages, CancellationToken ct = default)

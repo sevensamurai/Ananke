@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Ananke.Abstractions.Tracing;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Middleware;

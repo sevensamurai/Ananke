@@ -1,7 +1,5 @@
-using Ananke.Abstractions;
 using Ananke.Abstractions.Channels;
 using Ananke.Abstractions.Config;
-using Ananke.Abstractions.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
@@ -13,13 +11,13 @@ namespace Ananke.MQTT;
 /// MQTT-backed implementation of <see cref="IChannelReader{M, A}"/>.
 /// Subscribes to MQTT topics and dispatches messages to the provided <see cref="IBackgroundWorker{T}"/>.
 /// </summary>
-/// <typeparam name="M">Message type implementing <see cref="IBaseContext"/>.</typeparam>
+/// <typeparam name="M">Message type implementing <see cref="IMqttContext"/>.</typeparam>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
-public sealed class MqttChannelReader<M, A> : IChannelReader<M, A>, IAsyncDisposable
-    where M : class, IBaseContext
+public sealed class MqttChannelReader<M, A>(ILogger<MqttChannelReader<M, A>>? logger = null) : IChannelReader<M, A>, IAsyncDisposable
+    where M : class, IMqttContext
     where A : Enum
 {
-    private readonly ILogger<MqttChannelReader<M, A>> _logger;
+    private readonly ILogger<MqttChannelReader<M, A>> _logger = logger ?? NullLogger<MqttChannelReader<M, A>>.Instance;
 
     private IMqttClient? _client;
     private IBackgroundWorker<M>? _worker;
@@ -27,11 +25,6 @@ public sealed class MqttChannelReader<M, A> : IChannelReader<M, A>, IAsyncDispos
     private string? _topic;
     private bool _linked;
     private bool _disposed;
-
-    public MqttChannelReader(ILogger<MqttChannelReader<M, A>>? logger = null)
-    {
-        _logger = logger ?? NullLogger<MqttChannelReader<M, A>>.Instance;
-    }
 
     private static byte[] GetPayloadBytes(ReadOnlySequence<byte> payload)
     {

@@ -114,4 +114,19 @@ public sealed class InMemoryHandoffChannel : IHandoffChannel
 
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task SubscribeAsync<TMessage, TResponse>(
+        string topic,
+        Func<TMessage, Task<TResponse>> handler,
+        CancellationToken ct = default)
+        where TMessage : class
+        where TResponse : class
+    {
+        RegisterHandler(topic, handler);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => default;
 }

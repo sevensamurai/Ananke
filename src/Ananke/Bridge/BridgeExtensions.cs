@@ -2,65 +2,18 @@ using Ananke.Abstractions;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Execution;
 using Ananke.StateMachine;
-using Ananke.StateMachine.Builder;
 
 namespace Ananke.Bridge;
 
 /// <summary>
 /// Convenience extensions that simplify wiring between
 /// <c>Ananke.StateMachine</c> and <c>Ananke.Orchestration</c>.
-/// Each method wraps the underlying Bridge primitives
-/// (<see cref="WorkflowTriggerAction{TWorkflowState}"/>,
-///  <see cref="StateMachineTriggerJob{TWorkflowState,TContext,TState,TTransition,TNotification}"/>,
-///  <see cref="WorkflowCompletionTrigger{TWorkflowState,TContext,TState,TTransition,TNotification}"/>)
+/// Wraps <see cref="StateMachineTriggerJob{TWorkflowState,TContext,TState,TTransition,TNotification}"/>
+/// and <see cref="WorkflowCompletionTrigger{TWorkflowState,TContext,TState,TTransition,TNotification}"/>
 /// and lets the compiler infer all generic type parameters from the arguments.
 /// </summary>
 public static class BridgeExtensions
 {
-    // ── Pattern A: FSM state entered → start a workflow ──────────────
-
-    /// <summary>
-    /// Registers a workflow as an <c>OnEnter</c> action for the current state.
-    /// Each time the FSM enters this state, a fresh workflow execution starts
-    /// using the supplied <paramref name="initialStateFactory"/>.
-    /// </summary>
-    /// <returns>
-    /// The builder, so further <c>.OnExit()</c> or <c>.From()</c> calls can be chained.
-    /// </returns>
-    public static IStateConfigBuilder<S, T> OnEnterRunWorkflow<S, T, TWorkflowState>(
-        this IStateConfigBuilder<S, T> builder,
-        WorkflowDefinition<TWorkflowState> definition,
-        Func<TWorkflowState> initialStateFactory,
-        IWorkflowRunner runner)
-        where S : Enum
-        where T : Enum
-    {
-        var trigger = new WorkflowTriggerAction<TWorkflowState>(definition, initialStateFactory, runner);
-        return builder.OnEnter(trigger.CreateTrigger());
-    }
-
-    /// <inheritdoc cref="OnEnterRunWorkflow{S,T,TWorkflowState}(IStateConfigBuilder{S,T},WorkflowDefinition{TWorkflowState},Func{TWorkflowState},IWorkflowRunner)"/>
-    /// <param name="builder">The state configuration builder.</param>
-    /// <param name="definition">The compiled workflow definition to execute.</param>
-    /// <param name="initialStateFactory">Factory that produces fresh initial workflow state.</param>
-    /// <param name="runner">The workflow runner.</param>
-    /// <param name="triggerOut">
-    /// Receives the <see cref="WorkflowTriggerAction{TWorkflowState}"/> so callers
-    /// can inspect <see cref="WorkflowTriggerAction{TWorkflowState}.LastExecution"/> later.
-    /// </param>
-    public static IStateConfigBuilder<S, T> OnEnterRunWorkflow<S, T, TWorkflowState>(
-        this IStateConfigBuilder<S, T> builder,
-        WorkflowDefinition<TWorkflowState> definition,
-        Func<TWorkflowState> initialStateFactory,
-        IWorkflowRunner runner,
-        out WorkflowTriggerAction<TWorkflowState> triggerOut)
-        where S : Enum
-        where T : Enum
-    {
-        triggerOut = new WorkflowTriggerAction<TWorkflowState>(definition, initialStateFactory, runner);
-        return builder.OnEnter(triggerOut.CreateTrigger());
-    }
-
     // ── Pattern B: Workflow step → fire FSM transition ───────────────
 
     /// <summary>

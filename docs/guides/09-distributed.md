@@ -4,7 +4,7 @@ Coordinate across processes with Redis distributed locking, MQTT pub/sub,
 agent-to-agent handoff, and the Bridge layer that wires state machines into
 workflows.
 
-**Demo:** [DistributedServicesDemo](../../src/demos/DistributedServicesDemo/)
+**Demo:** [PetAdoptionDemo](../../src/demos/PetAdoptionDemo/)
 
 ---
 
@@ -192,33 +192,26 @@ var memory = new InMemoryConversationMemory(ttl: TimeSpan.FromHours(1));
 
 ## Full Demo Architecture
 
-The [DistributedServicesDemo](../../src/demos/DistributedServicesDemo/) shows all five
-features in one pipeline:
+The [PetAdoptionDemo](../../src/demos/PetAdoptionDemo/) shows distributed features
+in a full-stack application:
 
-```
-classify → fsm_triage → [decide] → escalate    ─┐
-                                  → auto_resolve ─┤
-                                                  │
-fsm_resolve ──────────────────────────────────────┘
-    │
-  notify → fsm_close → End
-```
+- **MQTT handoff** — payment processing runs as a separate service (`dotnet run -- --payment-service`)
+- **Redis conversation memory** — per-session chat history with TTL-based expiry
+- **State machine** — adoption phases (`Searching → Paperwork → Payment → Done`) with interrupt support
+- **Qdrant vector search** — knowledge base for pet data and shelter information
+- **Web UI** — ASP.NET Core with streaming chat, interrupt, and payment endpoints
 
 Run modes:
 ```bash
-dotnet run                    # single process (in-memory channels)
-dotnet run -- --specialist    # specialist service (MQTT listener)
+dotnet run                        # web app (main process)
+dotnet run -- --payment-service   # standalone MQTT payment listener
 ```
 
-Infrastructure toggle via config:
-```json
-{
-  "Mqtt": { "Host": "localhost", "Port": 1883 },
-  "Redis": { "Host": "localhost", "Port": 6379 }
-}
+Infrastructure (Docker):
+```bash
+cd src/demos/PetAdoptionDemo
+docker compose up -d    # starts Qdrant, MQTT, and Redis
 ```
-
-Empty host values fall back to in-memory implementations automatically.
 
 ---
 

@@ -51,6 +51,26 @@ public sealed record TaskRequirements
         if (request.HasStructuredOutput())
             caps |= ModelCapability.StructuredOutput;
 
+        // Detect multimodal content parts
+        foreach (var message in request.Messages)
+        {
+            if (message.Parts is not { Count: > 0 })
+                continue;
+
+            foreach (var part in message.Parts)
+            {
+                switch (part)
+                {
+                    case AudioPart:
+                        caps |= ModelCapability.AudioInput;
+                        break;
+                    case ImagePart:
+                        caps |= ModelCapability.Vision;
+                        break;
+                }
+            }
+        }
+
         var minTier = 1;
         var minContext = 0;
 

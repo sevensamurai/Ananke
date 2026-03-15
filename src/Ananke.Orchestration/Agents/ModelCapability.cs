@@ -40,4 +40,21 @@ public enum ModelCapability
 
     /// <summary>Multi-step reasoning, chain-of-thought, and complex analysis.</summary>
     Reasoning = 1 << 6,
+
+    // ── Tier 5 — Multimodal: audio, image generation, realtime ──
+
+    /// <summary>Audio input understanding (speech-to-text, audio analysis).</summary>
+    AudioInput = 1 << 7,
+
+    /// <summary>Image generation capability.</summary>
+    ImageGeneration = 1 << 8,
+
+    /// <summary>Audio output generation (text-to-speech, audio synthesis).</summary>
+    AudioOutput = 1 << 9,
+
+    /// <summary>Real-time bidirectional streaming (e.g. live conversation).</summary>
+    RealtimeStreaming = 1 << 10,
+
+    /// <summary>Video input understanding.</summary>
+    VideoInput = 1 << 11,
 }

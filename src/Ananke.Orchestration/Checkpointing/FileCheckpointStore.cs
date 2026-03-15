@@ -63,23 +63,23 @@ public sealed class FileCheckpointStore : ICheckpointStore
         return Task.CompletedTask;
     }
 
-    public Task<bool> ExistsAsync(string executionId, CancellationToken ct = default)
+    public async Task<bool> ExistsAsync(string executionId, CancellationToken ct = default)
     {
         var path = GetPath(executionId);
         if (!File.Exists(path))
-            return Task.FromResult(false);
+            return false;
 
         // Lazy expiry check on existence queries
         try
         {
-            var json = File.ReadAllText(path);
+            var json = await File.ReadAllTextAsync(path, ct);
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("ExpiresAt", out var expiresEl) &&
                 expiresEl.TryGetDateTimeOffset(out var expiresAt) &&
                 expiresAt <= DateTimeOffset.UtcNow)
             {
                 File.Delete(path);
-                return Task.FromResult(false);
+                return false;
             }
         }
         catch (JsonException ex)
@@ -87,7 +87,7 @@ public sealed class FileCheckpointStore : ICheckpointStore
             _logger.LogWarning(ex, "Corrupt checkpoint file for execution {ExecutionId}, treating as exists", executionId);
         }
 
-        return Task.FromResult(true);
+        return true;
     }
 
     public async Task CleanupExpiredAsync(CancellationToken ct = default)

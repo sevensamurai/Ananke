@@ -101,7 +101,7 @@ public sealed class WorkflowTaskAdapter
             Role = MessageRole.Agent,
             MessageId = Guid.NewGuid().ToString(),
             ContextId = messageSendParams.Message.ContextId,
-            Parts = [new TextPart { Text = resultText }]
+            Parts = [new global::A2A.TextPart { Text = resultText }]
         };
     }
 
@@ -111,7 +111,7 @@ public sealed class WorkflowTaskAdapter
             return string.Empty;
 
         var texts = message.Parts
-            .OfType<TextPart>()
+            .OfType<global::A2A.TextPart>()
             .Select(p => p.Text)
             .Where(t => !string.IsNullOrEmpty(t));
 

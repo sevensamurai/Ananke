@@ -1,0 +1,489 @@
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    margin: 0;
+    overflow: hidden;
+}
+
+body > main {
+    flex: 1;
+    min-height: 0;
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header bar — full-width, Burnt Sienna */
+#app-header {
+    flex-shrink: 0;
+    background: #E76F51;
+    border-bottom: 2px solid #c95a3e;
+}
+
+.header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+#app-header h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #fff;
+}
+
+#app-header nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#app-header nav a {
+    font-size: 0.82rem;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.25rem 0.75rem;
+    border-radius: 2rem;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+#app-header nav a:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.demo-run-btn {
+    font-size: 0.82rem;
+    padding: 0.25rem 0.75rem;
+    margin: 0;
+    border-radius: 2rem;
+    cursor: pointer;
+    background: #F4A261;
+    border: 1px solid #F4A261;
+    color: #264653;
+    font-weight: 600;
+}
+.demo-run-btn:hover {
+    background: #E76F51;
+    border-color: #E76F51;
+    color: #fff;
+}
+.demo-run-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Demo banner — palette warm tones */
+.demo-banner {
+    flex-shrink: 0;
+    background: #fdf6ec;
+    border: 1px solid #F4A261;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    color: #264653;
+    margin-bottom: 0.75rem;
+}
+
+[data-theme="dark"] .demo-banner {
+    background: #2c3e42;
+    border-color: #F4A261;
+    color: #E9C46A;
+}
+
+.demo-banner a {
+    color: inherit;
+    font-weight: 600;
+}
+
+/* Chat area */
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+/* Messages */
+.msg {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    max-width: 85%;
+    line-height: 1.5;
+}
+
+.msg p:last-child {
+    margin-bottom: 0;
+}
+
+.msg.user {
+    align-self: flex-end;
+    background: #2A9D8F;
+    color: #fff;
+}
+
+.msg.assistant {
+    align-self: flex-start;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+}
+
+.msg.assistant table {
+    margin: 0.5rem 0;
+    font-size: 0.9em;
+}
+
+/* Tool badges */
+.tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 1rem;
+    background: var(--pico-muted-border-color);
+    color: var(--pico-muted-color);
+    align-self: flex-start;
+    transition: opacity 0.3s;
+}
+
+.tool-badge.pending {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.tool-badge.done {
+    opacity: 0.7;
+}
+
+.tool-badge details {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.tool-badge summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.tool-badge summary::marker,
+.tool-badge summary::-webkit-details-marker {
+    display: none;
+}
+
+.tool-badge pre {
+    margin: 0.4rem 0 0;
+    padding: 0.4rem;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--pico-card-background-color);
+    border-radius: 0.3rem;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+/* Interrupt badge — Sandy Brown / Dark Teal */
+.interrupt-badge {
+    align-self: flex-start;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.4rem;
+    border: 1px dashed #F4A261;
+    color: #264653;
+    background: #fdf6ec;
+}
+
+[data-theme="dark"] .interrupt-badge {
+    background: #2c3e42;
+    border-color: #F4A261;
+    color: #E9C46A;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    color: var(--pico-muted-color);
+    padding: 3rem 1rem;
+}
+
+.empty-state p {
+    margin: 0.25rem 0;
+}
+
+.empty-state p:first-child {
+    font-size: 2rem;
+}
+
+/* Footer bar — full-width, dark teal */
+#form-footer {
+    flex-shrink: 0;
+    background: #264653;
+    border-top: 2px solid #2A9D8F;
+}
+
+#form {
+    padding: 0.5rem 0;
+}
+
+#form fieldset {
+    margin-bottom: 0;
+}
+
+#form fieldset > * {
+    height: 2.5rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    box-sizing: border-box;
+}
+
+#input {
+    margin-bottom: 0;
+}
+
+/* Mic button */
+#mic-btn,
+#photo-btn {
+    width: auto;
+    padding: 0 0.6rem;
+    background: none;
+    border: 1px solid #2A9D8F;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+#photo-btn.has-photo {
+    background: #2A9D8F;
+}
+
+/* Photo preview strip */
+.photo-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.photo-preview img {
+    height: 48px;
+    width: 48px;
+    object-fit: cover;
+    border-radius: 0.35rem;
+    border: 1px solid #2A9D8F;
+}
+
+.photo-remove {
+    background: none;
+    border: none;
+    color: #E76F51;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    line-height: 1;
+}
+
+/* Inline photo thumbnail in user messages */
+.msg-photo {
+    display: block;
+    max-width: 180px;
+    max-height: 140px;
+    border-radius: 0.35rem;
+    margin-bottom: 0.35rem;
+    object-fit: cover;
+}
+
+/* Recording indicator — red-orange from palette */
+#mic-btn.recording {
+    background: #E76F51;
+    border-color: #E76F51;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.recording-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #E76F51;
+    margin-top: 0.3rem;
+}
+
+#form-footer .recording-status {
+    color: #F4A261;
+}
+
+.recording-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #E76F51;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Send button — Persian Green from palette */
+#send-btn {
+    min-width: 5.5rem;
+    white-space: nowrap;
+    background: #2A9D8F !important;
+    border-color: #2A9D8F !important;
+    color: #fff !important;
+}
+
+#send-btn:hover {
+    background: #238578 !important;
+    border-color: #238578 !important;
+}
+
+/* Footer note */
+.footer-note {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: #2A9D8F;
+    text-align: center;
+    margin: 0.25rem 0 0;
+}
+
+/* Typing indicator */
+.typing-indicator::after {
+    content: "▊";
+    animation: blink 0.7s steps(1) infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Workflow tracker */
+.workflow-tracker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+    align-self: flex-start;
+    background: var(--pico-card-background-color);
+    border: 1px dashed var(--pico-muted-border-color);
+    border-radius: 0.5rem;
+    max-width: 90%;
+}
+
+.wf-label {
+    font-weight: 600;
+    color: var(--pico-muted-color);
+    margin-right: 0.2rem;
+}
+
+.wf-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+    white-space: nowrap;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.wf-step.active {
+    background: #dbeafe;
+    color: #1e40af;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+[data-theme="dark"] .wf-step.active {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+.wf-step.done {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+[data-theme="dark"] .wf-step.done {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+.wf-step.complete {
+    background: #d1fae5;
+    color: #065f46;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .wf-step.complete {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+.wf-step.interrupted {
+    background: #fdf6ec;
+    color: #264653;
+    border: 1px dashed #F4A261;
+}
+
+[data-theme="dark"] .wf-step.interrupted {
+    background: #2c3e42;
+    color: #E9C46A;
+    border-color: #F4A261;
+}
+
+.wf-arrow {
+    color: var(--pico-muted-color);
+    font-size: 0.7rem;
+    user-select: none;
+}
+
+/* Payment form (HITL) */
+.payment-form {
+    align-self: flex-start;
+    background: var(--pico-card-background-color);
+    border: 2px solid #2A9D8F;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    max-width: 480px;
+}
+
+.payment-form p {
+    margin: 0 0 0.75rem;
+    font-weight: 500;
+}
+
+.payment-form fieldset {
+    margin-bottom: 0;
+}
+
+.payment-form input {
+    margin-bottom: 0;
+}
+
+.payment-form.processing {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.pay-btn {
+    min-width: 7rem;
+    white-space: nowrap;
+    background: #E76F51 !important;
+    border-color: #E76F51 !important;
+    color: #fff !important;
+}
+
+.pay-btn:hover {
+    background: #c95a3e !important;
+    border-color: #c95a3e !important;
+}

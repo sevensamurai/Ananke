@@ -41,7 +41,7 @@ public interface IFromStateBuilder<S, T>
 /// <summary>
 /// Builder for configuring the target state of a transition
 /// </summary>
-public interface IToStateBuilder<S, T>
+public interface IToStateBuilder<S, T> : IResumeBuilder<S, T>
     where S : Enum
     where T : Enum
 {
@@ -49,6 +49,25 @@ public interface IToStateBuilder<S, T>
     /// Specifies the target state of this transition
     /// </summary>
     ITransitionConfigBuilder<S, T> To(S targetState);
+
+    /// <summary>
+    /// Transitions to <paramref name="interruptState"/> and pushes the current state
+    /// onto the interrupt stack so it can be restored with <see cref="IResumeBuilder{S,T}.ToResume"/>.
+    /// </summary>
+    ITransitionConfigBuilder<S, T> ToInterrupt(S interruptState);
+}
+
+/// <summary>
+/// Builder for configuring a resume transition that pops the interrupt stack.
+/// </summary>
+public interface IResumeBuilder<S, T>
+    where S : Enum
+    where T : Enum
+{
+    /// <summary>
+    /// Pops the interrupt stack and transitions back to the previously interrupted state.
+    /// </summary>
+    ITransitionConfigBuilder<S, T> ToResume();
 }
 
 /// <summary>
@@ -109,6 +128,12 @@ public class TransitionConfig<S, T>
     public required S FinalState { get; init; }
     public Func<Task<bool>>? GuardCondition { get; set; }
     public Func<Task<S>>? AfterTransitionAction { get; set; }
+
+    /// <summary>When <c>true</c>, the current state is pushed onto the interrupt stack before transitioning.</summary>
+    public bool IsInterrupt { get; init; }
+
+    /// <summary>When <c>true</c>, the target state is resolved at runtime by popping the interrupt stack.</summary>
+    public bool IsResume { get; init; }
 }
 
 /// <summary>

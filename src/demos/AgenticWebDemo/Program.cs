@@ -31,7 +31,8 @@ app.MapOpenApi();
 app.MapScalarApiReference();
 
 // --- 3. Build the AI agent ---
-var agentModel = AgentConfig.CreateModel(app.Configuration);
+var provider = AgentConfig.Configure(app.Configuration);
+var agentModel = provider.CreateAgentModel();
 var stockTools = StockTools.Create();
 
 // --- 4. Register endpoints ---

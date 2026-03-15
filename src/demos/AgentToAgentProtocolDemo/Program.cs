@@ -18,6 +18,12 @@ using AgentMessage = Ananke.Orchestration.Agents.AgentMessage;
 //  The server exposes an Ananke workflow and tools as an A2A-compliant
 //  agent. The client discovers the agent, inspects its skills, and
 //  sends messages — demonstrating cross-agent communication.
+//
+//  Cross-language interop (no Ananke SDK required):
+//
+//    dotnet run -- --server
+//    python python_client/a2a_client.py           (Python 3.9+)
+//
 // ─────────────────────────────────────────────────────────────────────
 
 Console.OutputEncoding = Encoding.UTF8;

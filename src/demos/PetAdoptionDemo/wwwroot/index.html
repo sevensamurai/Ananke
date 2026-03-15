@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Adoption — Ananke Demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="container header-inner">
+            <h1>🐾 Happy Tails Shelter</h1>
+            <nav>
+                <a href="/scalar/v1" target="_blank">API Docs</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <div class="demo-banner" role="status">
+            ⏳ Tool calls are intentionally slowed down for demo purposes to illustrate
+            real-time interrupts
+        </div>
+
+        <div id="chat">
+            <div class="empty-state" id="empty">
+                <p>🐶🐱🐰🦜</p>
+                <p><strong>Ask about adopting a pet</strong></p>
+                <p>Try: "What dogs do you have?" or "How does the adoption process work?"</p>
+                <p>📷 Attach a photo: "Looking for a pet like this"</p>
+                <p><strong>Or try the scripted interrupt demo:</strong></p>
+                <button id="demo-btn" class="demo-run-btn" title="Run scripted interrupt demo">▶ Demo</button>
+            </div>
+        </div>
+    </main>
+
+    <footer id="form-footer">
+        <form id="form" class="container">
+            <fieldset role="group">
+                <input type="text" id="input" placeholder="Ask about pets, adoption, care…" autocomplete="off" autofocus>
+                <button type="button" id="photo-btn" title="Attach a photo" aria-label="Attach a photo">📷</button>
+                <input type="file" id="photo-input" accept="image/*" hidden>
+                <button type="button" id="mic-btn" title="Record voice message" aria-label="Record voice message">🎤</button>
+                <button type="submit" id="send-btn">Send</button>
+            </fieldset>
+            <div id="photo-preview" class="photo-preview" hidden>
+                <img id="photo-preview-img" alt="Attached photo">
+                <button type="button" id="photo-remove" class="photo-remove" title="Remove photo">✕</button>
+            </div>
+            <div id="recording-status" class="recording-status" hidden>
+                <span class="recording-dot"></span> Recording… click 🎤 to stop
+            </div>
+        </form>
+    </footer>
+    <script src="app.js"></script>
+</body>
+</html>

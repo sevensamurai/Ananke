@@ -1,8 +1,8 @@
+using Ananke.AspNetCore.Sse;
 using Ananke.OpenTelemetry;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Tools;
-using System.Text.Json;
 
 internal static class AgenticApplication
 {
@@ -15,9 +15,7 @@ internal static class AgenticApplication
         TracingPipeline? tracing,
         CancellationToken ct)
     {
-        // SSE requires these headers so the browser keeps the connection open.
-        context.Response.ContentType = "text/event-stream";
-        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.EnableSse();
 
         var httpResponse = context.Response;
         var messages = BuildHistory(request);
@@ -26,8 +24,8 @@ internal static class AgenticApplication
             .WithSystemPrompt(AgentConfig.SystemPrompt)
             .WithTools(stockTools)
             .WithMaxToolRounds(10)
-            .OnTextDelta(async delta => await WriteSse(httpResponse, "delta", new { text = delta }))
-            .OnToolResult(async (name, result) => await WriteSse(httpResponse, "tool", new { name, result }))
+            .OnTextDelta(async delta => await httpResponse.WriteSseAsync("delta", new { text = delta }))
+            .OnToolResult(async (name, result) => await httpResponse.WriteSseAsync("tool", new { name, result }))
             .Build();
 
         if (tracing is not null)
@@ -38,11 +36,11 @@ internal static class AgenticApplication
         // Send the terminal SSE event based on execution outcome.
         var finalState = execution.State;
         if (execution.Status == ExecutionStatus.Completed && finalState.LastResponse?.RequiresAction == true)
-            await WriteSse(httpResponse, "error", new { message = "Tool-calling limit reached" });
+            await httpResponse.WriteSseAsync("error", new { message = "Tool-calling limit reached" });
         else if (execution.Status == ExecutionStatus.Completed)
-            await WriteSse(httpResponse, "done", new { text = finalState.FullText });
+            await httpResponse.WriteSseAsync("done", new { text = finalState.FullText });
         else if (execution.Status == ExecutionStatus.Faulted)
-            await WriteSse(httpResponse, "error", new { message = execution.Result?.Error ?? "Workflow failed" });
+            await httpResponse.WriteSseAsync("error", new { message = execution.Result?.Error ?? "Workflow failed" });
     }
 
     // Converts the request history into AgentMessages and appends the new user message.
@@ -57,13 +55,5 @@ internal static class AgenticApplication
         }
         messages.Add(AgentMessage.User(request.Message));
         return messages;
-    }
-
-    // Serialises data as JSON and writes it as an SSE event, then flushes so the browser receives it right away.
-    private static async Task WriteSse(HttpResponse response, string eventName, object data)
-    {
-        var json = JsonSerializer.Serialize(data);
-        await response.WriteAsync($"event: {eventName}\ndata: {json}\n\n");
-        await response.Body.FlushAsync();
     }
 }

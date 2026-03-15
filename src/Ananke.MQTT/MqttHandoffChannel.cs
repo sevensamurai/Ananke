@@ -25,9 +25,9 @@ namespace Ananke.MQTT;
 ///   <c>{namespace}/{topic}/reply/{correlationId}</c>.</item>
 /// </list>
 /// </remarks>
-public sealed class MqttHandoffChannel : IHandoffChannel, IAsyncDisposable
+public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = null) : IHandoffChannel, IAsyncDisposable
 {
-    private readonly ILogger<MqttHandoffChannel> _logger;
+    private readonly ILogger<MqttHandoffChannel> _logger = logger ?? NullLogger<MqttHandoffChannel>.Instance;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<byte[]>> _pending = new();
     private readonly ConcurrentDictionary<string, Func<string, byte[], CancellationToken, Task>> _subscriptions = new();
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -37,11 +37,6 @@ public sealed class MqttHandoffChannel : IHandoffChannel, IAsyncDisposable
     private string _namespace = string.Empty;
     private bool _configured;
     private bool _disposed;
-
-    public MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = null)
-    {
-        _logger = logger ?? NullLogger<MqttHandoffChannel>.Instance;
-    }
 
     /// <summary>Whether the channel is connected to the MQTT broker.</summary>
     public bool IsConnected => _configured && _client?.IsConnected == true;
@@ -251,6 +246,7 @@ public sealed class MqttHandoffChannel : IHandoffChannel, IAsyncDisposable
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Handoff subscription handler failed for {Topic}", topic);
+                        Console.Error.WriteLine($"[Handoff] Subscription handler failed for {topic}: {ex.Message}");
                     }
                 });
                 return Task.CompletedTask;

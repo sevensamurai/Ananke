@@ -1,7 +1,5 @@
-using Ananke.Orchestration.Agents;
+using Ananke.AspNetCore.Configuration;
 using Ananke.Orchestration.OpenAI;
-using OpenAI.Chat;
-using System.ClientModel;
 
 // Centralises all AI agent configuration: the model client and the system prompt.
 internal static class AgentConfig
@@ -17,12 +15,13 @@ internal static class AgentConfig
         Format your responses using Markdown for clarity (tables, bold, bullet points, etc.).
         """;
 
-    // Reads the API key and model name from configuration and creates the streaming agent model.
-    internal static IStreamingAgentModel CreateModel(IConfiguration config)
+    // Registers supported providers and reads the configuration.
+    internal static ProviderProfile Configure(IConfiguration config)
     {
-        var apiKey = config["OpenAI:ApiKey"]
-            ?? throw new InvalidOperationException("OpenAI:ApiKey not configured in secrets.json");
-        var modelName = config["OpenAI:Model"] ?? "gpt-4.1-mini";
-        return new OpenAIChatAgentModel(new ChatClient(modelName, new ApiKeyCredential(apiKey)));
+        AgentModelFactory.RegisterProvider("OpenAI",
+            defaultModel: "gpt-4.1-mini",
+            agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model));
+
+        return AgentModelFactory.FromConfiguration(config);
     }
 }

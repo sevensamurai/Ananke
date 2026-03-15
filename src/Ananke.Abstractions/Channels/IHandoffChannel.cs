@@ -3,13 +3,15 @@ namespace Ananke.Abstractions.Channels;
 /// <summary>
 /// Request-response messaging abstraction for agent-to-agent handoff.
 /// The sender publishes a message and awaits a correlated response; the responder
-/// completes the pending request via <see cref="CompleteAsync{TResponse}"/>.
+/// subscribes via <see cref="SubscribeAsync{TMessage, TResponse}"/> or completes
+/// individual requests via <see cref="CompleteAsync{TResponse}"/>.
 /// </summary>
 /// <remarks>
 /// Implementations: <c>InMemoryHandoffChannel</c> (testing, in Ananke.Orchestration) and
 /// <c>MqttHandoffChannel</c> (production, in Ananke.MQTT).
+/// Use <see cref="HandoffChannel.ConnectAsync"/> to create instances via the registered factory.
 /// </remarks>
-public interface IHandoffChannel
+public interface IHandoffChannel : IAsyncDisposable
 {
     /// <summary>
     /// Sends a message to the specified topic and waits for a correlated response.
@@ -44,5 +46,22 @@ public interface IHandoffChannel
         string correlationId,
         TResponse response,
         CancellationToken ct = default)
+        where TResponse : class;
+
+    /// <summary>
+    /// Subscribes to incoming handoff requests on the specified topic.
+    /// When a request arrives, the <paramref name="handler"/> is invoked and its
+    /// return value is published as the correlated response.
+    /// </summary>
+    /// <typeparam name="TMessage">The incoming request message type.</typeparam>
+    /// <typeparam name="TResponse">The response type to send back.</typeparam>
+    /// <param name="topic">The topic to listen on (e.g. a queue name).</param>
+    /// <param name="handler">Async function that processes the request and returns a response.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task SubscribeAsync<TMessage, TResponse>(
+        string topic,
+        Func<TMessage, Task<TResponse>> handler,
+        CancellationToken ct = default)
+        where TMessage : class
         where TResponse : class;
 }

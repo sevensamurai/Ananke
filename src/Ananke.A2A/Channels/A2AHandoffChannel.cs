@@ -150,4 +150,24 @@ public sealed class A2AHandoffChannel : IHandoffChannel
 
         return string.Join("", parts.OfType<TextPart>().Select(p => p.Text));
     }
+
+    /// <summary>
+    /// Not supported for <see cref="A2AHandoffChannel"/>. A2A is a request-response
+    /// protocol; use <see cref="SendAsync{TMessage, TResponse}"/> instead.
+    /// </summary>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public Task SubscribeAsync<TMessage, TResponse>(
+        string topic,
+        Func<TMessage, Task<TResponse>> handler,
+        CancellationToken ct = default)
+        where TMessage : class
+        where TResponse : class
+    {
+        throw new NotSupportedException(
+            $"{nameof(A2AHandoffChannel)} does not support SubscribeAsync. " +
+            "A2A agents respond synchronously via SendMessageAsync.");
+    }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => default;
 }

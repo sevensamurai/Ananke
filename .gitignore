@@ -82,3 +82,5 @@ secrets.json
 
 ## Demo: Distributed services - exclude Mosquitto directory
 src/demos/DistributedServicesDemo/mosquitto/
+.env
+__pycache__
