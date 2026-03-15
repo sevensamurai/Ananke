@@ -14,7 +14,7 @@
 
   <!-- Coordinated version across all packages -->
   <PropertyGroup>
-    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionPrefix>0.3.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- NuGet package metadata (applies when IsPackable=true in individual csproj) -->
