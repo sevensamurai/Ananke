@@ -37,8 +37,10 @@ public class ToolKitTests
     public async Task AddTool_TwoParams_ExecutesWithBothArgs()
     {
         var kit = new ToolKit("test")
-            .AddTool("add", "Adds context", (string a, string b) => $"{a}+{b}",
-                ("a", "First value"), ("b", "Second value"));
+            .AddTool("add", "Adds context", b => b
+                .Param("a", "First value")
+                .Param("b", "Second value")
+                .OnExecute(args => ToolResult.Ok($"{args.Get("a")}+{args.Get("b")}")));
 
         var tool = kit.Tools["add"];
         tool.Parameters.Count.ShouldBe(2);
@@ -104,13 +106,14 @@ public class ToolKitTests
     public async Task AddTool_AsyncTwoParams_ExecutesAsync()
     {
         var kit = new ToolKit("test")
-            .AddTool("combine", "Combines values",
-                async (string a, string b) =>
+            .AddTool("combine", "Combines values", b => b
+                .Param("a", "First")
+                .Param("b", "Second")
+                .OnExecute(async args =>
                 {
                     await Task.Delay(1);
-                    return $"{a}:{b}";
-                },
-                ("a", "First"), ("b", "Second"));
+                    return ToolResult.Ok($"{args.Get("a")}:{args.Get("b")}");
+                }));
 
         var result = await kit.Tools["combine"].ExecuteAsync(
             new Dictionary<string, object?> { ["a"] = "x", ["b"] = "y" });
@@ -178,9 +181,11 @@ public class ToolKitTests
     public async Task AddTool_TypedTwoParams_MixedTypes()
     {
         var kit = new ToolKit("test")
-            .AddTool<string, int>("repeat", "Repeats text N times",
-                (string text, int count) => string.Concat(Enumerable.Repeat(text, count)),
-                ("text", "The text to repeat"), ("count", "Number of repetitions"));
+            .AddTool("repeat", "Repeats text N times", b => b
+                .Param("text", "The text to repeat")
+                .Param<int>("count", "Number of repetitions")
+                .OnExecute(args => ToolResult.Ok(
+                    string.Concat(Enumerable.Repeat(args.Get("text"), args.Get<int>("count"))))));
 
         var tool = kit.Tools["repeat"];
         tool.Parameters[0].JsonType.ShouldBe("string");
@@ -215,13 +220,16 @@ public class ToolKitTests
     public async Task AddTool_TypedTwoParamsAsync_ExecutesAsync()
     {
         var kit = new ToolKit("test")
-            .AddTool<double, bool>("format", "Formats a number",
-                async (double n, bool round) =>
+            .AddTool("format", "Formats a number", b => b
+                .Param<double>("number", "The number")
+                .Param<bool>("round", "Whether to round")
+                .OnExecute(async args =>
                 {
                     await Task.Delay(1);
-                    return round ? Math.Round(n).ToString() : n.ToString();
-                },
-                ("number", "The number"), ("round", "Whether to round"));
+                    var n = args.Get<double>("number");
+                    var round = args.Get<bool>("round");
+                    return ToolResult.Ok(round ? Math.Round(n).ToString() : n.ToString());
+                }));
 
         var result = await kit.Tools["format"].ExecuteAsync(
             new Dictionary<string, object?> { ["number"] = 3.7, ["round"] = true });
@@ -278,9 +286,15 @@ public class ToolKitTests
     public async Task AddTool_TypedMixed_DeserializesFromJsonElement()
     {
         var kit = new ToolKit("test")
-            .AddTool<string, bool>("format", "Formats text",
-                (string text, bool upper) => upper ? text.ToUpperInvariant() : text,
-                ("text", "Input"), ("upper", "Uppercase flag"));
+            .AddTool("format", "Formats text", b => b
+                .Param("text", "Input")
+                .Param<bool>("upper", "Uppercase flag")
+                .OnExecute(args =>
+                {
+                    var text = args.Get("text");
+                    var upper = args.Get<bool>("upper");
+                    return ToolResult.Ok(upper ? text.ToUpperInvariant() : text);
+                }));
 
         using var doc = JsonDocument.Parse("""{"text": "hello", "upper": true}""");
         var args = new Dictionary<string, object?>();
@@ -415,5 +429,290 @@ public class ToolKitTests
 
         var schema = tool.ParametersJsonSchema;
         schema.ShouldNotContain("\"examples\"");
+    }
+
+    // --- Prerequisite checks ---
+
+    [Test]
+    public async Task CheckPrerequisitesAsync_NoRequires_ReturnsSuccess()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("ping", "pong", () => "pong");
+
+        var result = await kit.CheckPrerequisitesAsync();
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Passed.ShouldBeEmpty();
+        result.Failures.ShouldBeEmpty();
+        result.Summary.ShouldContain("All prerequisites satisfied");
+    }
+
+    [Test]
+    public async Task CheckPrerequisitesAsync_SatisfiedPrerequisite_ReturnsPassedName()
+    {
+        var alwaysOk = new ToolPrerequisite("fake-bin", _ => Task.FromResult(true), "n/a");
+        var kit = new ToolKit("test")
+            .AddTool(new ToolDefinition
+            {
+                Name = "tool-a", Description = "A",
+                Parameters = [],
+                Requires = [alwaysOk],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            });
+
+        var result = await kit.CheckPrerequisitesAsync();
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Passed.ShouldContain("fake-bin");
+    }
+
+    [Test]
+    public async Task CheckPrerequisitesAsync_MissingPrerequisite_ReturnsFailure()
+    {
+        var missing = new ToolPrerequisite("missing-bin", _ => Task.FromResult(false), "Run: install missing-bin");
+        var kit = new ToolKit("test")
+            .AddTool(new ToolDefinition
+            {
+                Name = "tool-b", Description = "B",
+                Parameters = [],
+                Requires = [missing],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            });
+
+        var result = await kit.CheckPrerequisitesAsync();
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Failures.Count.ShouldBe(1);
+        result.Failures[0].Prerequisite.ShouldBe("missing-bin");
+        result.Failures[0].ToolName.ShouldBe("tool-b");
+        result.Failures[0].InstallHint.ShouldBe("Run: install missing-bin");
+        result.Summary.ShouldContain("missing-bin");
+        result.Summary.ShouldContain("tool-b");
+    }
+
+    [Test]
+    public async Task CheckPrerequisitesAsync_SharedPrerequisite_CheckedOnlyOnce()
+    {
+        var checkCount = 0;
+        var shared = new ToolPrerequisite("shared-bin", _ =>
+        {
+            Interlocked.Increment(ref checkCount);
+            return Task.FromResult(true);
+        }, "n/a");
+
+        var kit = new ToolKit("test")
+            .AddTool(new ToolDefinition
+            {
+                Name = "tool-x", Description = "X",
+                Parameters = [], Requires = [shared],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            })
+            .AddTool(new ToolDefinition
+            {
+                Name = "tool-y", Description = "Y",
+                Parameters = [], Requires = [shared],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            });
+
+        await kit.CheckPrerequisitesAsync();
+
+        checkCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CheckPrerequisitesAsync_MixedResults_ReportsCorrectly()
+    {
+        var ok = new ToolPrerequisite("present", _ => Task.FromResult(true), "n/a");
+        var bad = new ToolPrerequisite("absent", _ => Task.FromResult(false), "pip install absent");
+
+        var kit = new ToolKit("test")
+            .AddTool(new ToolDefinition
+            {
+                Name = "good-tool", Description = "G",
+                Parameters = [], Requires = [ok],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            })
+            .AddTool(new ToolDefinition
+            {
+                Name = "bad-tool", Description = "B",
+                Parameters = [], Requires = [bad],
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+            });
+
+        var result = await kit.CheckPrerequisitesAsync();
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Passed.ShouldContain("present");
+        result.Failures.Count.ShouldBe(1);
+        result.Failures[0].Prerequisite.ShouldBe("absent");
+    }
+
+    [Test]
+    public async Task BinaryPrerequisite_DetectsDotnet()
+    {
+        // 'dotnet' should always be available in test environment
+        var prereq = ToolPrerequisite.Binary("dotnet",
+            "Install .NET: https://dot.net");
+
+        var ok = await prereq.Check(CancellationToken.None);
+
+        ok.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task BinaryPrerequisite_DetectsMissingBinary()
+    {
+        var prereq = ToolPrerequisite.Binary("this-binary-does-not-exist-xyz",
+            "You won't find this");
+
+        var ok = await prereq.Check(CancellationToken.None);
+
+        ok.ShouldBeFalse();
+    }
+
+    // --- ToolBuilder ---
+
+    [Test]
+    public async Task Builder_ThreeParams_ExecutesWithAllArgs()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("send", "Sends a message", b => b
+                .Param("to", "Recipient")
+                .Param("subject", "Subject line")
+                .Param("body", "Message body")
+                .OnExecute(args => ToolResult.Ok(
+                    $"{args.Get("to")}:{args.Get("subject")}:{args.Get("body")}")));
+
+        var tool = kit.Tools["send"];
+        tool.Parameters.Count.ShouldBe(3);
+
+        var result = await tool.ExecuteAsync(new Dictionary<string, object?>
+        {
+            ["to"] = "alice",
+            ["subject"] = "hi",
+            ["body"] = "hello"
+        });
+        result.Value.ShouldBe("alice:hi:hello");
+    }
+
+    [Test]
+    public async Task Builder_TypedParams_InfersJsonType()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("calc", "Calculates", b => b
+                .Param<double>("a", "First operand")
+                .Param<int>("b", "Second operand")
+                .Param<bool>("round", "Whether to round")
+                .OnExecute(args =>
+                {
+                    var a = args.Get<double>("a");
+                    var bVal = args.Get<int>("b");
+                    var round = args.Get<bool>("round");
+                    var val = a + bVal;
+                    return ToolResult.Ok(round ? Math.Round(val).ToString() : val.ToString());
+                }));
+
+        var tool = kit.Tools["calc"];
+        tool.Parameters[0].JsonType.ShouldBe("number");
+        tool.Parameters[1].JsonType.ShouldBe("integer");
+        tool.Parameters[2].JsonType.ShouldBe("boolean");
+
+        var result = await tool.ExecuteAsync(new Dictionary<string, object?>
+        {
+            ["a"] = 1.5, ["b"] = 2, ["round"] = true
+        });
+        result.Value.ShouldBe("4");
+    }
+
+    [Test]
+    public void Builder_Tags_AppearsOnDefinition()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("tagged", "A tagged tool", b => b
+                .Tags("finance", "trading")
+                .OnExecute(_ => ToolResult.Ok("ok")));
+
+        kit.Tools["tagged"].Tags.ShouldBe(["finance", "trading"]);
+    }
+
+    [Test]
+    public void Builder_Examples_AppearsOnDefinition()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("example", "An example tool", b => b
+                .Examples("do X", "do Y")
+                .OnExecute(_ => ToolResult.Ok("ok")));
+
+        kit.Tools["example"].Examples.ShouldBe(["do X", "do Y"]);
+    }
+
+    [Test]
+    public void Builder_ParamExamples_AppearsInSchema()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("lookup", "Looks up a symbol", b => b
+                .Param("symbol", "Ticker", examples: ["AAPL", "MSFT"])
+                .OnExecute(args => ToolResult.Ok(args.Get("symbol"))));
+
+        var tool = kit.Tools["lookup"];
+        tool.Parameters[0].Examples.ShouldBe(["AAPL", "MSFT"]);
+        tool.ParametersJsonSchema.ShouldContain("\"examples\"");
+    }
+
+    [Test]
+    public void Builder_OptionalParam_NotInRequired()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("search", "Searches", b => b
+                .Param("query", "Search query")
+                .Param("category", "Optional filter", required: false)
+                .OnExecute(args => ToolResult.Ok("ok")));
+
+        var tool = kit.Tools["search"];
+        tool.Parameters[0].IsRequired.ShouldBeTrue();
+        tool.Parameters[1].IsRequired.ShouldBeFalse();
+        tool.ParametersJsonSchema.ShouldContain("\"query\"");
+        tool.ParametersJsonSchema.ShouldNotContain("\"category\":[^}]*required");
+    }
+
+    [Test]
+    public async Task Builder_AsyncWithCancellation_ReceivesToken()
+    {
+        using var cts = new CancellationTokenSource();
+        var tokenReceived = false;
+
+        var kit = new ToolKit("test")
+            .AddTool("cancellable", "Supports cancellation", b => b
+                .OnExecute((args, ct) =>
+                {
+                    tokenReceived = !ct.IsCancellationRequested;
+                    return Task.FromResult(ToolResult.Ok("done"));
+                }));
+
+        await kit.Tools["cancellable"].ExecuteAsync(
+            new Dictionary<string, object?>(), cts.Token);
+
+        tokenReceived.ShouldBeTrue();
+    }
+
+    [Test]
+    public void Builder_NoOnExecute_ThrowsOnBuild()
+    {
+        var kit = new ToolKit("test");
+        Should.Throw<InvalidOperationException>(() =>
+            kit.AddTool("broken", "No handler", _ => { }));
+    }
+
+    [Test]
+    public void Builder_Requires_AppearsOnDefinition()
+    {
+        var prereq = new ToolPrerequisite("test-bin", _ => Task.FromResult(true), "install it");
+        var kit = new ToolKit("test")
+            .AddTool("need_bin", "Needs a binary", b => b
+                .Requires(prereq)
+                .OnExecute(_ => ToolResult.Ok("ok")));
+
+        kit.Tools["need_bin"].Requires.Count.ShouldBe(1);
+        kit.Tools["need_bin"].Requires[0].Name.ShouldBe("test-bin");
     }
 }

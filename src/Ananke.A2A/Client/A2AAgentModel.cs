@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using A2A;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 
 namespace Ananke.A2A.Client;

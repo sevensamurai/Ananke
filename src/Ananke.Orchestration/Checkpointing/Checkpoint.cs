@@ -48,6 +48,12 @@ public record Checkpoint<TState>
     /// </summary>
     public string? InterruptedBeforeJob { get; init; }
 
+    /// <summary>
+    /// Active loop iteration counters at the time of checkpointing, keyed by the loop
+    /// source job name. Restored on resume so loop iteration caps survive interrupts.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> LoopCounters { get; init; } = new Dictionary<string, int>();
+
     internal static Checkpoint<TState> Create(WorkflowExecution<TState> execution, TimeSpan? ttl = null) => new()
     {
         ExecutionId = execution.Id,
@@ -57,6 +63,7 @@ public record Checkpoint<TState>
         Status = execution.Status,
         History = [.. execution.History],
         Metadata = execution.Metadata,
+        LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
         CreatedAt = DateTimeOffset.UtcNow,
         ExpiresAt = DateTimeOffset.UtcNow + (ttl ?? TimeSpan.FromDays(7))
     };
@@ -73,6 +80,7 @@ public record Checkpoint<TState>
         Status = ExecutionStatus.Interrupted,
         History = [.. execution.History],
         Metadata = execution.Metadata,
+        LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
         InterruptedBeforeJob = interruptedBeforeJob,
         CreatedAt = DateTimeOffset.UtcNow,
         ExpiresAt = DateTimeOffset.UtcNow + (ttl ?? TimeSpan.FromDays(7))

@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Documents;
 
 namespace Ananke.Documents;
 

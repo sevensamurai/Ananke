@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.StateMachine\Ananke.StateMachine.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\..\Ananke.Learning\Ananke.Learning.csproj" />
   </ItemGroup>
 
 </Project>

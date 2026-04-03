@@ -1,5 +1,8 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Orchestration.Tools;
 using Shouldly;
 using System.Runtime.CompilerServices;

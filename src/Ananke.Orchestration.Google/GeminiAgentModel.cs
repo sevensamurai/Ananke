@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Google.GenAI;
 using Google.GenAI.Types;
@@ -74,6 +75,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         var fullText = new StringBuilder();
         var toolCalls = new List<AgentToolCall>();
         var responseParts = new List<ContentPart>();
+        TokenUsage? streamUsage = null;
 
         await foreach (var chunk in _client.Models.GenerateContentStreamAsync(
             model: _model,
@@ -81,6 +83,14 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
             config: config,
             cancellationToken: ct))
         {
+            // UsageMetadata is reported on the final streaming chunk
+            if (chunk.UsageMetadata is not null)
+                streamUsage = new TokenUsage
+                {
+                    InputTokens = chunk.UsageMetadata.PromptTokenCount ?? 0,
+                    OutputTokens = chunk.UsageMetadata.CandidatesTokenCount ?? 0
+                };
+
             if (chunk.Candidates is not { Count: > 0 })
                 continue;
 
@@ -126,7 +136,8 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
             {
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
                 Parts = responseParts.Count > 0 ? responseParts : null,
-                ToolCalls = toolCalls.Count > 0 ? toolCalls : null
+                ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
+                Usage = streamUsage
             }
         };
     }
@@ -331,7 +342,14 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         {
             Text = text,
             Parts = responseParts.Count > 0 ? responseParts : null,
-            ToolCalls = toolCalls.Count > 0 ? toolCalls : null
+            ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
+            Usage = response.UsageMetadata is not null
+                ? new TokenUsage
+                {
+                    InputTokens = response.UsageMetadata.PromptTokenCount ?? 0,
+                    OutputTokens = response.UsageMetadata.CandidatesTokenCount ?? 0
+                }
+                : null
         };
     }
 

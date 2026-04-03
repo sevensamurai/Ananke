@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Ananke.Abstractions.Tracing;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Middleware;
@@ -13,7 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Orchestration.Execution;
 
-public sealed class WorkflowRunner : IWorkflowRunner
+public sealed partial class WorkflowRunner : IWorkflowRunner
 {
     private readonly ICheckpointStore? _checkpointStore;
     private readonly IReadOnlyList<IJobMiddleware<object>> _middlewares;
@@ -58,7 +60,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
         if (checkpoint.InterruptedBeforeJob is not null)
             return await ExecuteAsync(definition, execution, checkpoint.InterruptedBeforeJob, ct, skipFirstInterrupt: true);
 
-        var nextJob = await ResolveNextJobAsync(definition, checkpoint.CurrentJob, execution.State, ct);
+        var nextJob = ResolveResumeTarget(definition, checkpoint.CurrentJob, execution);
         return await ExecuteAsync(definition, execution, nextJob, ct);
     }
 
@@ -74,8 +76,37 @@ public sealed class WorkflowRunner : IWorkflowRunner
         if (checkpoint.InterruptedBeforeJob is not null)
             return await ExecuteAsync(definition, execution, checkpoint.InterruptedBeforeJob, ct, skipFirstInterrupt: true);
 
-        var nextJob = await ResolveNextJobAsync(definition, checkpoint.CurrentJob, execution.State, ct);
+        var nextJob = ResolveResumeTarget(definition, checkpoint.CurrentJob, execution);
         return await ExecuteAsync(definition, execution, nextJob, ct);
+    }
+
+    /// <summary>
+    /// Resolves the next job to execute when resuming from a checkpoint. Handles
+    /// loop connections that <see cref="ResolveNextJobAsync"/> cannot because loop
+    /// evaluation requires access to the execution's loop counters.
+    /// </summary>
+    private static string? ResolveResumeTarget<TState>(
+        WorkflowDefinition<TState> definition,
+        string currentJob,
+        WorkflowExecution<TState> execution)
+    {
+        var loopConn = definition.ResolveLoop(currentJob);
+        if (loopConn is not null)
+        {
+            var iteration = execution.IncrementLoopCounter(currentJob);
+
+            if (loopConn.Until(execution.State) || iteration >= loopConn.MaxIterations)
+            {
+                execution.ResetLoopCounter(currentJob);
+                return loopConn.ExitTarget;
+            }
+            return loopConn.LoopTarget;
+        }
+
+        // Fall back to sync resolution (direct/router are resolved async but router
+        // resolution at resume time uses the current state synchronously via wrapper).
+        return definition.ResolveDirectTarget(currentJob)
+            ?? definition.ResolveRouter(currentJob)?.RouteAsync(execution.State).GetAwaiter().GetResult();
     }
 
     public async IAsyncEnumerable<WorkflowEvent<TState>> StreamAsync<TState>(
@@ -136,9 +167,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
         execution.Status = ExecutionStatus.Running;
         var currentJobName = startJob;
 
-        _logger.LogInformation(
-            "Workflow {WorkflowName} [{ExecutionId}] starting",
-            definition.Name, execution.Id);
+        LogWorkflowStarting(definition.Name, execution.Id);
 
         await using var trace = _tracer.StartTrace(
             definition.Name, execution.Id,
@@ -167,9 +196,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     var interruptCheckpoint = Checkpoint<TState>.CreateInterrupt(execution, currentJobName, _checkpointTtl);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
-                    _logger.LogInformation(
-                        "Workflow {WorkflowName} [{ExecutionId}] interrupted before job {JobName}",
-                        definition.Name, execution.Id, currentJobName);
+                    LogInterruptedBefore(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
@@ -200,9 +227,11 @@ public sealed class WorkflowRunner : IWorkflowRunner
                 timeoutCts?.CancelAfter(descriptor.Timeout!.Value);
                 var jobCt = timeoutCts?.Token ?? ct;
 
-                _logger.LogInformation(
-                    "Job {JobName} starting in workflow {WorkflowName} [{ExecutionId}]",
-                    currentJobName, definition.Name, execution.Id);
+                LogJobStarting(currentJobName, definition.Name, execution.Id);
+
+                // Set up token usage capture for this job
+                var usageAccumulator = new UsageAccumulator();
+                TokenUsageCapture.Current.Value = usageAccumulator;
 
                 await EmitEventAsync(events, new JobStarted<TState>
                 {
@@ -221,9 +250,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
 
                     execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, true));
 
-                    _logger.LogInformation(
-                        "Job {JobName} completed in {DurationMs}ms",
-                        currentJobName, jobSw.ElapsedMilliseconds);
+                    LogJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
 
                     await EmitEventAsync(events, new JobCompleted<TState>
                     {
@@ -253,9 +280,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                         execution, currentJobName, _checkpointTtl);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
-                    _logger.LogInformation(
-                        "Workflow {WorkflowName} [{ExecutionId}] interrupted by subflow at job {JobName}",
-                        definition.Name, execution.Id, currentJobName);
+                    LogInterruptedBySubflow(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
@@ -273,9 +298,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     var timeoutEx = new TimeoutException(timeoutMsg);
                     jobSpan.RecordError(timeoutEx);
                     execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, timeoutMsg));
-                    _logger.LogError(
-                        "Job {JobName} timed out after {TimeoutSeconds:F1}s",
-                        currentJobName, descriptor.Timeout!.Value.TotalSeconds);
+                    LogJobTimedOut(currentJobName, descriptor.Timeout!.Value.TotalSeconds);
                     throw timeoutEx;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -283,7 +306,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     jobSw.Stop();
                     jobSpan.RecordError(ex);
                     execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, ex.Message));
-                    _logger.LogError(ex, "Job {JobName} failed: {Error}", currentJobName, ex.Message);
+                    LogJobFailed(ex, currentJobName, ex.Message);
                     throw;
                 }
 
@@ -291,6 +314,39 @@ public sealed class WorkflowRunner : IWorkflowRunner
                 {
                     var checkpoint = Checkpoint<TState>.Create(execution, _checkpointTtl);
                     await _checkpointStore.SaveAsync(checkpoint, ct);
+                }
+
+                // --- Budget enforcement ---
+                var jobUsage = usageAccumulator.Usage;
+                if (jobUsage.TotalTokens > 0)
+                {
+                    execution.CumulativeUsage = execution.CumulativeUsage.Add(jobUsage);
+
+                    if (definition.Budget is { } budget)
+                    {
+                        execution.EstimatedCost = budget.EstimateCost(execution.CumulativeUsage);
+
+                        if (execution.EstimatedCost > budget.MaxCost)
+                        {
+                            totalSw.Stop();
+                            execution.Status = ExecutionStatus.BudgetExceeded;
+                            execution.CurrentJob = null;
+                            execution.Result = WorkflowResult<TState>.Failed(
+                                execution.State, totalSw.Elapsed, execution.History,
+                                $"Cost budget exceeded: estimated {execution.EstimatedCost:F6} > limit {budget.MaxCost:F6}");
+
+                            await EmitEventAsync(events, new BudgetExceeded<TState>
+                            {
+                                WorkflowName = definition.Name,
+                                ExecutionId = execution.Id,
+                                EstimatedCost = execution.EstimatedCost,
+                                Budget = budget.MaxCost,
+                                CumulativeUsage = execution.CumulativeUsage
+                            }, ct);
+
+                            return execution;
+                        }
+                    }
                 }
 
                 // --- Interrupt After ---
@@ -306,9 +362,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     var interruptCheckpoint = Checkpoint<TState>.Create(execution, _checkpointTtl);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
-                    _logger.LogInformation(
-                        "Workflow {WorkflowName} [{ExecutionId}] interrupted after job {JobName}",
-                        definition.Name, execution.Id, currentJobName);
+                    LogInterruptedAfter(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
@@ -346,6 +400,46 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     continue;
                 }
 
+                // --- Loop ---
+                var loopConn = definition.ResolveLoop(currentJobName);
+                if (loopConn is not null)
+                {
+                    var iteration = execution.IncrementLoopCounter(currentJobName);
+
+                    LoopExitReason? exitReason = null;
+
+                    if (loopConn.Until(execution.State))
+                        exitReason = LoopExitReason.ConditionMet;
+                    else if (iteration >= loopConn.MaxIterations)
+                        exitReason = LoopExitReason.MaxIterationsReached;
+
+                    if (exitReason.HasValue)
+                    {
+                        var completedIterations = iteration;
+                        execution.ResetLoopCounter(currentJobName);
+
+                        LogLoopExited(definition.Name, execution.Id, currentJobName, completedIterations, exitReason.Value.ToString());
+
+                        await EmitEventAsync(events, new LoopExited<TState>
+                        {
+                            WorkflowName = definition.Name,
+                            ExecutionId = execution.Id,
+                            LoopFrom = currentJobName,
+                            LoopTarget = loopConn.LoopTarget,
+                            IterationsCompleted = completedIterations,
+                            Reason = exitReason.Value
+                        }, ct);
+
+                        currentJobName = loopConn.ExitTarget;
+                    }
+                    else
+                    {
+                        jobSpan.SetAttribute("loop.iteration", iteration.ToString());
+                        currentJobName = loopConn.LoopTarget;
+                    }
+                    continue;
+                }
+
                 currentJobName = await ResolveNextJobAsync(definition, currentJobName, execution.State, ct);
             }
 
@@ -354,9 +448,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
             execution.CurrentJob = null;
             execution.Result = WorkflowResult<TState>.Succeeded(execution.State, totalSw.Elapsed, execution.History);
 
-            _logger.LogInformation(
-                "Workflow {WorkflowName} [{ExecutionId}] completed in {DurationMs}ms ({JobCount} jobs)",
-                definition.Name, execution.Id, totalSw.ElapsedMilliseconds, execution.History.Count);
+            LogWorkflowCompleted(definition.Name, execution.Id, totalSw.ElapsedMilliseconds, execution.History.Count);
 
             await EmitEventAsync(events, new WorkflowCompleted<TState>
             {
@@ -373,9 +465,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
             execution.Status = ExecutionStatus.Cancelled;
             execution.Result = WorkflowResult<TState>.Cancelled(
                 execution.State, totalSw.Elapsed, execution.History);
-            _logger.LogWarning(
-                "Workflow {WorkflowName} [{ExecutionId}] was cancelled",
-                definition.Name, execution.Id);
+            LogWorkflowCancelled(definition.Name, execution.Id);
         }
         catch (Exception ex)
         {
@@ -383,9 +473,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
             execution.Status = ExecutionStatus.Faulted;
             execution.Result = WorkflowResult<TState>.Failed(
                 execution.State, totalSw.Elapsed, execution.History, ex.Message, ex);
-            _logger.LogError(ex,
-                "Workflow {WorkflowName} [{ExecutionId}] faulted: {Error}",
-                definition.Name, execution.Id, ex.Message);
+            LogWorkflowFaulted(ex, definition.Name, execution.Id, ex.Message);
 
             await EmitEventAsync(events, new WorkflowFaulted<TState>
             {
@@ -467,9 +555,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
         forkSpan.SetAttribute("fork.targets", string.Join(",", fork.Targets));
         forkSpan.SetAttribute("fork.mode", fork.Mode.ToString());
 
-        _logger.LogInformation(
-            "Workflow {WorkflowName} [{ExecutionId}] forking to [{Targets}] ({Mode})",
-            definition.Name, execution.Id, string.Join(", ", fork.Targets), fork.Mode);
+        LogForkStarting(definition.Name, execution.Id, string.Join(", ", fork.Targets), fork.Mode.ToString());
 
         using var forkCts = fork.Mode == ForkMode.FailFast
             ? CancellationTokenSource.CreateLinkedTokenSource(ct)
@@ -525,9 +611,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                     throw new AggregateException("All fork branches faulted.", faults);
                 }
 
-                _logger.LogWarning(
-                    "Workflow {WorkflowName} [{ExecutionId}] fork completed with {SucceededCount}/{TotalCount} branches",
-                    definition.Name, execution.Id, results.Length, fork.Targets.Count);
+                LogForkPartialSuccess(definition.Name, execution.Id, results.Length, fork.Targets.Count);
             }
         }
 
@@ -559,9 +643,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
                 execution.RecordJobExecution(jobExec);
         }
 
-        _logger.LogInformation(
-            "Workflow {WorkflowName} [{ExecutionId}] joined {BranchCount} branches at {JoinTarget}",
-            definition.Name, execution.Id, results.Length, join.Target);
+        LogJoinCompleted(definition.Name, execution.Id, results.Length, join.Target);
 
         forkSpan.SetAttribute("fork.join_target", join.Target);
         return join.Target;
@@ -630,9 +712,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
             timeoutCts?.CancelAfter(descriptor.Timeout!.Value);
             var jobCt = timeoutCts?.Token ?? ct;
 
-            _logger.LogInformation(
-                "Branch job {JobName} starting in workflow {WorkflowName}",
-                currentJobName, definition.Name);
+            LogBranchJobStarting(currentJobName, definition.Name);
 
             try
             {
@@ -644,9 +724,7 @@ public sealed class WorkflowRunner : IWorkflowRunner
 
                 history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, true));
 
-                _logger.LogInformation(
-                    "Branch job {JobName} completed in {DurationMs}ms",
-                    currentJobName, jobSw.ElapsedMilliseconds);
+                LogBranchJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
             }
             catch (OperationCanceledException) when (
                 timeoutCts is not null && timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
@@ -682,4 +760,74 @@ public sealed class WorkflowRunner : IWorkflowRunner
         catch (ChannelClosedException) { }
         catch (OperationCanceledException) { }
     }
+
+    // ── Source-generated structured log methods ──────────────────────
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] starting")]
+    private partial void LogWorkflowStarting(string workflowName, string executionId);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] interrupted before job {JobName}")]
+    private partial void LogInterruptedBefore(string workflowName, string executionId, string jobName);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] interrupted by subflow at job {JobName}")]
+    private partial void LogInterruptedBySubflow(string workflowName, string executionId, string jobName);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] interrupted after job {JobName}")]
+    private partial void LogInterruptedAfter(string workflowName, string executionId, string jobName);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Job {JobName} starting in workflow {WorkflowName} [{ExecutionId}]")]
+    private partial void LogJobStarting(string jobName, string workflowName, string executionId);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Job {JobName} completed in {DurationMs}ms")]
+    private partial void LogJobCompleted(string jobName, long durationMs);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Job {JobName} timed out after {TimeoutSeconds}s")]
+    private partial void LogJobTimedOut(string jobName, double timeoutSeconds);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Job {JobName} failed: {Error}")]
+    private partial void LogJobFailed(Exception exception, string jobName, string error);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] completed in {DurationMs}ms ({JobCount} jobs)")]
+    private partial void LogWorkflowCompleted(string workflowName, string executionId, long durationMs, int jobCount);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] was cancelled")]
+    private partial void LogWorkflowCancelled(string workflowName, string executionId);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] faulted: {Error}")]
+    private partial void LogWorkflowFaulted(Exception exception, string workflowName, string executionId, string error);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] forking to [{Targets}] ({Mode})")]
+    private partial void LogForkStarting(string workflowName, string executionId, string targets, string mode);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] fork completed with {SucceededCount}/{TotalCount} branches")]
+    private partial void LogForkPartialSuccess(string workflowName, string executionId, int succeededCount, int totalCount);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] joined {BranchCount} branches at {JoinTarget}")]
+    private partial void LogJoinCompleted(string workflowName, string executionId, int branchCount, string joinTarget);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Branch job {JobName} starting in workflow {WorkflowName}")]
+    private partial void LogBranchJobStarting(string jobName, string workflowName);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Branch job {JobName} completed in {DurationMs}ms")]
+    private partial void LogBranchJobCompleted(string jobName, long durationMs);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Workflow {WorkflowName} [{ExecutionId}] loop at {LoopFrom} exited after {Iterations} iteration(s): {Reason}")]
+    private partial void LogLoopExited(string workflowName, string executionId, string loopFrom, int iterations, string reason);
 }

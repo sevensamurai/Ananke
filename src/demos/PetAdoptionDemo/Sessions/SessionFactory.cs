@@ -1,7 +1,8 @@
 using Ananke.AspNetCore.Sessions;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Memory;
+using Ananke.Abstractions.Memory;
 
 /// <summary>
 /// Creates fully-wired <see cref="AdoptionSession"/> instances.

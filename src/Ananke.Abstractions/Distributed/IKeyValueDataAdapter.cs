@@ -1,17 +1,12 @@
-using Ananke.Abstractions.Config;
-
 namespace Ananke.Abstractions.Distributed;
 
 /// <summary>
-/// Interface for key-value data storage operations
+/// Interface for key-value data storage operations.
+/// Implementations handle their own connection lifecycle internally
+/// (e.g. via DI constructor with <c>IOptions&lt;CacheConfig&gt;</c> and lazy connection).
 /// </summary>
 public interface IKeyValueDataAdapter : IAsyncDisposable
 {
-    /// <summary>
-    /// Sets up the connection to the data store
-    /// </summary>
-    Task SetupAsync(CacheConfig config, CancellationToken token = default);
-
     /// <summary>
     /// Gets a string value by key
     /// </summary>

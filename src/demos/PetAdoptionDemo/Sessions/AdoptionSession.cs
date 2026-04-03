@@ -1,4 +1,5 @@
 using Ananke.AspNetCore.Sessions;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
 using Ananke.StateMachine;

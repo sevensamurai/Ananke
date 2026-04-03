@@ -83,6 +83,17 @@ public static class ToolKitMcpExtensions
             properties.ValueKind != JsonValueKind.Object)
             return parameters;
 
+        var requiredSet = new HashSet<string>();
+        if (inputSchema.TryGetProperty("required", out var requiredArr) &&
+            requiredArr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in requiredArr.EnumerateArray())
+            {
+                if (item.GetString() is { } name)
+                    requiredSet.Add(name);
+            }
+        }
+
         foreach (var prop in properties.EnumerateObject())
         {
             var description = prop.Value.TryGetProperty("description", out var desc)
@@ -93,7 +104,7 @@ public static class ToolKitMcpExtensions
                 ? typeEl.GetString() ?? "string"
                 : "string";
 
-            parameters.Add(new ToolParameter(prop.Name, description, jsonType));
+            parameters.Add(new ToolParameter(prop.Name, description, jsonType, IsRequired: requiredSet.Contains(prop.Name)));
         }
 
         return parameters;

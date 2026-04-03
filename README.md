@@ -13,20 +13,18 @@
   <img src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10" />
 </p>
 
+# Ananke — AI Agent Orchestration Framework for .NET
+
 ---
 
-**Ananke** is a vendor-agnostic .NET framework that gives AI agents and automated pipelines
-everything they need to run in production — typed state, workflow orchestration, tool calling,
-long-term memory, human-in-the-loop approval, distributed coordination, and observability —
-so you can focus on agent logic instead of infrastructure.
+**Ananke** is a vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines. It provides typed workflow orchestration, LLM tool calling, multi-provider AI model support, long-term memory (RAG + empirical learning), human-in-the-loop approval, distributed coordination, and OpenTelemetry observability — all with idiomatic C# and no external services required for testing.
 
-Beyond orchestration, Ananke makes agents *smarter over time*:
-they accumulate knowledge from documents, recognize patterns across interactions,
-and build reusable skills and heuristics — turning raw LLM capability into
-compounding operational intelligence.
+Supports **OpenAI** (GPT-4.1, o-series), **Anthropic Claude**, **Google Gemini**, and any **OpenAI-compatible endpoint** including Ollama, Azure OpenAI, LM Studio, Groq, Deepseek, and Together AI.
+
+Beyond orchestration, Ananke makes agents *smarter over time*: they accumulate knowledge from documents, recognize patterns across interactions, and build reusable skills and heuristics — turning raw LLM capability into compounding operational intelligence.
 
 From a streaming chat agent to state-machine-coordinated multi-service pipelines:
-`dotnet add package Ananke` and [start building](#demos).
+`dotnet add package Ananke` and [start building](#getting-started).
 
 ---
 
@@ -49,8 +47,6 @@ Ananke starts from a different question:
 
 The answer is a typed, testable, composable foundation where the infrastructure comes first and LLM providers are pluggable.
 
-→ **[How does Ananke compare to LangGraph, Agent Framework, CrewAI, and others?](docs/about/framework-comparison.md)**
-
 ---
 
 ## Capabilities
@@ -62,7 +58,7 @@ Fluent graph-as-code builder · conditional & LLM-driven routing · fork/join pa
 `AgentJob` with tool calling + structured output · token-level streaming · multimodal messages (text, image, audio) · `ChatSessionEvent` async stream · multi-provider (OpenAI, Anthropic, Google Gemini + any OpenAI-compatible endpoint) · capability-based model routing · production decorators (429 retry with OTel, LLM response caching)
 
 ### 🧠 Long-Term Memory
-Document ingestion pipeline (extract → chunk → embed → store) · vector-indexed semantic search · knowledge catalog with LLM-enriched metadata and time-decay reranking · empirical memory (patterns, skills, heuristics learned over time)
+Document ingestion pipeline (extract → chunk → embed → store) · vector-indexed semantic search · knowledge catalog with LLM-enriched metadata and time-decay reranking · empirical memory (patterns, skills, heuristics) · episode store with temporal trajectories · Monte Carlo reward propagation · tag importance tracking · **skill package export/import** — portable bundles of learned knowledge with quality gates and trust scaling
 
 ### 🛑 Human-in-the-Loop
 Pause execution at any step · checkpoint full workflow state · resume with optional human input · interrupt stack for state machines
@@ -82,8 +78,40 @@ Plain-text DSL for workflow topology · runtime binding · Mermaid diagram expor
 ### 🗄️ Infrastructure
 Checkpointing (InMemory / File) · distributed locking (Redis) · MQTT pub/sub · OpenTelemetry tracing
 
+### 🎓 External Skill Catalog
+Discover CLI tools from the [OpenClaw/ClawHub](https://clawhub.io) registry · local JSON cache for offline search · `ToolKit.AddFromCatalogAsync()` for natural-language skill discovery · local skill voting and reliability scoring · **runs Python (PyPI) tools via `uvx`, Node.js tools via `npx`, Docker containers, or any shell command — no Python installation required**
+
 ### 🧑‍💻 Developer Experience
-Idiomatic C# (async/await, DI, generics) · full in-memory test mode for every infrastructure contract · 15 focused NuGet packages
+Idiomatic C# (async/await, DI, generics) · full in-memory test mode for every infrastructure contract · 18 focused NuGet packages
+
+---
+
+## Quick Example
+
+Build a typed multi-step pipeline in minutes:
+
+```csharp
+using Ananke.Orchestration;
+
+record ContentState
+{
+    public string Topic { get; init; } = "";
+    public string Draft  { get; init; } = "";
+    public string Final  { get; init; } = "";
+}
+
+var workflow = new Workflow<ContentState>("content-pipeline")
+    .Job("draft",  async (state, ct) => state with { Draft = $"Draft on: {state.Topic}" })
+    .Job("polish", async (state, ct) => state with { Final = state.Draft.ToUpperInvariant() })
+    .Chain("draft", "polish")
+    .Then("polish", Workflow.End);
+
+var result = await workflow.RunAsync(new ContentState { Topic = "AI in .NET" });
+Console.WriteLine(result.State.Final);  // "DRAFT ON: AI IN .NET"
+Console.WriteLine(result.Status);        // Completed
+```
+
+Drop an LLM agent into any job with the same API — add `Ananke.Orchestration.OpenAI` and replace the delegate with an `AgentJob`. See [Getting Started](docs/guides/01-getting-started.md) for a full walkthrough.
 
 ---
 
@@ -140,6 +168,9 @@ Each demo is a self-contained project you can run to see a specific capability e
 | [`Ananke.Orchestration.Anthropic`](Ananke.Orchestration.Anthropic/) | Anthropic / Claude provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Anthropic.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Anthropic) |
 | [`Ananke.Orchestration.Google`](Ananke.Orchestration.Google/) | Google Gemini provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Google.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Google) |
 | [`Ananke.MCP`](Ananke.MCP/) | Expose workflows and tools as MCP server capabilities | [![NuGet](https://img.shields.io/nuget/v/Ananke.MCP.svg)](https://www.nuget.org/packages/Ananke.MCP) |
+| [`Ananke.A2A`](Ananke.A2A/) | Agent-to-Agent (A2A) protocol — call remote agents as `IAgentModel`, expose workflows as A2A endpoints | [![NuGet](https://img.shields.io/nuget/v/Ananke.A2A.svg)](https://www.nuget.org/packages/Ananke.A2A) |
+| [`Ananke.Learning`](Ananke.Learning/) | Empirical memory, offline learning, episode store, Monte Carlo reward propagation, skill package export/import | [![NuGet](https://img.shields.io/nuget/v/Ananke.Learning.svg)](https://www.nuget.org/packages/Ananke.Learning) |
+| [`Ananke.Skills`](Ananke.Skills/) | External skill catalog — discover and run CLI tools from the OpenClaw registry via `ToolKit` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Skills.svg)](https://www.nuget.org/packages/Ananke.Skills) |
 | [`Ananke.Documents`](Ananke.Documents/) | Document extractors for the knowledge pipeline (PDF, Markdown) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Documents.svg)](https://www.nuget.org/packages/Ananke.Documents) |
 | [`Ananke.Qdrant`](Ananke.Qdrant/) | Qdrant vector database provider for `IKnowledgeStore`, `IKnowledgeCatalog`, and `IEmpiricalMemory` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Qdrant.svg)](https://www.nuget.org/packages/Ananke.Qdrant) |
 | [`Ananke.Redis`](Ananke.Redis/) | Distributed lock and key-value store via Redis | [![NuGet](https://img.shields.io/nuget/v/Ananke.Redis.svg)](https://www.nuget.org/packages/Ananke.Redis) |
@@ -150,16 +181,60 @@ Each demo is a self-contained project you can run to see a specific capability e
 
 ---
 
-## Documentation
+## Documentation & Guides
+
+The full documentation hub and progressive learning path are at **[docs/learning.md](docs/learning.md)** and the **[Feature Index](docs/reference/features.md)**.
+
+### Core Guides
 
 | Guide | What it covers |
 |---|---|
-| [Advanced Agent Features](docs/reference/advanced-agent-features.md) | Local/custom endpoints (Ollama, LM Studio, vLLM, Azure OpenAI), response caching, resilient retries, decorator composition |
-| [Tools & ToolKit Reference](docs/reference/tools-reference.md) | ToolDefinition, ToolParameter, ToolKit API, parameter examples for LLM accuracy, MCP/A2A integration |
+| [Getting Started](docs/guides/01-getting-started.md) | Install Ananke, build your first workflow, make your first LLM call |
+| [Workflows](docs/guides/02-workflows.md) | Workflow builder, conditional routing, fork/join parallelism, sub-workflows, event streaming |
+| [Agents & LLM Providers](docs/guides/03-agents.md) | OpenAI, Anthropic, Google Gemini, local models (Ollama, Azure OpenAI, LM Studio), model routing, multimodal |
+| [Tools & ToolKit](docs/guides/04-tools.md) | Typed tool parameters, `ToolResult`, async tools, JSON Schema inference |
+| [Streaming Chat](docs/guides/05-streaming-chat.md) | `StreamingChatWorkflow`, SSE endpoints, web UI integration, conversation memory |
+| [Long-Term Memory](docs/guides/06-memory.md) | Document ingestion, RAG pipeline, knowledge catalog, semantic search, time-decay reranking |
+| [Human-in-the-Loop](docs/guides/07-human-in-the-loop.md) | Interrupt before/after, checkpointing, resume with modified state |
+| [State Machine](docs/guides/08-state-machine.md) | Distributed FSM, guard conditions, middleware pipeline, circuit breaking |
+| [Distributed Systems](docs/guides/09-distributed.md) | Redis locking, MQTT pub/sub, agent handoff across processes |
+| [Observability](docs/guides/10-observability.md) | OpenTelemetry tracing, OTLP export, span attributes, retry event reporting |
+| [Advanced Agent Features](docs/guides/11-advanced-agents.md) | Local/custom endpoints, response caching, resilient retries, decorator composition |
+| [MCP & A2A Interop](docs/guides/12-mcp-and-interop.md) | Expose as MCP server, consume MCP tools, A2A agent-to-agent protocol |
+| [Empirical Memory & Skill Packaging](docs/guides/15-empirical-memory.md) | Patterns, skills, heuristics, confidence tracking, offline learning, episode store, skill export/import |
+| [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md) | `AffectOptions`, `OfflineLearnerOptions`, domain-specific recipes (game agents, incident response) |
+| [Testing](docs/guides/14-testing.md) | In-memory implementations, zero-config integration tests |
+| [uv & uvx Setup for .NET Developers](docs/guides/uv-setup-for-dotnet-developers.md) | Run Python-based OpenClaw skills from C# with one tool installed — no Python knowledge required |
+
+### Reference
+
+| Reference | What it covers |
+|---|---|
+| [Tools & ToolKit Reference](docs/reference/tools-reference.md) | `ToolDefinition`, `ToolParameter`, `ToolKit` API, parameter examples for LLM accuracy |
 | [Workflow DSL Reference](docs/reference/workflow-dsl.md) | Text DSL syntax, scaffold binding, router/fork/join patterns, Mermaid export |
-| [Framework Comparison](docs/about/framework-comparison.md) | Side-by-side comparison with LangGraph, Agent Framework, Semantic Kernel, CrewAI, Smolagents, and Agno |
+| [Full Feature Index](docs/reference/features.md) | Every capability in one scannable table |
+| [Skill Catalog (Ananke.Skills)](Ananke.Skills/README.md) | External skill registry integration, `ISkillCatalog`, `OpenClawCatalog`, scoring |
 | [Design Decisions](docs/reference/design-decisions.md) | Architecture Decision Records — `IAgentModel` vs `IChatClient`, and other trade-offs |
+| [FAQ](docs/faq.md) | Frequently asked questions |
 | [Background & Philosophy](docs/about/background.md) | The story and design philosophy behind Ananke |
+
+---
+
+## Frequently Asked Questions
+
+Common questions are answered in the **[FAQ](docs/faq.md)**. Quick answers:
+
+- **Which LLM providers are supported?** OpenAI (GPT-4.1, o-series), Anthropic Claude, Google Gemini, and any OpenAI-compatible endpoint — Ollama, Azure OpenAI, LM Studio, Groq, Deepseek, Together AI, vLLM.
+- **Can I test without a real LLM or external services?** Yes — every infrastructure contract ships with an in-memory implementation. Integration tests run in milliseconds with no API keys.
+- **Is Ananke only for chat agents?** No — it supports batch pipelines, state-machine workflows, distributed multi-service coordination, document-ingestion pipelines, and agentic design patterns alongside interactive chat.
+- **Can agents learn and improve over time?** Yes — `IEmpiricalMemory` accumulates patterns, skills, and heuristics from interactions. `IOfflineLearner` runs background sweeps that decay stale beliefs, explore hypotheses, and promote stable knowledge to the permanent store.
+- **Does Ananke support MCP (Model Context Protocol)?** Yes — expose any `ToolKit` or `Workflow` as an MCP server (compatible with VS Code Copilot, Claude Desktop, and any MCP client) and consume tools from external MCP servers.
+- **Does it support the A2A agent protocol?** Yes — call remote A2A agents as drop-in `IAgentModel` implementations and expose Ananke workflows as A2A endpoints.
+- **Can learned knowledge be transferred between agents?** Yes — `ISkillPackager` exports empirical entries and linked episodes as a portable JSON package (quality gates: min confidence, min strength, min observations). Import into any other agent with configurable trust scaling. Tag importance weights are bundled so the receiving agent inherits feature correlations too.
+- **What is the OpenClaw skill catalog?** `Ananke.Skills` connects to the [OpenClaw/ClawHub](https://clawhub.io) registry of CLI-based tools. One call to `toolkit.AddFromCatalogAsync("airbnb search lodging")` discovers, caches, and resolves matching tools as `ToolDefinition` entries that any agent can call.
+- **What is the difference between a Workflow and a State Machine?** A workflow runs a directed pipeline end to end (best for task pipelines, document processing, batch jobs). A state machine models long-lived entities with stable states and event-driven transitions (best for conversation sessions, order lifecycle, device management). Both compose: state machines can invoke workflows, and workflows can interact with state machines.
+
+→ **[Full FAQ →](docs/faq.md)**
 
 ---
 

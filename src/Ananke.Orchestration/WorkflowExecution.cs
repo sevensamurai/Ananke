@@ -1,3 +1,5 @@
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
 
@@ -35,9 +37,19 @@ public sealed class WorkflowExecution<TState>
     public IReadOnlyDictionary<string, string> Metadata { get; }
 
     private readonly List<JobExecution> _history = [];
+    private readonly Dictionary<string, int> _loopCounters = [];
 
     /// <summary>Ordered record of every job that has been executed in this run.</summary>
     public IReadOnlyList<JobExecution> History => _history;
+
+    /// <summary>Current iteration counts for active loops, keyed by the loop source job name.</summary>
+    internal IReadOnlyDictionary<string, int> LoopCounters => _loopCounters;
+
+    /// <summary>Cumulative token usage across all LLM calls in this execution.</summary>
+    public TokenUsage CumulativeUsage { get; internal set; } = TokenUsage.Zero;
+
+    /// <summary>Estimated cumulative cost in the unit defined by the workflow's cost model.</summary>
+    public decimal EstimatedCost { get; internal set; }
 
     internal WorkflowExecution(string workflowName, TState initialState,
         IReadOnlyDictionary<string, string>? metadata = null)
@@ -49,22 +61,41 @@ public sealed class WorkflowExecution<TState>
     }
 
     private WorkflowExecution(string id, string workflowName, TState state,
-        List<JobExecution> history, IReadOnlyDictionary<string, string>? metadata = null)
+        List<JobExecution> history, IReadOnlyDictionary<string, string>? metadata = null,
+        Dictionary<string, int>? loopCounters = null)
     {
         Id = id;
         WorkflowName = workflowName;
         State = state;
         _history = history;
         Metadata = metadata ?? new Dictionary<string, string>();
+        if (loopCounters is not null)
+            _loopCounters = loopCounters;
     }
 
     internal static WorkflowExecution<TState> FromCheckpoint(Checkpoint<TState> checkpoint) =>
         new(checkpoint.ExecutionId, checkpoint.WorkflowName, checkpoint.State,
-            [.. checkpoint.History], checkpoint.Metadata)
+            [.. checkpoint.History], checkpoint.Metadata,
+            checkpoint.LoopCounters is { Count: > 0 }
+                ? new Dictionary<string, int>(checkpoint.LoopCounters)
+                : null)
         {
             CurrentJob = checkpoint.CurrentJob,
             Status = checkpoint.Status
         };
+
+    /// <summary>Increments the loop counter for <paramref name="loopSource"/> and returns the new value.</summary>
+    internal int IncrementLoopCounter(string loopSource)
+    {
+        _loopCounters.TryGetValue(loopSource, out var count);
+        count++;
+        _loopCounters[loopSource] = count;
+        return count;
+    }
+
+    /// <summary>Resets the loop counter for <paramref name="loopSource"/> when the loop exits.</summary>
+    internal void ResetLoopCounter(string loopSource) =>
+        _loopCounters.Remove(loopSource);
 
     internal void RecordJobExecution(JobExecution execution) =>
         _history.Add(execution);

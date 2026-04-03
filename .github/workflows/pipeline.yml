@@ -30,7 +30,7 @@ jobs:
         run: dotnet restore src/Ananke.slnx
 
       - name: Build
-        run: dotnet build src/Ananke.slnx --configuration Release --no-restore
+        run: dotnet build src/Ananke.slnx --configuration Release
 
       - name: Test
         run: dotnet test src/Ananke.slnx --configuration Release --no-build --verbosity normal
@@ -63,7 +63,7 @@ jobs:
       - name: Pack
         run: |
           dotnet restore src/Ananke.slnx
-          dotnet build src/Ananke.slnx --configuration Release --no-restore
+          dotnet build src/Ananke.slnx --configuration Release
           dotnet pack src/Ananke.slnx --configuration Release --no-build --output ./packages
 
       - name: Publish to NuGet

@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using Ananke.Abstractions.Distributed;
 
+using Ananke.Abstractions.Agents;
+
 namespace Ananke.Orchestration.Agents;
 
 /// <summary>

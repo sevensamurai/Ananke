@@ -1,4 +1,5 @@
-using Ananke.Orchestration.Memory;
+using Ananke.Learning;
+using Ananke.Learning.Episodes;
 
 namespace Connect4Demo;
 
@@ -8,7 +9,10 @@ namespace Connect4Demo;
 /// <see cref="BoardFeatures"/>. No hardcoded strategic knowledge — patterns
 /// emerge through semantic similarity of feature descriptions across games.
 /// </summary>
-internal sealed class GameAnalyzer(InMemoryEmpiricalMemory memory)
+internal sealed class GameAnalyzer(
+    InMemoryEmpiricalMemory memory,
+    IEpisodeStore? episodeStore = null,
+    IRewardPropagator? rewardPropagator = null)
 {
     /// <summary>
     /// Analyzes a completed game: commits key board snapshots with outcome rewards,
@@ -28,7 +32,32 @@ internal sealed class GameAnalyzer(InMemoryEmpiricalMemory memory)
         };
 
         // ── Commit key board snapshots as observations ───────────────
-        insights.AddRange(await CommitSnapshotsAsync(board, reward, gameNumber));
+        var (snapshotInsights, steps) = await CommitSnapshotsAsync(board, reward, gameNumber);
+        insights.AddRange(snapshotInsights);
+
+        // ── Commit episode and propagate rewards ─────────────────────
+        if (episodeStore is not null && steps.Count > 0)
+        {
+            var episode = await episodeStore.CommitAsync(new Episode
+            {
+                Id = $"game_{gameNumber}",
+                Steps = steps,
+                TerminalReward = reward,
+                StartedAt = DateTimeOffset.UtcNow.AddSeconds(-board.MoveCount),
+                CompletedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["opponent"] = "training",
+                    ["moves"] = board.MoveCount.ToString()
+                }
+            });
+
+            if (rewardPropagator is not null)
+            {
+                var propagated = await rewardPropagator.PropagateAsync(episode, memory);
+                insights.Add($"\ud83d\udd04 Propagated reward through {propagated} steps");
+            }
+        }
 
         // ── Reinforce existing memories that match the final position ─
         insights.AddRange(await ReinforceMatchesAsync(board, reward, gameNumber));
@@ -43,11 +72,13 @@ internal sealed class GameAnalyzer(InMemoryEmpiricalMemory memory)
     /// Semantic tags decompose each snapshot into weighted dimensions for
     /// causal-aware dedup and structured recall.
     /// </summary>
-    private async Task<List<string>> CommitSnapshotsAsync(
+    private async Task<(List<string> Insights, List<EpisodeStep> Steps)> CommitSnapshotsAsync(
         Board board, float reward, int gameNumber)
     {
         var insights = new List<string>();
+        var steps = new List<EpisodeStep>();
         var replay = new Board();
+        var stepIndex = 0;
 
         foreach (var (col, player) in board.MoveHistory)
         {
@@ -69,8 +100,17 @@ internal sealed class GameAnalyzer(InMemoryEmpiricalMemory memory)
                     ObservationCount = 1,
                     Evidence = [$"game {gameNumber} move {replay.MoveCount} agent played col {col + 1} reward {reward:+0.0;-0.0;0}"],
                     FirstObserved = DateTimeOffset.UtcNow,
-                    LastObserved = DateTimeOffset.UtcNow
+                    LastObserved = DateTimeOffset.UtcNow,
+                    EpisodeId = $"game_{gameNumber}",
+                    StepIndex = stepIndex
                 });
+
+                steps.Add(new EpisodeStep
+                {
+                    StepIndex = stepIndex,
+                    EntryId = entry.Id
+                });
+                stepIndex++;
 
                 if (entry.ObservationCount > 1)
                     insights.Add($"📎 Merged into known position (observations: {entry.ObservationCount}, confidence: {entry.Confidence:F2})");
@@ -103,7 +143,7 @@ internal sealed class GameAnalyzer(InMemoryEmpiricalMemory memory)
         // Synthesize a heuristic from this game's observed tags
         insights.AddRange(await SynthesizeHeuristicAsync(board, reward, gameNumber));
 
-        return insights;
+        return (insights, steps);
     }
 
     /// <summary>

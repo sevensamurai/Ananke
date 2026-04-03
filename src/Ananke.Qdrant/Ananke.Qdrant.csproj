@@ -1,17 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Qdrant</PackageId>
-    <Description>Qdrant vector database provider for Ananke — IKnowledgeStore implementation with dense vector search, metadata filtering, and automatic collection management.</Description>
+    <Description>Qdrant vector database provider for Ananke � IKnowledgeStore implementation with dense vector search, metadata filtering, and automatic collection management.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Qdrant.Client" Version="1.17.0" />
+    <PackageReference Include="Qdrant.Client" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\Ananke.Learning\Ananke.Learning.csproj" />
   </ItemGroup>
 
 </Project>

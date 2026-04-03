@@ -9,22 +9,25 @@ namespace Ananke.MQTT;
 
 /// <summary>
 /// MQTT-backed implementation of <see cref="IChannelReader{M, A}"/>.
-/// Subscribes to MQTT topics and dispatches messages to the provided <see cref="IBackgroundWorker{T}"/>.
+/// Subscribes to MQTT topics and dispatches messages to the provided <see cref="IBackgroundWorker{T}"/>
+/// via a <see cref="BackgroundProcessor{T}"/> that provides backpressure and error isolation.
 /// </summary>
 /// <typeparam name="M">Message type implementing <see cref="IMqttContext"/>.</typeparam>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
-public sealed class MqttChannelReader<M, A>(ILogger<MqttChannelReader<M, A>>? logger = null) : IChannelReader<M, A>, IAsyncDisposable
+public sealed class MqttChannelReader<M, A>(
+    int queueCapacity = 1024,
+    ILogger<MqttChannelReader<M, A>>? logger = null) : IChannelReader<M, A>, IAsyncDisposable
     where M : class, IMqttContext
     where A : Enum
 {
     private readonly ILogger<MqttChannelReader<M, A>> _logger = logger ?? NullLogger<MqttChannelReader<M, A>>.Instance;
 
     private IMqttClient? _client;
-    private IBackgroundWorker<M>? _worker;
     private MqttClientOptions? _options;
     private string? _topic;
     private bool _linked;
     private bool _disposed;
+    private BackgroundProcessor<M>? _processor;
 
     private static byte[] GetPayloadBytes(ReadOnlySequence<byte> payload)
     {
@@ -62,7 +65,19 @@ public sealed class MqttChannelReader<M, A>(ILogger<MqttChannelReader<M, A>>? lo
     private async Task<bool> SetupClient(ChannelConfig config, IBackgroundWorker<M> consumer, string topic, bool useAction, CancellationToken token)
     {
         _topic = topic;
-        _worker = consumer;
+
+        // Dispose previous processor if ConfigureAsync is called again
+        if (_processor is not null)
+            await _processor.DisposeAsync();
+
+        _processor = new BackgroundProcessor<M>(
+            consumer,
+            queueCapacity,
+            onError: (ex, _) => _logger.LogError(ex,
+                "RX Channel worker failed to handle message of type {MessageType}", typeof(M).Name),
+            onInfo: msg => _logger.LogDebug("{Message}", msg));
+
+        _processor.Start(token);
 
         _logger.LogInformation("RX Channel subscribing to {Topic}", _topic);
         _client = new MqttClientFactory().CreateMqttClient();
@@ -93,7 +108,15 @@ public sealed class MqttChannelReader<M, A>(ILogger<MqttChannelReader<M, A>>? lo
                 message.Command = action;
             }
             _logger.LogDebug("Received message from {Topic}", e.ApplicationMessage.Topic);
-            await _worker.HandleAsync(message, token);
+
+            try
+            {
+                await _processor.EnqueueAsync(message);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("RX Channel enqueue cancelled for {Topic}", e.ApplicationMessage.Topic);
+            }
         };
 
         _client.ConnectedAsync += async _ =>
@@ -180,6 +203,9 @@ public sealed class MqttChannelReader<M, A>(ILogger<MqttChannelReader<M, A>>? lo
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (_processor is not null)
+            await _processor.DisposeAsync();
 
         await Clear();
 

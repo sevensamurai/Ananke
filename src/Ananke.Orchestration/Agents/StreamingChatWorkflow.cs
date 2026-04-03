@@ -2,8 +2,10 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
-using Ananke.Orchestration.Memory;
+using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Tools;
+
+using Ananke.Abstractions.Agents;
 
 namespace Ananke.Orchestration.Agents;
 
@@ -77,6 +79,7 @@ public static class StreamingChatWorkflow
         private Func<string, string, Task>? _onToolCall;
         private Func<string, string, Task>? _onToolResult;
         private IConversationMemory? _memory;
+        private IContextStrategy? _contextStrategy;
 
         internal Builder(string name, IStreamingAgentModel model)
         {
@@ -110,6 +113,19 @@ public static class StreamingChatWorkflow
         {
             ArgumentNullException.ThrowIfNull(toolKit);
             _toolKit = toolKit;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the context strategy applied before each agent generation round.
+        /// When set, the message history is passed through the strategy before
+        /// building the <see cref="AgentRequest"/> sent to the model.
+        /// </summary>
+        /// <param name="strategy">The context compaction strategy.</param>
+        public Builder WithContextStrategy(IContextStrategy strategy)
+        {
+            ArgumentNullException.ThrowIfNull(strategy);
+            _contextStrategy = strategy;
             return this;
         }
 
@@ -169,6 +185,7 @@ public static class StreamingChatWorkflow
             var onToolCall = _onToolCall;
             var onTool = _onToolResult;
             var memory = _memory;
+            var contextStrategy = _contextStrategy;
 
             return new Workflow<StreamingChatState>(_name)
                 .Job("agent", async (state, ct) =>
@@ -189,7 +206,9 @@ public static class StreamingChatWorkflow
                     var request = new AgentRequest
                     {
                         SystemPrompt = systemPrompt,
-                        Messages = state.Messages,
+                        Messages = contextStrategy is not null
+                            ? await contextStrategy.ApplyAsync(state.Messages, systemPrompt, ct)
+                            : state.Messages,
                         Tools = agentToolDefs
                     };
 
@@ -210,6 +229,10 @@ public static class StreamingChatWorkflow
                             completed = chunk.CompletedResponse;
                     }
 
+                    // Capture token usage for budget tracking
+                    if (completed is not null)
+                        TokenUsageCapture.Accumulate(completed);
+
                     return state with
                     {
                         LastResponse = completed,
@@ -221,6 +244,8 @@ public static class StreamingChatWorkflow
                     state.Messages.Add(AgentMessage.Assistant(
                         state.LastResponse!.Text ?? string.Empty,
                         state.LastResponse.ToolCalls));
+
+                    var hasNonRetryable = false;
 
                     foreach (var call in state.LastResponse.ToolCalls!)
                     {
@@ -235,7 +260,17 @@ public static class StreamingChatWorkflow
                         if (onTool is not null)
                             await onTool(call.FunctionName, toolResult.Value);
 
+                        if (toolResult.IsError && !toolResult.IsRetryable)
+                            hasNonRetryable = true;
+
                         state.Messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
+                    }
+
+                    if (hasNonRetryable)
+                    {
+                        state.Messages.Add(AgentMessage.User(
+                            "One or more tools returned a permanent error that will not succeed on retry. " +
+                            "Do not call those tools again. Proceed with your best answer using any information you already have."));
                     }
 
                     return state with

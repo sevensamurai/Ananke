@@ -1,5 +1,9 @@
-using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Memory;
+using Ananke.Learning;
+using Ananke.Learning.Episodes;
+using Ananke.Learning.Exploration;
+using Ananke.Learning.Offline;
+using Ananke.Learning.Skills;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.StateMachine;
 using Connect4Demo;
 
@@ -19,6 +23,10 @@ using Connect4Demo;
 //    Connect4Demo --train 200        — train (200 iterations) then play
 //    Connect4Demo --train --analyze  — train, print analysis report, exit
 //    Connect4Demo --analyze 300      — analyze 300 iterations then exit
+//    Connect4Demo --export skills.json            — play, export skills on exit
+//    Connect4Demo --import skills.json            — import skills then play
+//    Connect4Demo --train --export skills.json    — train, export, then play
+//    Connect4Demo --import prev.json --export next.json — full cycle
 // ═══════════════════════════════════════════════════════════════════
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -27,6 +35,8 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 var trainMode = false;
 var analyzeMode = false;
 var trainIterations = 50;
+string? exportPath = null;
+string? importPath = null;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -38,6 +48,14 @@ for (var i = 0; i < args.Length; i++)
     {
         analyzeMode = true;
         trainMode = true; // --analyze implies training
+    }
+    else if (args[i].Equals("--export", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+    {
+        exportPath = args[++i];
+    }
+    else if (args[i].Equals("--import", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+    {
+        importPath = args[++i];
     }
     else if (int.TryParse(args[i], out var n) && n > 0)
     {
@@ -53,15 +71,26 @@ var affectOptions = trainMode
     ? new AffectOptions { ReinforcementCooldownHours = 0.001f }
     : new AffectOptions();
 var memory = new InMemoryEmpiricalMemory(embedder, dedupThreshold: 0.85f, affectOptions: affectOptions);
-var agent = new Connect4Agent(memory);
-var analyzer = new GameAnalyzer(memory);
+var episodeStore = new InMemoryEpisodeStore();
+var rewardPropagator = new MonteCarloRewardPropagator();
+var explorationStrategy = new UcbExplorationStrategy();
+var skillFormat = new JsonSkillPackageFormat();
+var skillPackager = new SkillPackager();
+var agent = new Connect4Agent(memory, explorationStrategy);
+var analyzer = new GameAnalyzer(memory, episodeStore, rewardPropagator);
 var stats = new GameStats();
 var display = new Display(stats, memory);
+
+// ── Import skills from a previous session (optional) ─────────────
+if (importPath is not null)
+{
+    await ImportSkillsAsync(importPath);
+}
 
 // ── Training / analysis phase (optional) ─────────────────────────
 if (trainMode)
 {
-    var trainer = new Trainer(memory, analyzer);
+    var trainer = new Trainer(memory, analyzer, explorationStrategy);
 
     if (analyzeMode)
     {
@@ -70,6 +99,12 @@ if (trainMode)
     }
 
     await trainer.TrainAsync(trainIterations, stats);
+
+    // Export skills after training if requested
+    if (exportPath is not null)
+    {
+        await ExportSkillsAsync(exportPath);
+    }
 
     // Reset win/loss stats for interactive play but keep the memory
     stats.TotalGames = 0;
@@ -216,16 +251,90 @@ while (true)
 
     await machine.FireAsync(Action.AnalysisDone);
 
-    Console.Write("  Play again? (y/n): ");
-    var rematchKey = Console.ReadKey(intercept: true);
-    var again = rematchKey.KeyChar.ToString();
-    if (again is "n" or "N")
+    Console.Write("  Play again? (y/n/s=save skills): ");
+    while (true)
     {
-        await display.RenderFinalAsync();
-        break;
+        var rematchKey = Console.ReadKey(intercept: true);
+        var again = rematchKey.KeyChar.ToString();
+        if (again is "n" or "N")
+        {
+            Console.WriteLine();
+            if (exportPath is not null)
+                await ExportSkillsAsync(exportPath);
+            await display.RenderFinalAsync();
+            goto exit;
+        }
+
+        if (again is "s" or "S")
+        {
+            Console.WriteLine();
+            var savePath = exportPath ?? "connect4-skills.json";
+            await ExportSkillsAsync(savePath);
+            Console.Write("  Play again? (y/n/s=save skills): ");
+            continue;
+        }
+
+        Console.WriteLine();
+        break; // any other key = play again
     }
 
     display.ClearInsights();
+}
+
+exit:
+return;
+
+// ── Skill export / import helpers ────────────────────────────────────
+
+async Task ExportSkillsAsync(string path)
+{
+    await using var stream = File.Create(path);
+    await using var writer = skillFormat.CreateWriter(stream);
+    var result = await skillPackager.ExportAsync(
+        new SkillExportOptions
+        {
+            Name = "connect4-strategy",
+            Domain = "connect4",
+            Version = "1.0.0",
+            Description = $"Exported after {stats.TotalGames} games ({memory.Count} entries)",
+            MinStrength = 0.1f,
+            MinConfidence = 0.1f,
+            MinObservations = 1,
+            IncludeEpisodes = true
+        },
+        memory,
+        writer,
+        episodeStore);
+
+    Console.WriteLine(
+        $"  💾 Exported {result.EntriesExported} entries, " +
+        $"{result.EpisodesExported} episodes → {path}");
+}
+
+async Task ImportSkillsAsync(string path)
+{
+    if (!File.Exists(path))
+    {
+        Console.WriteLine($"  ⚠️  Skill file not found: {path}");
+        return;
+    }
+
+    await using var stream = File.OpenRead(path);
+    await using var reader = await skillFormat.CreateReaderAsync(stream);
+    var result = await skillPackager.ImportAsync(
+        reader,
+        memory,
+        episodeStore,
+        new SkillImportOptions
+        {
+            Mode = SkillImportMode.Merge,
+            StrengthScale = 0.9f,
+            EvidenceSource = "skill-import"
+        });
+
+    Console.WriteLine(
+        $"  📂 Imported {result.EntriesAdded} new + {result.EntriesMerged} merged entries, " +
+        $"{result.EpisodesImported} episodes ← {path}");
 }
 
 // ── State machine types ──────────────────────────────────────────────

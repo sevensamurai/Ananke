@@ -23,5 +23,10 @@ public enum ExecutionStatus
     /// <summary>
     /// Execution paused at an interrupt point, awaiting human input before resuming.
     /// </summary>
-    Interrupted
+    Interrupted,
+
+    /// <summary>
+    /// The workflow was terminated because its cost budget was exceeded.
+    /// </summary>
+    BudgetExceeded
 }

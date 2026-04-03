@@ -1,5 +1,6 @@
 using System.Text;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Documents;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Skills</PackageId>
+    <Description>External skill catalog for Ananke — discover, score, and resolve community-contributed CLI tools (e.g. OpenClaw/ClawHub) into ToolDefinition entries for agent use. Protocol-agnostic: bridges tools via direct process execution.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

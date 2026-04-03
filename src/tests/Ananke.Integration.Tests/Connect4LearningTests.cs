@@ -1,5 +1,6 @@
 using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Memory;
+using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Learning;
 using Shouldly;
 
 namespace Ananke.Integration.Tests;

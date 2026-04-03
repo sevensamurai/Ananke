@@ -1,25 +1,20 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
-using Ananke.Abstractions.Config;
 
 namespace Ananke.Abstractions.Distributed;
 
 /// <summary>
-/// Zero-config in-memory implementation of <see cref="IDistributedLock"/>.
+/// Zero-config in-memory implementation of <see cref="IDistributedLock"/> and
+/// <see cref="IKeyValueDataAdapter"/>.
 /// Replaces Redis for demos and unit tests — no external infrastructure required.
 /// </summary>
-public sealed class InMemoryDistributedLock : IDistributedLock
+public sealed class InMemoryDistributedLock : IDistributedLock, IKeyValueDataAdapter
 {
-    private readonly Dictionary<string, string> _store = [];
+    private readonly ConcurrentDictionary<string, string> _store = new();
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public Task SetupAsync(CacheConfig config, CancellationToken token = default) =>
-        Task.CompletedTask;
-
-    public Task<string?> GetValueAsync(string key)
-    {
-        _store.TryGetValue(key, out var value);
-        return Task.FromResult(value);
-    }
+    public Task<string?> GetValueAsync(string key) =>
+        Task.FromResult(_store.GetValueOrDefault(key));
 
     public Task<T?> GetValueAsync<T>(string key)
     {
@@ -41,7 +36,7 @@ public sealed class InMemoryDistributedLock : IDistributedLock
     }
 
     public Task<bool> RemoveAsync(string key) =>
-        Task.FromResult(_store.Remove(key));
+        Task.FromResult(_store.TryRemove(key, out _));
 
     public Task<bool> ExistsAsync(string key) =>
         Task.FromResult(_store.ContainsKey(key));
