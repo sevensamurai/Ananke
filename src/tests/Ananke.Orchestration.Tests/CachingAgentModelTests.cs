@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Ananke.Abstractions.Distributed;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Shouldly;
 

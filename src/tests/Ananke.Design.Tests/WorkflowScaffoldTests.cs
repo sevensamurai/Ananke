@@ -1,4 +1,5 @@
 using Ananke.Orchestration;
+using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Routing;
 using Shouldly;
@@ -9,6 +10,11 @@ public record ScaffoldState
 {
     public int Value { get; init; }
     public List<string> Trail { get; init; } = [];
+}
+
+public record SubFlowChildState
+{
+    public bool Done { get; init; }
 }
 
 [TestFixture]
@@ -352,6 +358,178 @@ public class WorkflowScaffoldTests
             new[] { "a -> b", "b -> End" });
 
         scaffold.JobNames.ShouldBe(["a", "b"], ignoreOrder: true);
+    }
+
+    // ── SubFlow directive ────────────────────────────────────────────
+
+    [Test]
+    public void Parse_SubFlowDirective_DoesNotAddExtraJobNames()
+    {
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """);
+
+        scaffold.JobNames.ShouldBe(["a", "b"], ignoreOrder: true);
+    }
+
+    [Test]
+    public void Parse_SubFlowReferencingUnknownJob_Throws()
+    {
+        Should.Throw<InvalidOperationException>(() =>
+            WorkflowScaffold.Parse<ScaffoldState>("test", """
+                a -> End
+                subflow(nonexistent)
+                """));
+    }
+
+    [Test]
+    public void UnboundSubFlows_TracksSubFlowNames()
+    {
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """);
+
+        scaffold.UnboundSubFlows.ShouldContain("a");
+    }
+
+    [Test]
+    public void UnboundSubFlows_ShrinkAfterBindSubFlow()
+    {
+        var inner = new Workflow<SubFlowChildState>("inner")
+            .Job("step", (s, _) => Task.FromResult(s with { Done = true }))
+            .Then("step", Workflow.End);
+
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """);
+
+        scaffold.BindSubFlow("a", inner,
+            parent => new SubFlowChildState(),
+            (parent, child) => parent with { Value = child.Done ? 1 : 0 });
+
+        scaffold.UnboundSubFlows.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void UnboundJobs_ExcludesSubFlowBindings()
+    {
+        var inner = new Workflow<SubFlowChildState>("inner")
+            .Job("step", (s, _) => Task.FromResult(s with { Done = true }))
+            .Then("step", Workflow.End);
+
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """);
+
+        scaffold.BindSubFlow("a", inner,
+            parent => new SubFlowChildState(),
+            (parent, child) => parent with { Value = child.Done ? 1 : 0 });
+
+        scaffold.UnboundJobs.ShouldNotContain("a");
+        scaffold.UnboundJobs.ShouldContain("b");
+    }
+
+    [Test]
+    public void BindSubFlow_NonSubFlowName_Throws()
+    {
+        var inner = new Workflow<SubFlowChildState>("inner")
+            .Job("step", (s, _) => Task.FromResult(s with { Done = true }))
+            .Then("step", Workflow.End);
+
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            """);
+
+        Should.Throw<InvalidOperationException>(() =>
+            scaffold.BindSubFlow("a", inner,
+                parent => new SubFlowChildState(),
+                (parent, child) => parent));
+    }
+
+    [Test]
+    public void Build_WithUnboundSubFlow_Throws()
+    {
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """);
+
+        scaffold.Bind("b", (s, _) => Task.FromResult(s));
+        // subflow "a" not bound
+
+        var ex = Should.Throw<InvalidOperationException>(() => scaffold.Build());
+        ex.Message.ShouldContain("a");
+        ex.Message.ShouldContain("subflow");
+    }
+
+    // ── Build + Run: SubFlow ─────────────────────────────────────────
+
+    [Test]
+    public async Task Build_SubFlow_RunsNestedWorkflow()
+    {
+        var inner = new Workflow<SubFlowChildState>("inner")
+            .Job("step", (s, _) => Task.FromResult(s with { Done = true }))
+            .Then("step", Workflow.End);
+
+        var workflow = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            subflow(a)
+            """)
+            .BindSubFlow("a", inner,
+                parent => new SubFlowChildState(),
+                (parent, child) => parent with { Value = child.Done ? 99 : 0 })
+            .Bind("b", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "b"] }))
+            .Build();
+
+        var execution = await workflow.RunAsync(new ScaffoldState());
+
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+        execution.Result!.FinalState.Value.ShouldBe(99);
+        execution.Result.FinalState.Trail.ShouldContain("b");
+    }
+
+    // ── Interrupt directive ──────────────────────────────────────────
+
+    [Test]
+    public void Parse_InterruptReferencingUnknownJob_Throws()
+    {
+        Should.Throw<InvalidOperationException>(() =>
+            WorkflowScaffold.Parse<ScaffoldState>("test", """
+                a -> End
+                interrupt(nonexistent)
+                """));
+    }
+
+    // ── Build + Run: Interrupt ───────────────────────────────────────
+
+    [Test]
+    public async Task Build_Interrupt_PausesBeforeJob()
+    {
+        var workflow = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            a -> b
+            b -> End
+            interrupt(b)
+            """)
+            .Bind("a", (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Bind("b", (s, _) => Task.FromResult(s with { Value = 2 }))
+            .Build()
+            .UseCheckpointing(new InMemoryCheckpointStore());
+
+        var execution = await workflow.RunAsync(new ScaffoldState());
+
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        execution.State.Value.ShouldBe(1);
     }
 
     // ── Test helpers ─────────────────────────────────────────────────

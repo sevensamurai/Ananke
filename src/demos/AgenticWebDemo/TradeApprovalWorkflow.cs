@@ -1,6 +1,7 @@
 using Ananke.AspNetCore.Sse;
 using Ananke.OpenTelemetry;
 using Ananke.Orchestration;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Tools;

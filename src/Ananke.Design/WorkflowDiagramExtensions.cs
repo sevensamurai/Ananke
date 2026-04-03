@@ -59,6 +59,11 @@ public static class WorkflowDiagramExtensions
                 case RouterConnection<TState>:
                     // Dynamic targets resolved at runtime — the diamond shape conveys decision semantics.
                     break;
+
+                case LoopConnection<TState> lc:
+                    sb.AppendLine($"    {from} -.->|\"loop (max {lc.MaxIterations})\"| {NodeId(lc.LoopTarget)}");
+                    sb.AppendLine($"    {from} -->|exit| {TargetId(lc.ExitTarget)}");
+                    break;
             }
         }
 
@@ -106,5 +111,6 @@ public static class WorkflowDiagramExtensions
 
     private static bool ReferencesEnd<TState>(WorkflowDefinition<TState> def) =>
         def.Connections.OfType<DirectConnection>().Any(c => c.To == Workflow.End) ||
+        def.Connections.OfType<LoopConnection<TState>>().Any(c => c.ExitTarget == Workflow.End) ||
         def.Joins.Any(j => j.Target == Workflow.End);
 }

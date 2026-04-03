@@ -68,7 +68,7 @@ public sealed record SearchOptions
 
 /// <summary>
 /// Controls how search results are formatted when surfaced to agents via
-/// <see cref="KnowledgeSearchTool"/> or <see cref="KnowledgeTools"/>.
+/// <see cref="Tools.KnowledgeSearchTool"/> or <see cref="Tools.KnowledgeTools"/>.
 /// </summary>
 public sealed record SearchResultFormatting
 {

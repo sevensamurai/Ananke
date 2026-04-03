@@ -16,4 +16,10 @@ internal abstract record ConnectionLine
 
     /// <summary><c>a -&gt; router(b, c, End)</c></summary>
     internal sealed record Router(string From, string[] Options) : ConnectionLine;
+
+    /// <summary><c>subflow(name)</c> — marks a job as a nested sub-workflow.</summary>
+    internal sealed record SubFlow(string Name) : ConnectionLine;
+
+    /// <summary><c>interrupt(name)</c> — pauses execution before the named job.</summary>
+    internal sealed record Interrupt(string JobName) : ConnectionLine;
 }

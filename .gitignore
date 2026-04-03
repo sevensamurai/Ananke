@@ -69,7 +69,7 @@ project.fragment.lock.json
 Thumbs.db
 
 # Ananke
-## Research, experimental, design
+## Research, experimental, design - only in private fork
 internals/
 
 ## Demo secrets

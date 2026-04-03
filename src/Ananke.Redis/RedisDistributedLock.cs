@@ -12,7 +12,8 @@ namespace Ananke.Redis;
 /// <summary>
 /// Redis-backed implementation of <see cref="IDistributedLock"/> using RedLock for coordination.
 /// Extends <see cref="RedisDataAdapter"/> for key-value storage.
-/// Supports both manual <see cref="SetupLockAsync"/> and DI via <see cref="IOptions{CacheConfig}"/>.
+/// Connection and RedLock factory are initialized from <see cref="IOptions{CacheConfig}"/>
+/// provided via DI; the Redis connection itself is deferred until first use.
 /// </summary>
 public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
 {
@@ -22,26 +23,10 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
     private bool _disposed;
 
     public RedisDistributedLock(IOptions<CacheConfig> options, ILogger<RedisDistributedLock>? logger = null)
-        : base(options, null)
+        : base(options.Value, null)
     {
         _logger = logger ?? NullLogger<RedisDistributedLock>.Instance;
         InitializeRedLock(options.Value);
-    }
-
-    public RedisDistributedLock(ILogger<RedisDistributedLock>? logger = null)
-        : base(null)
-    {
-        _logger = logger ?? NullLogger<RedisDistributedLock>.Instance;
-    }
-
-    /// <summary>
-    /// Sets up both the Redis connection and RedLock factory.
-    /// Preferred over the inherited <see cref="RedisDataAdapter.SetupAsync"/> when using manual setup.
-    /// </summary>
-    public async Task SetupLockAsync(CacheConfig config, CancellationToken token = default)
-    {
-        await SetupAsync(config, token);
-        InitializeRedLock(config);
     }
 
     private void InitializeRedLock(CacheConfig config)
@@ -58,7 +43,7 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
     public async Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(string resourceId, Func<Task<R>> action)
     {
         if (_factory is null)
-            return CoordinatedActionResult<R>.Failed("Lock factory not configured. Call SetupLockAsync() first.");
+            return CoordinatedActionResult<R>.Failed("Lock factory not initialized. Register via AddRedis() in DI.");
 
         try
         {
@@ -88,7 +73,7 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
         int retryDelayMs = 100)
     {
         if (_factory is null)
-            return CoordinatedActionResult<R>.Failed("Lock factory not configured. Call SetupLockAsync() first.");
+            return CoordinatedActionResult<R>.Failed("Lock factory not initialized. Register via AddRedis() in DI.");
 
         var attempt = 0;
         CoordinatedActionResult<R>? lastResult = null;

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Ananke.AspNetCore.Sse;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.StateMachine;
 using Microsoft.Extensions.Logging;

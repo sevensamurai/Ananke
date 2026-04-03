@@ -1,4 +1,4 @@
-using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Google.GenAI;
 using Google.GenAI.Types;
 

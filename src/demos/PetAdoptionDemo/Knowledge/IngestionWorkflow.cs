@@ -3,8 +3,12 @@ using System.Text.Json;
 using Ananke.AspNetCore.Configuration;
 using Ananke.Design;
 using Ananke.Documents;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
+using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Orchestration.Knowledge.Documents;
 using Ananke.Qdrant;
 using Qdrant.Client;
 

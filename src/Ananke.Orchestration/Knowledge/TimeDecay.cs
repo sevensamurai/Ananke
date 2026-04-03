@@ -1,3 +1,5 @@
+using Ananke.Orchestration.Knowledge.Catalog;
+
 namespace Ananke.Orchestration.Knowledge;
 
 /// <summary>

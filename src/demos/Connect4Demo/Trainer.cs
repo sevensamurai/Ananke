@@ -1,5 +1,7 @@
 using System.Text;
-using Ananke.Orchestration.Memory;
+using Ananke.Learning;
+using Ananke.Learning.Exploration;
+using Ananke.Learning.Offline;
 
 namespace Connect4Demo;
 
@@ -18,7 +20,8 @@ namespace Connect4Demo;
 /// </summary>
 internal sealed class Trainer(
     InMemoryEmpiricalMemory memory,
-    GameAnalyzer analyzer)
+    GameAnalyzer analyzer,
+    IExplorationStrategy? explorationStrategy = null)
 {
     /// <summary>Window size for learning-curve buckets.</summary>
     private const int WindowSize = 10;
@@ -72,7 +75,7 @@ internal sealed class Trainer(
         var evalGames = Math.Max(iterations / 2, 20);
         Console.WriteLine($"\n  Phase 3: Evaluating trained agent ({evalGames} games)...");
 
-        var trainedAgent = new Connect4Agent(memory);
+        var trainedAgent = new Connect4Agent(memory, explorationStrategy);
         var trainedWins = 0;
         var trainedLosses = 0;
         var trainedDraws = 0;
@@ -91,7 +94,7 @@ internal sealed class Trainer(
         Console.WriteLine($"  Phase 4: Baseline comparison ({evalGames} games, no memory)...");
 
         var baselineMemory = new InMemoryEmpiricalMemory(
-            new Ananke.Orchestration.Knowledge.InMemoryEmbedder(),
+            new Ananke.Orchestration.Knowledge.Embeddings.InMemoryEmbedder(),
             dedupThreshold: 0.85f,
             affectOptions: new AffectOptions());
 
@@ -237,7 +240,7 @@ internal sealed class Trainer(
         //    reference — the actual agent mechanism, not the strategic AI.
         const int baselineEpisodes = 40;
         var emptyMemory = new InMemoryEmpiricalMemory(
-            new Ananke.Orchestration.Knowledge.InMemoryEmbedder(),
+            new Ananke.Orchestration.Knowledge.Embeddings.InMemoryEmbedder(),
             dedupThreshold: 0.85f,
             affectOptions: new AffectOptions { ReinforcementCooldownHours = 0.001f });
         var emptyAgent = new Connect4Agent(emptyMemory);
@@ -266,7 +269,7 @@ internal sealed class Trainer(
             // then play games with a Connect4Agent backed by that memory.
             // This tests whether the pattern is useful to the recall mechanism.
             var focusedMemory = new InMemoryEmpiricalMemory(
-                new Ananke.Orchestration.Knowledge.InMemoryEmbedder(),
+                new Ananke.Orchestration.Knowledge.Embeddings.InMemoryEmbedder(),
                 dedupThreshold: 0.85f,
                 affectOptions: new AffectOptions { ReinforcementCooldownHours = 0.001f });
 

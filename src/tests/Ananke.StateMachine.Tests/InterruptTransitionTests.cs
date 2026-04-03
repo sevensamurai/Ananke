@@ -15,9 +15,9 @@ enum ConvoNotify { None }
 //  Responding ──[Interrupt]──► interrupt ──► Interrupted
 //  Interrupted ──[Resume]──► resume ──► (popped from stack)
 
-sealed class ConvoMachine(IDistributedLock locker, StateMachineOptions? options = null)
+sealed class ConvoMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
     : AbstractStateMachine<TestContext, ConvoState, ConvoAction, ConvoNotify>(
-        ConvoState.Idle, locker, options)
+        ConvoState.Idle, locker, store, options)
 {
     public bool AllowInterrupt { get; set; } = true;
 
@@ -44,9 +44,9 @@ enum DeepState { A, B, C, D }
 enum DeepAction { GoB, GoC, GoD, InterruptToB, InterruptToC, InterruptToD, Resume }
 enum DeepNotify { None }
 
-sealed class DeepInterruptMachine(IDistributedLock locker, StateMachineOptions? options = null)
+sealed class DeepInterruptMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
     : AbstractStateMachine<TestContext, DeepState, DeepAction, DeepNotify>(
-        DeepState.A, locker, options)
+        DeepState.A, locker, store, options)
 {
     protected override Action<ITransitionBuilder<DeepState, DeepAction>> Transitions => b => b
         .From(DeepState.A).On(DeepAction.InterruptToB).ToInterrupt(DeepState.B)
@@ -79,8 +79,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Interrupt_PushesCurrentStateAndTransitionsToInterruptState()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -101,8 +101,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Resume_PopsStackAndReturnsToInterruptedState()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -124,8 +124,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task NestedInterrupts_PushAndPopCorrectly()
     {
-        var machine = new DeepInterruptMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new DeepInterruptMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         // A → interrupt → B
         var r1 = await machine.TransitionAsync(ctx, DeepAction.InterruptToB);
@@ -170,8 +170,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Interrupt_WithGuardFailing_IsRejected()
     {
-        var machine = new ConvoMachine(_lock) { AllowInterrupt = false };
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock) { AllowInterrupt = false };
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -191,8 +191,8 @@ public class InterruptTransitionTests
     public async Task Interrupt_ExceedingMaxDepth_IsRejected()
     {
         var options = new StateMachineOptions { MaxInterruptDepth = 2 };
-        var machine = new DeepInterruptMachine(_lock, options);
-        var ctx = new TestContext(1);
+        var machine = new DeepInterruptMachine(_lock, _lock, options);
+        var ctx = new TestContext("1");
 
         // A → interrupt → B (depth 1)
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
@@ -212,8 +212,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Resume_WithEmptyStack_Fails()
     {
-        var machine = new DeepInterruptMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new DeepInterruptMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         // Try to resume from A without any interrupt — but Resume is only defined from B, C, D.
         // Let's interrupt first, resume, then try resuming again.
@@ -239,8 +239,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task IsInterrupted_TracksCorrectlyThroughInterruptAndResume()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         machine.IsInterrupted.ShouldBeFalse();
 
@@ -262,15 +262,15 @@ public class InterruptTransitionTests
     [Test]
     public async Task InterruptStack_SurvivesPersistenceRoundTrip()
     {
-        var machine = new DeepInterruptMachine(_lock);
-        var ctx = new TestContext(42);
+        var machine = new DeepInterruptMachine(_lock, _lock);
+        var ctx = new TestContext("42");
 
         // Build up a stack: A → B → C
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToC)).Success.ShouldBeTrue();
 
         // Create a new machine instance pointing at the same lock store
-        var machine2 = new DeepInterruptMachine(_lock);
+        var machine2 = new DeepInterruptMachine(_lock, _lock);
 
         // Resume should pop C → B (reading stack from persisted context)
         var result = await machine2.TransitionAsync(ctx, DeepAction.Resume);
@@ -291,8 +291,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task NormalTransitions_WorkAlongsideInterruptInfrastructure()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         // Full normal flow without interrupts
         (await machine.TransitionAsync(ctx, ConvoAction.Listen)).Success.ShouldBeTrue();
@@ -308,8 +308,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task AfterResume_CanContinueNormalFlow()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -327,8 +327,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Interrupt_WithPayload_SurfacesPayloadInResult()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -345,8 +345,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Interrupt_WithoutPayload_HasNullPayload()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -361,8 +361,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Resume_ClearsPayload()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
@@ -378,8 +378,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task NormalTransition_HasNullPayload()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, ConvoAction.Listen);
 
@@ -391,8 +391,8 @@ public class InterruptTransitionTests
     [Test]
     public async Task Interrupt_WithComplexPayload_PreservesObject()
     {
-        var machine = new ConvoMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new ConvoMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);

@@ -14,15 +14,15 @@ enum DoorState { Locked, Closed, Open }
 enum DoorAction { Unlock, Lock, OpenDoor, CloseDoor }
 enum DoorNotify { None }
 
-sealed record TestContext(long Id) : IBaseContext;
+sealed record TestContext(string Id) : IBaseContext;
 
 // ── Minimal concrete state machine for testing ───────────────────
 //  Off ──[TurnOn]──► On ──[TurnOff]──► Off
 //  On  ──[Blink]──► Blinking ──[Stabilize]──► On
 
-sealed class LightMachine(IDistributedLock locker, StateMachineOptions? options = null)
+sealed class LightMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
     : AbstractStateMachine<TestContext, Light, LightAction, LightNotify>(
-        Light.Off, locker, options)
+        Light.Off, locker, store, options)
 {
     protected override Action<ITransitionBuilder<Light, LightAction>> Transitions => b => b
         .From(Light.Off).On(LightAction.TurnOn).To(Light.On)
@@ -48,8 +48,8 @@ sealed class DoorMachine : AbstractStateMachine<TestContext, DoorState, DoorActi
     public bool HasKey { get; set; } = true;
     public List<string> ActionLog { get; } = [];
 
-    public DoorMachine(IDistributedLock locker, StateMachineOptions? options = null)
-        : base(DoorState.Locked, locker, options) { }
+    public DoorMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
+        : base(DoorState.Locked, locker, store, options) { }
 
     protected override Action<ITransitionBuilder<DoorState, DoorAction>> Transitions => b => b
         .From(DoorState.Locked).On(DoorAction.Unlock).To(DoorState.Closed)

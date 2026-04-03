@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Execution;
@@ -55,6 +56,8 @@ public static class Workflow
 /// <b>Thread safety:</b> <c>Workflow&lt;TState&gt;</c> is not thread-safe.
 /// Construct and configure your workflow on a single thread before calling
 /// <see cref="RunAsync"/> or <see cref="Build"/>.
+/// The builder is frozen after <see cref="Build"/> — subsequent mutations throw
+/// <see cref="InvalidOperationException"/>.
 /// </remarks>
 public sealed class Workflow<TState>
 {
@@ -72,7 +75,9 @@ public sealed class Workflow<TState>
     private IWorkflowTracer? _tracer;
     private bool _storeCompletions = true;
     private Dictionary<string, string>? _metadata;
+    private BudgetConfig? _budget;
     private WorkflowDefinition<TState>? _cachedDefinition;
+    private bool _frozen;
 
     public Workflow(string name)
     {
@@ -80,8 +85,16 @@ public sealed class Workflow<TState>
         _name = name;
     }
 
+    private void ThrowIfFrozen()
+    {
+        if (_frozen)
+            throw new InvalidOperationException(
+                $"Workflow '{_name}' is frozen after Build(). Create a new Workflow instance to make changes.");
+    }
+
     public Workflow<TState> Job(string name, Func<TState, CancellationToken, Task<TState>> execute)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (_jobs.ContainsKey(name))
@@ -100,6 +113,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> Job(string name, IJob<TState> job)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(job);
 
@@ -119,6 +133,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> Then(string from, string to)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(from);
         ArgumentException.ThrowIfNullOrWhiteSpace(to);
 
@@ -128,6 +143,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> Then(string from, IRouter<TState> router)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(from);
         ArgumentNullException.ThrowIfNull(router);
 
@@ -141,10 +157,58 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> Then(string from, ForkTarget fork)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(from);
         ArgumentNullException.ThrowIfNull(fork);
 
         _connections.Add(new ForkConnection { From = from, Targets = fork.Targets, Mode = fork.Mode });
+        return this;
+    }
+
+    /// <summary>
+    /// Creates a loop that cycles from <paramref name="from"/> back to
+    /// <paramref name="loopTarget"/> until <paramref name="until"/> returns <c>true</c>,
+    /// then continues to <paramref name="exitTarget"/>.
+    /// </summary>
+    /// <param name="from">The evaluation job — its output state is tested each iteration.</param>
+    /// <param name="loopTarget">The job to restart when the condition is not met.</param>
+    /// <param name="exitTarget">The job to continue to when the loop exits (or <see cref="Workflow.End"/>).</param>
+    /// <param name="until">Predicate evaluated after <paramref name="from"/> completes.</param>
+    /// <param name="maxIterations">Safety cap. Default 10.</param>
+    /// <example>
+    /// <code>
+    /// var workflow = new Workflow&lt;ReviewState&gt;("review-critique")
+    ///     .Job("generate", generatorAgent)
+    ///     .Job("critique", criticAgent)
+    ///     .Then("generate", "critique")
+    ///     .Loop("critique", loopTarget: "generate", exitTarget: Workflow.End,
+    ///           until: s =&gt; s.Score &gt;= 0.9, maxIterations: 5);
+    /// </code>
+    /// </example>
+    public Workflow<TState> Loop(
+        string from,
+        string loopTarget,
+        string exitTarget,
+        Func<TState, bool> until,
+        int maxIterations = 10)
+    {
+        ThrowIfFrozen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(from);
+        ArgumentException.ThrowIfNullOrWhiteSpace(loopTarget);
+        ArgumentNullException.ThrowIfNull(until);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxIterations, 1);
+
+        if (string.IsNullOrWhiteSpace(exitTarget) && exitTarget != Workflow.EndMarker)
+            ArgumentException.ThrowIfNullOrWhiteSpace(exitTarget);
+
+        _connections.Add(new LoopConnection<TState>
+        {
+            From = from,
+            LoopTarget = loopTarget,
+            ExitTarget = exitTarget,
+            Until = until,
+            MaxIterations = maxIterations
+        });
         return this;
     }
 
@@ -155,6 +219,7 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> Join(string[] sources, string target, Func<TState[], TState> merge)
     {
+        ThrowIfFrozen();
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentException.ThrowIfNullOrWhiteSpace(target);
         ArgumentNullException.ThrowIfNull(merge);
@@ -210,6 +275,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> OnEnter(string jobName, Func<TState, Task> action)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         _onEnterActions[jobName] = action;
         return this;
@@ -217,6 +283,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> OnExit(string jobName, Func<TState, Task> action)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         _onExitActions[jobName] = action;
         return this;
@@ -224,6 +291,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> Timeout(string jobName, TimeSpan timeout)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
         _timeouts[jobName] = timeout;
@@ -238,6 +306,7 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> InterruptBefore(string jobName)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         _interrupts[jobName] = InterruptMode.Before;
         return this;
@@ -251,6 +320,7 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> InterruptAfter(string jobName)
     {
+        ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         _interrupts[jobName] = InterruptMode.After;
         return this;
@@ -258,12 +328,14 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> UseRunner(IWorkflowRunner runner)
     {
+        ThrowIfFrozen();
         _runner = runner;
         return this;
     }
 
     public Workflow<TState> UseCheckpointing(ICheckpointStore store)
     {
+        ThrowIfFrozen();
         ArgumentNullException.ThrowIfNull(store);
         _checkpointStore = store;
         return this;
@@ -271,6 +343,7 @@ public sealed class Workflow<TState>
 
     public Workflow<TState> UseTracing(IWorkflowTracer tracer)
     {
+        ThrowIfFrozen();
         ArgumentNullException.ThrowIfNull(tracer);
         _tracer = tracer;
         return this;
@@ -282,6 +355,7 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> StoreCompletions(bool enabled)
     {
+        ThrowIfFrozen();
         _storeCompletions = enabled;
         return this;
     }
@@ -293,8 +367,36 @@ public sealed class Workflow<TState>
     /// </summary>
     public Workflow<TState> WithMetadata(Dictionary<string, string> metadata)
     {
+        ThrowIfFrozen();
         ArgumentNullException.ThrowIfNull(metadata);
         _metadata = metadata;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a cost budget for the workflow. If cumulative estimated cost exceeds
+    /// <paramref name="maxCost"/>, the workflow terminates with
+    /// <see cref="ExecutionStatus.BudgetExceeded"/>.
+    /// </summary>
+    /// <param name="maxCost">Maximum allowed estimated cost.</param>
+    /// <param name="costPer1KInputTokens">Cost per 1,000 input tokens.</param>
+    /// <param name="costPer1KOutputTokens">Cost per 1,000 output tokens.</param>
+    public Workflow<TState> WithBudget(
+        decimal maxCost,
+        decimal costPer1KInputTokens,
+        decimal costPer1KOutputTokens)
+    {
+        ThrowIfFrozen();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxCost, 0);
+        ArgumentOutOfRangeException.ThrowIfNegative(costPer1KInputTokens);
+        ArgumentOutOfRangeException.ThrowIfNegative(costPer1KOutputTokens);
+
+        _budget = new BudgetConfig
+        {
+            MaxCost = maxCost,
+            CostPer1KInputTokens = costPer1KInputTokens,
+            CostPer1KOutputTokens = costPer1KOutputTokens
+        };
         return this;
     }
 
@@ -321,7 +423,8 @@ public sealed class Workflow<TState>
 
         ApplyLifecycleActions();
 
-        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins);
+        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins, _budget);
+        _frozen = true;
         return _cachedDefinition;
     }
 

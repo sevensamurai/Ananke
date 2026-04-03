@@ -9,5 +9,5 @@ public interface IBaseContext
     /// <summary>
     /// Unique identifier for this context/entity
     /// </summary>
-    public long Id { get; }
+    public string Id { get; }
 }

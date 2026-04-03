@@ -1,4 +1,5 @@
 using Ananke.AspNetCore.Sessions;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 
 internal static class InterruptEndpoint

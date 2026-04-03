@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 
+using Ananke.Abstractions.Agents;
+
 namespace Ananke.Orchestration.Agents;
 
 public sealed class ModelRouter : IModelRouter

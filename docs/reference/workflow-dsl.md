@@ -80,6 +80,22 @@ validate -> End
 
 Lines starting with `#` and blank lines are ignored. Inline `#` comments are stripped.
 
+### SubFlow (nested workflow)
+
+```
+subflow(refine)
+```
+
+Marks the job `refine` as a nested sub-workflow. The job must also appear in a connection (e.g. `draft -> refine`). At bind time, supply the inner workflow and state mappers via `BindSubFlow()`.
+
+### Interrupt (human-in-the-loop)
+
+```
+interrupt(publish)
+```
+
+Pauses execution before the named job runs. The workflow returns with `ExecutionStatus.Interrupted` and can be resumed via `ResumeAsync`. Requires `UseCheckpointing` to be configured on the built workflow.
+
 ## Usage
 
 ### Basic: linear workflow
@@ -147,6 +163,56 @@ var workflow = scaffold
     .Build();
 ```
 
+### SubFlow (nested workflow)
+
+```csharp
+var editLoop = new Workflow<EditState>("edit-loop")
+    .Job("edit", async (state, ct) => state with { Text = "polished", Attempts = state.Attempts + 1 })
+    .Job("validate", async (state, ct) => state with { Valid = state.Attempts >= 2 })
+    .Then("edit", "validate")
+    .Then("validate", Workflow.Decide<EditState>(s => s.Valid ? Workflow.End : "edit"));
+
+var scaffold = WorkflowScaffold.Parse<DocState>("pipeline", """
+    draft -> refine
+    refine -> publish
+    publish -> End
+    subflow(refine)
+    """);
+
+var workflow = scaffold
+    .Bind("draft", async (state, ct) => state with { Draft = "rough draft" })
+    .BindSubFlow("refine", editLoop,
+        parent => new EditState { Text = parent.Draft },
+        (parent, child) => parent with { Draft = child.Text })
+    .Bind("publish", async (state, ct) => state with { Published = true })
+    .Build();
+```
+
+### Interrupt (human-in-the-loop)
+
+```csharp
+var scaffold = WorkflowScaffold.Parse<ApprovalState>("approval", """
+    draft -> review
+    review -> publish
+    publish -> End
+    interrupt(publish)
+    """);
+
+var workflow = scaffold
+    .Bind("draft", async (state, ct) => state with { Draft = "content" })
+    .Bind("review", async (state, ct) => state with { Reviewed = true })
+    .Bind("publish", async (state, ct) => state with { Published = true })
+    .Build()
+    .UseCheckpointing(new InMemoryCheckpointStore());
+
+// First run pauses before "publish"
+var execution = await workflow.RunAsync(initialState);
+// execution.Status == ExecutionStatus.Interrupted
+
+// Resume after human approval
+var resumed = await workflow.ResumeAsync(execution.Id);
+```
+
 ### Using IJob&lt;TState&gt; implementations
 
 ```csharp
@@ -181,9 +247,10 @@ var scaffold = WorkflowScaffold.Parse<MyState>("pipeline", dsl);
 IReadOnlySet<string> all = scaffold.JobNames;
 
 // What still needs binding
-IReadOnlySet<string> jobs    = scaffold.UnboundJobs;
-IReadOnlySet<string> merges  = scaffold.UnboundMerges;
-IReadOnlySet<string> routers = scaffold.UnboundRouters;
+IReadOnlySet<string> jobs     = scaffold.UnboundJobs;
+IReadOnlySet<string> merges   = scaffold.UnboundMerges;
+IReadOnlySet<string> routers  = scaffold.UnboundRouters;
+IReadOnlySet<string> subflows = scaffold.UnboundSubFlows;
 ```
 
 ## Combining with Mermaid export
@@ -204,14 +271,15 @@ string markdown = workflow.ToMarkdownMermaid();
 
 The scaffold validates at two stages:
 
-1. **Parse time** — syntax errors, minimum argument counts (fork ≥ 2 targets, join ≥ 2 sources, router ≥ 2 options)
-2. **Build time** — all jobs bound, all join merges bound, all routers bound. The resulting `Workflow<TState>.Build()` then applies the standard graph validation (reachability, terminal connections, etc.)
+1. **Parse time** — syntax errors, minimum argument counts (fork ≥ 2 targets, join ≥ 2 sources, router ≥ 2 options), and directive targets referencing known jobs (subflow/interrupt)
+2. **Build time** — all jobs bound, all join merges bound, all routers bound, all subflows bound. The resulting `Workflow<TState>.Build()` then applies the standard graph validation (reachability, terminal connections, etc.)
 
 Error messages are explicit:
 
 ```
 Unbound job(s): fetch_a, fetch_b. Call Bind() for each job before building.
 Unbound merge(s) for join target(s): combine. Call BindMerge() for each join target before building.
+Unbound subflow(s): refine. Call BindSubFlow() for each subflow before building.
 Job 'unknown' is not declared in the DSL. Known jobs: plan, fetch_a, fetch_b
 ```
 

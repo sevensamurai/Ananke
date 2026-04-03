@@ -1,5 +1,6 @@
 using Ananke.AspNetCore.Sessions;
 using Ananke.AspNetCore.Sse;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 
 internal static class ChatEndpoint

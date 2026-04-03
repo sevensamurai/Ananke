@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Learning</PackageId>
+    <Description>Empirical memory and skill learning for Ananke — pattern recognition, reinforcement learning, episodes, credit assignment, exploration strategies, and portable skill packaging.</Description>
+    <PackageTags>ai;agents;learning;empirical-memory;reinforcement;skills;prediction;simulation;offline-learning</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+</Project>

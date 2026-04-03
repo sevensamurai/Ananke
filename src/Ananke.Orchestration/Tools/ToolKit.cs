@@ -1,12 +1,26 @@
-using System.Globalization;
-using System.Text.Json;
-
 namespace Ananke.Orchestration.Tools;
 
 /// <summary>
 /// A named collection of <see cref="ToolDefinition"/> instances made available to an
 /// <c>AgentJob</c> for tool-calling workflows. Build a kit once and share it across agents.
 /// </summary>
+/// <remarks>
+/// <para><b>Quick-add (0 or 1 parameter):</b></para>
+/// <code>
+/// var kit = new ToolKit("stock")
+///     .AddTool("ping", "Returns pong", () =&gt; "pong")
+///     .AddTool("get_price", "Gets price", GetPrice, "symbol", "Ticker");
+/// </code>
+/// <para><b>Builder (2+ parameters, metadata, cancellation):</b></para>
+/// <code>
+/// kit.AddTool("buy", "Buys shares", b =&gt; b
+///     .Param("symbol", "Ticker", examples: ["AAPL", "MSFT"])
+///     .Param&lt;int&gt;("quantity", "Shares to buy")
+///     .Tags("trading")
+///     .OnExecute(async args =&gt; ToolResult.Ok(
+///         $"Bought {args.Get&lt;int&gt;("quantity")} {args.Get("symbol")}")));
+/// </code>
+/// </remarks>
 public sealed class ToolKit
 {
     private readonly Dictionary<string, ToolDefinition> _tools = [];
@@ -20,6 +34,9 @@ public sealed class ToolKit
         Name = name;
     }
 
+    // ── Convenience overloads (0-param) ─────────────────────────────
+
+    /// <summary>Adds a tool with no parameters (sync).</summary>
     public ToolKit AddTool(
         string name,
         string description,
@@ -35,6 +52,7 @@ public sealed class ToolKit
         return this;
     }
 
+    /// <summary>Adds a tool with no parameters (async).</summary>
     public ToolKit AddTool(
         string name,
         string description,
@@ -50,6 +68,9 @@ public sealed class ToolKit
         return this;
     }
 
+    // ── Convenience overloads (1-param string) ──────────────────────
+
+    /// <summary>Adds a tool with one string parameter (sync).</summary>
     public ToolKit AddTool(
         string name,
         string description,
@@ -61,16 +82,17 @@ public sealed class ToolKit
         {
             Name = name,
             Description = description,
-            Parameters = [new(paramName, paramDescription)],
+            Parameters = [new(paramName, paramDescription, IsRequired: true)],
             Execute = (args, _) =>
             {
-                var arg = GetArg(args, paramName);
+                var arg = new ToolArgs(args).Get(paramName);
                 return Task.FromResult(execute(arg));
             }
         };
         return this;
     }
 
+    /// <summary>Adds a tool with one string parameter (async).</summary>
     public ToolKit AddTool(
         string name,
         string description,
@@ -82,60 +104,19 @@ public sealed class ToolKit
         {
             Name = name,
             Description = description,
-            Parameters = [new(paramName, paramDescription)],
+            Parameters = [new(paramName, paramDescription, IsRequired: true)],
             Execute = (args, _) =>
             {
-                var arg = GetArg(args, paramName);
+                var arg = new ToolArgs(args).Get(paramName);
                 return execute(arg);
             }
         };
         return this;
     }
 
-    public ToolKit AddTool(
-        string name,
-        string description,
-        Func<string, string, ToolResult> execute,
-        (string name, string description) param1,
-        (string name, string description) param2)
-    {
-        _tools[name] = new ToolDefinition
-        {
-            Name = name,
-            Description = description,
-            Parameters = [new(param1.name, param1.description), new(param2.name, param2.description)],
-            Execute = (args, _) =>
-            {
-                var arg1 = GetArg(args, param1.name);
-                var arg2 = GetArg(args, param2.name);
-                return Task.FromResult(execute(arg1, arg2));
-            }
-        };
-        return this;
-    }
+    // ── Convenience overloads (1-param typed) ───────────────────────
 
-    public ToolKit AddTool(
-        string name,
-        string description,
-        Func<string, string, Task<ToolResult>> execute,
-        (string name, string description) param1,
-        (string name, string description) param2)
-    {
-        _tools[name] = new ToolDefinition
-        {
-            Name = name,
-            Description = description,
-            Parameters = [new(param1.name, param1.description), new(param2.name, param2.description)],
-            Execute = (args, _) =>
-            {
-                var arg1 = GetArg(args, param1.name);
-                var arg2 = GetArg(args, param2.name);
-                return execute(arg1, arg2);
-            }
-        };
-        return this;
-    }
-
+    /// <summary>Adds a tool with one typed parameter (sync).</summary>
     public ToolKit AddTool<T>(
         string name,
         string description,
@@ -147,16 +128,17 @@ public sealed class ToolKit
         {
             Name = name,
             Description = description,
-            Parameters = [new(paramName, paramDescription, JsonTypeFor(typeof(T)))],
+            Parameters = [new(paramName, paramDescription, ToolArgs.JsonTypeFor(typeof(T)), IsRequired: true)],
             Execute = (args, _) =>
             {
-                var arg = GetArg<T>(args, paramName);
+                var arg = new ToolArgs(args).Get<T>(paramName);
                 return Task.FromResult(execute(arg));
             }
         };
         return this;
     }
 
+    /// <summary>Adds a tool with one typed parameter (async).</summary>
     public ToolKit AddTool<T>(
         string name,
         string description,
@@ -168,120 +150,32 @@ public sealed class ToolKit
         {
             Name = name,
             Description = description,
-            Parameters = [new(paramName, paramDescription, JsonTypeFor(typeof(T)))],
+            Parameters = [new(paramName, paramDescription, ToolArgs.JsonTypeFor(typeof(T)), IsRequired: true)],
             Execute = (args, _) =>
             {
-                var arg = GetArg<T>(args, paramName);
+                var arg = new ToolArgs(args).Get<T>(paramName);
                 return execute(arg);
             }
         };
         return this;
     }
 
-    public ToolKit AddTool<T1, T2>(
-        string name,
-        string description,
-        Func<T1, T2, ToolResult> execute,
-        (string name, string description) param1,
-        (string name, string description) param2)
+    // ── Builder overload (2+ params, metadata, cancellation) ────────
+
+    /// <summary>
+    /// Adds a tool configured via a <see cref="ToolBuilder"/>. Use this for tools with
+    /// 2+ parameters, per-parameter examples, tags, prerequisites, or cancellation support.
+    /// </summary>
+    /// <param name="name">Tool name (used by the LLM to invoke it).</param>
+    /// <param name="description">Human-readable description sent to the LLM.</param>
+    /// <param name="configure">Builder callback — call <c>Param</c>, <c>OnExecute</c>, etc.</param>
+    public ToolKit AddTool(string name, string description, Action<ToolBuilder> configure)
     {
-        _tools[name] = new ToolDefinition
-        {
-            Name = name,
-            Description = description,
-            Parameters = [
-                new(param1.name, param1.description, JsonTypeFor(typeof(T1))),
-                new(param2.name, param2.description, JsonTypeFor(typeof(T2)))
-            ],
-            Execute = (args, _) =>
-            {
-                var arg1 = GetArg<T1>(args, param1.name);
-                var arg2 = GetArg<T2>(args, param2.name);
-                return Task.FromResult(execute(arg1, arg2));
-            }
-        };
+        var builder = new ToolBuilder();
+        configure(builder);
+        _tools[name] = builder.Build(name, description);
         return this;
     }
-
-    public ToolKit AddTool<T1, T2>(
-        string name,
-        string description,
-        Func<T1, T2, Task<ToolResult>> execute,
-        (string name, string description) param1,
-        (string name, string description) param2)
-    {
-        _tools[name] = new ToolDefinition
-        {
-            Name = name,
-            Description = description,
-            Parameters = [
-                new(param1.name, param1.description, JsonTypeFor(typeof(T1))),
-                new(param2.name, param2.description, JsonTypeFor(typeof(T2)))
-            ],
-            Execute = (args, _) =>
-            {
-                var arg1 = GetArg<T1>(args, param1.name);
-                var arg2 = GetArg<T2>(args, param2.name);
-                return execute(arg1, arg2);
-            }
-        };
-        return this;
-    }
-
-    private static string GetArg(IReadOnlyDictionary<string, object?> args, string name)
-    {
-        if (!args.TryGetValue(name, out var value) || value is null)
-            throw new ArgumentException($"Missing required tool argument: {name}");
-
-        if (value is JsonElement element)
-            return element.ValueKind == JsonValueKind.String
-                ? element.GetString() ?? string.Empty
-                : element.GetRawText();
-
-        return value.ToString() ?? string.Empty;
-    }
-
-    private static T GetArg<T>(IReadOnlyDictionary<string, object?> args, string name)
-    {
-        if (!args.TryGetValue(name, out var value) || value is null)
-            throw new ArgumentException($"Missing required tool argument: {name}");
-
-        if (value is JsonElement element)
-        {
-            try
-            {
-                return JsonSerializer.Deserialize<T>(element)
-                    ?? throw new ArgumentException(
-                        $"Tool argument '{name}' deserialized to null.");
-            }
-            catch (JsonException ex)
-            {
-                throw new ArgumentException(
-                    $"Tool argument '{name}' could not be deserialized to {typeof(T).Name}. JSON: {element.GetRawText()}", ex);
-            }
-        }
-
-        if (value is T typed)
-            return typed;
-
-        try
-        {
-            return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
-        }
-        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
-        {
-            throw new ArgumentException(
-                $"Tool argument '{name}' could not be converted to {typeof(T).Name}. Value: {value}");
-        }
-    }
-
-    private static string JsonTypeFor(Type type) => type switch
-    {
-        _ when type == typeof(int) || type == typeof(long) => "integer",
-        _ when type == typeof(float) || type == typeof(double) || type == typeof(decimal) => "number",
-        _ when type == typeof(bool) => "boolean",
-        _ => "string"
-    };
 
     /// <summary>
     /// Copies all tools from <paramref name="other"/> into this kit.
@@ -308,5 +202,76 @@ public sealed class ToolKit
         ArgumentNullException.ThrowIfNull(tool);
         _tools[tool.Name] = tool;
         return this;
+    }
+
+    /// <summary>
+    /// Checks all <see cref="ToolPrerequisite"/> entries declared by tools in this kit.
+    /// Returns a result indicating which prerequisites passed and which failed.
+    /// Call at startup (e.g. after <see cref="Workflow{TState}.Validate"/>) to fail fast
+    /// before any agent tries to invoke a tool with missing dependencies.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var result = await toolkit.CheckPrerequisitesAsync();
+    /// if (!result.IsSuccess)
+    ///     throw new InvalidOperationException(result.Summary);
+    /// </code>
+    /// </example>
+    public async Task<PrerequisiteCheckResult> CheckPrerequisitesAsync(CancellationToken ct = default)
+    {
+        var checked_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var passed = new List<string>();
+        var failures = new List<PrerequisiteFailure>();
+
+        foreach (var tool in _tools.Values)
+        {
+            foreach (var req in tool.Requires)
+            {
+                if (!checked_.Add(req.Name))
+                    continue;
+
+                var ok = await req.Check(ct).ConfigureAwait(false);
+                if (ok)
+                    passed.Add(req.Name);
+                else
+                    failures.Add(new PrerequisiteFailure(req.Name, tool.Name, req.InstallHint));
+            }
+        }
+
+        return new PrerequisiteCheckResult(passed, failures);
+    }
+}
+
+/// <summary>
+/// Describes a single prerequisite check failure — which binary is missing,
+/// which tool needs it, and how to install it.
+/// </summary>
+public sealed record PrerequisiteFailure(string Prerequisite, string ToolName, string InstallHint);
+
+/// <summary>
+/// The outcome of <see cref="ToolKit.CheckPrerequisitesAsync"/>. Contains the list of
+/// passed and failed prerequisites, plus a human-readable <see cref="Summary"/>.
+/// </summary>
+public sealed record PrerequisiteCheckResult(
+    IReadOnlyList<string> Passed,
+    IReadOnlyList<PrerequisiteFailure> Failures)
+{
+    public bool IsSuccess => Failures.Count == 0;
+
+    /// <summary>
+    /// A multi-line summary suitable for logging or exception messages.
+    /// Lists every missing prerequisite with its install hint.
+    /// </summary>
+    public string Summary
+    {
+        get
+        {
+            if (IsSuccess)
+                return $"All prerequisites satisfied ({Passed.Count} checked).";
+
+            var lines = Failures.Select(f =>
+                $"  ✗ '{f.Prerequisite}' required by tool '{f.ToolName}' — {f.InstallHint}");
+            return $"Missing prerequisites:\n{string.Join("\n", lines)}";
+        }
     }
 }

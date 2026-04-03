@@ -35,7 +35,7 @@ public record CoordinatedActionResult<R>
     };
 }
 
-public interface IDistributedLock : IKeyValueDataAdapter
+public interface IDistributedLock
 {
     /// <summary>
     /// Executes an action (distributed system) that involves a state check/change

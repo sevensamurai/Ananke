@@ -16,16 +16,14 @@ using Microsoft.Extensions.DependencyInjection;
 // ── 1. Define tools ──────────────────────────────────────────────────
 
 var mathTools = new ToolKit("math")
-    .AddTool<double, double>(
-        "add", "Adds two numbers",
-        (a, b) => $"{a + b}",
-        ("a", "First number"),
-        ("b", "Second number"))
-    .AddTool<double, double>(
-        "multiply", "Multiplies two numbers",
-        (a, b) => $"{a * b}",
-        ("a", "First number"),
-        ("b", "Second number"));
+    .AddTool("add", "Adds two numbers", b => b
+        .Param<double>("a", "First number")
+        .Param<double>("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{args.Get<double>("a") + args.Get<double>("b")}")))
+    .AddTool("multiply", "Multiplies two numbers", b => b
+        .Param<double>("a", "First number")
+        .Param<double>("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{args.Get<double>("a") * args.Get<double>("b")}")));
 
 var textTools = new ToolKit("text")
     .AddTool(

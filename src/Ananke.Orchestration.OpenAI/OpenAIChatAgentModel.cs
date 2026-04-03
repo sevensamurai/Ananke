@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using OpenAI;
 using OpenAI.Chat;
@@ -51,13 +52,15 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             return new AgentResponse
             {
                 Text = completion.Content.FirstOrDefault()?.Text,
-                ToolCalls = toolCalls
+                ToolCalls = toolCalls,
+                Usage = MapUsage(completion.Usage)
             };
         }
 
         return new AgentResponse
         {
-            Text = completion.Content.FirstOrDefault()?.Text
+            Text = completion.Content.FirstOrDefault()?.Text,
+            Usage = MapUsage(completion.Usage)
         };
     }
 
@@ -70,9 +73,13 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
 
         var fullText = new StringBuilder();
         var toolCallBuilders = new Dictionary<int, (string id, string name, StringBuilder args)>();
+        ChatTokenUsage? streamUsage = null;
 
         await foreach (var update in _client.CompleteChatStreamingAsync(messages, options, ct))
         {
+            // Usage is reported on the final streaming chunk
+            if (update.Usage is not null)
+                streamUsage = update.Usage;
             foreach (var part in update.ContentUpdate)
             {
                 if (part.Text is { Length: > 0 })
@@ -128,10 +135,18 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             CompletedResponse = new AgentResponse
             {
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
-                ToolCalls = toolCalls
+                ToolCalls = toolCalls,
+                Usage = MapUsage(streamUsage)
             }
         };
     }
+
+    private static TokenUsage? MapUsage(ChatTokenUsage? usage) =>
+        usage is null ? null : new TokenUsage
+        {
+            InputTokens = usage.InputTokenCount,
+            OutputTokens = usage.OutputTokenCount
+        };
 
     private static List<ChatMessage> MapMessages(AgentRequest request)
     {

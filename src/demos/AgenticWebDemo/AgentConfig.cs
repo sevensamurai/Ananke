@@ -18,10 +18,11 @@ internal static class AgentConfig
     // Registers supported providers and reads the configuration.
     internal static ProviderProfile Configure(IConfiguration config)
     {
-        AgentModelFactory.RegisterProvider("OpenAI",
-            defaultModel: "gpt-4.1-mini",
-            agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model));
+        var factory = new AgentModelFactory()
+            .RegisterProvider("OpenAI",
+                defaultModel: "gpt-4.1-mini",
+                agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model));
 
-        return AgentModelFactory.FromConfiguration(config);
+        return factory.FromConfiguration(config);
     }
 }

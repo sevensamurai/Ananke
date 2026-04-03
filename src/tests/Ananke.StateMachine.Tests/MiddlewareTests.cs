@@ -22,9 +22,9 @@ public class MiddlewareTests
     public async Task LoggingMiddleware_LogsTransitionAttemptAndResult()
     {
         var logs = new List<string>();
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
         machine.UseMiddleware(new LoggingMiddleware<TestContext, Light, LightAction>(msg => logs.Add(msg)));
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -38,9 +38,9 @@ public class MiddlewareTests
     {
         var logs = new List<string>();
         var options = new StateMachineOptions { AllowImplicitSelfTransitions = false };
-        var machine = new LightMachine(_lock, options);
+        var machine = new LightMachine(_lock, _lock, options);
         machine.UseMiddleware(new LoggingMiddleware<TestContext, Light, LightAction>(msg => logs.Add(msg)));
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOff); // invalid from Off
 
@@ -56,14 +56,14 @@ public class MiddlewareTests
         TimeSpan? elapsed = null;
         bool? wasSuccess = null;
 
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
         machine.UseMiddleware(new MetricsMiddleware<TestContext, Light, LightAction>((t, e, s) =>
         {
             recorded = t;
             elapsed = e;
             wasSuccess = s;
         }));
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -77,9 +77,9 @@ public class MiddlewareTests
     [Test]
     public async Task CustomMiddleware_CanShortCircuit()
     {
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
         machine.UseMiddleware(new BlockingMiddleware());
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -91,10 +91,10 @@ public class MiddlewareTests
     public async Task MultipleMiddlewares_ExecuteInRegistrationOrder()
     {
         var order = new List<int>();
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
         machine.UseMiddleware(new OrderedMiddleware(1, order));
         machine.UseMiddleware(new OrderedMiddleware(2, order));
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -104,9 +104,9 @@ public class MiddlewareTests
     [Test]
     public async Task UseMiddleware_GenericOverload_WorksLikeDirect()
     {
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
         machine.UseMiddleware<PassThroughMiddleware>();
-        var ctx = new TestContext(1);
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
 

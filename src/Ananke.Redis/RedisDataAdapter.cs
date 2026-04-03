@@ -11,7 +11,8 @@ namespace Ananke.Redis;
 
 /// <summary>
 /// Redis-backed implementation of <see cref="IKeyValueDataAdapter"/>.
-/// Supports both manual <see cref="SetupAsync"/> and DI via <see cref="IOptions{CacheConfig}"/>.
+/// Connection is established lazily on first use from the <see cref="CacheConfig"/>
+/// provided via <see cref="IOptions{CacheConfig}"/>.
 /// </summary>
 public class RedisDataAdapter : IKeyValueDataAdapter
 {
@@ -26,18 +27,22 @@ public class RedisDataAdapter : IKeyValueDataAdapter
     /// is established lazily on the first operation, avoiding sync-over-async in the constructor.
     /// </summary>
     public RedisDataAdapter(IOptions<CacheConfig> options, ILogger<RedisDataAdapter>? logger = null)
-        : this(logger)
     {
         ArgumentNullException.ThrowIfNull(options.Value);
         _deferredConfig = options.Value;
-    }
-
-    public RedisDataAdapter(ILogger<RedisDataAdapter>? logger = null)
-    {
         _logger = logger ?? NullLogger<RedisDataAdapter>.Instance;
     }
 
-    public async Task SetupAsync(CacheConfig config, CancellationToken token = default)
+    /// <summary>
+    /// Internal constructor for subclasses that manage their own config lifecycle.
+    /// </summary>
+    private protected RedisDataAdapter(CacheConfig? config, ILogger<RedisDataAdapter>? logger)
+    {
+        _deferredConfig = config;
+        _logger = logger ?? NullLogger<RedisDataAdapter>.Instance;
+    }
+
+    private async Task ConnectAsync(CacheConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
@@ -55,7 +60,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
 
     /// <summary>
     /// Establishes the Redis connection from deferred config on first use.
-    /// No-op if already connected or if no config was provided (manual setup path).
+    /// No-op if already connected.
     /// </summary>
     private async Task EnsureConnectedAsync()
     {
@@ -65,7 +70,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         try
         {
             if (_redis is not null || _deferredConfig is null) return;
-            await SetupAsync(_deferredConfig);
+            await ConnectAsync(_deferredConfig);
         }
         catch (Exception ex)
         {

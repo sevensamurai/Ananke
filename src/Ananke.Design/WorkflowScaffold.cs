@@ -43,10 +43,13 @@ public sealed class WorkflowScaffold<TState>
     private readonly string _name;
     private readonly List<ConnectionLine> _connections;
     private readonly HashSet<string> _jobNames;
+    private readonly HashSet<string> _subFlowNames;
+    private readonly HashSet<string> _interruptJobs;
     private readonly Dictionary<string, IJob<TState>> _boundJobs = [];
     private readonly Dictionary<string, Func<TState, CancellationToken, Task<TState>>> _boundDelegates = [];
     private readonly Dictionary<string, Func<TState[], TState>> _mergeFunctions = [];
     private readonly Dictionary<string, IRouter<TState>> _routers = [];
+    private readonly Dictionary<string, Action<Workflow<TState>>> _subFlowBindings = [];
 
     internal WorkflowScaffold(string name, List<ConnectionLine> connections)
     {
@@ -56,6 +59,26 @@ public sealed class WorkflowScaffold<TState>
 
         if (_jobNames.Count == 0)
             throw new InvalidOperationException("DSL produced no job names. At least one connection is required.");
+
+        _subFlowNames = connections.OfType<ConnectionLine.SubFlow>()
+            .Select(sf => sf.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        _interruptJobs = connections.OfType<ConnectionLine.Interrupt>()
+            .Select(i => i.JobName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var unknownSubFlows = _subFlowNames.Where(n => !_jobNames.Contains(n)).ToList();
+        if (unknownSubFlows.Count > 0)
+            throw new InvalidOperationException(
+                $"SubFlow directive(s) reference unknown job(s): {string.Join(", ", unknownSubFlows)}. " +
+                "Each subflow name must appear in a connection.");
+
+        var unknownInterrupts = _interruptJobs.Where(n => !_jobNames.Contains(n)).ToList();
+        if (unknownInterrupts.Count > 0)
+            throw new InvalidOperationException(
+                $"Interrupt directive(s) reference unknown job(s): {string.Join(", ", unknownInterrupts)}. " +
+                "Each interrupt target must appear in a connection.");
     }
 
     /// <summary>
@@ -65,9 +88,13 @@ public sealed class WorkflowScaffold<TState>
 
     /// <summary>
     /// Job names that have not yet been bound to an implementation.
+    /// Excludes jobs declared as subflows (use <see cref="BindSubFlow{TChild}"/> for those).
     /// </summary>
     public IReadOnlySet<string> UnboundJobs =>
-        new HashSet<string>(_jobNames.Where(n => !_boundJobs.ContainsKey(n) && !_boundDelegates.ContainsKey(n)));
+        new HashSet<string>(_jobNames.Where(n =>
+            !_boundJobs.ContainsKey(n) &&
+            !_boundDelegates.ContainsKey(n) &&
+            !_subFlowNames.Contains(n)));
 
     /// <summary>
     /// Join targets that have not yet been bound to a merge function.
@@ -101,6 +128,19 @@ public sealed class WorkflowScaffold<TState>
 
             routerJobs.ExceptWith(_routers.Keys);
             return routerJobs;
+        }
+    }
+
+    /// <summary>
+    /// SubFlow names that have not yet been bound via <see cref="BindSubFlow{TChild}"/>.
+    /// </summary>
+    public IReadOnlySet<string> UnboundSubFlows
+    {
+        get
+        {
+            var unbound = new HashSet<string>(_subFlowNames, StringComparer.OrdinalIgnoreCase);
+            unbound.ExceptWith(_subFlowBindings.Keys);
+            return unbound;
         }
     }
 
@@ -165,6 +205,36 @@ public sealed class WorkflowScaffold<TState>
     }
 
     /// <summary>
+    /// Binds a nested workflow for a job declared with <c>subflow(name)</c> in the DSL.
+    /// </summary>
+    /// <typeparam name="TChild">State type of the inner workflow.</typeparam>
+    /// <param name="name">Job name matching a <c>subflow(name)</c> directive.</param>
+    /// <param name="innerWorkflow">The nested workflow to execute.</param>
+    /// <param name="mapIn">Transforms the parent state into the child workflow's initial state.</param>
+    /// <param name="mapOut">Merges the child result back into the parent state.</param>
+    /// <param name="maxDepth">Maximum nesting depth (default 5).</param>
+    public WorkflowScaffold<TState> BindSubFlow<TChild>(
+        string name,
+        Workflow<TChild> innerWorkflow,
+        Func<TState, TChild> mapIn,
+        Func<TState, TChild, TState> mapOut,
+        int maxDepth = 5)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(innerWorkflow);
+        ArgumentNullException.ThrowIfNull(mapIn);
+        ArgumentNullException.ThrowIfNull(mapOut);
+
+        if (!_subFlowNames.Contains(name))
+            throw new InvalidOperationException(
+                $"'{name}' is not declared as a subflow in the DSL. " +
+                $"Add 'subflow({name})' to the DSL.");
+
+        _subFlowBindings[name] = wf => wf.SubFlow(name, innerWorkflow, mapIn, mapOut, maxDepth);
+        return this;
+    }
+
+    /// <summary>
     /// Builds the fully bound workflow. Throws if any jobs, merges, or routers are unbound.
     /// </summary>
     public Workflow<TState> Build()
@@ -176,7 +246,11 @@ public sealed class WorkflowScaffold<TState>
         // Register jobs in discovery order (first seen = entry job)
         foreach (var name in DiscoverOrderedJobNames(_connections))
         {
-            if (_boundJobs.TryGetValue(name, out var job))
+            if (_subFlowBindings.TryGetValue(name, out var applySubFlow))
+            {
+                applySubFlow(workflow);
+            }
+            else if (_boundJobs.TryGetValue(name, out var job))
                 workflow.Job(name, job);
             else if (_boundDelegates.TryGetValue(name, out var execute))
                 workflow.Job(name, execute);
@@ -209,8 +283,16 @@ public sealed class WorkflowScaffold<TState>
                 case ConnectionLine.Router r:
                     workflow.Then(r.From, _routers[r.From]);
                     break;
+
+                case ConnectionLine.SubFlow:
+                case ConnectionLine.Interrupt:
+                    break; // node annotations — handled separately
             }
         }
+
+        // Apply interrupt directives
+        foreach (var job in _interruptJobs)
+            workflow.InterruptBefore(job);
 
         return workflow;
     }
@@ -244,6 +326,12 @@ public sealed class WorkflowScaffold<TState>
             throw new InvalidOperationException(
                 $"Unbound router(s): {string.Join(", ", unboundRouters)}. " +
                 "Call BindRouter() for each router job before building.");
+
+        var unboundSubFlows = UnboundSubFlows;
+        if (unboundSubFlows.Count > 0)
+            throw new InvalidOperationException(
+                $"Unbound subflow(s): {string.Join(", ", unboundSubFlows)}. " +
+                "Call BindSubFlow() for each subflow before building.");
     }
 
     private static ForkMode? ParseForkMode(string? mode) => mode?.ToLowerInvariant() switch
@@ -289,6 +377,10 @@ public sealed class WorkflowScaffold<TState>
                     TryAdd(r.From);
                     foreach (var o in r.Options) TryAdd(o);
                     break;
+
+                case ConnectionLine.SubFlow:
+                case ConnectionLine.Interrupt:
+                    break; // node annotations — don't introduce new names
             }
         }
 
@@ -309,8 +401,9 @@ public static class WorkflowScaffold
     /// </summary>
     /// <param name="name">Workflow name.</param>
     /// <param name="dsl">
-    /// Multi-line topology DSL. Each line is one connection:
-    /// <c>a -&gt; b</c>, <c>a -&gt; fork(b, c)</c>, <c>join(a, b) -&gt; c</c>, <c>a -&gt; router(b, c)</c>.
+    /// Multi-line topology DSL. Each line is a connection or node directive:
+    /// <c>a -&gt; b</c>, <c>a -&gt; fork(b, c)</c>, <c>join(a, b) -&gt; c</c>, <c>a -&gt; router(b, c)</c>,
+    /// <c>subflow(name)</c>, <c>interrupt(name)</c>.
     /// Lines starting with <c>#</c> are comments. Blank lines are ignored.
     /// </param>
     public static WorkflowScaffold<TState> Parse<TState>(string name, string dsl)

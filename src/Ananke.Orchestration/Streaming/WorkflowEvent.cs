@@ -88,3 +88,32 @@ public sealed record WorkflowFaulted<TState> : WorkflowEvent<TState>
     /// <summary>Workflow state at the time of failure.</summary>
     public required TState State { get; init; }
 }
+
+/// <summary>Emitted when a loop terminates, either because the condition was met or the iteration cap was reached.</summary>
+public sealed record LoopExited<TState> : WorkflowEvent<TState>
+{
+    /// <summary>The job whose loop connection was evaluated (the loop source).</summary>
+    public required string LoopFrom { get; init; }
+
+    /// <summary>The job the loop would have cycled back to.</summary>
+    public required string LoopTarget { get; init; }
+
+    /// <summary>Number of iterations completed before the loop exited.</summary>
+    public required int IterationsCompleted { get; init; }
+
+    /// <summary>Why the loop terminated.</summary>
+    public required Routing.LoopExitReason Reason { get; init; }
+}
+
+/// <summary>Emitted when the workflow terminates due to cost budget exhaustion.</summary>
+public sealed record BudgetExceeded<TState> : WorkflowEvent<TState>
+{
+    /// <summary>Estimated cost at the time the budget was exceeded.</summary>
+    public required decimal EstimatedCost { get; init; }
+
+    /// <summary>The configured budget limit.</summary>
+    public required decimal Budget { get; init; }
+
+    /// <summary>Cumulative token usage across all LLM calls in this execution.</summary>
+    public required Agents.TokenUsage CumulativeUsage { get; init; }
+}

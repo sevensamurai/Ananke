@@ -1,0 +1,1070 @@
+{
+  "header": {
+    "id": "795f5a5ea2f8457c88afd585ea807159",
+    "name": "connect4-strategy",
+    "domain": "connect4",
+    "version": "1.0.0",
+    "description": "Exported after 2 games (9 entries)"
+  },
+  "entries": [
+    {
+      "id": "heuristic_g1",
+      "kind": "heuristic",
+      "tags": [
+        "game_1",
+        "win"
+      ],
+      "source": "game_analysis",
+      "description": {
+        "summary": "When agent had multiple pieces in center column: play center column when available",
+        "semanticTags": {
+          "phase:endgame": 0.4,
+          "center:agent": 0.5,
+          "center:opponent": 0.16666667,
+          "line:a3": 0.8,
+          "line:a2": 0.4,
+          "line:a1": 0.089999996,
+          "line:e2": 0.4,
+          "line:e1": 0.12,
+          "outcome:win": 1
+        }
+      },
+      "confidence": 0.52383447,
+      "observationCount": 36,
+      "evidence": [
+        "game 1: agent won",
+        "game 2: agent won",
+        "game 3: agent won",
+        "game 4: agent won",
+        "game 5: agent won",
+        "game 6: agent won",
+        "game 7: agent won",
+        "game 8: agent won",
+        "game 9: agent won",
+        "game 10: agent won",
+        "game 11: agent won",
+        "game 12: agent won",
+        "game 13: agent won",
+        "game 14: agent won",
+        "game 15: agent won",
+        "game 16: agent lost",
+        "game 17: agent won",
+        "game 18: agent won",
+        "game 19: agent won",
+        "game 20: agent won",
+        "game 21: agent won",
+        "game 22: agent won",
+        "game 23: agent won",
+        "game 24: agent won",
+        "game 25: agent won",
+        "game 26: agent won",
+        "game 27: agent won",
+        "game 28: agent won",
+        "game 29: agent lost",
+        "game 30: agent won",
+        "game 31: agent won",
+        "game 32: agent won",
+        "game 33: agent won",
+        "validation: 50% WR vs 40% baseline (\u002B10%)",
+        "game 1: agent lost",
+        "game 2: agent lost"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9505532+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8875528+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "situation": "Agent had multiple pieces in center column",
+      "preferredApproach": "Play center column when available",
+      "strength": 0.5009938,
+      "valence": 0.3,
+      "intensity": 0.3,
+      "variance": 0.909,
+      "lastPredictionError": 0.3,
+      "prediction": 0.3
+    },
+    {
+      "id": "obs_g1_m6",
+      "kind": "pattern",
+      "tags": [
+        "game_1",
+        "col_4",
+        "move_6"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "midgame c3h4 c4h1 c5h1 h_a1f3 da_e1f3 h_a1f3 h_a1f3 h_e1f3 dd_a1f3 dd_a1f3 dd_a1f3 da_a1f3 h_a1f3 da_e1f3 h_a1f3 h_e1f3 dd_a1f3 dd_e1f3 da_a1f3 h_a1f3 da_a1f3 h_a1f3 da_e1f3 h_e1f3 dd_e1f3 da_a1f3 h_a1f3 da_a1f3 h_a1f3 da_a1f3 h_e1f3 dd_e1f3 v_e1f3 v_e1f3 played_c4",
+        "semanticTags": {
+          "phase:midgame": 0.4,
+          "action:col_4": 0.9,
+          "center:agent": 0.5,
+          "center:opponent": 0.16666667,
+          "line:a1": 0.5,
+          "line:e1": 0.35999998
+        }
+      },
+      "confidence": 0.61184436,
+      "observationCount": 286,
+      "evidence": [
+        "episode:game_27 step:5 return:0.857",
+        "episode:game_27 step:6 return:0.902",
+        "game-27: similar position, outcome reward \u002B1.0",
+        "game 28 move 7 agent played col 3 reward \u002B1.0",
+        "game 28 move 9 agent played col 5 reward \u002B1.0",
+        "episode:game_28 step:3 return:0.698",
+        "episode:game_28 step:4 return:0.735",
+        "game-28: similar position, outcome reward \u002B1.0",
+        "game 29 move 6 agent played col 5 reward -1.0",
+        "game 29 move 8 agent played col 3 reward -1.0",
+        "game 29 move 10 agent played col 6 reward -1.0",
+        "episode:game_29 step:3 return:-0.630",
+        "episode:game_29 step:4 return:-0.663",
+        "episode:game_29 step:5 return:-0.698",
+        "game-29: similar position, outcome reward -1.0",
+        "game 30 move 5 agent played col 5 reward \u002B1.0",
+        "game 30 move 7 agent played col 6 reward \u002B1.0",
+        "episode:game_30 step:2 return:0.815",
+        "episode:game_30 step:3 return:0.857",
+        "game-30: similar position, outcome reward \u002B1.0",
+        "game 31 move 6 agent played col 3 reward \u002B1.0",
+        "game 31 move 8 agent played col 4 reward \u002B1.0",
+        "game 31 move 10 agent played col 5 reward \u002B1.0",
+        "game 31 move 12 agent played col 1 reward \u002B1.0",
+        "game 31 move 14 agent played col 6 reward \u002B1.0",
+        "episode:game_31 step:3 return:0.774",
+        "episode:game_31 step:4 return:0.815",
+        "episode:game_31 step:5 return:0.857",
+        "episode:game_31 step:6 return:0.902",
+        "episode:game_31 step:7 return:0.950",
+        "game-31: similar position, outcome reward \u002B1.0",
+        "game 32 move 5 agent played col 3 reward \u002B1.0",
+        "game 32 move 7 agent played col 5 reward \u002B1.0",
+        "game 32 move 9 agent played col 5 reward \u002B1.0",
+        "episode:game_32 step:2 return:0.569",
+        "episode:game_32 step:3 return:0.599",
+        "episode:game_32 step:4 return:0.630",
+        "game 33 move 2 agent played col 3 reward \u002B1.0",
+        "episode:game_33 step:1 return:0.902",
+        "game-33: similar position, outcome reward \u002B1.0",
+        "validation: 80% WR vs 40% baseline (\u002B40%)",
+        "game 1 move 7 agent played col 3 reward -1.0",
+        "game 1 move 9 agent played col 4 reward -1.0",
+        "game 1 move 11 agent played col 5 reward -1.0",
+        "game 1 move 13 agent played col 2 reward -1.0",
+        "episode:game_1 step:3 return:-0.540",
+        "episode:game_1 step:4 return:-0.569",
+        "episode:game_1 step:5 return:-0.599",
+        "episode:game_1 step:6 return:-0.630",
+        "game-2: similar position, outcome reward -1.0"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9483026+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8876916+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.47046283,
+      "valence": -1,
+      "intensity": 1,
+      "variance": 0.63440263,
+      "lastPredictionError": 1.3,
+      "prediction": 0.3,
+      "episodeId": "game_1",
+      "stepIndex": 3
+    },
+    {
+      "id": "obs_g1_m0",
+      "kind": "pattern",
+      "tags": [
+        "game_1",
+        "col_3",
+        "move_0"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "opening played_c3",
+        "semanticTags": {
+          "phase:opening": 0.4,
+          "action:col_3": 0.9
+        }
+      },
+      "confidence": 0.734629,
+      "observationCount": 39,
+      "evidence": [
+        "game 1 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_1 step:0 return:0.663",
+        "game-2: similar position, outcome reward \u002B1.0",
+        "game 3 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_3 step:0 return:0.857",
+        "game-3: similar position, outcome reward \u002B1.0",
+        "game 5 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_5 step:0 return:0.774",
+        "game 7 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_7 step:0 return:0.857",
+        "game 9 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_9 step:0 return:0.663",
+        "game 11 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_11 step:0 return:0.774",
+        "game 13 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_13 step:0 return:0.377",
+        "game 15 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_15 step:0 return:0.599",
+        "game 17 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_17 step:0 return:0.599",
+        "game 19 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_19 step:0 return:0.599",
+        "game 21 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_21 step:0 return:0.630",
+        "game 23 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_23 step:0 return:0.698",
+        "game 25 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_25 step:0 return:0.735",
+        "game 27 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_27 step:0 return:0.663",
+        "game 29 move 0 agent played col 4 reward -1.0",
+        "episode:game_29 step:0 return:-0.540",
+        "game 31 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_31 step:0 return:0.663",
+        "game 33 move 0 agent played col 4 reward \u002B1.0",
+        "episode:game_33 step:0 return:0.857",
+        "validation: 80% WR vs 40% baseline (\u002B40%)",
+        "game 2 move 0 agent played col 2 reward -1.0",
+        "episode:game_2 step:0 return:-0.463"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9319599+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8876121+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.50073683,
+      "valence": -0.7632911,
+      "intensity": 0.7632911,
+      "variance": 0.36123133,
+      "lastPredictionError": 0.7632911,
+      "prediction": 0.3,
+      "episodeId": "game_1",
+      "stepIndex": 0
+    },
+    {
+      "id": "obs_g1_m2",
+      "kind": "pattern",
+      "tags": [
+        "game_1",
+        "col_3",
+        "move_2"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "opening c3h1 c4h1 h_a1f3 dd_a1f3 dd_e1f3 v_a1f3 da_a1f3 v_e1f3 played_c3",
+        "semanticTags": {
+          "phase:opening": 0.4,
+          "action:col_3": 0.9,
+          "center:agent": 0.16666667,
+          "line:a1": 0.12,
+          "line:e1": 0.06
+        }
+      },
+      "confidence": 0.5001491,
+      "observationCount": 267,
+      "evidence": [
+        "game 31 agent won agent lines: 1x12 2x4 3x1 4x1 | opp lines: 1x9 2x6 3x1 4x0",
+        "episode:game_31 step:1 return:0.698",
+        "episode:game_31 step:2 return:0.735",
+        "episode:game_31 step:8 return:1.000",
+        "game-31: similar position, outcome reward \u002B1.0",
+        "game 32 move 3 agent played col 4 reward \u002B1.0",
+        "game 32 move 11 agent played col 5 reward \u002B1.0",
+        "game 32 move 13 agent played col 2 reward \u002B1.0",
+        "game 32 move 15 agent played col 3 reward \u002B1.0",
+        "episode:game_32 step:1 return:0.540",
+        "episode:game_32 step:5 return:0.663",
+        "episode:game_32 step:6 return:0.698",
+        "episode:game_32 step:7 return:0.735",
+        "game-32: similar position, outcome reward \u002B1.0",
+        "game 33 move 4 agent played col 5 reward \u002B1.0",
+        "game 33 move 6 agent played col 6 reward \u002B1.0",
+        "game 33 agent won agent lines: 1x4 2x0 3x1 4x1 | opp lines: 1x7 2x4 3x0 4x0",
+        "episode:game_33 step:2 return:0.950",
+        "episode:game_33 step:3 return:1.000",
+        "game-33: similar position, outcome reward \u002B1.0",
+        "validation: 60% WR vs 40% baseline (\u002B20%)",
+        "game 1 move 15 agent played col 6 reward -1.0",
+        "game 1 move 17 agent played col 7 reward -1.0",
+        "game 1 move 19 agent played col 5 reward -1.0",
+        "game 1 move 25 agent played col 1 reward -1.0",
+        "episode:game_1 step:7 return:-0.663",
+        "episode:game_1 step:8 return:-0.698",
+        "episode:game_1 step:9 return:-0.735",
+        "episode:game_1 step:12 return:-0.857",
+        "game 2 move 2 agent played col 5 reward -1.0",
+        "game 2 move 4 agent played col 4 reward -1.0",
+        "game 2 move 6 agent played col 6 reward -1.0",
+        "game 2 move 8 agent played col 3 reward -1.0",
+        "game 2 move 16 agent played col 1 reward -1.0",
+        "game 2 move 18 agent played col 3 reward -1.0",
+        "game 2 move 20 agent played col 4 reward -1.0",
+        "game 2 move 22 agent played col 1 reward -1.0",
+        "game 2 move 24 agent played col 6 reward -1.0",
+        "game 2 move 26 agent played col 2 reward -1.0",
+        "episode:game_2 step:1 return:-0.488",
+        "episode:game_2 step:2 return:-0.513",
+        "episode:game_2 step:3 return:-0.540",
+        "episode:game_2 step:4 return:-0.569",
+        "episode:game_2 step:8 return:-0.698",
+        "episode:game_2 step:9 return:-0.735",
+        "episode:game_2 step:10 return:-0.774",
+        "episode:game_2 step:11 return:-0.815",
+        "episode:game_2 step:12 return:-0.857",
+        "episode:game_2 step:13 return:-0.902",
+        "game-2: similar position, outcome reward -1.0"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9469826+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8876975+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.50069684,
+      "valence": -1,
+      "intensity": 1,
+      "variance": 0.99940395,
+      "lastPredictionError": 1.3,
+      "prediction": 0.3,
+      "episodeId": "game_1",
+      "stepIndex": 1
+    },
+    {
+      "id": "outcome_g13",
+      "kind": "pattern",
+      "tags": [
+        "game_13",
+        "outcome",
+        "win"
+      ],
+      "source": "game_outcome",
+      "description": {
+        "summary": "endgame c0h4 c1h6 c2h6 c3h6 c4h6 c5h6 c6h5 dd_a4f0",
+        "semanticTags": {
+          "phase:endgame": 0.4,
+          "outcome:win": 1,
+          "center:agent": 0.6666667,
+          "center:opponent": 0.33333334
+        }
+      },
+      "confidence": 0.54303557,
+      "observationCount": 3,
+      "evidence": [
+        "game 13 agent won agent lines: 1x0 2x0 3x0 4x1 | opp lines: 1x0 2x0 3x0 4x0",
+        "game-32: similar position, outcome reward \u002B1.0",
+        "validation: 70% WR vs 40% baseline (\u002B30%)"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9644829+00:00",
+      "lastObserved": "2026-04-02T10:55:17.0249406+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.501108,
+      "valence": 0.29999995,
+      "intensity": 0.29999995,
+      "variance": 0.8414999,
+      "lastPredictionError": 0.29999995,
+      "prediction": 0.5
+    },
+    {
+      "id": "obs_g4_m13",
+      "kind": "pattern",
+      "tags": [
+        "game_4",
+        "col_4",
+        "move_13"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "midgame c1h4 c2h4 c3h4 c4h1 da_e1f3 h_e3f1 dd_e2f2 h_e3f1 dd_e2f2 dd_e1f3 da_a2f2 h_a2f2 h_e2f2 dd_e2f2 dd_e1f3 da_e1f3 h_a1f3 da_a1f3 h_e1f3 v_e2f2 da_e1f3 h_e1f3 dd_e1f3 v_a1f3 played_c4",
+        "semanticTags": {
+          "phase:midgame": 0.4,
+          "action:col_4": 0.9,
+          "center:agent": 0.16666667,
+          "center:opponent": 0.5,
+          "line:a2": 0.2,
+          "line:a1": 0.089999996,
+          "line:e3": 0.8,
+          "line:e2": 0.5,
+          "line:e1": 0.24
+        }
+      },
+      "confidence": 0.47276694,
+      "observationCount": 129,
+      "evidence": [
+        "game-25: similar position, outcome reward \u002B1.0",
+        "game-26: similar position, outcome reward \u002B1.0",
+        "game-27: similar position, outcome reward \u002B1.0",
+        "game 28 move 11 agent played col 5 reward \u002B1.0",
+        "game 28 move 13 agent played col 5 reward \u002B1.0",
+        "game 28 move 19 agent played col 3 reward \u002B1.0",
+        "game 28 agent won agent lines: 1x1 2x6 3x5 4x1 | opp lines: 1x1 2x3 3x0 4x0",
+        "episode:game_28 step:5 return:0.774",
+        "episode:game_28 step:6 return:0.815",
+        "episode:game_28 step:9 return:0.950",
+        "game-28: similar position, outcome reward \u002B1.0",
+        "game 29 move 14 agent played col 3 reward -1.0",
+        "game 29 move 16 agent played col 3 reward -1.0",
+        "game 29 move 18 agent played col 2 reward -1.0",
+        "game 29 move 20 agent played col 7 reward -1.0",
+        "episode:game_29 step:7 return:-0.774",
+        "episode:game_29 step:8 return:-0.815",
+        "episode:game_29 step:9 return:-0.857",
+        "episode:game_29 step:10 return:-0.902",
+        "game-29: similar position, outcome reward -1.0",
+        "game-30: similar position, outcome reward \u002B1.0",
+        "game-31: similar position, outcome reward \u002B1.0",
+        "game 32 move 17 agent played col 4 reward \u002B1.0",
+        "game 32 move 19 agent played col 5 reward \u002B1.0",
+        "game 32 move 23 agent played col 6 reward \u002B1.0",
+        "episode:game_32 step:8 return:0.774",
+        "episode:game_32 step:9 return:0.815",
+        "episode:game_32 step:11 return:0.902",
+        "game-33: similar position, outcome reward \u002B1.0",
+        "validation: 50% WR vs 40% baseline (\u002B10%)",
+        "game 1 move 21 agent played col 1 reward -1.0",
+        "game 1 move 23 agent played col 7 reward -1.0",
+        "game 1 move 27 agent played col 6 reward -1.0",
+        "game 1 move 29 agent played col 7 reward -1.0",
+        "episode:game_1 step:10 return:-0.774",
+        "episode:game_1 step:11 return:-0.815",
+        "episode:game_1 step:13 return:-0.902",
+        "episode:game_1 step:14 return:-0.950",
+        "game-1: similar position, outcome reward -1.0",
+        "game 2 move 10 agent played col 6 reward -1.0",
+        "game 2 move 12 agent played col 7 reward -1.0",
+        "game 2 move 14 agent played col 2 reward -1.0",
+        "game 2 move 28 agent played col 7 reward -1.0",
+        "game 2 move 30 agent played col 5 reward -1.0",
+        "episode:game_2 step:5 return:-0.599",
+        "episode:game_2 step:6 return:-0.630",
+        "episode:game_2 step:7 return:-0.663",
+        "episode:game_2 step:14 return:-0.950",
+        "episode:game_2 step:15 return:-1.000",
+        "game-2: similar position, outcome reward -1.0"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9578504+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8876995+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.50087047,
+      "valence": -1,
+      "intensity": 1,
+      "variance": 1.1152071,
+      "lastPredictionError": 1.3,
+      "prediction": 0.3,
+      "episodeId": "game_4",
+      "stepIndex": 6
+    },
+    {
+      "id": "obs_g2_m1",
+      "kind": "pattern",
+      "tags": [
+        "game_2",
+        "col_3",
+        "move_1"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "opening c1h1 h_e1f3 h_e1f3 v_e1f3 da_e1f3 played_c3",
+        "semanticTags": {
+          "phase:opening": 0.4,
+          "action:col_3": 0.9,
+          "line:e1": 0.12
+        }
+      },
+      "confidence": 0.6242988,
+      "observationCount": 65,
+      "evidence": [
+        "game-12: similar position, outcome reward \u002B1.0",
+        "game-13: similar position, outcome reward \u002B1.0",
+        "game-14: similar position, outcome reward \u002B1.0",
+        "game-15: similar position, outcome reward \u002B1.0",
+        "game 16 move 1 agent played col 4 reward -1.0",
+        "episode:game_16 step:0 return:-0.599",
+        "game-16: similar position, outcome reward -1.0",
+        "game-17: similar position, outcome reward \u002B1.0",
+        "game 18 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_18 step:0 return:0.630",
+        "game-18: similar position, outcome reward \u002B1.0",
+        "game-19: similar position, outcome reward \u002B1.0",
+        "game 20 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_20 step:0 return:0.663",
+        "game-20: similar position, outcome reward \u002B1.0",
+        "game-21: similar position, outcome reward \u002B1.0",
+        "game 22 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_22 step:0 return:0.735",
+        "game-22: similar position, outcome reward \u002B1.0",
+        "game-23: similar position, outcome reward \u002B1.0",
+        "game 24 move 1 agent played col 4 reward \u002B1.0",
+        "game 24 move 17 agent played col 2 reward \u002B1.0",
+        "episode:game_24 step:0 return:0.663",
+        "episode:game_24 step:8 return:1.000",
+        "game-24: similar position, outcome reward \u002B1.0",
+        "game-25: similar position, outcome reward \u002B1.0",
+        "game 26 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_26 step:0 return:0.663",
+        "game-26: similar position, outcome reward \u002B1.0",
+        "game-27: similar position, outcome reward \u002B1.0",
+        "game 28 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_28 step:0 return:0.599",
+        "game-28: similar position, outcome reward \u002B1.0",
+        "game-29: similar position, outcome reward -1.0",
+        "game 30 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_30 step:0 return:0.735",
+        "game-30: similar position, outcome reward \u002B1.0",
+        "game-31: similar position, outcome reward \u002B1.0",
+        "game 32 move 1 agent played col 4 reward \u002B1.0",
+        "episode:game_32 step:0 return:0.513",
+        "game-32: similar position, outcome reward \u002B1.0",
+        "game-33: similar position, outcome reward \u002B1.0",
+        "validation: 50% WR vs 40% baseline (\u002B10%)",
+        "game 1 move 1 agent played col 1 reward -1.0",
+        "game 1 move 3 agent played col 2 reward -1.0",
+        "game 1 move 5 agent played col 4 reward -1.0",
+        "episode:game_1 step:0 return:-0.463",
+        "episode:game_1 step:1 return:-0.488",
+        "episode:game_1 step:2 return:-0.513",
+        "game-1: similar position, outcome reward -1.0"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9567436+00:00",
+      "lastObserved": "2026-04-02T10:57:27.7013419+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.5008001,
+      "valence": -1,
+      "intensity": 1,
+      "variance": 0.601797,
+      "lastPredictionError": 1.3,
+      "prediction": 0.3,
+      "episodeId": "game_2",
+      "stepIndex": 0
+    },
+    {
+      "id": "outcome_g1",
+      "kind": "pattern",
+      "tags": [
+        "game_1",
+        "outcome",
+        "win"
+      ],
+      "source": "game_outcome",
+      "description": {
+        "summary": "endgame c1h3 c2h3 c3h4 c4h4 c5h3 da_e1f3 h_e1f3 dd_a2f2 dd_a1f3 v_e2f2 v_e1f3 da_e1f3 h_e2f2 dd_a2f2 v_a2f2 h_a4f0 v_a1f3 h_e2f2 da_a3f1 da_a2f2 h_a3f1 h_e2f2 v_a1f3",
+        "semanticTags": {
+          "phase:endgame": 0.4,
+          "outcome:win": 1,
+          "center:agent": 0.5,
+          "center:opponent": 0.16666667,
+          "line:a3": 0.8,
+          "line:a2": 0.4,
+          "line:a1": 0.089999996,
+          "line:e2": 0.4,
+          "line:e1": 0.12
+        }
+      },
+      "confidence": 0.55178607,
+      "observationCount": 86,
+      "evidence": [
+        "episode:game_13 step:15 return:0.815",
+        "episode:game_13 step:17 return:0.902",
+        "game-13: similar position, outcome reward \u002B1.0",
+        "game-14: similar position, outcome reward \u002B1.0",
+        "game 15 agent won agent lines: 1x1 2x1 3x3 4x1 | opp lines: 1x3 2x2 3x0 4x0",
+        "game-15: similar position, outcome reward \u002B1.0",
+        "game 16 agent lost agent lines: 1x6 2x0 3x3 4x0 | opp lines: 1x2 2x5 3x4 4x1",
+        "game-16: similar position, outcome reward -1.0",
+        "game-17: similar position, outcome reward \u002B1.0",
+        "game-18: similar position, outcome reward \u002B1.0",
+        "game 19 agent won agent lines: 1x1 2x2 3x2 4x1 | opp lines: 1x6 2x4 3x0 4x0",
+        "game-19: similar position, outcome reward \u002B1.0",
+        "game 20 move 17 agent played col 2 reward \u002B1.0",
+        "episode:game_20 step:8 return:1.000",
+        "game-20: similar position, outcome reward \u002B1.0",
+        "game 21 agent won agent lines: 1x1 2x5 3x5 4x1 | opp lines: 1x12 2x4 3x2 4x0",
+        "game-21: similar position, outcome reward \u002B1.0",
+        "game-22: similar position, outcome reward \u002B1.0",
+        "game-23: similar position, outcome reward \u002B1.0",
+        "game 24 agent won agent lines: 1x3 2x5 3x4 4x1 | opp lines: 1x12 2x7 3x0 4x0",
+        "game-24: similar position, outcome reward \u002B1.0",
+        "game-25: similar position, outcome reward \u002B1.0",
+        "game-26: similar position, outcome reward \u002B1.0",
+        "game 27 agent won agent lines: 1x3 2x4 3x2 4x1 | opp lines: 1x4 2x4 3x0 4x0",
+        "game-27: similar position, outcome reward \u002B1.0",
+        "game-28: similar position, outcome reward \u002B1.0",
+        "game 29 move 22 agent played col 5 reward -1.0",
+        "game 29 move 24 agent played col 6 reward -1.0",
+        "game 29 agent lost agent lines: 1x1 2x4 3x1 4x0 | opp lines: 1x1 2x4 3x3 4x1",
+        "episode:game_29 step:11 return:-0.950",
+        "episode:game_29 step:12 return:-1.000",
+        "game-29: similar position, outcome reward -1.0",
+        "game 30 agent won agent lines: 1x6 2x4 3x0 4x1 | opp lines: 1x14 2x6 3x1 4x0",
+        "game-30: similar position, outcome reward \u002B1.0",
+        "game-31: similar position, outcome reward \u002B1.0",
+        "game 32 move 21 agent played col 6 reward \u002B1.0",
+        "game 32 move 25 agent played col 3 reward \u002B1.0",
+        "game 32 move 27 agent played col 2 reward \u002B1.0",
+        "game 32 agent won agent lines: 1x0 2x0 3x3 4x1 | opp lines: 1x1 2x2 3x0 4x0",
+        "episode:game_32 step:10 return:0.857",
+        "episode:game_32 step:12 return:0.950",
+        "episode:game_32 step:13 return:1.000",
+        "game-32: similar position, outcome reward \u002B1.0",
+        "game-33: similar position, outcome reward \u002B1.0",
+        "validation: 80% WR vs 40% baseline (\u002B40%)",
+        "game 1 move 31 agent played col 3 reward -1.0",
+        "game 1 agent lost agent lines: 1x0 2x0 3x0 4x0 | opp lines: 1x2 2x3 3x1 4x5",
+        "episode:game_1 step:15 return:-1.000",
+        "game 2 agent lost agent lines: 1x3 2x1 3x2 4x0 | opp lines: 1x0 2x1 3x5 4x4",
+        "game-2: similar position, outcome reward -1.0"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9489712+00:00",
+      "lastObserved": "2026-04-02T10:59:11.8876951+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.50084394,
+      "valence": -1,
+      "intensity": 1,
+      "variance": 0.8122967,
+      "lastPredictionError": 1.5,
+      "prediction": 0.5
+    },
+    {
+      "id": "obs_g13_m32",
+      "kind": "pattern",
+      "tags": [
+        "game_13",
+        "col_1",
+        "move_32"
+      ],
+      "source": "game_observation",
+      "description": {
+        "summary": "endgame c0h1 c1h5 c2h6 c3h6 c4h6 c5h6 c6h2 v_a1f3 dd_a3f1 da_a3f1 v_e2f2 v_e1f3 played_c1",
+        "semanticTags": {
+          "phase:endgame": 0.4,
+          "action:col_1": 0.9,
+          "center:agent": 0.6666667,
+          "center:opponent": 0.33333334,
+          "line:a3": 0.8,
+          "line:a1": 0.03,
+          "line:e2": 0.1,
+          "line:e1": 0.03
+        }
+      },
+      "confidence": 0.57422984,
+      "observationCount": 8,
+      "evidence": [
+        "game 13 move 32 agent played col 2 reward \u002B1.0",
+        "game 13 move 36 agent played col 1 reward \u002B1.0",
+        "game 13 move 38 agent played col 1 reward \u002B1.0",
+        "episode:game_13 step:16 return:0.857",
+        "episode:game_13 step:18 return:0.950",
+        "episode:game_13 step:19 return:1.000",
+        "game-32: similar position, outcome reward \u002B1.0",
+        "validation: 60% WR vs 40% baseline (\u002B20%)"
+      ],
+      "firstObserved": "2026-04-02T10:55:16.9643306+00:00",
+      "lastObserved": "2026-04-02T10:55:17.0206844+00:00",
+      "timesUsed": 0,
+      "timesSucceeded": 0,
+      "strength": 0.500836,
+      "valence": 0.40000004,
+      "intensity": 0.40000004,
+      "variance": 0.74146307,
+      "lastPredictionError": 0.40000004,
+      "prediction": 0.3,
+      "episodeId": "game_13",
+      "stepIndex": 16
+    }
+  ],
+  "episodes": [
+    {
+      "id": "game_1",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "entryId": "obs_g2_m1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 1,
+          "entryId": "obs_g2_m1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 2,
+          "entryId": "obs_g2_m1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 3,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 4,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 5,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 6,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 7,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 8,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 9,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 10,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 11,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 12,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 13,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 14,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 15,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        }
+      ],
+      "terminalReward": -1,
+      "startedAt": "2026-04-02T10:56:54.7011927+00:00",
+      "completedAt": "2026-04-02T10:57:27.7011937+00:00",
+      "metadata": {
+        "opponent": "training",
+        "moves": "33"
+      }
+    },
+    {
+      "id": "game_4",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "entryId": "obs_g2_m1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 1,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 2,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 3,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 4,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 5,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 6,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 7,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 8,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 9,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 10,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 11,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 12,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 13,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 14,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        }
+      ],
+      "terminalReward": 1,
+      "startedAt": "2026-04-02T10:54:46.9581393+00:00",
+      "completedAt": "2026-04-02T10:55:16.9581396+00:00",
+      "metadata": {
+        "opponent": "training",
+        "moves": "30"
+      }
+    },
+    {
+      "id": "game_2",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "entryId": "obs_g1_m0",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 1,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 2,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 3,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 4,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 5,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 6,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 7,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 8,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 9,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 10,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 11,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 12,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 13,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 14,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 15,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        }
+      ],
+      "terminalReward": -1,
+      "startedAt": "2026-04-02T10:58:39.8875958+00:00",
+      "completedAt": "2026-04-02T10:59:11.887597+00:00",
+      "metadata": {
+        "opponent": "training",
+        "moves": "32"
+      }
+    },
+    {
+      "id": "game_13",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "entryId": "obs_g1_m0",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 1,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 2,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 3,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 4,
+          "entryId": "obs_g1_m6",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 5,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 6,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 7,
+          "entryId": "obs_g1_m2",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 8,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 9,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 10,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 11,
+          "entryId": "obs_g4_m13",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 12,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 13,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 14,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 15,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 16,
+          "entryId": "obs_g13_m32",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 17,
+          "entryId": "outcome_g1",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 18,
+          "entryId": "obs_g13_m32",
+          "intermediateReward": 0
+        },
+        {
+          "stepIndex": 19,
+          "entryId": "obs_g13_m32",
+          "intermediateReward": 0
+        }
+      ],
+      "terminalReward": 1,
+      "startedAt": "2026-04-02T10:54:37.9645183+00:00",
+      "completedAt": "2026-04-02T10:55:16.9645185+00:00",
+      "metadata": {
+        "opponent": "training",
+        "moves": "39"
+      }
+    }
+  ],
+  "manifest": {
+    "totalEntries": 9,
+    "totalEpisodes": 4,
+    "averageReward": 0,
+    "createdAt": "2026-04-02T10:59:18.2271701+00:00",
+    "trainingDuration": "00:00:00",
+    "statistics": {},
+    "configuration": {}
+  }
+}

@@ -66,10 +66,25 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         _client.DisconnectedAsync += async _ =>
         {
             _logger.LogDebug("Handoff channel disconnected");
-            if (!_disposed)
+            if (_disposed) return;
+
+            var delay = TimeSpan.FromSeconds(1);
+            var maxDelay = TimeSpan.FromSeconds(30);
+
+            while (!_disposed)
             {
-                try { await _client.ConnectAsync(_options, CancellationToken.None); }
-                catch (Exception ex) { _logger.LogWarning(ex, "Handoff channel reconnection failed"); }
+                try
+                {
+                    await Task.Delay(delay);
+                    await _client.ConnectAsync(_options, CancellationToken.None);
+                    _logger.LogInformation("Handoff channel reconnected");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Handoff channel reconnection failed, retrying in {Delay}s", delay.TotalSeconds);
+                    delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, maxDelay.Ticks));
+                }
             }
         };
 
