@@ -34,7 +34,9 @@ public static class ServiceCollectionExtensions
         configure(options);
 
         services.TryAddSingleton(options.StateMachineOptions);
-        services.TryAddSingleton<IDistributedLock, InMemoryDistributedLock>();
+        services.TryAddSingleton<InMemoryDistributedLock>();
+        services.TryAddSingleton<IDistributedLock>(sp => sp.GetRequiredService<InMemoryDistributedLock>());
+        services.TryAddSingleton<IKeyValueDataAdapter>(sp => sp.GetRequiredService<InMemoryDistributedLock>());
 
         return services;
     }

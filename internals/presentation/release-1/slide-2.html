@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 2 – Declare Topology, Bind Code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:        #E63946;
+      --honeydew:   #F1FAEE;
+      --frost:      #A8DADC;
+      --steel:      #457B9D;
+      --deep:       #1D3557;
+      --deeper:     #162843;
+      --darkest:    #0f1d30;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* ── Background grid ────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    /* ── Glow blobs ─────────────────────────────────────────── */
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.15) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.10) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 960px;
+      height: 980px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+      padding-top: 36px;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 48px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+    .title-sub {
+      font-size: 22px;
+      font-weight: 500;
+      color: rgba(168,218,220,0.5);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 19px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.60);
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      margin-bottom: 24px;
+    }
+    .headline strong {
+      color: var(--frost);
+      font-weight: 600;
+    }
+
+    /* ── Separator ──────────────────────────────────────────── */
+    .sep {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(168,218,220,0.18) 0%, transparent 80%);
+      margin-bottom: 22px;
+    }
+
+    /* ── Editor row ─────────────────────────────────────────── */
+    .editors-row {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Editor card ────────────────────────────────────────── */
+    .editor {
+      flex: 1;
+      min-width: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(168,218,220,0.13);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.28),
+        0 20px 50px rgba(0,0,0,0.45),
+        0 0 60px rgba(168,218,220,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Title bar ──────────────────────────────────────────── */
+    .editor-titlebar {
+      background: #17283d;
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      gap: 12px;
+      border-bottom: 1px solid rgba(168,218,220,0.08);
+      flex-shrink: 0;
+    }
+    .traffic-lights { display: flex; gap: 7px; }
+    .tl { width: 11px; height: 11px; border-radius: 50%; }
+    .tl-red   { background: #ff5f57; }
+    .tl-amber { background: #ffbd2e; }
+    .tl-green { background: #28c840; }
+
+    .editor-tabs { display: flex; gap: 2px; margin-left: 4px; }
+    .tab {
+      padding: 3px 13px;
+      border-radius: 5px 5px 0 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(241,250,238,0.40);
+    }
+    .tab.active {
+      background: var(--darkest);
+      color: var(--frost);
+      border-top: 1px solid rgba(168,218,220,0.18);
+      border-left: 1px solid rgba(168,218,220,0.07);
+      border-right: 1px solid rgba(168,218,220,0.07);
+    }
+    .editor-lang {
+      margin-left: auto;
+      font-size: 10.5px;
+      font-family: 'JetBrains Mono', monospace;
+      color: rgba(168,218,220,0.35);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Editor body ────────────────────────────────────────── */
+    .editor-body {
+      background: var(--darkest);
+      display: flex;
+      padding: 16px 0 0;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* bottom fade – signals more content below */
+    .editor-body::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 56px;
+      background: linear-gradient(to bottom, transparent, var(--darkest));
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .code-scroll {
+      display: flex;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .line-numbers {
+      padding: 0 14px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      user-select: none;
+      border-right: 1px solid rgba(168,218,220,0.06);
+      min-width: 46px;
+      flex-shrink: 0;
+    }
+    .ln {
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.72;
+      color: rgba(168,218,220,0.18);
+    }
+    .ln-yaml { font-size: 11.5px; }
+    .ln-cs   { font-size: 13px; }
+
+    .code-area {
+      padding: 0 20px 16px;
+      flex: 1;
+      min-width: 0;
+    }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--honeydew);
+      white-space: pre;
+      line-height: 1.72;
+    }
+    pre.yaml { font-size: 11.5px; }
+    pre.cs   { font-size: 13px; }
+
+    /* ── YAML syntax tokens ─────────────────────────────────── */
+    .y-key    { color: var(--frost); }
+    .y-val    { color: #c9e8c7; }
+    .y-str    { color: #c9e8c7; }
+    .y-com    { color: rgba(168,218,220,0.30); font-style: italic; }
+    .y-kw     { color: var(--red); font-weight: 600; }          /* type: agent/code, End   */
+    .y-op     { color: #f9c74f; font-weight: 600; }             /* ->, fork(), join()      */
+    .y-scalar { color: rgba(241,250,238,0.65); }
+    .y-anchor { color: rgba(168,218,220,0.55); }                 /* | block scalar marker   */
+    .y-dash   { color: rgba(168,218,220,0.45); }                 /* - list item             */
+    .y-prov   { color: #7ec8cc; }                               /* provider/model values   */
+
+    /* ── C# syntax tokens ───────────────────────────────────── */
+    .kw   { color: var(--red); font-weight: 600; }
+    .type { color: var(--frost); }
+    .meth { color: #7ec8cc; }
+    .str  { color: #c9e8c7; }
+    .ident{ color: rgba(241,250,238,0.80); }
+    .pun  { color: rgba(168,218,220,0.48); }
+    .prop { color: var(--frost); opacity: 0.85; }
+    .com  { color: rgba(168,218,220,0.30); font-style: italic; }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding-top: 14px;
+      flex-shrink: 0;
+    }
+    .footer-left {
+      font-size: 12px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.5;
+    }
+    .footer-right {
+      font-size: 12px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Design Pipeline
+    </div>
+
+    <!-- Title -->
+    <h1 class="title">
+      Declare Topology,&nbsp;<em>Bind Code</em>
+      <span class="title-sub">&nbsp;&nbsp;/&nbsp; Design Pipeline</span>
+    </h1>
+
+    <!-- Headline -->
+    <p class="headline">
+      Non-developers define the flow.&nbsp;
+      <strong>Developers wire the implementation.</strong>
+    </p>
+
+    <div class="sep"></div>
+
+    <!-- Two editors -->
+    <div class="editors-row">
+
+      <!-- ── Left: YAML ──────────────────────────────────────── -->
+      <div class="editor">
+        <div class="editor-titlebar">
+          <div class="traffic-lights">
+            <div class="tl tl-red"></div>
+            <div class="tl tl-amber"></div>
+            <div class="tl tl-green"></div>
+          </div>
+          <div class="editor-tabs">
+            <div class="tab active">pipeline.yaml</div>
+          </div>
+          <span class="editor-lang">YAML</span>
+        </div>
+        <div class="editor-body">
+          <div class="code-scroll">
+            <div class="line-numbers">
+              <span class="ln ln-yaml">1</span><span class="ln ln-yaml">2</span><span class="ln ln-yaml">3</span>
+              <span class="ln ln-yaml">4</span><span class="ln ln-yaml">5</span><span class="ln ln-yaml">6</span>
+              <span class="ln ln-yaml">7</span><span class="ln ln-yaml">8</span><span class="ln ln-yaml">9</span>
+              <span class="ln ln-yaml">10</span><span class="ln ln-yaml">11</span><span class="ln ln-yaml">12</span>
+              <span class="ln ln-yaml">13</span><span class="ln ln-yaml">14</span><span class="ln ln-yaml">15</span>
+              <span class="ln ln-yaml">16</span><span class="ln ln-yaml">17</span><span class="ln ln-yaml">18</span>
+              <span class="ln ln-yaml">19</span><span class="ln ln-yaml">20</span><span class="ln ln-yaml">21</span>
+              <span class="ln ln-yaml">22</span><span class="ln ln-yaml">23</span><span class="ln ln-yaml">24</span>
+              <span class="ln ln-yaml">25</span><span class="ln ln-yaml">26</span><span class="ln ln-yaml">27</span>
+              <span class="ln ln-yaml">28</span><span class="ln ln-yaml">29</span><span class="ln ln-yaml">30</span>
+              <span class="ln ln-yaml">31</span><span class="ln ln-yaml">32</span>
+            </div>
+            <div class="code-area"><pre class="yaml"
+><span class="y-key">name</span><span class="pun">:</span> <span class="y-val">etl-pipeline</span>
+<span class="y-key">models</span><span class="pun">:</span>
+  <span class="y-key">planner</span><span class="pun">:</span>
+    <span class="y-key">provider</span><span class="pun">:</span> <span class="y-prov">openai</span>
+    <span class="y-key">model</span><span class="pun">:</span>    <span class="y-prov">gpt-4.1-mini</span>
+  <span class="y-key">analyst</span><span class="pun">:</span>
+    <span class="y-key">provider</span><span class="pun">:</span> <span class="y-prov">openai</span>
+    <span class="y-key">model</span><span class="pun">:</span>    <span class="y-prov">gpt-4.1-mini</span>
+<span class="y-com"># Jon declarations. "type: code" jobs must use Bind().</span>
+<span class="y-key">jobs</span><span class="pun">:</span>
+  <span class="y-key">plan</span><span class="pun">:</span>
+    <span class="y-key">type</span><span class="pun">:</span> <span class="y-kw">agent</span>
+    <span class="y-key">model</span><span class="pun">:</span> <span class="y-prov">planner</span>
+    <span class="y-key">system_prompt</span><span class="pun">:</span> <span class="y-anchor">|</span>
+      <span class="y-scalar">You are an ETL planning agent...</span>
+  <span class="y-key">fetch_a</span><span class="pun">:</span>
+    <span class="y-key">type</span><span class="pun">:</span> <span class="y-kw">code</span>
+  <span class="y-key">transform_a</span><span class="pun">:</span>
+    <span class="y-key">type</span><span class="pun">:</span> <span class="y-kw">agent</span>
+    <span class="y-key">model</span><span class="pun">:</span> <span class="y-prov">analyst</span>
+    <span class="y-key">system_prompt</span><span class="pun">:</span> <span class="y-anchor">|</span>
+      <span class="y-scalar">You are a data transformation agent...</span>
+<span class="y-scalar"> </span>
+<span class="y-com"># Topology — DSL syntax.</span>
+<span class="y-key">connections</span><span class="pun">:</span>
+  <span class="y-dash">-</span> <span class="y-val">plan</span> <span class="y-op">-&gt;</span> <span class="y-op">fork(</span><span class="y-val">fetch_a</span><span class="pun">,</span> <span class="y-val">fetch_b</span><span class="y-op">)</span>
+  <span class="y-dash">-</span> <span class="y-val">fetch_a</span> <span class="y-op">-&gt;</span> <span class="y-val">transform_a</span>
+  <span class="y-dash">-</span> <span class="y-val">fetch_b</span> <span class="y-op">-&gt;</span> <span class="y-val">transform_b</span>
+  <span class="y-dash">-</span> <span class="y-op">join(</span><span class="y-val">transform_a</span><span class="pun">,</span> <span class="y-val">transform_b</span><span class="y-op">)</span> <span class="y-op">-&gt;</span> <span class="y-val">combine</span>
+  <span class="y-dash">-</span> <span class="y-val">combine</span> <span class="y-op">-&gt;</span> <span class="y-kw">End</span></pre></div>
+          </div><!-- /code-scroll -->
+        </div><!-- /editor-body -->
+      </div><!-- /editor yaml -->
+
+      <!-- ── Right: C# ───────────────────────────────────────── -->
+      <div class="editor">
+        <div class="editor-titlebar">
+          <div class="traffic-lights">
+            <div class="tl tl-red"></div>
+            <div class="tl tl-amber"></div>
+            <div class="tl tl-green"></div>
+          </div>
+          <div class="editor-tabs">
+            <div class="tab active">EtlPipeline.cs</div>
+          </div>
+          <span class="editor-lang">C#</span>
+        </div>
+        <div class="editor-body">
+          <div class="code-scroll">
+            <div class="line-numbers">
+              <span class="ln ln-cs">1</span><span class="ln ln-cs">2</span>
+              <span class="ln ln-cs">3</span><span class="ln ln-cs">4</span>
+              <span class="ln ln-cs">5</span><span class="ln ln-cs">6</span>
+              <span class="ln ln-cs">7</span><span class="ln ln-cs">8</span>
+              <span class="ln ln-cs">9</span><span class="ln ln-cs">10</span>
+              <span class="ln ln-cs">11</span><span class="ln ln-cs">12</span>
+              <span class="ln ln-cs">13</span>
+            </div>
+            <div class="code-area"><pre class="cs"
+><span class="kw">var</span> <span class="ident">scaffold</span> <span class="pun">=</span> <span class="type">WorkflowScaffold</span><span class="meth">.Parse</span><span class="pun">&lt;</span><span class="type">MyState</span><span class="pun">&gt;
+    (</span><span class="str">"etl-pipeline"</span><span class="pun">, dsl);</span>
+<span class="kw">var</span> <span class="ident">workflow</span>  <span class="pun">=</span> <span class="ident">scaffold</span>
+    <span class="meth">.Bind</span><span class="pun">(</span><span class="str">"plan"</span><span class="pun">,    planJob)</span>
+    <span class="meth">.Bind</span><span class="pun">(</span><span class="str">"fetch_a"</span><span class="pun">, fetchAJob)</span>
+    <span class="meth">.Bind</span><span class="pun">(</span><span class="str">"fetch_b"</span><span class="pun">, fetchBJob)</span>
+    <span class="meth">.Bind</span><span class="pun">(</span><span class="str">"combine"</span><span class="pun">, combineJob)</span>
+    <span class="meth">.BindMerge</span><span class="pun">(</span><span class="str">"combine"</span><span class="pun">,</span> <span class="ident">branches</span> <span class="pun">=&gt;</span> <span class="type">Merge</span><span class="pun">(branches))</span>
+    <span class="meth">.Build</span><span class="pun">();</span>
+<span class="y-scalar"> </span>
+<span class="com">// Visualize the validated graph</span>
+<span class="type">Console</span><span class="meth">.WriteLine</span><span class="pun">(</span><span class="ident">workflow</span><span class="meth">.ToMermaid</span><span class="pun">());</span></pre></div>
+          </div><!-- /code-scroll -->
+        </div><!-- /editor-body -->
+      </div><!-- /editor cs -->
+
+    </div><!-- /editors-row -->
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; INTERNALS</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">slide 02</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

@@ -215,6 +215,48 @@ public class WorkflowDslParserTests
             WorkflowDslParser.Parse("not valid syntax at all"));
     }
 
+    // ── SubFlow directive ────────────────────────────────────────────
+
+    [Test]
+    public void Parse_SubFlow_ReturnsSubFlow()
+    {
+        var result = WorkflowDslParser.Parse("subflow(refine)");
+
+        result.Count.ShouldBe(1);
+        var sf = result[0].ShouldBeOfType<ConnectionLine.SubFlow>();
+        sf.Name.ShouldBe("refine");
+    }
+
+    [Test]
+    public void Parse_SubFlowCaseInsensitive_Succeeds()
+    {
+        var result = WorkflowDslParser.Parse("SubFlow(myJob)");
+
+        result.Count.ShouldBe(1);
+        result[0].ShouldBeOfType<ConnectionLine.SubFlow>().Name.ShouldBe("myJob");
+    }
+
+    // ── Interrupt directive ──────────────────────────────────────────
+
+    [Test]
+    public void Parse_Interrupt_ReturnsInterrupt()
+    {
+        var result = WorkflowDslParser.Parse("interrupt(publish)");
+
+        result.Count.ShouldBe(1);
+        var intr = result[0].ShouldBeOfType<ConnectionLine.Interrupt>();
+        intr.JobName.ShouldBe("publish");
+    }
+
+    [Test]
+    public void Parse_InterruptCaseInsensitive_Succeeds()
+    {
+        var result = WorkflowDslParser.Parse("INTERRUPT(deploy)");
+
+        result.Count.ShouldBe(1);
+        result[0].ShouldBeOfType<ConnectionLine.Interrupt>().JobName.ShouldBe("deploy");
+    }
+
     // ── IEnumerable<string> overload ─────────────────────────────────
 
     [Test]
@@ -250,5 +292,27 @@ public class WorkflowDslParserTests
         result[4].ShouldBeOfType<ConnectionLine.Router>();
         result[5].ShouldBeOfType<ConnectionLine.Direct>();
         result[6].ShouldBeOfType<ConnectionLine.Direct>();
+    }
+
+    [Test]
+    public void Parse_MixedTopologyWithDirectives_AllTypesRecognized()
+    {
+        var dsl = """
+            draft -> refine
+            refine -> review
+            review -> publish
+            publish -> End
+            subflow(refine)
+            interrupt(publish)
+            """;
+
+        var result = WorkflowDslParser.Parse(dsl);
+        result.Count.ShouldBe(6);
+        result[0].ShouldBeOfType<ConnectionLine.Direct>();
+        result[1].ShouldBeOfType<ConnectionLine.Direct>();
+        result[2].ShouldBeOfType<ConnectionLine.Direct>();
+        result[3].ShouldBeOfType<ConnectionLine.Direct>();
+        result[4].ShouldBeOfType<ConnectionLine.SubFlow>().Name.ShouldBe("refine");
+        result[5].ShouldBeOfType<ConnectionLine.Interrupt>().JobName.ShouldBe("publish");
     }
 }

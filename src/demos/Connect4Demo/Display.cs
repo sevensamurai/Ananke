@@ -1,5 +1,5 @@
 using System.Text;
-using Ananke.Orchestration.Memory;
+using Ananke.Learning;
 
 namespace Connect4Demo;
 

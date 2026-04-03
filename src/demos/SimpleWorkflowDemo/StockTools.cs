@@ -35,18 +35,18 @@ internal static class StockTools
             "Gets the latest market news headlines relevant to a stock or sector.",
             GetMarketNews,
             "query", "The stock ticker symbol or sector name")
-        .AddTool(
-            "buy_shares",
+        .AddTool("buy_shares",
             "Buys a specified number of shares of a stock at the current market price. Returns a confirmation with the total cost.",
-            BuyShares,
-            ("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)"),
-            ("quantity", "The number of shares to buy"))
-        .AddTool(
-            "sell_shares",
+            b => b
+                .Param("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)")
+                .Param("quantity", "The number of shares to buy")
+                .OnExecute(args => BuyShares(args.Get("symbol"), args.Get("quantity"))))
+        .AddTool("sell_shares",
             "Sells a specified number of shares of a stock at the current market price. Returns a confirmation with the total proceeds.",
-            SellShares,
-            ("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)"),
-            ("quantity", "The number of shares to sell"));
+            b => b
+                .Param("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)")
+                .Param("quantity", "The number of shares to sell")
+                .OnExecute(args => SellShares(args.Get("symbol"), args.Get("quantity"))));
 
     private static ToolResult BuyShares(string symbol, string quantityStr)
     {

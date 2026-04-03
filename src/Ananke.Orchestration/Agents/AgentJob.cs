@@ -1,13 +1,15 @@
 using System.Text.Json;
 using Ananke.Abstractions.Tracing;
 using Ananke.Orchestration.Jobs;
-using Ananke.Orchestration.Memory;
+using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 using Polly.Retry;
+
+using Ananke.Abstractions.Agents;
 
 namespace Ananke.Orchestration.Agents;
 
@@ -25,6 +27,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
     private readonly int? _maxContextTokens;
     private readonly IConversationMemory? _memory;
     private readonly Func<TState, string>? _sessionIdBuilder;
+    private readonly IContextStrategy? _contextStrategy;
     private readonly ILogger _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -47,6 +50,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
         int? maxContextTokens,
         IConversationMemory? memory,
         Func<TState, string>? sessionIdBuilder,
+        IContextStrategy? contextStrategy,
         ILogger logger)
     {
         Name = name;
@@ -79,6 +83,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
         _maxContextTokens = maxContextTokens;
         _memory = memory;
         _sessionIdBuilder = sessionIdBuilder;
+        _contextStrategy = contextStrategy;
         _logger = logger;
     }
 
@@ -119,6 +124,17 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
         }
 
         messages.Add(AgentMessage.User(userPrompt));
+
+        // Apply context strategy to compact messages before the first LLM call
+        if (_contextStrategy is not null)
+        {
+            var compacted = await _contextStrategy.ApplyAsync(messages, _systemPrompt, ct);
+            if (!ReferenceEquals(compacted, messages))
+            {
+                historyCount = 0; // compacted list may have dropped history messages
+                messages = [.. compacted];
+            }
+        }
 
         TResponse response = _tools is not null
             ? await ExecuteWithToolsAsync(messages, ct)
@@ -194,6 +210,8 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
             messages.Add(AgentMessage.Assistant(
                 result.Text ?? string.Empty, result.ToolCalls));
 
+            var hasNonRetryable = false;
+
             foreach (var call in result.ToolCalls!)
             {
                 await using var toolSpan = llmSpan?.StartSpan($"tool:{call.FunctionName}", SpanKind.ToolCall);
@@ -210,10 +228,23 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
                     _logger.LogWarning(
                         "[{AgentName}] Tool '{Tool}' returned error: {Error}",
                         Name, call.FunctionName, toolResult.Value);
+
+                    if (!toolResult.IsRetryable)
+                    {
+                        toolSpan?.SetAttribute("tool.retryable", "false");
+                        hasNonRetryable = true;
+                    }
                 }
 
                 toolSpan?.SetAttribute("output_length", toolResult.Value.Length.ToString());
                 messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
+            }
+
+            if (hasNonRetryable)
+            {
+                messages.Add(AgentMessage.User(
+                    "One or more tools returned a permanent error that will not succeed on retry. " +
+                    "Do not call those tools again. Proceed with your best answer using any information you already have."));
             }
 
             if (_maxContextTokens.HasValue)
@@ -229,7 +260,14 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
                         Name, estimated, _maxContextTokens.Value, toolRound);
             }
 
-            request = request with { Messages = messages };
+            // Apply context strategy before re-requesting in the tool loop
+            IReadOnlyList<AgentMessage> requestMessages = messages;
+            if (_contextStrategy is not null)
+            {
+                requestMessages = await _contextStrategy.ApplyAsync(messages, _systemPrompt, ct);
+            }
+
+            request = request with { Messages = requestMessages };
             result = await GenerateWithRetryAsync(request, ct);
         }
 
@@ -255,10 +293,16 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
 
     private static int EstimateTokens(AgentRequest request) =>
         ((request.SystemPrompt?.Length ?? 0) +
-         request.Messages.Sum(m => m.Content?.Length ?? 0)) / 4;
+         request.Messages.Sum(m => (m.Content?.Length ?? 0) + (m.ToolCalls?.Sum(tc => tc.Arguments.Length + tc.FunctionName.Length) ?? 0)) +
+         (request.Tools?.Sum(t => t.Name.Length + t.Description.Length + t.ParametersJsonSchema.Length) ?? 0)) / 4;
 
-    private async Task<AgentResponse> GenerateWithRetryAsync(AgentRequest request, CancellationToken ct) =>
-        await _retryPipeline.ExecuteAsync(async token => await _model.GenerateAsync(request, token), ct);
+    private async Task<AgentResponse> GenerateWithRetryAsync(AgentRequest request, CancellationToken ct)
+    {
+        var response = await _retryPipeline.ExecuteAsync(
+            async token => await _model.GenerateAsync(request, token), ct);
+        TokenUsageCapture.Accumulate(response);
+        return response;
+    }
 
     /// <summary>Fluent builder for <see cref="AgentJob{TState, TResponse}"/>.</summary>
     /// <remarks>
@@ -280,6 +324,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
         private int? _maxContextTokens;
         private IConversationMemory? _memory;
         private Func<TState, string>? _sessionIdBuilder;
+        private IContextStrategy? _contextStrategy;
         private ILoggerFactory? _loggerFactory;
 
         public Builder(string name, IAgentModel model)
@@ -360,6 +405,21 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
             return this;
         }
 
+        /// <summary>
+        /// Sets the context strategy applied before each LLM call.
+        /// When set, the message history is passed through the strategy before
+        /// building the <see cref="AgentRequest"/>. Use with
+        /// <see cref="WithContextLimit"/> to set the token budget, or configure
+        /// the budget directly on the strategy.
+        /// </summary>
+        /// <param name="strategy">The context compaction strategy.</param>
+        public Builder WithContextStrategy(IContextStrategy strategy)
+        {
+            ArgumentNullException.ThrowIfNull(strategy);
+            _contextStrategy = strategy;
+            return this;
+        }
+
         public Builder OnResponse(Action<TState, TResponse> handler)
         {
             _onResponse = handler;
@@ -393,7 +453,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
             return new AgentJob<TState, TResponse>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
                 tools, toolExecutors, _onResponse, _maxToolRounds, _maxRetryAttempts, _retryBaseDelay,
-                _maxContextTokens, _memory, _sessionIdBuilder, logger);
+                _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger);
         }
     }
 }

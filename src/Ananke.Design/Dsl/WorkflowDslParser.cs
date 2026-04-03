@@ -14,6 +14,8 @@ namespace Ananke.Design.Dsl;
 ///   <item><c>a -&gt; fork(b, c, mode: best-effort)</c> — parallel fork (BestEffort)</item>
 ///   <item><c>join(a, b) -&gt; c</c> — fan-in join</item>
 ///   <item><c>a -&gt; router(b, c, End)</c> — dynamic routing decision point</item>
+///   <item><c>subflow(name)</c> — marks a job as a nested sub-workflow</item>
+///   <item><c>interrupt(name)</c> — pauses execution before the named job</item>
 /// </list>
 /// </remarks>
 internal static partial class WorkflowDslParser
@@ -35,6 +37,18 @@ internal static partial class WorkflowDslParser
         @"^(?<from>\w+)\s*->\s*router\((?<options>[^)]+)\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex RouterPattern();
+
+    // subflow(name)
+    [GeneratedRegex(
+        @"^subflow\((?<name>\w+)\)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex SubFlowPattern();
+
+    // interrupt(name)
+    [GeneratedRegex(
+        @"^interrupt\((?<job>\w+)\)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex InterruptPattern();
 
     // a -> b  (simple direct, including End)
     [GeneratedRegex(
@@ -82,6 +96,14 @@ internal static partial class WorkflowDslParser
         match = RouterPattern().Match(line);
         if (match.Success)
             return ParseRouter(match, line);
+
+        match = SubFlowPattern().Match(line);
+        if (match.Success)
+            return new ConnectionLine.SubFlow(match.Groups["name"].Value);
+
+        match = InterruptPattern().Match(line);
+        if (match.Success)
+            return new ConnectionLine.Interrupt(match.Groups["job"].Value);
 
         match = DirectPattern().Match(line);
         if (match.Success)

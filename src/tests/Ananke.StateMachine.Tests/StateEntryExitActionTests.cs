@@ -19,8 +19,8 @@ public class StateEntryExitActionTests
     public async Task Transition_FiresExitAction_OnPreviousState()
     {
         var events = new List<string>();
-        var machine = new EntryExitMachine(_lock, events);
-        var ctx = new TestContext(1);
+        var machine = new EntryExitMachine(_lock, _lock, events);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -31,8 +31,8 @@ public class StateEntryExitActionTests
     public async Task Transition_FiresEntryAction_OnNewState()
     {
         var events = new List<string>();
-        var machine = new EntryExitMachine(_lock, events);
-        var ctx = new TestContext(1);
+        var machine = new EntryExitMachine(_lock, _lock, events);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -43,8 +43,8 @@ public class StateEntryExitActionTests
     public async Task Transition_ExitBeforeEntry_CorrectOrder()
     {
         var events = new List<string>();
-        var machine = new EntryExitMachine(_lock, events);
-        var ctx = new TestContext(1);
+        var machine = new EntryExitMachine(_lock, _lock, events);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -55,9 +55,9 @@ public class StateEntryExitActionTests
 
     // ── Machine with entry/exit actions ──────────────────────────────
 
-    private sealed class EntryExitMachine(IDistributedLock locker, List<string> events)
+    private sealed class EntryExitMachine(IDistributedLock locker, IKeyValueDataAdapter store, List<string> events)
         : AbstractStateMachine<TestContext, Light, LightAction, LightNotify>(
-            Light.Off, locker)
+            Light.Off, locker, store)
     {
         protected override Action<ITransitionBuilder<Light, LightAction>> Transitions => b => b
             .From(Light.Off).On(LightAction.TurnOn).To(Light.On)

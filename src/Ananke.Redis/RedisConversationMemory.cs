@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Ananke.Orchestration.Agents;
-using Ananke.Orchestration.Memory;
+using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StackExchange.Redis;

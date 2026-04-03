@@ -19,8 +19,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_Valid_SucceedsAndUpdatesState()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -33,8 +33,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_Chain_FollowsCorrectPath()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         (await machine.TransitionAsync(ctx, LightAction.TurnOn)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, LightAction.Blink)).Success.ShouldBeTrue();
@@ -47,8 +47,8 @@ public class StateMachineTransitionTests
     public async Task Transition_Invalid_FailsWithMessage()
     {
         var options = new StateMachineOptions { AllowImplicitSelfTransitions = false };
-        var machine = new LightMachine(_lock, options);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock, options);
+        var ctx = new TestContext("1");
 
         // Can't turn off when already off (no explicit transition defined)
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOff);
@@ -62,8 +62,8 @@ public class StateMachineTransitionTests
     public async Task Transition_Invalid_StateUnchanged()
     {
         var options = new StateMachineOptions { AllowImplicitSelfTransitions = false };
-        var machine = new LightMachine(_lock, options);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock, options);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOff); // invalid
 
@@ -75,8 +75,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_ImplicitSelfTransition_AllowedByDefault()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         // TurnOn from Off is valid (not a self-transition, just testing setup)
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
@@ -93,8 +93,8 @@ public class StateMachineTransitionTests
     public async Task Transition_ImplicitSelfTransition_DisabledByOption()
     {
         var options = new StateMachineOptions { AllowImplicitSelfTransitions = false };
-        var machine = new LightMachine(_lock, options);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock, options);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
 
@@ -110,8 +110,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_GuardPasses_Succeeds()
     {
-        var machine = new DoorMachine(_lock) { HasKey = true };
-        var ctx = new TestContext(1);
+        var machine = new DoorMachine(_lock, _lock) { HasKey = true };
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, DoorAction.Unlock);
 
@@ -122,8 +122,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_GuardFails_BlocksTransition()
     {
-        var machine = new DoorMachine(_lock) { HasKey = false };
-        var ctx = new TestContext(1);
+        var machine = new DoorMachine(_lock, _lock) { HasKey = false };
+        var ctx = new TestContext("1");
 
         var result = await machine.TransitionAsync(ctx, DoorAction.Unlock);
 
@@ -137,8 +137,8 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_WithAction_ActionExecuted()
     {
-        var machine = new DoorMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new DoorMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, DoorAction.Unlock);
         await machine.TransitionAsync(ctx, DoorAction.OpenDoor);
@@ -151,8 +151,8 @@ public class StateMachineTransitionTests
     {
         // This validates the WithAction(Func<Task>) closure bug fix:
         // the action must return the target state defined at builder time.
-        var machine = new DoorMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new DoorMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.TransitionAsync(ctx, DoorAction.Unlock);
         var result = await machine.TransitionAsync(ctx, DoorAction.OpenDoor);
@@ -166,14 +166,14 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_PersistedState_SurvivesMultipleTransitions()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(42);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("42");
 
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
         await machine.TransitionAsync(ctx, LightAction.Blink);
 
         // Verify the persisted context has the correct state
-        var persisted = await machine.GetPersistedContextAsync(42);
+        var persisted = await machine.GetPersistedContextAsync("42");
         persisted.State.ShouldBe(Light.Blinking);
         persisted.Step.ShouldBe(2);
     }
@@ -183,13 +183,13 @@ public class StateMachineTransitionTests
     [Test]
     public async Task Transition_DifferentContexts_IndependentState()
     {
-        var machine = new LightMachine(_lock);
-        var ctx1 = new TestContext(1);
-        var ctx2 = new TestContext(2);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx1 = new TestContext("1");
+        var ctx2 = new TestContext("2");
 
         await machine.TransitionAsync(ctx1, LightAction.TurnOn);
         // ctx2 should still be at initial state
-        var persisted2 = await machine.GetPersistedContextAsync(2);
+        var persisted2 = await machine.GetPersistedContextAsync("2");
         persisted2.State.ShouldBe(Light.Off);
         persisted2.Step.ShouldBe(0);
     }
@@ -199,7 +199,7 @@ public class StateMachineTransitionTests
     [Test]
     public void InitialState_ReturnsConstructorValue()
     {
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
 
         machine.InitialState.ShouldBe(Light.Off);
     }

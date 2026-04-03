@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Ananke.Orchestration.Knowledge.Embeddings;
 
 namespace Ananke.Orchestration.Knowledge;
 

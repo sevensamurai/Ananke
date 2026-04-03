@@ -1,4 +1,5 @@
-using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 

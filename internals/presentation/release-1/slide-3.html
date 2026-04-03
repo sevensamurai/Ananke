@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 3 – Conversational Knowledge Building</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* ── Background grid ────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    /* ── Glow blobs ─────────────────────────────────────────── */
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.16) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 940px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 54px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 21px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.62);
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      margin-bottom: 20px;
+    }
+    .headline strong {
+      color: var(--frost);
+      font-weight: 600;
+    }
+
+    /* ── Pipeline flow pills ─────────────────────────────────── */
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 20px;
+      flex-wrap: nowrap;
+    }
+    .flow-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 13px;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .flow-pill.user {
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.30);
+      color: #f4909a;
+    }
+    .flow-pill.stage {
+      background: rgba(168,218,220,0.09);
+      border: 1px solid rgba(168,218,220,0.18);
+      color: var(--frost);
+    }
+    .flow-pill.end {
+      background: rgba(69,123,157,0.18);
+      border: 1px solid rgba(69,123,157,0.35);
+      color: #87bdd8;
+    }
+    .flow-arrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: rgba(249,199,79,0.55);
+      padding: 0 5px;
+      flex-shrink: 0;
+    }
+
+    /* ── Editor card ────────────────────────────────────────── */
+    .editor {
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(168,218,220,0.14);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.3),
+        0 28px 64px rgba(0,0,0,0.50),
+        0 0 80px rgba(168,218,220,0.06);
+      margin-bottom: 28px;
+    }
+
+    /* ── Title bar ──────────────────────────────────────────── */
+    .editor-titlebar {
+      background: #17283d;
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      gap: 14px;
+      border-bottom: 1px solid rgba(168,218,220,0.08);
+    }
+    .traffic-lights { display: flex; gap: 7px; }
+    .tl { width: 12px; height: 12px; border-radius: 50%; }
+    .tl-red   { background: #ff5f57; }
+    .tl-amber { background: #ffbd2e; }
+    .tl-green { background: #28c840; }
+    .editor-tabs { display: flex; gap: 2px; margin-left: 6px; }
+    .tab {
+      padding: 4px 16px;
+      border-radius: 6px 6px 0 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: rgba(241,250,238,0.40);
+    }
+    .tab.active {
+      background: var(--darkest);
+      color: var(--frost);
+      border-top: 1px solid rgba(168,218,220,0.2);
+      border-left: 1px solid rgba(168,218,220,0.08);
+      border-right: 1px solid rgba(168,218,220,0.08);
+    }
+    .editor-lang {
+      margin-left: auto;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: rgba(168,218,220,0.4);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Editor body ────────────────────────────────────────── */
+    .editor-body {
+      background: var(--darkest);
+      display: flex;
+      padding: 18px 0;
+    }
+    .line-numbers {
+      padding: 0 16px 0 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      user-select: none;
+      border-right: 1px solid rgba(168,218,220,0.06);
+      min-width: 56px;
+    }
+    .ln {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      line-height: 1.72;
+      color: rgba(168,218,220,0.18);
+    }
+    .code-area { padding: 0 28px; flex: 1; }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      line-height: 1.72;
+      color: var(--honeydew);
+      white-space: pre;
+    }
+
+    /* ── Syntax tokens ──────────────────────────────────────── */
+    .kw   { color: var(--red);   font-weight: 600; }
+    .type { color: var(--frost); }
+    .meth { color: #7ec8cc; }
+    .str  { color: #c9e8c7; }
+    .ident{ color: rgba(241,250,238,0.80); }
+    .pun  { color: rgba(168,218,220,0.48); }
+    .prop { color: var(--frost); opacity: 0.85; }
+
+    /* comment base */
+    .com  { color: rgba(168,218,220,0.28); font-style: italic; }
+
+    /* within-comment highlights (override italic via parent) */
+    .com .c-str  { color: rgba(201,232,199,0.65); font-style: normal; }
+    .com .c-arr  { color: rgba(249,199,79,0.70);  font-style: normal; font-weight: 600; }
+    .com .c-step { color: rgba(126,200,204,0.70); font-style: normal; }
+
+    /* blank-line spacer in <pre> */
+    .blank { display: block; }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Streaming Chat
+    </div>
+
+    <!-- Title -->
+    <h1 class="title"><em>Conversational</em> Knowledge Building</h1>
+
+    <!-- Headline -->
+    <p class="headline">
+      The knowledge base grows through normal conversation —<br>
+      <strong>no batch job required.</strong>
+    </p>
+
+    <!-- Pipeline flow pills -->
+    <div class="flow-row">
+      <span class="flow-pill user">"Index this PDF"</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill stage">process_document</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill stage">fetch</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill stage">extract</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill stage">chunk</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill stage">embed</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-pill end">store</span>
+    </div>
+
+    <!-- Code editor -->
+    <div class="editor">
+      <div class="editor-titlebar">
+        <div class="traffic-lights">
+          <div class="tl tl-red"></div>
+          <div class="tl tl-amber"></div>
+          <div class="tl tl-green"></div>
+        </div>
+        <div class="editor-tabs">
+          <div class="tab active">knowledge-demo.cs</div>
+          <div class="tab">KnowledgeTools.cs</div>
+        </div>
+        <span class="editor-lang">C#</span>
+      </div>
+
+      <div class="editor-body">
+        <div class="line-numbers">
+          <span class="ln">1</span>
+          <span class="ln">2</span>
+          <span class="ln">3</span>
+          <span class="ln">4</span>
+          <span class="ln">5</span>
+          <span class="ln">6</span>
+          <span class="ln">7</span>
+          <span class="ln">8</span>
+          <span class="ln">9</span>
+          <span class="ln">10</span>
+          <span class="ln">11</span>
+          <span class="ln">12</span>
+          <span class="ln">13</span>
+          <span class="ln">14</span>
+          <span class="ln">15</span>
+          <span class="ln">16</span>
+        </div>
+
+        <div class="code-area"><pre
+>
+<span class="com">// <span class="c-str">"Index this PDF"</span>       <span class="c-arr">→</span> <span class="c-step">process_document</span>  <span class="c-arr">→</span> <span class="c-step">fetch</span> <span class="c-arr">→</span> <span class="c-step">extract</span> <span class="c-arr">→</span> <span class="c-step">chunk</span> <span class="c-arr">→</span> <span class="c-step">embed</span> <span class="c-arr">→</span> <span class="c-step">store</span></span>
+<span class="com">// <span class="c-str">"What does chapter 3 say?"</span> <span class="c-arr">→</span> <span class="c-step">search_knowledge</span>  <span class="c-arr">→</span> <span class="c-step">time-decay reranked results</span> <span class="c-arr">→</span> <span class="c-step">answer</span></span>
+<span class="y-scalar"> </span>
+<span class="kw">var</span> <span class="ident">embeddingModel</span> <span class="pun">=</span> <span class="type">OpenAIEmbeddingModel</span><span class="meth">.Create</span><span class="pun">(</span><span class="ident">apiKey</span><span class="pun">);</span>
+
+<span class="type">IKnowledgeStore</span> <span class="ident">knowledgeStore</span> <span class="pun">=</span> <span class="ident">useQdrant</span>
+    <span class="pun">?</span> <span class="kw">new</span> <span class="type">QdrantKnowledgeStore</span><span class="pun">(</span><span class="kw">new</span> <span class="type">QdrantClient</span><span class="pun">(</span><span class="str">"localhost"</span><span class="pun">,</span> <span class="ident">6334</span><span class="pun">),</span> <span class="ident">embeddingModel</span><span class="pun">)</span>
+    <span class="pun">:</span> <span class="kw">new</span> <span class="type">InMemoryKnowledgeStore</span><span class="pun">(</span><span class="ident">embeddingModel</span><span class="pun">);</span>
+<span class="kw">var</span> <span class="ident">memory</span>  <span class="pun">=</span> <span class="kw">new</span> <span class="type">InMemoryConversationMemory</span><span class="pun">();</span>
+<span class="kw">var</span> <span class="ident">builder</span> <span class="pun">=</span> <span class="type">StreamingChatWorkflow</span><span class="meth">.Create</span><span class="pun">(</span><span class="str">"knowledge-demo"</span><span class="pun">,</span> <span class="ident">chatModel</span><span class="pun">)</span>
+    <span class="meth">.WithSystemPrompt</span><span class="pun">(</span><span class="ident">systemPrompt</span><span class="pun">)</span>
+    <span class="meth">.WithTools</span><span class="pun">(</span><span class="ident">tools</span><span class="pun">)</span>
+    <span class="meth">.WithMemory</span><span class="pun">(</span><span class="ident">memory</span><span class="pun">);</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; INTERNALS</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">slide 03</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

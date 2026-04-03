@@ -29,6 +29,32 @@ cd src/demos/Connect4Demo
 dotnet run
 ```
 
+### Command-line options
+
+| Flag | Description |
+|---|---|
+| `--train` | Train through self-play before interactive mode |
+| `--train 200` | Train for 200 iterations (default: 50) |
+| `--analyze` | Train + print analysis report, then exit |
+| `--export skills.json` | Export learned skills to a JSON file |
+| `--import skills.json` | Import skills from a previous session |
+
+Options compose freely:
+
+```bash
+# Train, export skills, then play
+dotnet run -- --train --export skills.json
+
+# Import previous skills, train more, export updated skills
+dotnet run -- --import skills.json --train 100 --export skills-v2.json
+
+# Just play with imported knowledge
+dotnet run -- --import skills.json
+```
+
+During interactive play, press `s` at the "Play again?" prompt to save
+skills to disk mid-session.
+
 ## What to observe
 
 ### Games 1–2: Random play
@@ -77,6 +103,27 @@ Press `m` during your turn to inspect the agent's empirical memory:
 | **Pattern** | _"Opponent has 3 in a line with an open cell → must block"_ |
 | **Skill** | _"Build offensive pressure: extend lines, create shared threats, force reactive play"_ |
 | **Heuristic** | _"Prefer center column — it participates in the most winning lines"_ |
+
+## Skill export / import
+
+The demo uses `ISkillPackager` + `JsonSkillPackageFormat` to save and load
+learned experience as portable JSON skill packages. This lets you:
+
+- **Train once, reuse forever** — export after training, import in future runs
+- **Incremental learning** — import yesterday's skills, train more, export the update
+- **Share knowledge** — give a skill file to another player / CI pipeline
+
+```bash
+# Session 1: train and save
+dotnet run -- --train 200 --export gen1.json
+
+# Session 2: pick up where you left off
+dotnet run -- --import gen1.json --train 100 --export gen2.json
+```
+
+Skill files include quality-gated empirical entries and linked episodes.
+Imported entries receive a 0.9× strength scale so fresh local experience
+can gradually outweigh stale imported knowledge.
 
 ## Swapping to Qdrant for persistence
 

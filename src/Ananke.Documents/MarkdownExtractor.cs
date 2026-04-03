@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Documents;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;

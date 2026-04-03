@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Tools;

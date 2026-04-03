@@ -1,88 +1,44 @@
-# Ananke - AI Agent Instructions
+﻿# Ananke - Copilot Instructions
 
-## Project Overview
-Ananke is a C# .NET library project currently serving as a NuGet package name reservation. The project is configured for automated publishing to NuGet on merges to the main branch.
+## Project
 
-## Technology Stack
-- **Language**: C# 
-- **Framework**: .NET 10.0
-- **Package Manager**: NuGet
-- **CI/CD**: GitHub Actions
-- **License**: Apache 2.0
+C# .NET 10.0 library for AI agent orchestration. Solution: `src/Ananke.slnx` (37 projects). Build settings shared via `src/Directory.Build.props`.
 
-## Project Structure
-```
-src/
-  ├── Ananke.csproj      - Project configuration with NuGet metadata
-  └── Placeholder.cs      - Placeholder implementation
-.github/
-  └── workflows/
-      └── publish.yml     - Automated NuGet publishing workflow
-```
+## Dependency Graph
 
-## Coding Standards
+Ananke.Abstractions (zero deps) -> Ananke.Orchestration -> Ananke.Learning. Check this before adding cross-project references.
 
-### C# Style Guidelines
-- Use modern C# language features and idiomatic patterns
-- Follow Microsoft's C# coding conventions
-- Use file-scoped namespaces where appropriate
-- Prefer nullable reference types
-- Use XML documentation comments for public APIs
-- Keep code simple and maintainable
+## Coding Rules
 
-### Project Conventions
-- Target framework: .NET 10.0
-- Use minimal APIs and modern patterns
-- Maintain backward compatibility when possible
-- Keep dependencies minimal
+- File-scoped namespaces (`namespace X;`), matching assembly + folder path
+- Never put types from one assembly into another assembly's namespace
+- Organize code by vertical slices: group related types into sub-folders with matching sub-namespaces (e.g., `Ananke.Learning.Episodes`, `Ananke.Learning.Skills`). 
+- Keep root namespace for core abstractions only. When a project grows beyond ~8 files, introduce vertical folders.
+- `sealed record` for immutable data; `required` for mandatory fields
+- Primary constructors for dependency injection in classes
+- `IReadOnlyList<T>` / `IReadOnlyDictionary<TK, TV>` in public APIs
+- XML doc comments on public APIs
+- Every new interface must ship with an in-memory implementation
+- No breaking changes to established interfaces without an ADR
 
-## Version Management
-- Version is specified in `src/Ananke.csproj` in the `<Version>` property
-- Follow semantic versioning (MAJOR.MINOR.PATCH)
-- Update version before merging to main for new releases
-- Currently using placeholder version 0.0.1
+## Build Rules
 
-## NuGet Publishing
-- Automatic publishing occurs on merge to main branch
-- GitHub Actions workflow handles build, pack, and publish
-- Requires `NUGET_API_KEY` secret in GitHub repository settings
-- Package includes symbols (snupkg) for debugging
+- `Directory.Build.props` owns `TargetFramework`, `Nullable`, `ImplicitUsings`, `VersionPrefix` â€” never repeat these in individual csproj files
+- `TreatWarningsAsErrors` is on: zero warnings allowed
+- New packable project: set only `IsPackable`, `PackageId`, `Description`, optionally `PackageTags`; add a `README.md` next to the csproj
 
-## Development Workflow
-1. Make changes in feature branches
-2. Update version in Ananke.csproj if releasing
-3. Test locally with `dotnet build` and `dotnet pack`
-4. Create pull request to main
-5. After merge, GitHub Actions automatically publishes to NuGet
+## Testing
 
-## Key Files
-- **Ananke.csproj**: Contains all NuGet metadata and package configuration
-- **Placeholder.cs**: Current implementation (placeholder)
-- **.github/workflows/publish.yml**: CI/CD pipeline configuration
-- **README.md**: Project documentation and setup instructions
+- NUnit + Shouldly
+- Run full suite after changes: `dotnet test src/Ananke.slnx`
+- Test project naming: `Ananke.<Feature>.Tests`; test class naming: `<ClassUnderTest>Tests`
 
-## Common Tasks
+## Version & Release
 
-### Build the project
-```bash
-dotnet build src/Ananke.csproj
-```
+- Version lives in `Directory.Build.props` `<VersionPrefix>` â€” single source of truth
+- Add `releases/v{VERSION}.md` before merging (CI enforces this)
 
-### Create NuGet package locally
-```bash
-dotnet pack src/Ananke.csproj --configuration Release --output ./packages
-```
+## Tooling for Creating or Rewriting Files
 
-### Restore dependencies
-```bash
-dotnet restore src/Ananke.csproj
-```
-
-## AI Agent Guidelines
-- Always maintain the project structure and conventions
-- When adding new features, update documentation accordingly
-- Ensure all changes maintain NuGet package compatibility
-- Keep the codebase minimal and focused
-- Test changes locally before committing
-- Update version numbers appropriately for releases
-- Follow semantic versioning principles
+- For new files: use `create_file` directly. Do NOT pre-create an empty file then try to edit it.
+- For replacing entire file content: use `replace_string_in_file` with old content matched from `get_file`. Read the file first to get exact current content.

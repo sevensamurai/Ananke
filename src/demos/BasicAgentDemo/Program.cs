@@ -1,17 +1,18 @@
-﻿using System.ClientModel;
+using System.ClientModel;
 using Ananke.Orchestration;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.OpenAI;
 using Ananke.Orchestration.Tools;
 using Microsoft.Extensions.Configuration;
 using OpenAI.Chat;
 
-// ─────────────────────────────────────────────────────────────────────
-//  BasicAgentDemo — demonstrates three levels of model usage:
+// ---------------------------------------------------------------------
+//  BasicAgentDemo � demonstrates three levels of model usage:
 //    1. Direct model call (simplest)
 //    2. Capability-based routing (automatic cost-effective selection)
 //    3. Full workflow with AgentJob + routed model
-// ─────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------
 
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
@@ -21,7 +22,7 @@ var config = new ConfigurationBuilder()
 var apiKey = config["OpenAI:ApiKey"]
     ?? throw new InvalidOperationException("OpenAI:ApiKey missing from secrets.json");
 
-// ── Create two models at different tiers ────────────────────────────
+// -- Create two models at different tiers ----------------------------
 //    In production these could be entirely different providers.
 
 IStreamingAgentModel miniModel = new OpenAIChatAgentModel(
@@ -30,15 +31,15 @@ IStreamingAgentModel miniModel = new OpenAIChatAgentModel(
 IStreamingAgentModel fullModel = new OpenAIChatAgentModel(
     new ChatClient("gpt-4.1", new ApiKeyCredential(apiKey)));
 
-Console.WriteLine("═══════════════════════════════════════════════════════════");
-Console.WriteLine("  Ananke — BasicAgentDemo");
-Console.WriteLine("═══════════════════════════════════════════════════════════");
+Console.WriteLine("-----------------------------------------------------------");
+Console.WriteLine("  Ananke � BasicAgentDemo");
+Console.WriteLine("-----------------------------------------------------------");
 
 // =====================================================================
-//  PART 1 — Direct model call (specify the model explicitly)
+//  PART 1 � Direct model call (specify the model explicitly)
 // =====================================================================
 Console.WriteLine();
-Console.WriteLine("── Part 1: Direct model call (gpt-4.1-mini) ──");
+Console.WriteLine("-- Part 1: Direct model call (gpt-4.1-mini) --");
 Console.WriteLine();
 
 var directRequest = new AgentRequest
@@ -51,10 +52,10 @@ var directResponse = await miniModel.GenerateAsync(directRequest);
 Console.WriteLine($"  Response: {directResponse.Text}");
 
 // =====================================================================
-//  PART 2 — CapabilityModelRouter (automatic selection)
+//  PART 2 � CapabilityModelRouter (automatic selection)
 // =====================================================================
 Console.WriteLine();
-Console.WriteLine("── Part 2: Capability-based routing ──");
+Console.WriteLine("-- Part 2: Capability-based routing --");
 Console.WriteLine();
 
 // Define model profiles with capabilities, cost, and intelligence tiers.
@@ -87,7 +88,7 @@ var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
     .AddModel(miniProfile)
     .AddModel(fullProfile);
 
-// 2a — Simple text request → should route to gpt-4.1-mini (cheaper, meets requirements)
+// 2a � Simple text request ? should route to gpt-4.1-mini (cheaper, meets requirements)
 var simpleRequest = new AgentRequest
 {
     SystemPrompt = "You are a concise assistant.",
@@ -96,9 +97,9 @@ var simpleRequest = new AgentRequest
 
 var simpleModel = router.Select(simpleRequest);
 var simpleResponse = await simpleModel.GenerateAsync(simpleRequest);
-Console.WriteLine($"  [Simple text]   → {ModelNameOf(simpleModel)} → {simpleResponse.Text}");
+Console.WriteLine($"  [Simple text]   ? {ModelNameOf(simpleModel)} ? {simpleResponse.Text}");
 
-// 2b — Reasoning request → metadata bumps min_intelligence, routes to gpt-4.1
+// 2b � Reasoning request ? metadata bumps min_intelligence, routes to gpt-4.1
 var reasoningRequest = new AgentRequest
 {
     SystemPrompt = "You are a senior software architect.",
@@ -109,10 +110,10 @@ var reasoningRequest = new AgentRequest
 
 var reasoningModel = router.Select(reasoningRequest);
 var reasoningResponse = await reasoningModel.GenerateAsync(reasoningRequest);
-Console.WriteLine($"  [Reasoning]     → {ModelNameOf(reasoningModel)}");
+Console.WriteLine($"  [Reasoning]     ? {ModelNameOf(reasoningModel)}");
 Console.WriteLine($"                    {Truncate(reasoningResponse.Text, 200)}");
 
-// 2c — Code generation request → inferred from capability flag
+// 2c � Code generation request ? inferred from capability flag
 var codeRequest = new AgentRequest
 {
     SystemPrompt = "You are a C# expert. Respond only with code.",
@@ -122,14 +123,14 @@ var codeRequest = new AgentRequest
 
 var codeModel = router.Select(codeRequest);
 var codeResponse = await codeModel.GenerateAsync(codeRequest);
-Console.WriteLine($"  [Code gen]      → {ModelNameOf(codeModel)}");
+Console.WriteLine($"  [Code gen]      ? {ModelNameOf(codeModel)}");
 Console.WriteLine($"                    {Truncate(codeResponse.Text, 200)}");
 
 // =====================================================================
-//  PART 3 — Workflow with AgentJob + CapabilityModelRouter
+//  PART 3 � Workflow with AgentJob + CapabilityModelRouter
 // =====================================================================
 Console.WriteLine();
-Console.WriteLine("── Part 3: Workflow with AgentJob + routed model ──");
+Console.WriteLine("-- Part 3: Workflow with AgentJob + routed model --");
 Console.WriteLine();
 
 // A simple state for our two-step workflow
@@ -146,7 +147,7 @@ var researchTools = new ToolKit("research")
         },
         "country", "The country name to look up");
 
-// Step 1 — gather: uses tools (mini is fine — tool calling doesn't need frontier)
+// Step 1 � gather: uses tools (mini is fine � tool calling doesn't need frontier)
 var gatherJob = new AgentJob<ResearchState, GatherResult>
     .Builder("gather", router)
     .WithSystemPrompt("You are a research assistant. Use tools to gather data, then return a JSON summary.")
@@ -155,7 +156,7 @@ var gatherJob = new AgentJob<ResearchState, GatherResult>
     .MapResult((s, r) => s with { Facts = r.Summary })
     .Build();
 
-// Step 2 — analyze: requires reasoning (full model will be selected)
+// Step 2 � analyze: requires reasoning (full model will be selected)
 var analyzeJob = new AgentJob<ResearchState, AnalysisResult>
     .Builder("analyze", router)
     .WithSystemPrompt("""
@@ -180,11 +181,11 @@ Console.WriteLine($"  Facts:    {execution.State.Facts}");
 Console.WriteLine($"  Analysis: {execution.State.Analysis}");
 
 Console.WriteLine();
-Console.WriteLine("═══════════════════════════════════════════════════════════");
+Console.WriteLine("-----------------------------------------------------------");
 Console.WriteLine("  Done.");
-Console.WriteLine("═══════════════════════════════════════════════════════════");
+Console.WriteLine("-----------------------------------------------------------");
 
-// ── Helpers ──────────────────────────────────────────────────────────
+// -- Helpers ----------------------------------------------------------
 
 static string ModelNameOf(IAgentModel model) => model switch
 {
@@ -196,9 +197,9 @@ static string ModelNameOf(IAgentModel model) => model switch
 static string Truncate(string? text, int maxLength) =>
     text is null ? "(empty)"
     : text.Length <= maxLength ? text.ReplaceLineEndings(" ")
-    : string.Concat(text.AsSpan(0, maxLength).ToString().ReplaceLineEndings(" "), "…");
+    : string.Concat(text.AsSpan(0, maxLength).ToString().ReplaceLineEndings(" "), "�");
 
-// ── State & response records ────────────────────────────────────────
+// -- State & response records ----------------------------------------
 
 public record ResearchState
 {

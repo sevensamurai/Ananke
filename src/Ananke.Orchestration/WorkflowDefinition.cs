@@ -31,13 +31,20 @@ public sealed class WorkflowDefinition<TState>
     /// <summary>Fan-in descriptors that merge parallel branches back into a single execution path.</summary>
     public IReadOnlyList<JoinDescriptor<TState>> Joins { get; }
 
+    /// <summary>
+    /// Optional cost budget configuration. When set, the runner tracks token usage
+    /// and terminates the workflow when the estimated cost exceeds the budget.
+    /// </summary>
+    public BudgetConfig? Budget { get; }
+
     internal WorkflowDefinition(
         string name,
         Dictionary<string, JobDescriptor<TState>> jobs,
         List<Connection> connections,
         string entryJob,
         IReadOnlyDictionary<string, string>? metadata = null,
-        List<JoinDescriptor<TState>>? joins = null)
+        List<JoinDescriptor<TState>>? joins = null,
+        BudgetConfig? budget = null)
     {
         Name = name;
         Jobs = new Dictionary<string, JobDescriptor<TState>>(jobs);
@@ -45,6 +52,7 @@ public sealed class WorkflowDefinition<TState>
         EntryJob = entryJob;
         Metadata = metadata ?? new Dictionary<string, string>();
         Joins = joins is not null ? [.. joins] : [];
+        Budget = budget;
 
         Validate();
     }
@@ -75,6 +83,16 @@ public sealed class WorkflowDefinition<TState>
         {
             if (connection.From == fromJob && connection is ForkConnection fork)
                 return fork;
+        }
+        return null;
+    }
+
+    internal LoopConnection<TState>? ResolveLoop(string fromJob)
+    {
+        foreach (var connection in Connections)
+        {
+            if (connection.From == fromJob && connection is LoopConnection<TState> loop)
+                return loop;
         }
         return null;
     }
@@ -125,6 +143,15 @@ public sealed class WorkflowDefinition<TState>
                         throw new InvalidOperationException($"Fork target '{target}' from '{connection.From}' is not defined as a job.");
                 }
             }
+            else if (connection is LoopConnection<TState> loop)
+            {
+                if (!Jobs.ContainsKey(loop.LoopTarget))
+                    throw new InvalidOperationException($"Loop target '{loop.LoopTarget}' from '{connection.From}' is not defined as a job.");
+                if (loop.ExitTarget != Workflow.EndMarker && !Jobs.ContainsKey(loop.ExitTarget))
+                    throw new InvalidOperationException($"Loop exit target '{loop.ExitTarget}' from '{connection.From}' is not defined as a job.");
+                if (loop.MaxIterations < 1)
+                    throw new InvalidOperationException($"Loop from '{connection.From}' must have MaxIterations >= 1.");
+            }
 
             jobsWithConnections.Add(connection.From);
         }
@@ -153,6 +180,14 @@ public sealed class WorkflowDefinition<TState>
                 {
                     foreach (var target in conn.Targets)
                         queue.Enqueue(target);
+                }
+
+                foreach (var conn in Connections.OfType<LoopConnection<TState>>()
+                             .Where(c => c.From == current))
+                {
+                    queue.Enqueue(conn.LoopTarget);
+                    if (conn.ExitTarget != Workflow.EndMarker)
+                        queue.Enqueue(conn.ExitTarget);
                 }
 
                 foreach (var join in Joins.Where(j => j.Sources.Contains(current)))

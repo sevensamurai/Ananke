@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 1 – Fluent Type-Safe Workflows</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:        #E63946;
+      --honeydew:   #F1FAEE;
+      --frost:      #A8DADC;
+      --steel:      #457B9D;
+      --deep:       #1D3557;
+      --deeper:     #162843;
+      --darkest:    #0f1d30;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      position: relative;
+    }
+
+    /* ── Decorative background grid ─────────────────────────── */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    /* ── Glow blobs ─────────────────────────────────────────── */
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.18) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.12) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Content wrapper ────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 940px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 28px;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 58px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 22px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.65);
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      max-width: 680px;
+    }
+    .headline strong {
+      color: var(--frost);
+      font-weight: 600;
+    }
+
+    /* ── Editor card ────────────────────────────────────────── */
+    .editor {
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(168,218,220,0.14);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.3),
+        0 24px 60px rgba(0,0,0,0.5),
+        0 0 80px rgba(168,218,220,0.06);
+    }
+
+    /* ── Editor title bar ───────────────────────────────────── */
+    .editor-titlebar {
+      background: #17283d;
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      gap: 14px;
+      border-bottom: 1px solid rgba(168,218,220,0.08);
+    }
+    .traffic-lights {
+      display: flex;
+      gap: 7px;
+    }
+    .tl {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .tl-red   { background: #ff5f57; }
+    .tl-amber { background: #ffbd2e; }
+    .tl-green { background: #28c840; }
+
+    .editor-tabs {
+      display: flex;
+      gap: 2px;
+      margin-left: 6px;
+    }
+    .tab {
+      padding: 4px 16px;
+      border-radius: 6px 6px 0 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: rgba(241,250,238,0.45);
+      background: transparent;
+    }
+    .tab.active {
+      background: var(--darkest);
+      color: var(--frost);
+      border-top: 1px solid rgba(168,218,220,0.2);
+      border-left: 1px solid rgba(168,218,220,0.08);
+      border-right: 1px solid rgba(168,218,220,0.08);
+    }
+    .editor-lang {
+      margin-left: auto;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: rgba(168,218,220,0.4);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Editor body ────────────────────────────────────────── */
+    .editor-body {
+      background: var(--darkest);
+      display: flex;
+      padding: 22px 0;
+    }
+
+    .line-numbers {
+      padding: 0 18px 0 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: flex-end;
+      user-select: none;
+      border-right: 1px solid rgba(168,218,220,0.06);
+      min-width: 58px;
+    }
+    .ln {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      line-height: 1.75;
+      color: rgba(168,218,220,0.2);
+    }
+
+    .code-area {
+      padding: 0 28px;
+      flex: 1;
+    }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--honeydew);
+      white-space: pre;
+    }
+
+    /* ── Syntax tokens ──────────────────────────────────────── */
+    .kw   { color: var(--red);    font-weight: 600; }   /* keywords:   var, await, new    */
+    .type { color: var(--frost);  }                      /* types:      Workflow, State    */
+    .meth { color: #7ec8cc;       }                      /* methods:    .Job, .Then, …     */
+    .str  { color: #c9e8c7;       }                      /* strings                        */
+    .ident{ color: rgba(241,250,238,0.80); }             /* identifiers / params           */
+    .pun  { color: rgba(168,218,220,0.50); }             /* punctuation                    */
+    .prop { color: var(--frost);  opacity: 0.85; }       /* static props: .Fork, .End      */
+    .num  { color: #f9c74f;       }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.35);
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.6;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background glow blobs -->
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Workflow Engine
+    </div>
+
+    <!-- Title -->
+    <h1 class="title">Fluent <em>Type-Safe</em><br>Workflows</h1>
+
+    <!-- Headline -->
+    <p class="headline">
+      Your workflow reads like a diagram —<br>
+      and the <strong>compiler enforces it.</strong>
+    </p>
+
+    <!-- Code Editor Dialog -->
+    <div class="editor">
+
+      <!-- Title bar -->
+      <div class="editor-titlebar">
+        <div class="traffic-lights">
+          <div class="tl tl-red"></div>
+          <div class="tl tl-amber"></div>
+          <div class="tl tl-green"></div>
+        </div>
+        <div class="editor-tabs">
+          <div class="tab active">research-pipeline.cs</div>
+          <div class="tab">ResearchState.cs</div>
+        </div>
+        <span class="editor-lang">C#</span>
+      </div>
+
+      <!-- Code body -->
+      <div class="editor-body">
+
+        <!-- Line numbers -->
+        <div class="line-numbers">
+          <span class="ln">1</span>
+          <span class="ln">2</span>
+          <span class="ln">3</span>
+          <span class="ln">4</span>
+          <span class="ln">5</span>
+          <span class="ln">6</span>
+          <span class="ln">7</span>
+          <span class="ln">8</span>
+          <span class="ln">9</span>
+          <span class="ln">10</span>
+          <span class="ln">11</span>
+        </div>
+
+        <!-- Highlighted code -->
+        <div class="code-area"><pre
+><span class="kw">var</span> <span class="ident">workflow</span> <span class="pun">=</span> <span class="kw">new</span> <span class="type">Workflow</span><span class="pun">&lt;</span><span class="type">ResearchState</span><span class="pun">&gt;(</span><span class="str">"research-pipeline"</span><span class="pun">)</span>
+    <span class="meth">.Job</span><span class="pun">(</span><span class="str">"plan"</span><span class="pun">,       </span><span class="ident">planJob</span><span class="pun">)</span>
+    <span class="meth">.Job</span><span class="pun">(</span><span class="str">"search_web"</span><span class="pun">, </span><span class="ident">searchWebJob</span><span class="pun">)</span>
+    <span class="meth">.Job</span><span class="pun">(</span><span class="str">"search_db"</span><span class="pun">,  </span><span class="ident">searchDbJob</span><span class="pun">)</span>
+    <span class="meth">.Job</span><span class="pun">(</span><span class="str">"synthesize"</span><span class="pun">, </span><span class="ident">synthesizeJob</span><span class="pun">)</span>
+    <span class="meth">.Then</span><span class="pun">(</span><span class="str">"plan"</span><span class="pun">, </span><span class="type">Workflow</span><span class="pun">.</span><span class="prop">Fork</span><span class="pun">(</span><span class="str">"search_web"</span><span class="pun">, </span><span class="str">"search_db"</span><span class="pun">))</span>
+    <span class="meth">.Join</span><span class="pun">([</span><span class="str">"search_web"</span><span class="pun">, </span><span class="str">"search_db"</span><span class="pun">], </span><span class="str">"synthesize"</span><span class="pun">, </span><span class="ident">Merge</span><span class="pun">)</span>
+    <span class="meth">.Then</span><span class="pun">(</span><span class="str">"synthesize"</span><span class="pun">, </span><span class="type">Workflow</span><span class="pun">.</span><span class="prop">End</span><span class="pun">);</span>
+
+<span class="kw">var</span> <span class="ident">result</span> <span class="pun">=</span> <span class="kw">await</span> <span class="ident">workflow</span><span class="meth">.RunAsync</span><span class="pun">(</span><span class="kw">new</span> <span class="type">ResearchState</span> <span class="pun">{</span> <span class="ident">Query</span> <span class="pun">=</span> <span class="str">"distributed systems"</span> <span class="pun">});</span></pre></div>
+
+      </div><!-- /editor-body -->
+    </div><!-- /editor -->
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; INTERNALS</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">slide 01</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

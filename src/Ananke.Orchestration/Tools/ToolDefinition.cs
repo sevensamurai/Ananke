@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Ananke.Orchestration.Tools;
@@ -15,8 +16,21 @@ public readonly record struct ToolResult(string Value, bool IsError)
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    /// <summary>
+    /// Whether this error is transient and the tool call could succeed on retry.
+    /// Defaults to <c>true</c>. Set to <c>false</c> for permanent failures
+    /// (e.g. usage/argument errors) that would fail identically on retry.
+    /// </summary>
+    public bool IsRetryable { get; init; } = true;
+
     public static ToolResult Ok(string value) => new(value, IsError: false);
     public static ToolResult Error(string error) => new(error, IsError: true);
+
+    /// <summary>
+    /// Creates a non-retryable error — signals the agent to stop calling this tool
+    /// because the failure is permanent (bad configuration, unknown arguments, etc.).
+    /// </summary>
+    public static ToolResult Fatal(string error) => new(error, IsError: true) { IsRetryable = false };
 
     /// <summary>
     /// Serializes <paramref name="value"/> to JSON and wraps it as a successful result.
@@ -26,6 +40,53 @@ public readonly record struct ToolResult(string Value, bool IsError)
         new(JsonSerializer.Serialize(value, JsonOptions), IsError: false);
 
     public static implicit operator ToolResult(string value) => Ok(value);
+}
+
+/// <summary>
+/// A runtime dependency that a tool requires to function (e.g. a CLI binary on PATH).
+/// Checked eagerly by <see cref="ToolKit.CheckPrerequisitesAsync"/> at startup,
+/// before any tool is exposed to an agent.
+/// </summary>
+/// <param name="Name">Short identifier (e.g. <c>"uvx"</c>, <c>"node"</c>, <c>"docker"</c>).</param>
+/// <param name="Check">Returns <see langword="true"/> when the prerequisite is satisfied.</param>
+/// <param name="InstallHint">
+/// Human-readable install instruction shown when the check fails.
+/// Keep it actionable — a single command or a short URL.
+/// </param>
+public sealed record ToolPrerequisite(string Name, Func<CancellationToken, Task<bool>> Check, string InstallHint)
+{
+    /// <summary>
+    /// Creates a prerequisite that verifies a CLI binary is reachable on <c>PATH</c>.
+    /// The check runs <c>&lt;binary&gt; --version</c> and expects a zero exit code.
+    /// </summary>
+    /// <param name="binary">The executable name (e.g. <c>"uvx"</c>, <c>"node"</c>).</param>
+    /// <param name="installHint">
+    /// Shown when the binary is missing.
+    /// Example: <c>"Install uv: winget install astral-sh.uv — see docs/guides/uv-setup-for-dotnet-developers.md"</c>
+    /// </param>
+    /// <param name="versionFlag">The flag used to probe the binary. Defaults to <c>"--version"</c>.</param>
+    public static ToolPrerequisite Binary(string binary, string installHint, string versionFlag = "--version") =>
+        new(binary, async ct =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(binary, versionFlag)
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = Process.Start(psi);
+                if (process is null) return false;
+                await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                return process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }, installHint);
 }
 
 /// <summary>
@@ -39,11 +100,13 @@ public readonly record struct ToolResult(string Value, bool IsError)
 /// which helps the LLM produce correct values — especially for ambiguous, format-sensitive,
 /// or enum-like parameters.
 /// </param>
+/// <param name="IsRequired">When <c>true</c>, the parameter is included in the JSON Schema <c>required</c> array.</param>
 public record ToolParameter(
     string Name,
     string Description,
     string JsonType = "string",
-    IReadOnlyList<string>? Examples = null);
+    IReadOnlyList<string>? Examples = null,
+    bool IsRequired = false);
 
 public record ToolDefinition
 {
@@ -62,6 +125,13 @@ public record ToolDefinition
     /// sent to the LLM to improve tool-calling accuracy.
     /// </summary>
     public IReadOnlyList<string> Examples { get; init; } = [];
+
+    /// <summary>
+    /// Runtime dependencies this tool needs (e.g. CLI binaries on PATH).
+    /// Validated at startup by <see cref="ToolKit.CheckPrerequisitesAsync"/>.
+    /// Tools with no external dependencies leave this empty.
+    /// </summary>
+    public IReadOnlyList<ToolPrerequisite> Requires { get; init; } = [];
 
     public required Func<IReadOnlyDictionary<string, object?>, CancellationToken, Task<ToolResult>> Execute { get; init; }
 
@@ -87,7 +157,8 @@ public record ToolDefinition
                     prop["examples"] = param.Examples;
 
                 properties[param.Name] = prop;
-                required.Add(param.Name);
+                if (param.IsRequired)
+                    required.Add(param.Name);
             }
 
             return JsonSerializer.Serialize(new Dictionary<string, object>

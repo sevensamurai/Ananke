@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 5 – Distributed State Machine with Circuit Breaking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+    }
+
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.16) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 920px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 50px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.08;
+      letter-spacing: -0.025em;
+      margin-bottom: 16px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 22px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.58);
+      line-height: 1.45;
+      margin-bottom: 44px;
+    }
+    .headline strong {
+      color: rgba(241,250,238,0.85);
+      font-weight: 600;
+    }
+
+    /* ── Cards row ──────────────────────────────────────────── */
+    .cards {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .card {
+      flex: 1;
+      border-radius: 16px;
+      padding: 30px 28px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      position: relative;
+      overflow: hidden;
+      background: var(--honeydew);
+      border: 1px solid rgba(241,250,238,0.15);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.38), 0 2px 8px rgba(0,0,0,0.20);
+    }
+
+    /* top accent bars */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 16px 16px 0 0;
+    }
+    .card-generics::before  { background: linear-gradient(90deg, var(--red),   rgba(230,57,70,0.08)); }
+    .card-redlock::before   { background: linear-gradient(90deg, var(--steel), rgba(69,123,157,0.08)); }
+    .card-opstatus::before  { background: linear-gradient(90deg, #3a9ba0,      rgba(58,155,160,0.08)); }
+
+    /* ── Card header ────────────────────────────────────────── */
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+      padding-top: 6px;
+    }
+    .card-icon {
+      width: 40px; height: 40px;
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .card-generics .card-icon  { background: rgba(230,57,70,0.12); }
+    .card-redlock  .card-icon  { background: rgba(69,123,157,0.14); }
+    .card-opstatus .card-icon  { background: rgba(58,155,160,0.13); }
+
+    .card-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+    .card-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--deep);
+      line-height: 1.3;
+    }
+    .card-sub {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .card-generics .card-sub  { color: rgba(230,57,70,0.65); }
+    .card-redlock  .card-sub  { color: rgba(69,123,157,0.70); }
+    .card-opstatus .card-sub  { color: rgba(58,155,160,0.70); }
+
+    /* ── Divider ────────────────────────────────────────────── */
+    .card-divider {
+      height: 1px;
+      background: rgba(29,53,87,0.10);
+    }
+
+    /* ── Body text ──────────────────────────────────────────── */
+    .card-body {
+      font-size: 16px;
+      line-height: 1.65;
+      color: rgba(29,53,87,0.78);
+      font-weight: 400;
+    }
+    .card-body em {
+      font-style: normal;
+      font-weight: 700;
+      color: var(--deep);
+    }
+    .card-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 5px;
+    }
+    .card-generics .card-body code  { background: rgba(230,57,70,0.10);   color: #b81a26; }
+    .card-redlock  .card-body code  { background: rgba(69,123,157,0.13);  color: #2c5f7a; }
+    .card-opstatus .card-body code  { background: rgba(58,155,160,0.12);  color: #1e6e72; }
+
+    /* ── Pill list ──────────────────────────────────────────── */
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 2px;
+    }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .pill-red {
+      background: rgba(230,57,70,0.09);
+      border: 1px solid rgba(230,57,70,0.25);
+      color: #b81a26;
+    }
+    .pill-steel {
+      background: rgba(69,123,157,0.10);
+      border: 1px solid rgba(69,123,157,0.28);
+      color: #2c5f7a;
+    }
+    .pill-teal {
+      background: rgba(58,155,160,0.10);
+      border: 1px solid rgba(58,155,160,0.28);
+      color: #1e6e72;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 42px;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; State Machine
+    </div>
+
+    <h1 class="title">Distributed <em>State Machine</em><br>with Circuit Breaking</h1>
+
+    <p class="headline">
+      The state machine is a first-class citizen —
+      <strong>not bolted on.</strong>
+    </p>
+
+    <div class="cards">
+
+      <!-- ── Card 1: Generic type safety ─────────────────── -->
+      <div class="card card-generics">
+        <div class="card-header">
+          <div class="card-icon">🧩</div>
+          <div class="card-title-block">
+            <span class="card-name">AbstractStateMachine</span>
+            <span class="card-sub">Type Safety</span>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+        <p class="card-body">
+          Four generics — <em>all enums or interfaces</em>, no stringly-typed
+          anything. <code>C</code> context, <code>S</code> state, <code>T</code> trigger,
+          <code>N</code> node id. The compiler rejects invalid transitions at build time.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-red">enum-driven</span>
+          <span class="pill pill-red">no magic strings</span>
+          <span class="pill pill-red">compile-time safety</span>
+        </div>
+      </div>
+
+      <!-- ── Card 2: RedLock distributed coordination ────── -->
+      <div class="card card-redlock">
+        <div class="card-header">
+          <div class="card-icon">🔒</div>
+          <div class="card-title-block">
+            <span class="card-name">RedLock Coordination</span>
+            <span class="card-sub">Distributed</span>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+        <p class="card-body">
+          Lock coordination is <em>injected</em>, not hard-coded.
+          Multiple service replicas share state safely — no split-brain,
+          no double-transitions. Swap <code>IDistributedLock</code>
+          for any backend without touching machine logic.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-steel">injected locking</span>
+          <span class="pill pill-steel">replica-safe</span>
+          <span class="pill pill-steel">no split-brain</span>
+        </div>
+      </div>
+
+      <!-- ── Card 3: OperationalStatus ───────────────────── -->
+      <div class="card card-opstatus">
+        <div class="card-header">
+          <div class="card-icon">⚙️</div>
+          <div class="card-title-block">
+            <span class="card-name">OperationalStatus</span>
+            <span class="card-sub">Circuit Breaking</span>
+          </div>
+        </div>
+        <div class="card-divider"></div>
+        <p class="card-body">
+          <em>Fault / Reset lifecycle</em> built in — no separate library required.
+          <code>OperationalStatus</code> tracks health transitions as a
+          first-class state, giving you circuit-breaker semantics with the
+          same enum-safe machinery.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-teal">Fault / Reset</span>
+          <span class="pill pill-teal">built-in lifecycle</span>
+          <span class="pill pill-teal">no extra deps</span>
+        </div>
+      </div>
+
+    </div><!-- /cards -->
+
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; INTERNALS</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">slide 05</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 0 – The Signal Behind Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+      --amber:    #f9c74f;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* ── Background grid ────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    /* ── Glow blobs ─────────────────────────────────────────── */
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.16) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 920px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 54px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 19px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.55);
+      line-height: 1.58;
+      margin-bottom: 30px;
+      max-width: 840px;
+    }
+    .headline em {
+      font-style: italic;
+      color: rgba(241,250,238,0.80);
+    }
+
+    /* ── Signal table ────────────────────────────────────────── */
+    .signal-table {
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(168,218,220,0.12);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.22);
+      margin-bottom: 22px;
+    }
+    .tbl-header {
+      display: grid;
+      grid-template-columns: 175px 1fr 1.1fr;
+      background: rgba(15,29,48,0.85);
+      border-bottom: 1px solid rgba(168,218,220,0.10);
+    }
+    .tbl-header .th {
+      padding: 11px 22px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(168,218,220,0.38);
+    }
+    .tbl-row {
+      display: grid;
+      grid-template-columns: 175px 1fr 1.1fr;
+      border-bottom: 1px solid rgba(168,218,220,0.06);
+    }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:nth-child(odd)  { background: rgba(15,29,48,0.50); }
+    .tbl-row:nth-child(even) { background: rgba(22,40,67,0.50); }
+
+    .tbl-signal {
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .sig-pip {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .pip-red   { background: var(--red);   box-shadow: 0 0 7px rgba(230,57,70,0.55); }
+    .pip-amber { background: var(--amber); box-shadow: 0 0 7px rgba(249,199,79,0.45); }
+    .pip-frost { background: var(--frost); box-shadow: 0 0 7px rgba(168,218,220,0.45); }
+
+    .sig-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .lbl-red   { color: #f4909a; }
+    .lbl-amber { color: #fcd97f; }
+    .lbl-frost { color: var(--frost); }
+
+    .tbl-cell {
+      padding: 18px 22px;
+      font-size: 15px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.66);
+      line-height: 1.52;
+      border-left: 1px solid rgba(168,218,220,0.06);
+    }
+    .tbl-cell strong {
+      font-weight: 600;
+      color: rgba(241,250,238,0.92);
+    }
+
+    /* ── Attribution row ─────────────────────────────────────── */
+    .attrib-row {
+      display: flex;
+      gap: 18px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .attrib-card {
+      flex: 1;
+      border-radius: 12px;
+      padding: 17px 22px;
+      background: rgba(15,29,48,0.55);
+      border: 1px solid rgba(168,218,220,0.09);
+    }
+    .attrib-year {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--red);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .attrib-name {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--honeydew);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .attrib-desc {
+      font-size: 13.5px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.52);
+      line-height: 1.58;
+    }
+
+    /* ── Quote ───────────────────────────────────────────────── */
+    .quote {
+      padding: 14px 22px;
+      border-left: 3px solid rgba(168,218,220,0.28);
+    }
+    .quote p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      font-style: italic;
+      color: rgba(168,218,220,0.52);
+      line-height: 1.6;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 28px;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Learning Architecture
+    </div>
+
+    <!-- Title -->
+    <h1 class="title">The Signal Behind <em>Learning</em></h1>
+
+    <!-- Headline -->
+    <p class="headline">
+      <strong>Happened</strong> and <strong>mattered</strong> are not the same thing
+      — combining them produces a system that learns the routine and forgets the remarkable.
+      Biological cognition decomposes the learning event into three orthogonal signals.
+    </p>
+
+    <!-- Signal table -->
+    <div class="signal-table">
+      <div class="tbl-header">
+        <div class="th">Signal</div>
+        <div class="th">Question it answers</div>
+        <div class="th">Role in learning</div>
+      </div>
+      <div class="tbl-row">
+        <div class="tbl-signal">
+          <span class="sig-pip pip-red"></span>
+          <span class="sig-label lbl-red">Valence</span>
+        </div>
+        <div class="tbl-cell">Was the outcome <strong>good or bad</strong>?</div>
+        <div class="tbl-cell">Shapes what surfaces in future recall — <strong>priority</strong>, not truth</div>
+      </div>
+      <div class="tbl-row">
+        <div class="tbl-signal">
+          <span class="sig-pip pip-amber"></span>
+          <span class="sig-label lbl-amber">Intensity</span>
+        </div>
+        <div class="tbl-cell">How much <strong>did it matter</strong>?</div>
+        <div class="tbl-cell">Amplifies or suppresses the priority signal</div>
+      </div>
+      <div class="tbl-row">
+        <div class="tbl-signal">
+          <span class="sig-pip pip-frost"></span>
+          <span class="sig-label lbl-frost">Surprise</span>
+        </div>
+        <div class="tbl-cell">How <strong>unexpected</strong> was it?</div>
+        <div class="tbl-cell">Determines the <strong>learning rate</strong> — proportional to prediction error</div>
+      </div>
+    </div>
+
+    <!-- Theory attribution -->
+    <div class="attrib-row">
+      <div class="attrib-card">
+        <div class="attrib-year">Rescorla-Wagner · 1972</div>
+        <div class="attrib-name">Prediction Error Learning</div>
+        <div class="attrib-desc">
+          Learning rate proportional to prediction error. If an outcome matches expectation,
+          the update is small. Surprising outcomes drive significant revision.
+          The basis of temporal-difference learning in modern reinforcement learning.
+        </div>
+      </div>
+      <div class="attrib-card">
+        <div class="attrib-year">Damasio · 1994</div>
+        <div class="attrib-name">Somatic Marker Hypothesis</div>
+        <div class="attrib-desc">
+          The valence trace of past outcomes shapes future decisions faster than deliberate reasoning —
+          not by computing, but by leaving a mark that surfaces automatically during recall.
+        </div>
+      </div>
+    </div>
+
+    <!-- Quote -->
+    <div class="quote">
+      <p>Aether borrows the architecture, not the phenomenology.</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; RELEASE 3</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">0 / 3</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 using A2A;
 using Ananke.Orchestration;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 
 namespace Ananke.A2A.Server;
@@ -134,7 +135,7 @@ public sealed class WorkflowTaskAdapter
             var request = new AgentRequest
             {
                 SystemPrompt = systemPrompt,
-                Messages = [Orchestration.Agents.AgentMessage.User(input)]
+                Messages = [global::Ananke.Abstractions.Agents.AgentMessage.User(input)]
             };
 
             var response = await model.GenerateAsync(request, ct).ConfigureAwait(false);

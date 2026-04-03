@@ -1,4 +1,5 @@
-﻿using Ananke.Design;
+using Ananke.Design;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Anthropic;
 using Ananke.Orchestration.OpenAI;
@@ -6,7 +7,7 @@ using Ananke.Orchestration.Tools;
 using Microsoft.Extensions.Configuration;
 using System.Text;
 
-// ── 1. Load secrets ─────────────────────────────────────────────────
+// -- 1. Load secrets -------------------------------------------------
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("secrets.json", optional: true)    // local dev
@@ -14,11 +15,11 @@ var config = new ConfigurationBuilder()
     .Build();
 
 Console.OutputEncoding = Encoding.UTF8;
-Console.WriteLine("━━━ Ananke.Design — YAML + Agents → Workflow ━━━");
+Console.WriteLine("??? Ananke.Design � YAML + Agents ? Workflow ???");
 Console.WriteLine();
 
-// ── 2. Load workflow YAML ───────────────────────────────────────────
-var yamlPath = Path.Combine(AppContext.BaseDirectory, "etl-pipeline.yml");
+// -- 2. Load workflow YAML -------------------------------------------
+var yamlPath = Path.Combine(AppContext.BaseDirectory, "etl-pipeline.ananke.yml");
 var manifest = WorkflowManifest.Load(yamlPath);
 
 Console.WriteLine($"  Workflow: {manifest.Name}");
@@ -28,23 +29,23 @@ Console.WriteLine($"  Agent:   {string.Join(", ", manifest.Jobs.Where(j => j.Val
 Console.WriteLine($"  Code:    {string.Join(", ", manifest.Jobs.Where(j => j.Value.Type == "code").Select(j => j.Key))}");
 Console.WriteLine();
 
-// ── 3. Resolve models from secrets ──────────────────────────────────
+// -- 3. Resolve models from secrets ----------------------------------
 var models = new ModelResolver()
     .Register("openai", "OpenAI", OpenAIChatAgentModel.Create)
     .Register("anthropic", "Anthropic", AnthropicAgentModel.Create)
     .Resolve(manifest, key => config[key]);
 foreach (var (alias, _) in models)
-    Console.WriteLine($"  ✓ Model '{alias}' resolved");
+    Console.WriteLine($"  ? Model '{alias}' resolved");
 Console.WriteLine();
 
-// ── 4. Parse topology and bind jobs ─────────────────────────────────
+// -- 4. Parse topology and bind jobs ---------------------------------
 var scaffold = WorkflowScaffold.Parse<PipelineState>(manifest.Name, manifest.Connections);
 
 Console.WriteLine($"  Discovered: {string.Join(", ", scaffold.JobNames)}");
 Console.WriteLine($"  Unbound:    {string.Join(", ", scaffold.UnboundJobs)}");
 Console.WriteLine();
 
-// ── Tools (code-only — implementations can't live in YAML) ──────────
+// -- Tools (code-only � implementations can't live in YAML) ----------
 var dataTools = new ToolKit("data-tools")
     .AddTool(
         "list_datasets",
@@ -73,12 +74,12 @@ foreach (var (jobName, jobDef) in manifest.Jobs.Where(j => j.Value.Type == "agen
         .MapResult((state, response) => ApplyAgentResult(jobName, state, response.Text ?? ""))
         .WithMaxToolRounds(jobDef.MaxToolRounds);
 
-    // Attach tools to specific jobs — tools are code, not YAML
+    // Attach tools to specific jobs � tools are code, not YAML
     if (jobName == "plan")
         builder.WithTools(dataTools);
 
     scaffold.Bind(jobName, builder.Build());
-    Console.WriteLine($"  ✓ Bound agent job '{jobName}' → {jobDef.ModelAlias}");
+    Console.WriteLine($"  ? Bound agent job '{jobName}' ? {jobDef.ModelAlias}");
 }
 
 // Bind code jobs
@@ -111,7 +112,7 @@ scaffold.BindMerge("combine", branches =>
 
 Console.WriteLine();
 
-// ── 5. Build and run ────────────────────────────────────────────────
+// -- 5. Build and run ------------------------------------------------
 var workflow = scaffold.Build();
 
 Console.WriteLine("  Running workflow...");
@@ -129,14 +130,14 @@ Console.WriteLine($"  Status: {result.Status}");
 Console.WriteLine($"  Output: {result.State.Output?[..Math.Min(200, result.State.Output?.Length ?? 0)]}...");
 Console.WriteLine();
 
-// ── 6. Mermaid ──────────────────────────────────────────────────────
+// -- 6. Mermaid ------------------------------------------------------
 Console.WriteLine(workflow.ToMermaid());
 
 return;
 
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 // Helpers
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 
 static string BuildPromptForJob(string jobName, PipelineState state) => jobName switch
 {
@@ -169,9 +170,9 @@ static PipelineState ApplyAgentResult(string jobName, PipelineState state, strin
     _ => state
 };
 
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 // State
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 
 record PipelineState
 {

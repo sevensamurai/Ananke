@@ -19,7 +19,7 @@ public class OperationalStatusTests
     [Test]
     public void NewMachine_StatusIsOperative()
     {
-        var machine = new LightMachine(_lock);
+        var machine = new LightMachine(_lock, _lock);
 
         machine.OperationalStatus.ShouldBe(OperationalStatus.Operative);
         machine.OperationalStatusReason.ShouldBeNull();
@@ -30,8 +30,8 @@ public class OperationalStatusTests
     [Test]
     public async Task FaultAsync_SetsStatusToFaulted()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         var change = await machine.FaultAsync(ctx, "Hardware failure");
 
@@ -47,8 +47,8 @@ public class OperationalStatusTests
     [Test]
     public async Task FaultAsync_AlreadyFaulted_ReturnsFalse()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.FaultAsync(ctx, "First fault");
         var change = await machine.FaultAsync(ctx, "Second fault");
@@ -61,8 +61,8 @@ public class OperationalStatusTests
     [Test]
     public async Task FaultAsync_BlocksSubsequentTransitions()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.FaultAsync(ctx, "Broken");
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
@@ -76,8 +76,8 @@ public class OperationalStatusTests
     [Test]
     public async Task ResetAsync_RestoresOperativeStatus()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.FaultAsync(ctx, "Broken");
         var change = await machine.ResetAsync(ctx, "Repaired");
@@ -94,8 +94,8 @@ public class OperationalStatusTests
     [Test]
     public async Task ResetAsync_AlreadyOperative_ReturnsFalse()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         var change = await machine.ResetAsync(ctx, "Unnecessary reset");
 
@@ -106,8 +106,8 @@ public class OperationalStatusTests
     [Test]
     public async Task ResetAsync_AllowsTransitionsAgain()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.FaultAsync(ctx, "Broken");
         await machine.ResetAsync(ctx, "Fixed");
@@ -121,8 +121,8 @@ public class OperationalStatusTests
     [Test]
     public async Task FaultAsync_PersistsStatusToDistributedStore()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         // Transition to create persisted state, then fault
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
@@ -130,7 +130,7 @@ public class OperationalStatusTests
 
         // Create a second machine instance pointing at the same lock/store.
         // When it loads the persisted context, it should see Faulted.
-        var machine2 = new LightMachine(_lock);
+        var machine2 = new LightMachine(_lock, _lock);
         var result = await machine2.TransitionAsync(ctx, LightAction.TurnOff);
 
         // The transition should be blocked because persisted status is Faulted
@@ -143,8 +143,8 @@ public class OperationalStatusTests
     [Test]
     public async Task ResetAsync_PersistsStatusToDistributedStore()
     {
-        var machine = new LightMachine(_lock);
-        var ctx = new TestContext(1);
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
         await machine.FaultAsync(ctx, "Broken");
         await machine.ResetAsync(ctx, "Fixed");

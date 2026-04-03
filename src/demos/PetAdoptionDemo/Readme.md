@@ -4,8 +4,6 @@ A full-stack demo for the **Ananke** framework showcasing stateful multi-phase A
 real-time streaming via SSE, mid-generation interrupts, human-in-the-loop payment, and multimodal
 input (voice and photo).
 
-![Corgi with a red bandanna](wwwroot/media/corgi.jpg){width=240}
-
 ---
 
 ## What it demonstrates

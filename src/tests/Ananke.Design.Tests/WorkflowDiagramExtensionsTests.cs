@@ -175,6 +175,44 @@ public class WorkflowDiagramExtensionsTests
         fromWorkflow.ShouldBe(fromDefinition);
     }
 
+    // ── Mermaid: loop ──────────────────────────────────────────────
+
+    [Test]
+    public void ToMermaid_Loop_ShowsLoopAndExitEdges()
+    {
+        var workflow = new Workflow<ScaffoldState>("test")
+            .Job("generate", (s, _) => Task.FromResult(s))
+            .Job("critique", (s, _) => Task.FromResult(s))
+            .Job("publish", (s, _) => Task.FromResult(s))
+            .Then("generate", "critique")
+            .Loop("critique", loopTarget: "generate", exitTarget: "publish",
+                  until: _ => true, maxIterations: 5)
+            .Then("publish", Workflow.End);
+
+        var mermaid = workflow.ToMermaid();
+
+        mermaid.ShouldContain("loop (max 5)");
+        mermaid.ShouldContain("exit");
+        mermaid.ShouldContain("j_generate");
+        mermaid.ShouldContain("j_critique");
+        mermaid.ShouldContain("j_publish");
+    }
+
+    [Test]
+    public void ToMermaid_LoopExitToEnd_ShowsEndNode()
+    {
+        var workflow = new Workflow<ScaffoldState>("test")
+            .Job("refine", (s, _) => Task.FromResult(s))
+            .Loop("refine", loopTarget: "refine", exitTarget: Workflow.End,
+                  until: _ => true, maxIterations: 10);
+
+        var mermaid = workflow.ToMermaid();
+
+        mermaid.ShouldContain("_end");
+        mermaid.ShouldContain("loop (max 10)");
+        mermaid.ShouldContain("exit");
+    }
+
     // ── Test helpers ─────────────────────────────────────────────────
 
     private sealed class SimpleRouter : IRouter<ScaffoldState>

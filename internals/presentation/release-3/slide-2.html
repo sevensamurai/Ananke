@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 2 – Rich Interaction Surface</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+      --teal:     #3a9ba0;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.15) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 920px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 52px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 19px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.55);
+      line-height: 1.5;
+      margin-bottom: 36px;
+    }
+
+    /* ── Feature cards (stacked) ─────────────────────────────── */
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      width: 100%;
+      border-radius: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      background: var(--honeydew);
+      border: 1px solid rgba(241,250,238,0.15);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.38), 0 2px 8px rgba(0,0,0,0.20);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left accent bar */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px;
+      height: 100%;
+      border-radius: 16px 0 0 16px;
+    }
+    .card-multimodal::before { background: linear-gradient(180deg, var(--red),   rgba(230,57,70,0.10)); }
+    .card-streaming::before  { background: linear-gradient(180deg, var(--teal),  rgba(58,155,160,0.10)); }
+    .card-interrupt::before  { background: linear-gradient(180deg, var(--steel), rgba(69,123,157,0.10)); }
+
+    .card-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 26px 30px 26px 34px;
+      flex: 1;
+    }
+
+    /* ── Card icon ──────────────────────────────────────────── */
+    .card-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .card-multimodal .card-icon { background: rgba(230,57,70,0.10); }
+    .card-streaming  .card-icon { background: rgba(58,155,160,0.12); }
+    .card-interrupt  .card-icon { background: rgba(69,123,157,0.12); }
+
+    /* ── Card text ──────────────────────────────────────────── */
+    .card-text { flex: 1; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .card-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--deep);
+    }
+
+    .card-tag {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .card-multimodal .card-tag { background: rgba(230,57,70,0.10);   color: var(--red);  }
+    .card-streaming  .card-tag { background: rgba(58,155,160,0.12);  color: #1e8a90;     }
+    .card-interrupt  .card-tag { background: rgba(69,123,157,0.13);  color: var(--steel);}
+
+    .card-body {
+      font-size: 16px;
+      line-height: 1.65;
+      color: rgba(29,53,87,0.78);
+      font-weight: 400;
+    }
+    .card-body strong {
+      font-weight: 700;
+      color: var(--deep);
+    }
+    .card-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .card-multimodal .card-body code { background: rgba(230,57,70,0.10);  color: #c0202e; }
+    .card-streaming  .card-body code { background: rgba(58,155,160,0.11); color: #1e7a80; }
+    .card-interrupt  .card-body code { background: rgba(69,123,157,0.12); color: #2c5f7a; }
+
+    /* ── Pill row ───────────────────────────────────────────── */
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .pill-red   { background: rgba(230,57,70,0.09);   border: 1px solid rgba(230,57,70,0.25);   color: #b81a26; }
+    .pill-teal  { background: rgba(58,155,160,0.09);  border: 1px solid rgba(58,155,160,0.26);  color: #1e6e72; }
+    .pill-steel { background: rgba(69,123,157,0.09);  border: 1px solid rgba(69,123,157,0.26);  color: #2c5f7a; }
+
+    /* ── Quote ──────────────────────────────────────────────── */
+    .quote {
+      padding: 13px 20px;
+      border-left: 3px solid rgba(168,218,220,0.28);
+    }
+    .quote p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      font-style: italic;
+      color: rgba(168,218,220,0.52);
+      line-height: 1.6;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 28px;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Interaction
+    </div>
+
+    <!-- Title -->
+    <h1 class="title">The Interaction Surface is<br><em>Considerably More Expressive</em></h1>
+
+    <!-- Headline -->
+    <p class="headline">Any modality. Any event stream. Any context — interruptible and clean.</p>
+
+    <!-- Feature cards -->
+    <div class="cards">
+
+      <!-- Rich Multimodal Messages -->
+      <div class="card card-multimodal">
+        <div class="card-inner">
+          <div class="card-icon">&#x1F5BC;&#xFE0F;</div>
+          <div class="card-text">
+            <div class="card-header">
+              <span class="card-name">Rich Multimodal Messages</span>
+              <span class="card-tag">Multimodal</span>
+            </div>
+            <p class="card-body">
+              Agent messages natively carry <strong>text, audio</strong> (with transcript and duration),
+              and <strong>images</strong> (bytes or URI). Model routing detects provider capabilities
+              at request time and routes accordingly — no changes to pipeline code.
+            </p>
+            <div class="pill-row">
+              <span class="pill pill-red">text</span>
+              <span class="pill pill-red">audio + transcript</span>
+              <span class="pill pill-red">image (bytes | URI)</span>
+              <span class="pill pill-red">auto-routed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Streaming IAsyncEnumerable API -->
+      <div class="card card-streaming">
+        <div class="card-inner">
+          <div class="card-icon">&#x1F30A;</div>
+          <div class="card-text">
+            <div class="card-header">
+              <span class="card-name">Streaming IAsyncEnumerable API</span>
+              <span class="card-tag">Streaming</span>
+            </div>
+            <p class="card-body">
+              A typed async stream of <code>ChatSessionEvent</code> — text deltas, audio chunks,
+              tool calls, interruptions, completions — replaces callback wiring.
+              Maps directly to <strong>Server-Sent Events</strong> via <code>Ananke.AspNetCore</code>.
+            </p>
+            <div class="pill-row">
+              <span class="pill pill-teal">TextDelta</span>
+              <span class="pill pill-teal">AudioChunk</span>
+              <span class="pill pill-teal">ToolCall</span>
+              <span class="pill pill-teal">Interruption</span>
+              <span class="pill pill-teal">Completion</span>
+              <span class="pill pill-teal">→ SSE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interrupt Stack -->
+      <div class="card card-interrupt">
+        <div class="card-inner">
+          <div class="card-icon">&#x1F500;</div>
+          <div class="card-text">
+            <div class="card-header">
+              <span class="card-name">Interrupt Stack</span>
+              <span class="card-tag">Stateful</span>
+            </div>
+            <p class="card-body">
+              Push and pop temporary contexts onto the state machine — e.g. a payment flow mid-conversation.
+              On pop, the stack <strong>automatically repairs conversation history</strong>
+              to prevent orphaned tool calls.
+            </p>
+            <div class="pill-row">
+              <span class="pill pill-steel">push context</span>
+              <span class="pill pill-steel">nested flows</span>
+              <span class="pill pill-steel">history repair</span>
+              <span class="pill pill-steel">no orphaned calls</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /cards -->
+
+    <!-- Quote -->
+    <div class="quote">
+      <p>Express any modality. Stream any event. Interrupt anything — cleanly.</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; RELEASE 3</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">2 / 3</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

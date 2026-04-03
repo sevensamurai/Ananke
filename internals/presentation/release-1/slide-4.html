@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 4 – Smart Model Router</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+    }
+
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.16) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 860px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 26px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 62px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      margin-bottom: 18px;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 24px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.58);
+      line-height: 1.45;
+      letter-spacing: 0.005em;
+      margin-bottom: 52px;
+    }
+
+    /* ── Two-idea label ─────────────────────────────────────── */
+    .intro {
+      font-size: 18px;
+      font-weight: 500;
+      color: rgba(168,218,220,0.55);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    /* ── Cards row ──────────────────────────────────────────── */
+    .cards {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+    }
+
+    .card {
+      flex: 1;
+      border-radius: 16px;
+      padding: 32px 34px 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+      background: var(--honeydew);
+      border: 1px solid rgba(241,250,238,0.15);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.38), 0 2px 8px rgba(0,0,0,0.20);
+    }
+
+    /* top accent bars — only color differs */
+    .card-explicit::before,
+    .card-capability::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 16px 16px 0 0;
+    }
+    .card-explicit::before   { background: linear-gradient(90deg, var(--red),   rgba(230,57,70,0.10)); }
+    .card-capability::before { background: linear-gradient(90deg, var(--steel), rgba(69,123,157,0.10)); }
+
+    /* ── Card header ────────────────────────────────────────── */
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 6px;
+    }
+    .card-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .card-explicit .card-icon   { background: rgba(230,57,70,0.12); }
+    .card-capability .card-icon { background: rgba(69,123,157,0.14); }
+
+    .card-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--deep);
+    }
+
+    .card-tag {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 999px;
+      margin-left: auto;
+    }
+    .card-explicit .card-tag {
+      background: rgba(230,57,70,0.10);
+      color: var(--red);
+    }
+    .card-capability .card-tag {
+      background: rgba(69,123,157,0.14);
+      color: var(--steel);
+    }
+
+    /* ── Divider ────────────────────────────────────────────── */
+    .card-divider {
+      height: 1px;
+      background: rgba(29,53,87,0.12);
+    }
+
+    /* ── Body text ──────────────────────────────────────────── */
+    .card-body {
+      font-size: 17px;
+      line-height: 1.65;
+      color: rgba(29,53,87,0.80);
+      font-weight: 400;
+    }
+    .card-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 5px;
+    }
+    .card-explicit .card-body code {
+      background: rgba(230,57,70,0.10);
+      color: #c0202e;
+    }
+    .card-capability .card-body code {
+      background: rgba(69,123,157,0.14);
+      color: #2c5f7a;
+    }
+    .card-body em {
+      font-style: normal;
+      font-weight: 700;
+      color: var(--deep);
+    }
+
+    /* ── Pill list ──────────────────────────────────────────── */
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 11px;
+      border-radius: 999px;
+    }
+    .pill-red {
+      background: rgba(230,57,70,0.10);
+      border: 1px solid rgba(230,57,70,0.28);
+      color: #b81a26;
+    }
+    .pill-frost {
+      background: rgba(69,123,157,0.12);
+      border: 1px solid rgba(69,123,157,0.30);
+      color: #2c5f7a;
+    }
+    .pill-amber {
+      background: rgba(180,120,0,0.08);
+      border: 1px solid rgba(180,120,0,0.22);
+      color: #7a5200;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 46px;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Routing
+    </div>
+
+    <h1 class="title">Smart <em>Model Router</em></h1>
+
+    <p class="headline">Pay for intelligence only when you need it.</p>
+
+    <p class="intro">Two modes, one interface</p>
+
+    <div class="cards">
+
+      <!-- ── Card 1: ModelRouter ──────────────────────────── -->
+      <div class="card card-explicit">
+        <div class="card-header">
+          <div class="card-icon">⚡</div>
+          <span class="card-name">ModelRouter</span>
+          <span class="card-tag">Explicit</span>
+        </div>
+        <div class="card-divider"></div>
+        <p class="card-body">
+          Developer-controlled routing via <em>explicit predicates</em>
+          evaluated per request.
+        </p>
+        <p class="card-body">
+          <em>"If the prompt contains 'vision', use <code>gpt-4o</code>"</em>
+          — you declare the rules, the router executes them.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-red">predicate-based</span>
+          <span class="pill pill-red">per-request</span>
+          <span class="pill pill-red">deterministic</span>
+        </div>
+      </div>
+
+      <!-- ── Card 2: CapabilityModelRouter ───────────────── -->
+      <div class="card card-capability">
+        <div class="card-header">
+          <div class="card-icon">🧠</div>
+          <span class="card-name">CapabilityModelRouter</span>
+          <span class="card-tag">Automatic</span>
+        </div>
+        <div class="card-divider"></div>
+        <p class="card-body">
+          Declare a <code>ModelProfile</code> once — capabilities, cost,
+          speed, intelligence tier — then pass a <code>RoutingStrategy</code>.
+        </p>
+        <p class="card-body">
+          <code>CheapestFit</code> sends simple tasks to <code>gpt-4o-mini</code>.
+          Requests that need <em>Reasoning</em> or <em>Vision</em> escalate automatically.
+          <code>BestFit</code> always picks the highest-quality match.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-frost">CheapestFit</span>
+          <span class="pill pill-frost">BestFit</span>
+          <span class="pill pill-amber">TaskRequirements</span>
+          <span class="pill pill-amber">auto-escalation</span>
+        </div>
+      </div>
+
+    </div><!-- /cards -->
+
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; INTERNALS</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">slide 04</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

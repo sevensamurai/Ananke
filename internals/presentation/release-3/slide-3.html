@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>Slide 3c – Real-World Scenarios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Palette ────────────────────────────────────────────── */
+    :root {
+      --red:      #E63946;
+      --honeydew: #F1FAEE;
+      --frost:    #A8DADC;
+      --steel:    #457B9D;
+      --deep:     #1D3557;
+      --deeper:   #162843;
+      --darkest:  #0f1d30;
+      --teal:     #3a9ba0;
+    }
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    body {
+      width: 1080px;
+      height: 1080px;
+      background: var(--deep);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(168,218,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,218,220,0.04) 1px, transparent 1px);
+      background-size: 54px 54px;
+      pointer-events: none;
+    }
+
+    .glow-red {
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(230,57,70,0.15) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -100px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(168,218,220,0.11) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── Slide wrapper ──────────────────────────────────────── */
+    .slide {
+      position: relative;
+      z-index: 1;
+      width: 960px;
+      height: 960px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(230,57,70,0.14);
+      border: 1px solid rgba(230,57,70,0.35);
+      border-radius: 999px;
+      padding: 5px 14px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title {
+      font-size: 50px;
+      font-weight: 800;
+      color: var(--honeydew);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .title em {
+      font-style: normal;
+      color: var(--frost);
+    }
+
+    /* ── Headline ───────────────────────────────────────────── */
+    .headline {
+      font-size: 18px;
+      font-weight: 400;
+      color: rgba(241,250,238,0.52);
+      line-height: 1.5;
+      margin-bottom: 22px;
+      flex-shrink: 0;
+    }
+
+    /* ── Two-column body ─────────────────────────────────────── */
+    .body-row {
+      display: flex;
+      gap: 22px;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Left column: two stacked cards ────────────────────── */
+    .left-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .card {
+      flex: 1;
+      border-radius: 16px;
+      padding: 22px 24px 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+      background: var(--honeydew);
+      border: 1px solid rgba(241,250,238,0.14);
+      box-shadow: 0 16px 44px rgba(0,0,0,0.38), 0 2px 6px rgba(0,0,0,0.20);
+      min-height: 0;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 16px 16px 0 0;
+    }
+    .card-adoption::before { background: linear-gradient(90deg, var(--red),  rgba(230,57,70,0.08)); }
+    .card-connect4::before  { background: linear-gradient(90deg, var(--teal), rgba(58,155,160,0.08)); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .card-icon {
+      width: 40px; height: 40px;
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .card-adoption .card-icon { background: rgba(230,57,70,0.10); }
+    .card-connect4 .card-icon { background: rgba(58,155,160,0.12); }
+
+    .card-title-block { flex: 1; }
+    .card-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--deep);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .card-sub {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .card-adoption .card-sub { color: rgba(230,57,70,0.60); }
+    .card-connect4 .card-sub { color: rgba(58,155,160,0.65); }
+
+    .card-divider {
+      height: 1px;
+      background: rgba(29,53,87,0.10);
+    }
+
+    .card-body {
+      font-size: 14.5px;
+      line-height: 1.60;
+      color: rgba(29,53,87,0.78);
+      font-weight: 400;
+    }
+    .card-body em {
+      font-style: normal;
+      font-weight: 700;
+      color: var(--deep);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 999px;
+    }
+    .pill-red  { background: rgba(230,57,70,0.09);  border: 1px solid rgba(230,57,70,0.24);  color: #b81a26; }
+    .pill-teal { background: rgba(58,155,160,0.09); border: 1px solid rgba(58,155,160,0.26); color: #1e6e72; }
+
+    .card-quote {
+      padding: 9px 14px;
+      border-left: 3px solid rgba(29,53,87,0.18);
+      background: rgba(29,53,87,0.04);
+      border-radius: 0 6px 6px 0;
+      margin-top: auto;
+    }
+    .card-quote p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-style: italic;
+      color: rgba(29,53,87,0.55);
+      line-height: 1.5;
+    }
+
+    /* ── Right column: screenshot window ────────────────────── */
+    .app-window {
+      width: 380px;
+      flex-shrink: 0;
+      align-self: center;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(168,218,220,0.14);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.30),
+        0 28px 72px rgba(0,0,0,0.55),
+        0 0 80px rgba(168,218,220,0.07);
+    }
+
+    .window-titlebar {
+      background: #17283d;
+      display: flex;
+      align-items: center;
+      padding: 11px 16px;
+      gap: 12px;
+      border-bottom: 1px solid rgba(168,218,220,0.08);
+      flex-shrink: 0;
+    }
+    .traffic-lights { display: flex; gap: 7px; }
+    .tl { width: 11px; height: 11px; border-radius: 50%; }
+    .tl-red   { background: #ff5f57; }
+    .tl-amber { background: #ffbd2e; }
+    .tl-green { background: #28c840; }
+
+    .window-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(241,250,238,0.38);
+      letter-spacing: 0.02em;
+    }
+    .window-badge {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(40,200,64,0.70);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #28c840;
+      box-shadow: 0 0 5px rgba(40,200,64,0.70);
+    }
+
+    .window-img-wrap {
+      display: block;
+      line-height: 0;
+    }
+    .window-screenshot {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 20px;
+      flex-shrink: 0;
+    }
+    .footer-left {
+      font-size: 13px;
+      color: rgba(168,218,220,0.30);
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.55;
+    }
+    .footer-right {
+      font-size: 13px;
+      color: rgba(168,218,220,0.22);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+
+  <div class="slide">
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Ananke &nbsp;·&nbsp; Demos
+    </div>
+
+    <!-- Title -->
+    <h1 class="title"><em>New Features</em> Use Cases</h1>
+
+    <!-- Headline -->
+    <p class="headline">Two new demos that put all of it together.</p>
+
+    <!-- Two-column body -->
+    <div class="body-row">
+
+      <!-- Left: two stacked cards -->
+      <div class="left-col">
+
+        <!-- Pet Adoption Store -->
+        <div class="card card-adoption">
+          <div class="card-header">
+            <div class="card-icon">&#x1F43E;</div>
+            <div class="card-title-block">
+              <span class="card-name">Pet Adoption Store</span>
+              <span class="card-sub">End-to-end integration</span>
+            </div>
+          </div>
+          <div class="card-divider"></div>
+          <p class="card-body">
+            State machine drives sessions through
+            <em>Searching → Paperwork → Payment → Done</em>.
+            Streaming over SSE. Mid-generation interrupts. Human-in-the-loop
+            payment pause. Voice and photo input. Qdrant knowledge base.
+          </p>
+          <div class="pill-row">
+            <span class="pill pill-red">SSE streaming</span>
+            <span class="pill pill-red">interrupts</span>
+            <span class="pill pill-red">voice + photo</span>
+            <span class="pill pill-red">Qdrant</span>
+            <span class="pill pill-red">OpenAI / Gemini</span>
+          </div>
+          <div class="card-quote">
+            <p>Every feature in a single, Docker runnable demo.</p>
+          </div>
+        </div>
+
+        <!-- Connect 4 -->
+        <div class="card card-connect4">
+          <div class="card-header">
+            <div class="card-icon">&#x265F;</div>
+            <div class="card-title-block">
+              <span class="card-name">Connect 4 — Agent Learns</span>
+              <span class="card-sub">Empirical memory in action</span>
+            </div>
+          </div>
+          <div class="card-divider"></div>
+          <p class="card-body">
+            Starts knowing <em>only the rules</em> — no LLM, no API keys, no Docker.
+            After each game the offline learner runs, decay sweeps stale beliefs,
+            and new patterns commit. By <em>game 7</em>: center control and offensive pressure.
+          </p>
+          <div class="pill-row">
+            <span class="pill pill-teal">no LLM</span>
+            <span class="pill pill-teal">offline learner</span>
+            <span class="pill pill-teal">belief decay</span>
+            <span class="pill pill-teal">pattern growth</span>
+          </div>
+          <div class="card-quote">
+            <p>Watch confidence scores grow. Inspect memory live.</p>
+          </div>
+        </div>
+
+      </div><!-- /left-col -->
+
+      <!-- Right: screenshot -->
+      <div class="app-window">
+        <div class="window-titlebar">
+          <div class="traffic-lights">
+            <div class="tl tl-red"></div>
+            <div class="tl tl-amber"></div>
+            <div class="tl tl-green"></div>
+          </div>
+          <span class="window-title">localhost:5033</span>
+          <span class="window-badge">
+            <span class="live-dot"></span>
+            running
+          </span>
+        </div>
+        <div class="window-img-wrap">
+          <img class="window-screenshot" src="./pet-adoption-demo.jpg" alt="Pet Adoption Store demo" />
+        </div>
+      </div>
+
+    </div><!-- /body-row -->
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-left">ANANKE &nbsp;·&nbsp; RELEASE 3</span>
+      <div class="footer-dot"></div>
+      <span class="footer-right">3</span>
+    </div>
+
+  </div><!-- /slide -->
+
+</body>
+</html>

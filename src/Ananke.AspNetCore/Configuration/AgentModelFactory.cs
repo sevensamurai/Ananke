@@ -1,13 +1,15 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Microsoft.Extensions.Configuration;
 
 namespace Ananke.AspNetCore.Configuration;
 
 /// <summary>
-/// Reads LLM provider settings from <see cref="IConfiguration"/> and creates
-/// <see cref="IStreamingAgentModel"/> and <see cref="IEmbeddingModel"/> instances
-/// via registered factory functions.
+/// Resolved provider settings from <see cref="IConfiguration"/> paired with the
+/// <see cref="AgentModelFactory"/> that produced them — so <see cref="CreateAgentModel"/>
+/// and <see cref="CreateEmbeddingModel"/> can delegate back without static state.
 /// <para>
 /// Configuration layout (secrets.json / appsettings.json):
 /// <code>
@@ -21,18 +23,17 @@ namespace Ananke.AspNetCore.Configuration;
 /// }
 /// </code>
 /// </para>
-/// <para>
-/// Register provider factories before calling <see cref="AgentModelFactory.FromConfiguration"/>:
-/// <code>
-/// AgentModelFactory.RegisterProvider("OpenAI",
-///     defaultModel: "gpt-4.1-mini",
-///     agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model),
-///     embeddingFactory: (key, model) => OpenAIEmbeddingModel.Create(key, model));
-/// </code>
-/// </para>
 /// </summary>
 public sealed record ProviderProfile
 {
+    private readonly AgentModelFactory _factory;
+
+    internal ProviderProfile(AgentModelFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _factory = factory;
+    }
+
     /// <summary>Provider name (e.g. <c>"OpenAI"</c>, <c>"Google"</c>).</summary>
     public required string Provider { get; init; }
 
@@ -49,7 +50,7 @@ public sealed record ProviderProfile
     /// Creates an <see cref="IStreamingAgentModel"/> using the registered factory for this provider.
     /// </summary>
     public IStreamingAgentModel CreateAgentModel() =>
-        AgentModelFactory.CreateAgentModel(Provider, ApiKey, Model);
+        _factory.CreateAgentModel(Provider, ApiKey, Model);
 
     /// <summary>
     /// Creates an <see cref="IEmbeddingModel"/> using the registered factory for this provider.
@@ -59,20 +60,34 @@ public sealed record ProviderProfile
     public IEmbeddingModel? CreateEmbeddingModel() =>
         string.IsNullOrWhiteSpace(EmbeddingModel)
             ? null
-            : AgentModelFactory.CreateEmbeddingModel(Provider, ApiKey, EmbeddingModel);
+            : _factory.CreateEmbeddingModel(Provider, ApiKey, EmbeddingModel);
 }
 
 /// <summary>
 /// Registry of provider factory functions and configuration reader.
-/// Register providers at startup, then call <see cref="FromConfiguration"/> to
-/// read settings and create model instances.
+/// Create an instance at startup (or register as a singleton in DI), register
+/// providers, then call <see cref="FromConfiguration"/> to read settings and
+/// create model instances.
 /// </summary>
-public static class AgentModelFactory
+/// <remarks>
+/// <para>
+/// This is an instance class so it can be scoped, replaced in tests, and
+/// registered in DI without global mutable state. For DI registration:
+/// <code>
+/// services.AddSingleton(new AgentModelFactory()
+///     .RegisterProvider("OpenAI", "gpt-4.1-mini",
+///         (key, model) =&gt; OpenAIChatAgentModel.Create(key, model),
+///         (key, model) =&gt; OpenAIEmbeddingModel.Create(key, model)));
+/// </code>
+/// </para>
+/// </remarks>
+public sealed class AgentModelFactory
 {
-    private static readonly Dictionary<string, ProviderRegistration> Providers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ProviderRegistration> _providers = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Registers a provider with its factory functions and default model name.
+    /// Returns <see langword="this"/> for fluent chaining.
     /// </summary>
     /// <param name="providerName">Provider name used in configuration (e.g. <c>"OpenAI"</c>).</param>
     /// <param name="defaultModel">Default model name when not specified in configuration.</param>
@@ -81,7 +96,7 @@ public static class AgentModelFactory
     /// Optional factory that creates an <see cref="IEmbeddingModel"/> from (apiKey, model).
     /// <see langword="null"/> if the provider does not support embeddings.
     /// </param>
-    public static void RegisterProvider(
+    public AgentModelFactory RegisterProvider(
         string providerName,
         string defaultModel,
         Func<string, string, IStreamingAgentModel> agentFactory,
@@ -91,7 +106,8 @@ public static class AgentModelFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(defaultModel);
         ArgumentNullException.ThrowIfNull(agentFactory);
 
-        Providers[providerName] = new ProviderRegistration(defaultModel, agentFactory, embeddingFactory);
+        _providers[providerName] = new ProviderRegistration(defaultModel, agentFactory, embeddingFactory);
+        return this;
     }
 
     /// <summary>
@@ -104,7 +120,7 @@ public static class AgentModelFactory
     /// <exception cref="InvalidOperationException">
     /// Thrown when the API key is missing or the provider is not registered.
     /// </exception>
-    public static ProviderProfile FromConfiguration(IConfiguration config)
+    public ProviderProfile FromConfiguration(IConfiguration config)
     {
         var provider = config["Provider"] ?? "OpenAI";
         var section = config.GetSection(provider);
@@ -115,13 +131,13 @@ public static class AgentModelFactory
                 $"{provider}:ApiKey is not configured. " +
                 $"Add it to secrets.json: {{ \"{provider}\": {{ \"ApiKey\": \"...\" }} }}");
 
-        if (!Providers.TryGetValue(provider, out var registration))
+        if (!_providers.TryGetValue(provider, out var registration))
             throw new InvalidOperationException(
                 $"Provider '{provider}' is not registered. " +
-                $"Call AgentModelFactory.RegisterProvider(\"{provider}\", ...) before reading configuration. " +
-                $"Registered providers: {string.Join(", ", Providers.Keys)}");
+                $"Call RegisterProvider(\"{provider}\", ...) before reading configuration. " +
+                $"Registered providers: {string.Join(", ", _providers.Keys)}");
 
-        return new ProviderProfile
+        return new ProviderProfile(this)
         {
             Provider = provider,
             ApiKey = apiKey,
@@ -130,17 +146,17 @@ public static class AgentModelFactory
         };
     }
 
-    internal static IStreamingAgentModel CreateAgentModel(string provider, string apiKey, string model)
+    internal IStreamingAgentModel CreateAgentModel(string provider, string apiKey, string model)
     {
-        if (!Providers.TryGetValue(provider, out var registration))
+        if (!_providers.TryGetValue(provider, out var registration))
             throw new InvalidOperationException($"Unknown provider: {provider}");
 
         return registration.AgentFactory(apiKey, model);
     }
 
-    internal static IEmbeddingModel? CreateEmbeddingModel(string provider, string apiKey, string model)
+    internal IEmbeddingModel? CreateEmbeddingModel(string provider, string apiKey, string model)
     {
-        if (!Providers.TryGetValue(provider, out var registration))
+        if (!_providers.TryGetValue(provider, out var registration))
             throw new InvalidOperationException($"Unknown provider: {provider}");
 
         return registration.EmbeddingFactory?.Invoke(apiKey, model);

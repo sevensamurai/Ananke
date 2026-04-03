@@ -124,7 +124,7 @@ public interface IQueryableStateMachine<C, S, T, N> : IActionStateMachine<C, S, 
     /// <summary>
     /// Gets the current state for a specific context
     /// </summary>
-    Task<S> GetStateAsync(long contextId);
+    Task<S> GetStateAsync(string contextId);
 
     /// <summary>
     /// Checks if a transition is valid from the current state

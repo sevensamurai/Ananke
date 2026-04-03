@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Memory;
+using Ananke.Orchestration.Knowledge.Catalog;
+using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Learning;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Qdrant.Client;

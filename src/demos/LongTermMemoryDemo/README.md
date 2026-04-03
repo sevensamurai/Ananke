@@ -9,6 +9,7 @@ End-to-end knowledge pipeline: batch document import, agent Q&A with autonomous 
 | **Batch document import** | `DocumentProcessor` extracts a local PDF, chunks it, embeds it, and stores it in the knowledge store |
 | **Auto-description** | LLM summarizes what the document covers — used as the search tool description |
 | **Knowledge catalog** | `CatalogAwareKnowledgeStore` auto-maintains document-level metadata with keywords, categories, and time-decay reranking |
+| **Cross-document linking** | `LinkedKnowledgeStore` + `DocumentLinkExtractor` discover relationships between documents and expand search results through a link graph |
 | **Agent-autonomous search** | Agent decides when to call `search_engineering_docs` based on the question — no explicit instruction needed |
 | **Conversational knowledge building** | `KnowledgeTools` gives the agent both `process_document` and `search_knowledge` — user says "index this URL", agent does it, and answers from it immediately |
 | **In-memory / Qdrant backends** | Same code, swap the store — `InMemoryKnowledgeStore` for dev, `QdrantKnowledgeStore` for production |
@@ -20,11 +21,20 @@ Step 1: Batch import
   refactoring.pdf → PdfExtractor → SlidingWindowChunker → EmbeddingModel → KnowledgeStore
 
 Step 2: Agent Q&A (search-only)
-  User question → Agent → search_engineering_docs → KnowledgeStore → grounded answer
+  User question → Agent → search_knowledge → KnowledgeStore → grounded answer
 
 Step 3: Conversational knowledge building
-  "Index this URL" → Agent → process_document → DocumentProcessor → KnowledgeStore
+  "Index this URL" → Agent → process_external_url → DocumentProcessor → KnowledgeStore
                    → Agent → search_knowledge → KnowledgeStore → grounded answer
+
+Step 4: Cross-document linking (--linking)
+  New document ingested → DocumentLinkExtractor → LLM classifies relationships
+    → IDocumentLinkGraph stores links (references, extends, prerequisite, ...)
+    → search_knowledge expands results through graph traversal
+
+Step 5: Cross-document query
+  "How do refactoring principles relate to .NET contribution guidelines?"
+    → search_knowledge → vector results + graph-expanded results → merged answer
 ```
 
 ## Running locally
@@ -57,9 +67,52 @@ dotnet run --project demos/LongTermMemoryDemo -- --qdrant
 # With knowledge catalog (LLM-enriched metadata + time decay)
 dotnet run --project demos/LongTermMemoryDemo -- --catalog
 
-# Full featured: Qdrant + catalog
-dotnet run --project demos/LongTermMemoryDemo -- --qdrant --catalog
+# With cross-document linking (graph-expanded search)
+dotnet run --project demos/LongTermMemoryDemo -- --linking
+
+# Catalog + linking (full pipeline)
+dotnet run --project demos/LongTermMemoryDemo -- --catalog --linking
+
+# Full featured: Qdrant + catalog + linking
+dotnet run --project demos/LongTermMemoryDemo -- --qdrant --catalog --linking
 ```
+
+### Flags
+
+| Flag | What it adds |
+|---|---|
+| `--qdrant` | Uses Qdrant vector database instead of in-memory store (requires `docker compose up`) |
+| `--catalog` | Enables `CatalogAwareKnowledgeStore` — LLM-enriched keywords, categories, summaries, and time-decay reranking |
+| `--linking` | Enables `LinkedKnowledgeStore` + `DocumentLinkExtractor` — cross-document link discovery and graph-expanded search |
+
+## Cross-document linking (`--linking`)
+
+When `--linking` is enabled, the demo wraps the knowledge store with `LinkedKnowledgeStore` and registers a `DocumentLinkExtractor`. After each document is ingested, the extractor:
+
+1. **Finds candidates** — searches the store for chunks semantically similar to each new chunk
+2. **Classifies relationships** — asks the LLM to classify each pair as `references`, `extends`, `prerequisite`, `example-of`, `contradicts`, or `none`
+3. **Stores links** — writes directed, weighted edges into an `IDocumentLinkGraph`
+
+At search time, `LinkedKnowledgeStore` performs **dual retrieval**:
+
+```
+Query → Vector similarity search     → ranked results (standard)
+Query → Graph traversal from top hits → linked results (expansion)
+        ──────────────────────────────────────────────
+        Merged, deduplicated, re-ranked by combined score
+```
+
+This means a query about "refactoring and code quality" can surface chunks from the .NET CONTRIBUTING.md even if they use different terminology, because the link extractor established the relationship during ingestion.
+
+The decorator stacking order is:
+
+```csharp
+InMemoryKnowledgeStore          // vector storage
+  → CatalogAwareKnowledgeStore  // catalog metadata + time decay (--catalog)
+    → LinkedKnowledgeStore      // graph-expanded search (--linking)
+```
+
+See [ADR-012](../../internals/adr-012-ars-contexta-cognitive-architecture-patterns.md) for the design rationale and the critical distinction between applying these patterns to authoritative documents (safe) vs. empirical agent memory (rejected).
 
 ## Security note
 

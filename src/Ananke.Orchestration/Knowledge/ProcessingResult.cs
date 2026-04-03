@@ -8,7 +8,7 @@ namespace Ananke.Orchestration.Knowledge;
 /// A human- or LLM-generated description of the document's content and domain.
 /// Used to build tool descriptions for agent integration so the model knows what
 /// topics the knowledge base covers. Populate manually at ingest time, or generate
-/// automatically via <see cref="DocumentSummarizer.AutoDescribeAsync"/>.
+/// automatically via <see cref="Documents.DocumentSummarizer.AutoDescribeAsync"/>.
 /// </param>
 public sealed record ProcessingResult(
     int Sections,

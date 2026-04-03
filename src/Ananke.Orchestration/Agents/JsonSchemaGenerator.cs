@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using Ananke.Abstractions.Agents;
+
 namespace Ananke.Orchestration.Agents;
 
 public static class JsonSchemaGenerator

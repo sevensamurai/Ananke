@@ -1,6 +1,6 @@
-namespace Ananke.Orchestration.Agents;
+using Ananke.Abstractions.Agents;
 
-public sealed record AgentToolCall(string Id, string FunctionName, string Arguments);
+namespace Ananke.Orchestration.Agents;
 
 public sealed record AgentResponse
 {
@@ -32,4 +32,7 @@ public sealed record AgentResponse
 
     public IReadOnlyList<AgentToolCall>? ToolCalls { get; init; }
     public bool RequiresAction => ToolCalls is { Count: > 0 };
+
+    /// <summary>Token usage for this LLM call, if reported by the provider.</summary>
+    public TokenUsage? Usage { get; init; }
 }

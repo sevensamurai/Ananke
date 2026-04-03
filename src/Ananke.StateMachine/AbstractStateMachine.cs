@@ -20,11 +20,13 @@ namespace Ananke.StateMachine;
 /// <typeparam name="N">Notification enum type</typeparam>
 /// <param name="initialState">The initial state of the machine</param>
 /// <param name="locker">Distributed lock implementation</param>
+/// <param name="store">Key-value data adapter for persisting state</param>
 /// <param name="options">Optional configuration options</param>
 /// <param name="logger">Optional logger</param>
 public abstract class AbstractStateMachine<C, S, T, N>(
     S initialState,
     IDistributedLock locker,
+    IKeyValueDataAdapter store,
     StateMachineOptions? options = null,
     ILogger<AbstractStateMachine<C, S, T, N>>? logger = null)
     : IActionStateMachine<C, S, T, N>
@@ -35,6 +37,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 {
     private readonly S _initialState = initialState;
     private readonly IDistributedLock _locker = locker;
+    private readonly IKeyValueDataAdapter _store = store;
     private readonly ILogger<AbstractStateMachine<C, S, T, N>> Log = logger ?? NullLogger<AbstractStateMachine<C, S, T, N>>.Instance;
     private readonly List<ITransitionMiddleware<C, S, T>> _middlewares = [];
     private readonly StateMachineOptions _options = options ?? new StateMachineOptions();
@@ -214,7 +217,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// <summary>
     /// Persists operational status to distributed state
     /// </summary>
-    private async Task PersistOperationalStatusAsync(long id)
+    private async Task PersistOperationalStatusAsync(string id)
     {
         // Capture values before GetPersistedContextAsync, which restores
         // OperationalStatus from the (stale) persisted state as a side-effect.
@@ -228,16 +231,16 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         OperationalStatusReason = reasonToSave;
         persistedContext.OperationalStatus = statusToSave;
         persistedContext.OperationalStatusReason = reasonToSave;
-        await _locker.SetValueAsync(id.ToString(), persistedContext);
+        await _store.SetValueAsync(id, persistedContext);
     }
 
     #endregion
 
     #region Core Transition Logic
 
-    internal async Task<PersistedContext<S>> GetPersistedContextAsync(long id)
+    internal async Task<PersistedContext<S>> GetPersistedContextAsync(string id)
     {
-        var context = await _locker.GetValueAsync<PersistedContext<S>>(id.ToString());
+        var context = await _store.GetValueAsync<PersistedContext<S>>(id);
 
         if (context != null)
         {
@@ -250,10 +253,10 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         return context ?? new PersistedContext<S> { State = _initialState, Step = 0 };
     }
 
-    internal Task<TransitionResult<S>> TryExecuteTransitionAsync(long id, T transition)
+    internal Task<TransitionResult<S>> TryExecuteTransitionAsync(string id, T transition)
         => TryExecuteTransitionAsync(id, transition, payload: null);
 
-    internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(long id, T transition, object? payload)
+    internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(string id, T transition, object? payload)
     {
         try
         {
@@ -274,7 +277,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     // Self-transition: state stays the same, just increment step
                     persistedContext.Step += 1;
-                    await _locker.SetValueAsync(id.ToString(), persistedContext);
+                    await _store.SetValueAsync(id, persistedContext);
 
                     Log.LogDebug("SELF-TRANSITION: {State} (implicit)", CurrentState);
                     return TransitionResult<S>.Succeeded(previousState, CurrentState);
@@ -338,7 +341,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             CurrentState = resolvedFinalState;
             IsInterrupted = persistedContext.InterruptStack.Count > 0;
 
-            await _locker.SetValueAsync(id.ToString(), persistedContext);
+            await _store.SetValueAsync(id, persistedContext);
             Log.LogDebug("OK: {PreviousState} --({Transition})--> {NewState}", previousState, transition, resolvedFinalState);
 
             // Execute state entry action
@@ -361,7 +364,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     persistedContext.State = actionResult;
                     CurrentState = actionResult;
-                    await _locker.SetValueAsync(id.ToString(), persistedContext);
+                    await _store.SetValueAsync(id, persistedContext);
                 }
 
                 return new TransitionResult<S>
@@ -455,13 +458,13 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         return result;
     }
 
-    private Task<TransitionResult<S>> ExecuteLockedTransitionAsync(long id, T transition)
+    private Task<TransitionResult<S>> ExecuteLockedTransitionAsync(string id, T transition)
         => ExecuteLockedTransitionAsync(id, transition, payload: null);
 
-    private async Task<TransitionResult<S>> ExecuteLockedTransitionAsync(long id, T transition, object? payload)
+    private async Task<TransitionResult<S>> ExecuteLockedTransitionAsync(string id, T transition, object? payload)
     {
         var result = await _locker.RunCoordinatedActionWithRetryAsync(
-            id.ToString(),
+            id,
             () => TryExecuteTransitionAsync(id, transition, payload),
             _options.LockRetryCount,
             _options.LockRetryDelayMs);

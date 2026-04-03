@@ -6,7 +6,8 @@ using Ananke.AspNetCore.Sessions;
 using Ananke.MQTT;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Memory;
+using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Abstractions.Memory;
 using Ananke.Redis;
 using Microsoft.Extensions.Logging.Console;
 using Scalar.AspNetCore;
@@ -33,12 +34,12 @@ builder.Logging
     .AddConsole(o => o.FormatterName = MinimalConsoleFormatter.FormatterName);
 
 // --- Register LLM providers & validate config before any work ---
-ProviderRegistration.RegisterProviders();
+var modelFactory = ProviderRegistration.CreateFactory();
 
 ProviderProfile settings;
 try
 {
-    settings = AgentModelFactory.FromConfiguration(builder.Configuration);
+    settings = modelFactory.FromConfiguration(builder.Configuration);
 }
 catch (InvalidOperationException ex)
 {

@@ -43,6 +43,31 @@ public sealed class WorkflowManifest
     /// Parses manifest content from an array of lines (e.g. from <see cref="File.ReadAllLines(string)"/>
     /// or an embedded resource).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This parser handles an intentionally minimal YAML subset — just enough for the
+    /// <c>.ananke.yml</c> manifest schema. It is <b>not</b> a general-purpose YAML parser.
+    /// </para>
+    /// <para><b>Supported YAML features:</b></para>
+    /// <list type="bullet">
+    ///   <item>Top-level scalars (<c>name: value</c>)</item>
+    ///   <item>Two-level nested mappings (2-space indent blocks under <c>models:</c> / <c>jobs:</c>)</item>
+    ///   <item>Block scalars (<c>|</c> literal style for multi-line <c>system_prompt</c>)</item>
+    ///   <item>Dash-prefixed list items (<c>- item</c> under <c>connections:</c>)</item>
+    ///   <item>Comment lines (<c># ...</c>) and blank lines (skipped)</item>
+    /// </list>
+    /// <para><b>Not supported</b> (by design — not needed by the manifest schema):</para>
+    /// <list type="bullet">
+    ///   <item>Anchors / aliases (<c>&amp;</c> / <c>*</c>), merge keys (<c>&lt;&lt;</c>)</item>
+    ///   <item>Flow sequences (<c>[a, b]</c>) or flow mappings (<c>{a: 1}</c>)</item>
+    ///   <item>Quoted strings, tags (<c>!!str</c>), multi-document (<c>---</c>)</item>
+    /// </list>
+    /// <para>
+    /// A general-purpose YAML library (e.g. YamlDotNet, SharpYaml) was evaluated and rejected:
+    /// the manifest schema is fixed, the parser is well-tested (14 tests), and adding a
+    /// dependency would increase package size with no user-facing benefit.
+    /// </para>
+    /// </remarks>
     public static WorkflowManifest Parse(string[] lines)
     {
         string? name = null;

@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Documents;
 using Shouldly;
 
 namespace Ananke.Documents.Tests;

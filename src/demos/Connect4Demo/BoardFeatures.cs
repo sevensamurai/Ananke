@@ -4,7 +4,7 @@ namespace Connect4Demo;
 /// Extracts structural features from a <see cref="Board"/> as text tokens.
 /// Each of the 69 possible winning lines (24 horizontal, 21 vertical,
 /// 12 diagonal-ascending, 12 diagonal-descending) is encoded as a single
-/// compound token using underscores (safe from <see cref="Ananke.Orchestration.Knowledge.InMemoryEmbedder"/>
+/// compound token using underscores (safe from <see cref="Ananke.Orchestration.Knowledge.Embeddings.InMemoryEmbedder"/>
 /// separator splitting). Boards with similar threat structures produce
 /// similar hash vectors via shared tokens.
 /// </summary>
@@ -86,7 +86,7 @@ internal static class BoardFeatures
     /// Decomposes the board into weighted semantic tags for structured recall.
     /// Unlike <see cref="Describe"/>, which produces flat text tokens for embedding,
     /// this returns namespaced tags with relevance weights that enable causal-aware
-    /// dedup and dimension-projected recall via <see cref="Ananke.Orchestration.Memory.SemanticDescription"/>.
+    /// dedup and dimension-projected recall via <see cref="Ananke.Learning.SemanticDescription"/>.
     /// </summary>
     /// <remarks>
     /// Tags describe <b>raw structural observations</b>, not strategic interpretations.

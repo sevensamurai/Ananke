@@ -2,7 +2,9 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Anthropic;
+using Anthropic.Core;
 using Anthropic.Models.Messages;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 
 namespace Ananke.Orchestration.Anthropic;
@@ -26,14 +28,10 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     /// Creates an <see cref="AnthropicAgentModel"/> from an API key and model name.
     /// Convenience factory for use with <c>ModelResolver</c> or standalone construction.
     /// </summary>
-    /// <remarks>
-    /// Sets the <c>ANTHROPIC_API_KEY</c> environment variable for the current process,
-    /// which the Anthropic SDK reads during client construction.
-    /// </remarks>
     public static AnthropicAgentModel Create(string apiKey, string model)
     {
-        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", apiKey);
-        return new AnthropicAgentModel(new AnthropicClient(), model);
+        var client = new AnthropicClient(new ClientOptions { ApiKey = apiKey });
+        return new AnthropicAgentModel(client, model);
     }
 
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
@@ -52,9 +50,18 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
 
         var fullText = new StringBuilder();
         var toolCallBuilders = new Dictionary<long, (string id, string name, StringBuilder args)>();
+        int streamInputTokens = 0, streamOutputTokens = 0;
 
         await foreach (var evt in _client.Messages.CreateStreaming(parameters, ct))
         {
+            // Start event carries input token count
+            if (evt.TryPickStart(out var msgStart) && msgStart.Message.Usage is not null)
+                streamInputTokens = (int)msgStart.Message.Usage.InputTokens;
+
+            // Delta event carries output token count
+            if (evt.TryPickDelta(out var msgDelta) && msgDelta.Usage is not null)
+                streamOutputTokens = (int)msgDelta.Usage.OutputTokens;
+
             if (evt.TryPickContentBlockStart(out var blockStart))
             {
                 if (blockStart.ContentBlock.TryPickToolUse(out var toolUse))
@@ -86,7 +93,10 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
             CompletedResponse = new AgentResponse
             {
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
-                ToolCalls = toolCalls
+                ToolCalls = toolCalls,
+                Usage = (streamInputTokens > 0 || streamOutputTokens > 0)
+                    ? new TokenUsage { InputTokens = streamInputTokens, OutputTokens = streamOutputTokens }
+                    : null
             }
         };
     }
@@ -116,7 +126,14 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
         return new AgentResponse
         {
             Text = text,
-            ToolCalls = toolCalls.Count > 0 ? toolCalls : null
+            ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
+            Usage = message.Usage is not null
+                ? new TokenUsage
+                {
+                    InputTokens = (int)message.Usage.InputTokens,
+                    OutputTokens = (int)message.Usage.OutputTokens
+                }
+                : null
         };
     }
 

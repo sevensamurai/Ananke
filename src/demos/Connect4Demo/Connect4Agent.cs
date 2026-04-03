@@ -1,4 +1,5 @@
-using Ananke.Orchestration.Memory;
+using Ananke.Learning;
+using Ananke.Learning.Exploration;
 
 namespace Connect4Demo;
 
@@ -8,9 +9,13 @@ namespace Connect4Demo;
 /// positions with similar structural features and semantic tag overlap influence
 /// column scoring.
 /// </summary>
-internal sealed class Connect4Agent(InMemoryEmpiricalMemory memory)
+internal sealed class Connect4Agent(
+    InMemoryEmpiricalMemory memory,
+    IExplorationStrategy? explorationStrategy = null)
 {
     private static readonly Random Rng = new();
+    private readonly int[] _columnCounts = new int[Board.Cols];
+    private int _totalMoves;
 
     /// <summary>
     /// Chooses a column to play. Returns the column index and a list of
@@ -50,6 +55,8 @@ internal sealed class Connect4Agent(InMemoryEmpiricalMemory memory)
             new RecallOptions { TopK = 8, MinConfidence = 0.1f });
 
         var scores = new float[Board.Cols];
+        var variances = new float[Board.Cols];
+        var voteCounts = new int[Board.Cols];
         var hasExperience = false;
 
         foreach (var match in recalled)
@@ -67,6 +74,10 @@ internal sealed class Connect4Agent(InMemoryEmpiricalMemory memory)
 
             // Weight: confidence × strength × match score × tag overlap
             var influence = entry.Confidence * entry.Strength * match.Score * tagBoost;
+
+            // Track variance for exploration uncertainty
+            variances[recalledCol.Value] += entry.Variance;
+            voteCounts[recalledCol.Value]++;
 
             // For heuristics, check if situation matches and apply as general guidance
             if (entry.Kind == EmpiricalKind.Heuristic)
@@ -93,12 +104,35 @@ internal sealed class Connect4Agent(InMemoryEmpiricalMemory memory)
 
         if (hasExperience)
         {
+            // Normalize variances: average per column, default 1.0 for unknown columns
+            for (var i = 0; i < Board.Cols; i++)
+                variances[i] = voteCounts[i] > 0 ? variances[i] / voteCounts[i] : 1.0f;
+
+            if (explorationStrategy is not null)
+            {
+                var candidates = legal.Select(c => new ActionCandidate
+                {
+                    Score = scores[c],
+                    Uncertainty = variances[c],
+                    SelectionCount = _columnCounts[c]
+                }).ToList();
+
+                var selectedIdx = explorationStrategy.SelectAction(candidates, _totalMoves);
+                var choice = legal[selectedIdx];
+                _columnCounts[choice]++;
+                _totalMoves++;
+                reasoning.Add($"→ Column {choice + 1} (exploration-guided, score: {scores[choice]:F2})");
+                return (choice, reasoning);
+            }
+
             var bestScore = legal.Max(c => scores[c]);
             var bestMoves = legal.Where(c => scores[c] >= bestScore && bestScore > 0).ToList();
 
             if (bestMoves.Count > 0)
             {
                 var choice = bestMoves[Rng.Next(bestMoves.Count)];
+                _columnCounts[choice]++;
+                _totalMoves++;
                 reasoning.Add($"→ Column {choice + 1} (experience-guided, score: {scores[choice]:F2})");
                 return (choice, reasoning);
             }
@@ -106,6 +140,8 @@ internal sealed class Connect4Agent(InMemoryEmpiricalMemory memory)
 
         // ── Fallback: random legal move ──────────────────────────
         var fallback = legal[Rng.Next(legal.Count)];
+        _columnCounts[fallback]++;
+        _totalMoves++;
         reasoning.Add($"→ Column {fallback + 1} (random — no relevant experience)");
         return (fallback, reasoning);
     }

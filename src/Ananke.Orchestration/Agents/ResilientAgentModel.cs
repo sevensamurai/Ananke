@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Polly;
 using Polly.Retry;
