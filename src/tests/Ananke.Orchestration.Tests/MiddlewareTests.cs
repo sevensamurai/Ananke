@@ -4,7 +4,7 @@ using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
 
-public class LoggingMiddleware : IJobMiddleware<object>
+public class LoggingMiddleware : IWorkflowJobMiddleware<object>
 {
     public List<string> Log { get; } = [];
 
@@ -80,7 +80,7 @@ public class MiddlewareTests
     }
 }
 
-file class OrderedMiddleware(string name, List<string> log) : IJobMiddleware<object>
+file class OrderedMiddleware(string name, List<string> log) : IWorkflowJobMiddleware<object>
 {
     public async Task<object> InvokeAsync(
         string jobName,

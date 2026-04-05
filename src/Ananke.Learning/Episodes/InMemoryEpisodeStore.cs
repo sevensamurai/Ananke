@@ -29,9 +29,14 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
 
     /// <inheritdoc />
     public Task<IReadOnlyList<Episode>> BrowseAsync(
-        int offset, int limit, CancellationToken ct = default)
+        int offset, int limit, string? entityId = null,
+        CancellationToken ct = default)
     {
-        var result = _episodes.Values
+        var query = _episodes.Values.AsEnumerable();
+        if (entityId is not null)
+            query = query.Where(e => e.EntityId == entityId);
+
+        var result = query
             .OrderByDescending(e => e.CompletedAt)
             .Skip(offset).Take(limit)
             .ToList();
@@ -41,10 +46,14 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
     /// <inheritdoc />
     public Task<IReadOnlyList<Episode>> BrowseByOutcomeAsync(
         float minReward, float maxReward, int offset, int limit,
-        CancellationToken ct = default)
+        string? entityId = null, CancellationToken ct = default)
     {
-        var result = _episodes.Values
-            .Where(e => e.TerminalReward >= minReward && e.TerminalReward <= maxReward)
+        var query = _episodes.Values
+            .Where(e => e.TerminalReward >= minReward && e.TerminalReward <= maxReward);
+        if (entityId is not null)
+            query = query.Where(e => e.EntityId == entityId);
+
+        var result = query
             .OrderByDescending(e => e.CompletedAt)
             .Skip(offset).Take(limit)
             .ToList();

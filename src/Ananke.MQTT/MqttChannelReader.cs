@@ -9,15 +9,29 @@ namespace Ananke.MQTT;
 
 /// <summary>
 /// MQTT-backed implementation of <see cref="IChannelReader{M, A}"/>.
-/// Subscribes to MQTT topics and dispatches messages to the provided <see cref="IBackgroundWorker{T}"/>
+/// Subscribes to MQTT topics and dispatches messages to the provided background worker
 /// via a <see cref="BackgroundProcessor{T}"/> that provides backpressure and error isolation.
 /// </summary>
-/// <typeparam name="M">Message type implementing <see cref="IMqttContext"/>.</typeparam>
+/// <remarks>
+/// Three configuration modes:
+/// <list type="bullet">
+///   <item><see cref="ConfigureAsync(ChannelConfig, IBackgroundWorker{M, A}, CancellationToken)"/>
+///   — typed-action delivery (preferred). The action enum is parsed from the MQTT topic and
+///   delivered alongside the message. No <see cref="IMqttContext"/> needed.</item>
+///   <item><see cref="ConfigureAsync(ChannelConfig, IBackgroundWorker{M}, CancellationToken)"/>
+///   — wildcard subscription with untyped worker. If <typeparamref name="M"/> implements
+///   <see cref="IMqttContext"/>, the action string is set on <see cref="IMqttContext.Command"/>
+///   (legacy compatibility).</item>
+///   <item><see cref="ConfigureAsync(ChannelConfig, IBackgroundWorker{M}, A, CancellationToken)"/>
+///   — single-action subscription with untyped worker.</item>
+/// </list>
+/// </remarks>
+/// <typeparam name="M">Message type (any class; no longer requires <see cref="IMqttContext"/>).</typeparam>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
 public sealed class MqttChannelReader<M, A>(
     int queueCapacity = 1024,
-    ILogger<MqttChannelReader<M, A>>? logger = null) : IChannelReader<M, A>, IAsyncDisposable
-    where M : class, IMqttContext
+    ILogger<MqttChannelReader<M, A>>? logger = null) : IChannelReader<M, A>
+    where M : class
     where A : Enum
 {
     private readonly ILogger<MqttChannelReader<M, A>> _logger = logger ?? NullLogger<MqttChannelReader<M, A>>.Instance;
@@ -27,42 +41,80 @@ public sealed class MqttChannelReader<M, A>(
     private string? _topic;
     private bool _linked;
     private bool _disposed;
-    private BackgroundProcessor<M>? _processor;
+    private IAsyncDisposable? _processor;
 
     private static byte[] GetPayloadBytes(ReadOnlySequence<byte> payload)
     {
         return payload.IsSingleSegment ? payload.FirstSpan.ToArray() : payload.ToArray();
     }
 
+    /// <inheritdoc />
     public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M> consumer, CancellationToken token = default)
     {
-        ArgumentNullException.ThrowIfNull(config);
+        ValidateConfig(config);
         ArgumentNullException.ThrowIfNull(consumer);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Namespace);
 
         var topic = NamespaceMapper.GetTopicWildcard<A>(config.Namespace);
         if (!string.IsNullOrWhiteSpace(config.GroupName))
             topic = $"$share/{config.GroupName}/{topic}";
 
-        return await SetupClient(config, consumer, topic, useAction: false, token: token);
+        var processor = new BackgroundProcessor<M>(
+            consumer, queueCapacity,
+            onError: (ex, _) => _logger.LogError(ex, "RX Channel worker failed to handle message of type {MessageType}", typeof(M).Name),
+            onInfo: msg => _logger.LogDebug("{Message}", msg));
+
+        return await SetupClient(config, topic, processor,
+            onMessage: (message, _) => processor.EnqueueAsync(message),
+            setCommandOnMessage: true, token: token);
     }
 
+    /// <inheritdoc />
     public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M> consumer, A action, CancellationToken token = default)
     {
-        ArgumentNullException.ThrowIfNull(config);
+        ValidateConfig(config);
         ArgumentNullException.ThrowIfNull(consumer);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Namespace);
 
         var topic = NamespaceMapper.GetTopic(config.Namespace, action);
         if (!string.IsNullOrWhiteSpace(config.GroupName))
             topic = $"$share/{config.GroupName}/{topic}";
 
-        return await SetupClient(config, consumer, topic, useAction: true, token: token);
+        var processor = new BackgroundProcessor<M>(
+            consumer, queueCapacity,
+            onError: (ex, _) => _logger.LogError(ex, "RX Channel worker failed to handle message of type {MessageType}", typeof(M).Name),
+            onInfo: msg => _logger.LogDebug("{Message}", msg));
+
+        return await SetupClient(config, topic, processor,
+            onMessage: (message, _) => processor.EnqueueAsync(message),
+            setCommandOnMessage: false, token: token);
     }
 
-    private async Task<bool> SetupClient(ChannelConfig config, IBackgroundWorker<M> consumer, string topic, bool useAction, CancellationToken token)
+    /// <inheritdoc />
+    public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M, A> consumer, CancellationToken token = default)
+    {
+        ValidateConfig(config);
+        ArgumentNullException.ThrowIfNull(consumer);
+
+        var topic = NamespaceMapper.GetTopicWildcard<A>(config.Namespace);
+        if (!string.IsNullOrWhiteSpace(config.GroupName))
+            topic = $"$share/{config.GroupName}/{topic}";
+
+        var processor = new BackgroundProcessor<M, A>(
+            consumer, queueCapacity,
+            onError: (ex, _) => _logger.LogError(ex, "RX Channel worker failed to handle message of type {MessageType}", typeof(M).Name),
+            onInfo: msg => _logger.LogDebug("{Message}", msg));
+
+        return await SetupClient(config, topic, processor,
+            onMessage: (message, action) => processor.EnqueueAsync(message, action),
+            setCommandOnMessage: false, token: token);
+    }
+
+    private async Task<bool> SetupClient(
+        ChannelConfig config,
+        string topic,
+        IAsyncDisposable processor,
+        Func<M, A, ValueTask> onMessage,
+        bool setCommandOnMessage,
+        CancellationToken token)
     {
         _topic = topic;
 
@@ -70,14 +122,12 @@ public sealed class MqttChannelReader<M, A>(
         if (_processor is not null)
             await _processor.DisposeAsync();
 
-        _processor = new BackgroundProcessor<M>(
-            consumer,
-            queueCapacity,
-            onError: (ex, _) => _logger.LogError(ex,
-                "RX Channel worker failed to handle message of type {MessageType}", typeof(M).Name),
-            onInfo: msg => _logger.LogDebug("{Message}", msg));
+        _processor = processor;
 
-        _processor.Start(token);
+        if (processor is BackgroundProcessor<M> p)
+            p.Start(token);
+        else if (processor is BackgroundProcessor<M, A> pa)
+            pa.Start(token);
 
         _logger.LogInformation("RX Channel subscribing to {Topic}", _topic);
         _client = new MqttClientFactory().CreateMqttClient();
@@ -102,16 +152,24 @@ public sealed class MqttChannelReader<M, A>(
                 return;
             }
 
-            if (!useAction)
+            var actionStr = NamespaceMapper.GetActionFromTopic(e.ApplicationMessage.Topic);
+
+            // Legacy: set Command on IMqttContext if the message type supports it
+            if (setCommandOnMessage && message is IMqttContext mqttCtx)
+                mqttCtx.Command = actionStr;
+
+            if (!Enum.TryParse(typeof(A), actionStr, ignoreCase: true, out var parsed) || parsed is not A action)
             {
-                var action = NamespaceMapper.GetActionFromTopic(e.ApplicationMessage.Topic);
-                message.Command = action;
+                _logger.LogWarning("RX Channel could not parse action '{Action}' as {EnumType} from {Topic}",
+                    actionStr, typeof(A).Name, e.ApplicationMessage.Topic);
+                return;
             }
+
             _logger.LogDebug("Received message from {Topic}", e.ApplicationMessage.Topic);
 
             try
             {
-                await _processor.EnqueueAsync(message);
+                await onMessage(message, action);
             }
             catch (OperationCanceledException)
             {
@@ -188,9 +246,10 @@ public sealed class MqttChannelReader<M, A>(
         _logger.LogError("RX Channel failed to reconnect after {MaxAttempts} attempts", maxAttempts);
     }
 
-    public async Task Clear()
+    /// <inheritdoc />
+    public async Task ClearAsync()
     {
-        if (_client is not null)
+        if (_client is not null && _client.IsConnected)
         {
             if (!string.IsNullOrEmpty(_topic))
                 await _client.UnsubscribeAsync(_topic);
@@ -199,6 +258,7 @@ public sealed class MqttChannelReader<M, A>(
         _linked = false;
     }
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
@@ -207,7 +267,7 @@ public sealed class MqttChannelReader<M, A>(
         if (_processor is not null)
             await _processor.DisposeAsync();
 
-        await Clear();
+        await ClearAsync();
 
         if (_client is not null)
         {
@@ -216,5 +276,12 @@ public sealed class MqttChannelReader<M, A>(
         }
 
         GC.SuppressFinalize(this);
+    }
+
+    private static void ValidateConfig(ChannelConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
+        ArgumentException.ThrowIfNullOrWhiteSpace(config.Namespace);
     }
 }

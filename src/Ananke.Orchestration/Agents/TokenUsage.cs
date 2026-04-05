@@ -46,6 +46,20 @@ internal static class TokenUsageCapture
 
         Current.Value.Add(response.Usage);
     }
+
+    /// <summary>
+    /// Accumulates usage and computes per-call cost using model-specific rates.
+    /// Called by <see cref="RoutedAgentModel"/> when the router implements
+    /// <see cref="IModelCostResolver"/>.
+    /// </summary>
+    internal static void AccumulateWithCost(AgentResponse response, ModelCostRates rates)
+    {
+        if (response.Usage is null || Current.Value is null)
+            return;
+
+        Current.Value.Add(response.Usage);
+        Current.Value.AddCost(rates.EstimateCost(response.Usage));
+    }
 }
 
 /// <summary>Mutable accumulator shared by reference through the AsyncLocal.</summary>
@@ -53,6 +67,21 @@ internal sealed class UsageAccumulator
 {
     public TokenUsage Usage { get; private set; } = TokenUsage.Zero;
 
+    /// <summary>
+    /// Cost accumulated from model-specific rates. When <c>&gt; 0</c>, the runner
+    /// uses this instead of flat <see cref="BudgetConfig"/> rates for budget enforcement.
+    /// </summary>
+    public decimal AccumulatedCost { get; private set; }
+
+    /// <summary>Whether any per-call model-based cost has been reported.</summary>
+    public bool HasModelBasedCost { get; private set; }
+
     public void Add(TokenUsage usage) =>
         Usage = Usage.Add(usage);
+
+    public void AddCost(decimal cost)
+    {
+        AccumulatedCost += cost;
+        HasModelBasedCost = true;
+    }
 }

@@ -37,6 +37,12 @@ public sealed class WorkflowDefinition<TState>
     /// </summary>
     public BudgetConfig? Budget { get; }
 
+    /// <summary>
+    /// Optional workflow-level error handler invoked when any job throws.
+    /// Registered via <see cref="Workflow{TState}.OnError"/>.
+    /// </summary>
+    internal Func<TState, string, Exception, Task>? OnError { get; }
+
     internal WorkflowDefinition(
         string name,
         Dictionary<string, JobDescriptor<TState>> jobs,
@@ -44,7 +50,8 @@ public sealed class WorkflowDefinition<TState>
         string entryJob,
         IReadOnlyDictionary<string, string>? metadata = null,
         List<JoinDescriptor<TState>>? joins = null,
-        BudgetConfig? budget = null)
+        BudgetConfig? budget = null,
+        Func<TState, string, Exception, Task>? onError = null)
     {
         Name = name;
         Jobs = new Dictionary<string, JobDescriptor<TState>>(jobs);
@@ -53,6 +60,7 @@ public sealed class WorkflowDefinition<TState>
         Metadata = metadata ?? new Dictionary<string, string>();
         Joins = joins is not null ? [.. joins] : [];
         Budget = budget;
+        OnError = onError;
 
         Validate();
     }

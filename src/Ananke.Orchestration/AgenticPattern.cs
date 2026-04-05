@@ -10,7 +10,7 @@ namespace Ananke.Orchestration;
 /// <para>
 /// The returned <see cref="Workflow{TState}"/> can be further customized with
 /// checkpointing, tracing, metadata, and additional jobs — or embedded as a
-/// <see cref="Workflow{TState}.SubFlow{TChild}"/> inside a larger workflow.
+/// <see cref="Workflow{TState}.SubFlow{TChild}(string, Workflow{TChild}, System.Func{TState, TChild}, System.Func{TState, TChild, TState}, int)"/> inside a larger workflow.
 /// </para>
 /// </summary>
 /// <remarks>

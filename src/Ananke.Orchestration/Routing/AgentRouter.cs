@@ -48,8 +48,6 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         _maxToolRounds = maxToolRounds;
     }
 
-    public Task<string> RouteAsync(TState state) => RouteAsync(state, CancellationToken.None);
-
     public async Task<string> RouteAsync(TState state, CancellationToken ct)
     {
         var optionsList = string.Join(", ", _options);

@@ -15,7 +15,66 @@ public enum RoutingStrategy
     FastestFit,
 
     /// <summary>Highest intelligence that meets requirements. Ties broken by cost (cheapest wins).</summary>
-    BestFit
+    BestFit,
+
+    /// <summary>
+    /// Composite score: <c>−cost × W_cost + speed × W_speed + intelligence × W_intelligence</c>.
+    /// Configure weights via <see cref="CapabilityModelRouter(RoutingWeights)"/>.
+    /// </summary>
+    Weighted,
+
+    /// <summary>
+    /// Custom scoring delegate. Configure via
+    /// <see cref="CapabilityModelRouter(Func{ModelProfile, decimal})"/>.
+    /// </summary>
+    Custom
+}
+
+/// <summary>
+/// Weights for the <see cref="RoutingStrategy.Weighted"/> strategy.
+/// Each weight controls how much that dimension contributes to the
+/// composite score. Cost is inverted (lower cost → higher score).
+/// </summary>
+/// <remarks>
+/// The scoring formula is:
+/// <c>score = −CostPer1KTokens × CostWeight + SpeedTier × SpeedWeight + IntelligenceTier × IntelligenceWeight</c>.
+/// All weights default to <c>1.0</c> (equal importance).
+/// </remarks>
+/// <example>
+/// <code>
+/// // Prefer speed over cost, ignore intelligence:
+/// var weights = new RoutingWeights { SpeedWeight = 2.0m, CostWeight = 0.5m, IntelligenceWeight = 0m };
+/// var router = new CapabilityModelRouter(weights);
+/// </code>
+/// </example>
+public sealed record RoutingWeights
+{
+    /// <summary>
+    /// Weight for cost (inverted — lower cost scores higher).
+    /// Set to <c>0</c> to ignore cost in scoring. Default: <c>1.0</c>.
+    /// </summary>
+    public decimal CostWeight { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Weight for speed tier (1–5, higher is faster).
+    /// Set to <c>0</c> to ignore speed in scoring. Default: <c>1.0</c>.
+    /// </summary>
+    public decimal SpeedWeight { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Weight for intelligence tier (1–5, higher is smarter).
+    /// Set to <c>0</c> to ignore intelligence in scoring. Default: <c>1.0</c>.
+    /// </summary>
+    public decimal IntelligenceWeight { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Computes the composite score for <paramref name="profile"/>.
+    /// Higher scores are preferred.
+    /// </summary>
+    internal decimal Score(ModelProfile profile) =>
+        -(profile.CostPer1KTokens * CostWeight)
+        + (profile.SpeedTier * SpeedWeight)
+        + (profile.IntelligenceTier * IntelligenceWeight);
 }
 
 /// <summary>
@@ -57,15 +116,56 @@ public enum RoutingStrategy
 ///     .Build();
 /// </code>
 /// </example>
-public sealed class CapabilityModelRouter : IModelRouter
+public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
 {
     private readonly List<ModelProfile> _profiles = [];
     private readonly RoutingStrategy _strategy;
+    private readonly RoutingWeights? _weights;
+    private readonly Func<ModelProfile, decimal>? _scorer;
     private ModelProfile? _fallback;
 
+    /// <summary>Creates a router with a built-in strategy (CheapestFit, FastestFit, or BestFit).</summary>
     public CapabilityModelRouter(RoutingStrategy strategy = RoutingStrategy.CheapestFit)
     {
         _strategy = strategy;
+    }
+
+    /// <summary>
+    /// Creates a router with the <see cref="RoutingStrategy.Weighted"/> strategy,
+    /// balancing cost, speed, and intelligence according to <paramref name="weights"/>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// // Favour speed, tolerate higher cost:
+    /// var router = new CapabilityModelRouter(new RoutingWeights
+    /// {
+    ///     CostWeight = 0.3m, SpeedWeight = 2.0m, IntelligenceWeight = 1.0m
+    /// });
+    /// </code>
+    /// </example>
+    public CapabilityModelRouter(RoutingWeights weights)
+    {
+        ArgumentNullException.ThrowIfNull(weights);
+        _strategy = RoutingStrategy.Weighted;
+        _weights = weights;
+    }
+
+    /// <summary>
+    /// Creates a router with a custom scoring function.
+    /// The candidate with the <b>highest</b> score wins.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// // Custom scorer: prefer large context windows, penalise cost
+    /// var router = new CapabilityModelRouter(p =>
+    ///     p.MaxContextTokens / 100_000m - p.CostPer1KTokens * 2);
+    /// </code>
+    /// </example>
+    public CapabilityModelRouter(Func<ModelProfile, decimal> scorer)
+    {
+        ArgumentNullException.ThrowIfNull(scorer);
+        _strategy = RoutingStrategy.Custom;
+        _scorer = scorer;
     }
 
     /// <summary>Registers a model profile as a routing candidate.</summary>
@@ -88,7 +188,15 @@ public sealed class CapabilityModelRouter : IModelRouter
     }
 
     /// <inheritdoc />
-    public IAgentModel Select(AgentRequest request)
+    public IAgentModel Select(AgentRequest request) => SelectProfile(request).Model;
+
+    /// <inheritdoc />
+    public ModelCostRates ResolveCostRates(AgentRequest request) => SelectProfile(request).GetCostRates();
+
+    /// <summary>Wraps this router as an <see cref="IAgentModel"/> for use in <c>AgentJob</c>.</summary>
+    public IAgentModel ToAgentModel() => new RoutedAgentModel(this);
+
+    private ModelProfile SelectProfile(AgentRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -97,14 +205,14 @@ public sealed class CapabilityModelRouter : IModelRouter
 
         if (candidates.Count == 0)
         {
-            return _fallback?.Model
+            return _fallback
                 ?? throw new InvalidOperationException(
                     $"No model satisfies the inferred requirements ({requirements.RequiredCapabilities}, " +
                     $"tier ≥ {requirements.MinIntelligenceTier}) and no fallback is configured. " +
                     $"Call WithFallback() or add a model with broader capabilities.");
         }
 
-        var selected = _strategy switch
+        return _strategy switch
         {
             RoutingStrategy.CheapestFit => candidates
                 .OrderBy(p => p.CostPer1KTokens)
@@ -118,12 +226,13 @@ public sealed class CapabilityModelRouter : IModelRouter
                 .OrderByDescending(p => p.IntelligenceTier)
                 .ThenBy(p => p.CostPer1KTokens)
                 .First(),
+            RoutingStrategy.Weighted when _weights is not null => candidates
+                .OrderByDescending(p => _weights.Score(p))
+                .First(),
+            RoutingStrategy.Custom when _scorer is not null => candidates
+                .OrderByDescending(_scorer)
+                .First(),
             _ => candidates[0]
         };
-
-        return selected.Model;
     }
-
-    /// <summary>Wraps this router as an <see cref="IAgentModel"/> for use in <c>AgentJob</c>.</summary>
-    public IAgentModel ToAgentModel() => new RoutedAgentModel(this);
 }

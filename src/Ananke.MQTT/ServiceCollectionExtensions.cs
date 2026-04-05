@@ -13,12 +13,12 @@ public static class ServiceCollectionExtensions
     /// Registers MQTT-backed <see cref="IChannelReader{M, A}"/> and <see cref="IChannelWriter{A}"/>
     /// for the specified context and action types.
     /// </summary>
-    /// <typeparam name="TContext">Message context type implementing <see cref="IMqttContext"/>.</typeparam>
+    /// <typeparam name="TContext">Message context type (any class).</typeparam>
     /// <typeparam name="TAction">Action/transition enum type used for topic routing.</typeparam>
     public static IServiceCollection AddMqtt<TContext, TAction>(
         this IServiceCollection services,
         Action<ChannelConfig> configure)
-        where TContext : class, IMqttContext
+        where TContext : class
         where TAction : Enum
     {
         services.Configure(configure);
@@ -39,7 +39,7 @@ public static class ServiceCollectionExtensions
         string @namespace,
         string? username = null,
         string? password = null)
-        where TContext : class, IMqttContext
+        where TContext : class
         where TAction : Enum
     {
         return services.AddMqtt<TContext, TAction>(c =>

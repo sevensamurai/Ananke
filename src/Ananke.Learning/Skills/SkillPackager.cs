@@ -38,7 +38,7 @@ public sealed class SkillPackager : ISkillPackager
 
         while (true)
         {
-            var page = await memory.BrowseAsync(offset, PageSize, options.Kind, ct);
+            var page = await memory.BrowseAsync(offset, PageSize, options.Kind, ct: ct);
             if (page.Count == 0) break;
 
             foreach (var entry in page)

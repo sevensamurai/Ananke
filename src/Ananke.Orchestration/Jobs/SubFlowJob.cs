@@ -16,7 +16,7 @@ internal interface ISubFlowConfiguration
 
 /// <summary>
 /// A job that executes a nested workflow, mapping state between parent and child types.
-/// Created via <see cref="Workflow{TState}.SubFlow{TChild}"/>.
+/// Created via <see cref="Workflow{TState}.SubFlow{TChild}(string, Workflow{TChild}, System.Func{TState, TChild}, System.Func{TState, TChild, TState}, int)"/>.
 /// </summary>
 /// <remarks>
 /// <para>

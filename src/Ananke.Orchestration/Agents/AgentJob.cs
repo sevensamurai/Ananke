@@ -460,11 +460,45 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
 
 public static class AgentJobFactory
 {
+    /// <summary>
+    /// Creates a builder for a structured agent job that deserializes the model's response
+    /// to <typeparamref name="TResponse"/> via JSON schema enforcement.
+    /// </summary>
     public static AgentJob<TState, TResponse>.Builder Create<TState, TResponse>(
         string name, IAgentModel model) where TResponse : class
         => new(name, model);
 
+    /// <summary>
+    /// Creates a builder for a structured agent job using a <see cref="IModelRouter"/>
+    /// for capability-based model selection.
+    /// </summary>
     public static AgentJob<TState, TResponse>.Builder Create<TState, TResponse>(
         string name, IModelRouter router) where TResponse : class
+        => new(name, router);
+
+    /// <summary>
+    /// Creates a builder for a plain-text agent job — the simplest way to call an LLM
+    /// within a workflow. No JSON schema, no <c>TResponse</c> type parameter.
+    /// The model's text response is passed directly to <see cref="TextAgentJob{TState}.Builder.MapResult"/>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var agent = AgentJobFactory.Create&lt;MyState&gt;("summarize", model)
+    ///     .WithSystemPrompt("You summarize text concisely.")
+    ///     .WithPrompt(s =&gt; s.Input)
+    ///     .MapResult((s, text) =&gt; s with { Summary = text })
+    ///     .Build();
+    /// </code>
+    /// </example>
+    public static TextAgentJob<TState>.Builder Create<TState>(
+        string name, IAgentModel model)
+        => new(name, model);
+
+    /// <summary>
+    /// Creates a builder for a plain-text agent job using a <see cref="IModelRouter"/>
+    /// for capability-based model selection.
+    /// </summary>
+    public static TextAgentJob<TState>.Builder Create<TState>(
+        string name, IModelRouter router)
         => new(name, router);
 }

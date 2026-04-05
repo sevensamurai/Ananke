@@ -40,6 +40,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private const string SourceKey = "source";
     private const string TagsKey = "tags";
     private const string EvidenceKey = "evidence";
+    private const string EntityIdKey = "entity_id";
 
     // Pattern-specific
     private const string ConditionKey = "condition";
@@ -169,11 +170,19 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
         var embedding = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct);
 
-        // Semantic dedup: search for a similar existing entry of the same kind
+        // Semantic dedup: search for a similar existing entry of the same kind and entity
         var kindFilter = new Filter
         {
             Must = { Conditions.MatchKeyword(KindKey, entry.Kind.ToString().ToLowerInvariant()) }
         };
+
+        if (entry.EntityId is not null)
+            kindFilter.Must.Add(Conditions.MatchKeyword(EntityIdKey, entry.EntityId));
+        else
+            kindFilter.Must.Add(new Condition
+            {
+                IsEmpty = new IsEmptyCondition { Key = EntityIdKey }
+            });
 
         var similar = await _client.SearchAsync(
             collectionName: _collectionName,
@@ -491,13 +500,20 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
-        int offset, int limit, EmpiricalKind? kind = null, CancellationToken ct = default)
+        int offset, int limit, EmpiricalKind? kind = null,
+        string? entityId = null, CancellationToken ct = default)
     {
         await EnsureCollectionAsync(ct);
 
-        Filter? filter = kind is not null
-            ? new Filter { Must = { Conditions.MatchKeyword(KindKey, kind.Value.ToString().ToLowerInvariant()) } }
-            : null;
+        Filter? filter = null;
+        if (kind is not null || entityId is not null)
+        {
+            filter = new Filter();
+            if (kind is not null)
+                filter.Must.Add(Conditions.MatchKeyword(KindKey, kind.Value.ToString().ToLowerInvariant()));
+            if (entityId is not null)
+                filter.Must.Add(Conditions.MatchKeyword(EntityIdKey, entityId));
+        }
 
         var result = await _client.ScrollAsync(
             _collectionName,
@@ -578,6 +594,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
                     _collectionName, TagsKey,
                     PayloadSchemaType.Keyword, cancellationToken: ct);
 
+                await _client.CreatePayloadIndexAsync(
+                    _collectionName, EntityIdKey,
+                    PayloadSchemaType.Keyword, cancellationToken: ct);
+
                 // Affective signals — strength indexed for decay filtering
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, StrengthKey,
@@ -608,6 +628,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             [TagsKey] = ToListValue(entry.Tags),
             [EvidenceKey] = ToListValue(entry.Evidence)
         };
+
+        // Entity scoping
+        if (entry.EntityId is not null)
+            payload[EntityIdKey] = entry.EntityId;
 
         // Pattern-specific fields
         if (entry.Condition is not null) payload[ConditionKey] = entry.Condition;
@@ -666,6 +690,27 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private static Filter? BuildRecallFilter(RecallOptions options)
     {
         var filter = new Filter();
+
+        if (options.EntityId is not null)
+        {
+            if (options.IncludeGlobal)
+            {
+                // Match entity-specific OR global (entity_id absent)
+                var entityOrGlobal = new Filter
+                {
+                    Should =
+                    {
+                        Conditions.MatchKeyword(EntityIdKey, options.EntityId),
+                        new Condition { IsEmpty = new IsEmptyCondition { Key = EntityIdKey } }
+                    }
+                };
+                filter.Must.Add(new Condition { Filter = entityOrGlobal });
+            }
+            else
+            {
+                filter.Must.Add(Conditions.MatchKeyword(EntityIdKey, options.EntityId));
+            }
+        }
 
         if (options.Kind is not null)
             filter.Must.Add(Conditions.MatchKeyword(KindKey,
@@ -734,7 +779,8 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             LastPredictionError = (float)GetDouble(payload, LastPredictionErrorKey),
             Prediction = payload.TryGetValue(PredictionKey, out var pred)
                 ? (float)pred.DoubleValue : null,
-            ConsolidatedInto = GetStringOrNull(payload, ConsolidatedIntoKey)
+            ConsolidatedInto = GetStringOrNull(payload, ConsolidatedIntoKey),
+            EntityId = GetStringOrNull(payload, EntityIdKey)
         };
     }
 

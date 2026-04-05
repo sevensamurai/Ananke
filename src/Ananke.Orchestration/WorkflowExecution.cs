@@ -1,4 +1,3 @@
-using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
@@ -50,6 +49,41 @@ public sealed class WorkflowExecution<TState>
 
     /// <summary>Estimated cumulative cost in the unit defined by the workflow's cost model.</summary>
     public decimal EstimatedCost { get; internal set; }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the workflow completed successfully
+    /// (<see cref="Status"/> is <see cref="ExecutionStatus.Completed"/>).
+    /// </summary>
+    public bool IsSuccess => Status == ExecutionStatus.Completed;
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the workflow terminated due to a fault, cancellation,
+    /// or budget exhaustion.
+    /// </summary>
+    public bool IsFailure => Status is ExecutionStatus.Faulted or ExecutionStatus.Cancelled
+        or ExecutionStatus.BudgetExceeded;
+
+    /// <summary>
+    /// Converts this execution into an immutable <see cref="WorkflowResult{TState}"/>.
+    /// Unlike <see cref="Result"/> (which is <see langword="null"/> while running),
+    /// this method synthesises a result from current state at any point in the lifecycle.
+    /// </summary>
+    public WorkflowResult<TState> ToResult() =>
+        Result ?? new WorkflowResult<TState>
+        {
+            Success = IsSuccess,
+            FinalState = State,
+            TotalDuration = TimeSpan.Zero,
+            JobsExecuted = _history.Count,
+            History = _history,
+            Error = Status switch
+            {
+                ExecutionStatus.Running => "Workflow is still running.",
+                ExecutionStatus.NotStarted => "Workflow has not started.",
+                ExecutionStatus.Interrupted => "Workflow is paused at an interrupt point.",
+                _ => null
+            }
+        };
 
     internal WorkflowExecution(string workflowName, TState initialState,
         IReadOnlyDictionary<string, string>? metadata = null)

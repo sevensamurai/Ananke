@@ -15,7 +15,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.5" />
   </ItemGroup>
   <ItemGroup Label="LLM Providers">
-    <PackageVersion Include="OpenAI" Version="2.9.1" />
+    <PackageVersion Include="OpenAI" Version="2.10.0" />
     <PackageVersion Include="Anthropic" Version="12.11.0" />
     <PackageVersion Include="Google.GenAI" Version="1.6.1" />
   </ItemGroup>
@@ -33,7 +33,7 @@
   </ItemGroup>
   <ItemGroup Label="ASP.NET Core">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.13.18" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.13.20" />
   </ItemGroup>
   <ItemGroup Label="Documents">
     <PackageVersion Include="PdfPig" Version="0.1.14" />
@@ -52,5 +52,11 @@
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="coverlet.collector" Version="8.0.1" />
     <PackageVersion Include="coverlet.msbuild" Version="8.0.1" />
+  </ItemGroup>
+  <ItemGroup Label="Analyzers">
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.2" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
   </ItemGroup>
 </Project>

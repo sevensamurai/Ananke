@@ -149,6 +149,28 @@ public sealed record EmpiricalEntry
     /// </summary>
     public required string Source { get; init; }
 
+    // ── Entity scoping ───────────────────────────────────────────────
+
+    /// <summary>
+    /// The entity this knowledge pertains to (user, customer, device,
+    /// household, etc.). When <see langword="null"/>, the entry is global —
+    /// visible to all entities and used as fallback during entity-scoped recall.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Entity-scoped entries are isolated during dedup: a pattern about
+    /// entity A will not merge with a semantically similar pattern about
+    /// entity B. This prevents cross-entity knowledge leakage.
+    /// </para>
+    /// <para>
+    /// The value is typically an external identifier (user ID, customer ID,
+    /// device serial, session group ID) and should be stable across the
+    /// entity's lifetime. Ananke does not interpret the value — it is an
+    /// opaque partition key.
+    /// </para>
+    /// </remarks>
+    public string? EntityId { get; init; }
+
     // ── Core content (embedded for vector search) ────────────────────
 
     /// <summary>
@@ -362,6 +384,24 @@ public sealed record RecallOptions
     /// When <see langword="null"/> or empty, no tag filtering is applied.
     /// </summary>
     public IReadOnlyList<string>? RequiredTags { get; init; }
+
+    /// <summary>
+    /// Filter by entity scope. When set, only entries whose
+    /// <see cref="EmpiricalEntry.EntityId"/> matches are returned.
+    /// When <see cref="IncludeGlobal"/> is <see langword="true"/>,
+    /// global entries (<c>EntityId = null</c>) are also included.
+    /// When this property is <see langword="null"/>, all entries
+    /// (entity-scoped and global) are searched — no entity filtering is applied.
+    /// </summary>
+    public string? EntityId { get; init; }
+
+    /// <summary>
+    /// When <see cref="EntityId"/> is set and this is <see langword="true"/>,
+    /// global entries are included alongside entity-specific results.
+    /// Has no effect when <see cref="EntityId"/> is <see langword="null"/>.
+    /// Default is <see langword="false"/>.
+    /// </summary>
+    public bool IncludeGlobal { get; init; }
 }
 
 /// <summary>

@@ -7,6 +7,7 @@
     <Project Path="demos/Connect4Demo/Connect4Demo.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
+    <Project Path="demos/EntityMemoryDemo/EntityMemoryDemo.csproj" Id="c5086923-5519-4c66-a42b-e45c231f8f0d" />
     <Project Path="demos/LogEventsDemo/LogEventsDemo.csproj" Id="23aa0734-a003-485b-a2ee-46367f61ad39" />
     <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad">
       <Build Solution="Debug|*" Project="false" />
@@ -41,6 +42,7 @@
   </Folder>
   <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
   <Project Path="Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  <Project Path="Ananke.Analyzers/Ananke.Analyzers.csproj" />
   <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85">
     <Build Solution="Debug|*" Project="false" />
   </Project>
