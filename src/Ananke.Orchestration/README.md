@@ -37,7 +37,7 @@ var result = await workflow.RunAsync(new ResearchState { Query = "distributed sy
 ```csharp
 using Ananke.Orchestration.Extensions;
 
-services.AddFlowOrchestration(o => o
+services.AddWorkflowOrchestration(o => o
     .UseCheckpointing()
     .StoreCompletions(false)
     .WithCheckpointTtl(TimeSpan.FromDays(14)));

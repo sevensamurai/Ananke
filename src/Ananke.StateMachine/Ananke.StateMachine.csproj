@@ -19,8 +19,4 @@
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Worker\" />
-  </ItemGroup>
-
 </Project>

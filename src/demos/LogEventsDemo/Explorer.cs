@@ -388,9 +388,9 @@ internal sealed class Explorer
 
     private async Task CmdStatusAsync(CancellationToken ct)
     {
-        var patterns = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Pattern, ct);
-        var heuristics = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Heuristic, ct);
-        var skills = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Skill, ct);
+        var patterns = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Pattern, ct: ct);
+        var heuristics = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Heuristic, ct: ct);
+        var skills = await _memory.BrowseAsync(0, 1000, EmpiricalKind.Skill, ct: ct);
 
         Console.WriteLine("\n  📊 Empirical Memory Status:");
         Console.WriteLine($"     Patterns:   {patterns.Count}");

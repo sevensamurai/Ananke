@@ -1,5 +1,4 @@
 using Ananke.Abstractions.Channels;
-using Ananke.Abstractions.Config;
 
 namespace Ananke.MQTT;
 

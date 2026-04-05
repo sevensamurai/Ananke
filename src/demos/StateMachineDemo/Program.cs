@@ -1,258 +1,201 @@
-using System.Text;
+ï»¿using System.Text;
 using Ananke.Abstractions;
+using Ananke.Abstractions.Channels;
+using Ananke.Abstractions.Config;
 using Ananke.Abstractions.Distributed;
 using Ananke.StateMachine;
-using Ananke.StateMachine.Builder;
+using Ananke.StateMachine.Channels;
 using Ananke.StateMachine.Middleware;
+using StateMachineDemo;
 
 // --------------------------------------------------------------------------
-//  Ananke — StateMachineDemo
-//  Domain: Support Ticket Lifecycle
+//  Ananke â€” StateMachineDemo
+//  Domain: Car Engine IoT â€” Distributed FSM
 //
 //  State diagram:
 //
-//     +----------------------------------------------------------+
-//     ¦                                                          ¦
-//     ¦   Open --[Assign]--? InProgress --[Resolve]--? Resolved ¦
-//     ¦    ?                                            ¦    ¦   ¦
-//     ¦    ¦                                        [Reopen] ¦   ¦
-//     ¦    +--------------------------------------------+ [Close] ¦
-//     ¦                                                       ¦   ¦
-//     ¦                                                    Closed ¦
-//     +----------------------------------------------------------+
+//     Parked --[Start]--> Running --[Drive]--> Moving
+//       ^                   ^                    |
+//       |               [Resume]             [Halt]
+//       |                   |                    |
+//       +---[Park]--- Idle <---------------------+
 //
-//  Transitions defined:
-//    Open       --[Assign]-->  InProgress   (always valid)
-//    InProgress --[Resolve]--> Resolved     (guard: ResolutionNote must be set)
-//    Resolved   --[Reopen]-->  Open         (allowed — re-raise a ticket)
-//    Resolved   --[Close]-->   Closed       (terminal — archives the ticket)
+//  Two "processes" in the same project (via in-memory channels):
 //
-//  NOT defined (invalid — the machine will reject these):
-//    Open       --[Resolve]    (must Assign first)
-//    InProgress --[Close]      (must Resolve before Close)
-//    Closed     --[Reopen]     (Closed is terminal)
+//    Engine Controller (writer â†’ reader â†’ FSM)
+//      Sends transition commands. The StateMachineChannelWorker bridge
+//      auto-dispatches to the FSM â€” no hand-written worker needed.
+//
+//    Trip Reporter (observer)
+//      Subscribes to transition events via the FSM middleware callback.
+//      Records trip segments: time running, distance traveled.
 //
 //  Sections:
-//    1. Happy path          — full lifecycle with lifecycle hooks
-//    2. Invalid transitions — three different rejection scenarios
-//    3. Guard condition     — Resolve blocked, then unblocked by note
-//    4. Fault / Reset       — circuit-breaker that blocks all transitions
+//    1. In-memory channels â€” full lifecycle with typed-action delivery
+//    2. Guard condition    â€” cannot Drive without fuel
+//    3. Fault / Reset      â€” engine fault blocks transitions
+//    4. MQTT-driven        â€” same FSM over MQTT broker (--mqtt flag)
+//
+//  Usage:
+//    dotnet run                     # sections 1â€“3 (no broker needed)
+//    dotnet run -- --mqtt           # sections 1â€“4 (requires Docker broker)
 // --------------------------------------------------------------------------
+
+var enableMqtt = args.Contains("--mqtt", StringComparer.OrdinalIgnoreCase);
 
 Console.OutputEncoding = Encoding.UTF8;
-PrintBanner();
+DemoConsole.PrintBanner();
 
-// -- Shared machine (sections 1–3) ----------------------------------------
-//    One machine instance handles multiple independent tickets via context IDs.
-//    The middleware intercepts every transition attempt — success or failure.
-var lock1 = new InMemoryDistributedLock();
-var machine = new TicketMachine(lock1, lock1,
-    new StateMachineOptions { AllowImplicitSelfTransitions = false });
-machine.UseMiddleware(new LoggingMiddleware<TicketContext, TicketState, TicketTransition>(
-    msg => Dim($"    ~ {msg}")));
+// -- Shared infrastructure ------------------------------------------------
+var lockStore = new InMemoryDistributedLock();
+var options = new StateMachineOptions { AllowImplicitSelfTransitions = false };
 
-// --------------------------------------------------------------------------
-//  1. Happy path — full lifecycle with hooks and after-action
-// --------------------------------------------------------------------------
-Section("1. Happy path — full ticket lifecycle");
+// -- Trip reporter (the "second process") ----------------------------------
+//    Observes transitions and records trip segments.
+var reporter = new TripReporter();
 
-var t1 = new TicketContext("1") { Title = "Login page returns HTTP 500" };
-Say($"  Ticket #{t1.Id}: \"{t1.Title}\"  [starts: {machine.CurrentState}]");
-Console.WriteLine();
-
-// Open ? InProgress  (OnEnter InProgress fires)
-await Do(machine, t1, TicketTransition.Assign);
-
-// InProgress ? Resolved  (guard: ResolutionNote must be non-empty; OnExit fires)
-machine.ResolutionNote = "Fixed null-reference in AuthController.LoginAsync";
-Say($"  Note set: \"{machine.ResolutionNote}\"");
-await Do(machine, t1, TicketTransition.Resolve);
-
-// Resolved ? Closed
-await Do(machine, t1, TicketTransition.Close);
+// -- Engine FSM -----------------------------------------------------------
+var engine = new CarEngineStateMachine(lockStore, lockStore, options);
+engine.UseMiddleware(new LoggingMiddleware<CarContext, EngineState, EngineTransition>(
+    msg => DemoConsole.Dim($"    ~ {msg}")));
 
 // --------------------------------------------------------------------------
-//  2. Invalid transitions — three rejection scenarios
+//  1. In-memory channels â€” full lifecycle
 // --------------------------------------------------------------------------
-Section("2. Invalid transitions");
+DemoConsole.Section("1. In-memory channel â€” full engine lifecycle");
 
-// 2a — Cannot Resolve before Assigning
-Say("  2a. Open --[Resolve]--> ?  (no path defined — must Assign first)");
-var t2a = new TicketContext("10") { Title = "Payment timeout" };
-await Do(machine, t2a, TicketTransition.Resolve);   // ?
-Console.WriteLine();
+// Build the channel pair (no MQTT broker needed)
+var reader = new InMemoryChannelReader<CarContext, EngineTransition>();
+var writer = new InMemoryChannelWriter<EngineTransition>().LinkTo(reader);
 
-// 2b — Cannot jump from InProgress directly to Closed
-Say("  2b. InProgress --[Close]--> ?  (must Resolve before Close)");
-var t2b = new TicketContext("11") { Title = "Dark mode flicker" };
-await Do(machine, t2b, TicketTransition.Assign);    // ? Open ? InProgress (setup)
-await Do(machine, t2b, TicketTransition.Close);     // ?
-Console.WriteLine();
-
-// 2c — Closed is terminal; cannot reopen once archived
-Say("  2c. Closed --[Reopen]--> ?  (Closed is a terminal state)");
-var t2c = new TicketContext("12") { Title = "Cache invalidation bug" };
-machine.ResolutionNote = "Cache key normalised to lowercase";
-await Do(machine, t2c, TicketTransition.Assign);    // ? setup
-await Do(machine, t2c, TicketTransition.Resolve);   // ? setup
-await Do(machine, t2c, TicketTransition.Close);     // ? setup — now Closed
-await Do(machine, t2c, TicketTransition.Reopen);    // ?
-
-// --------------------------------------------------------------------------
-//  3. Guard condition — Resolve requires a non-empty ResolutionNote
-// --------------------------------------------------------------------------
-Section("3. Guard condition — ResolutionNote required before Resolve");
-
-machine.ResolutionNote = null;   // clear any note left from section 2
-
-var t3 = new TicketContext("20") { Title = "Export button does nothing" };
-Say($"  Ticket #{t3.Id}: \"{t3.Title}\"");
-Console.WriteLine();
-
-await Do(machine, t3, TicketTransition.Assign);     // ? Open ? InProgress
-
-// Guard blocks the transition — note is empty
-Say("  ResolutionNote is null — guard will block Resolve:");
-await Do(machine, t3, TicketTransition.Resolve);    // ? guard fails
-Console.WriteLine();
-
-// Set the note and retry — guard now passes
-machine.ResolutionNote = "JS event listener was missing after last bundle update";
-Say($"  Note set: \"{machine.ResolutionNote}\"");
-Say("  Retry — guard now passes:");
-await Do(machine, t3, TicketTransition.Resolve);    // ?
-
-// --------------------------------------------------------------------------
-//  4. OperationalStatus — Fault and Reset circuit breaker
-// --------------------------------------------------------------------------
-Section("4. OperationalStatus — Fault blocks all transitions until Reset");
-
-// Fresh isolated machine — fault/reset applies to the whole machine instance
-var lock2 = new InMemoryDistributedLock();
-var guardedMachine = new TicketMachine(lock2, lock2,
-    new StateMachineOptions { AllowImplicitSelfTransitions = false });
-var t4 = new TicketContext("30") { Title = "Database migration failure" };
-
-Say($"  Ticket #{t4.Id}: \"{t4.Title}\"");
-Say($"  Operational status: {guardedMachine.OperationalStatus}");
-Console.WriteLine();
-
-// Fault — simulates a critical incident requiring manual intervention
-var fault = await guardedMachine.FaultAsync(t4, "Schema migration rolled back — manual DBA intervention required");
-Say($"  FaultAsync ? [{fault.CurrentStatus}]");
-Say($"  Reason: {fault.Reason}");
-Console.WriteLine();
-
-// All transitions are now blocked regardless of whether they would otherwise be valid
-Say("  Attempting Assign while Faulted:");
-await Do(guardedMachine, t4, TicketTransition.Assign);  // ? blocked
-Console.WriteLine();
-
-// Reset — operator clears the fault after remediation
-var reset = await guardedMachine.ResetAsync(t4, "Migration re-applied by DBA — system verified healthy");
-Say($"  ResetAsync ? [{reset.CurrentStatus}]");
-Say($"  Reason: {reset.Reason}");
-Console.WriteLine();
-
-// Normal transitions resume after reset
-Say("  Retry Assign after Reset:");
-await Do(guardedMachine, t4, TicketTransition.Assign);  // ?
-
-Console.WriteLine();
-Say("--------------------------------------------------------------");
-Say("  Done.");
-Say("--------------------------------------------------------------");
-
-// -- Helpers --------------------------------------------------------------
-
-static async Task Do(TicketMachine m, TicketContext ctx, TicketTransition t)
+// StateMachineChannelWorker: the generic bridge â€” zero hand-written code
+var worker = new StateMachineChannelWorker<CarContext, EngineState, EngineTransition, EngineNotification>(engine)
 {
-    var r = await m.TransitionAsync(ctx, t);
-    if (r.Success)
-        Console.WriteLine($"  ?  {r.PreviousState,-12} --[{t}]--?  {r.CurrentState}");
-    else
-        Console.WriteLine($"  ?  {r.PreviousState,-12} --[{t}]--?  blocked  ({r.ErrorMessage})");
+    OnTransition = (ctx, transition, result) =>
+    {
+        // Report to console
+        if (result.Success)
+            DemoConsole.Say($"  âœ“  {result.PreviousState,-10} --[{transition}]-->  {result.CurrentState,-10}  (car: {ctx.Id})");
+        else
+            DemoConsole.Say($"  âœ—  {result.PreviousState,-10} --[{transition}]-->  blocked     ({result.ErrorMessage})");
+
+        // Feed the trip reporter
+        reporter.OnTransition(ctx, transition, result);
+    }
+};
+
+await reader.ConfigureAsync(new ChannelConfig(), worker);
+await writer.ConfigureAsync(new ChannelConfig());
+
+var car1 = new CarContext { Id = "CAR-001", Model = "Model S", FuelLevel = 85.0 };
+DemoConsole.Say($"  Car: {car1.Id} ({car1.Model}), fuel: {car1.FuelLevel}%");
+Console.WriteLine();
+
+// Parked â†’ Running â†’ Moving â†’ Idle â†’ Parked (full trip)
+await Send(writer, car1, EngineTransition.Start);
+await Send(writer, car1, EngineTransition.Drive);
+await Task.Delay(50); // simulate driving
+await Send(writer, car1, EngineTransition.Halt);
+await Send(writer, car1, EngineTransition.Park);
+
+Console.WriteLine();
+reporter.PrintReport(car1.Id);
+
+// --------------------------------------------------------------------------
+//  2. Guard condition â€” cannot Drive without fuel
+// --------------------------------------------------------------------------
+DemoConsole.Section("2. Guard condition â€” fuel required to Drive");
+
+var car2 = new CarContext { Id = "CAR-002", Model = "Civic", FuelLevel = 0.0 };
+DemoConsole.Say($"  Car: {car2.Id} ({car2.Model}), fuel: {car2.FuelLevel}%");
+Console.WriteLine();
+
+await Send(writer, car2, EngineTransition.Start);   // âœ“ engine can start
+await Send(writer, car2, EngineTransition.Drive);    // âœ— no fuel â€” guard blocks
+
+Console.WriteLine();
+DemoConsole.Say("  Refueling...");
+car2 = car2 with { FuelLevel = 50.0 };
+DemoConsole.Say($"  Fuel now: {car2.FuelLevel}%");
+await Send(writer, car2, EngineTransition.Drive);    // âœ“ guard passes
+
+await Send(writer, car2, EngineTransition.Halt);
+await Send(writer, car2, EngineTransition.Park);
+
+// --------------------------------------------------------------------------
+//  3. Fault / Reset â€” engine fault blocks all transitions
+// --------------------------------------------------------------------------
+DemoConsole.Section("3. Fault / Reset â€” engine malfunction");
+
+// Fresh machine for fault isolation
+var faultLock = new InMemoryDistributedLock();
+var faultEngine = new CarEngineStateMachine(faultLock, faultLock, options);
+var car3 = new CarContext { Id = "CAR-003", Model = "Corolla", FuelLevel = 70.0 };
+
+DemoConsole.Say($"  Car: {car3.Id}, status: {faultEngine.OperationalStatus}");
+Console.WriteLine();
+
+var fault = await faultEngine.FaultAsync(car3, "Check engine light â€” cylinder misfire detected");
+DemoConsole.Say($"  FaultAsync â†’ [{fault.CurrentStatus}]");
+DemoConsole.Say($"  Reason: {fault.Reason}");
+Console.WriteLine();
+
+DemoConsole.Say("  Attempting Start while Faulted:");
+var blocked = await faultEngine.TransitionAsync(car3, EngineTransition.Start);
+DemoConsole.Say($"  âœ—  {blocked.PreviousState,-10} --[Start]-->  blocked  ({blocked.ErrorMessage})");
+Console.WriteLine();
+
+var reset = await faultEngine.ResetAsync(car3, "Cylinder repaired â€” diagnostics passed");
+DemoConsole.Say($"  ResetAsync â†’ [{reset.CurrentStatus}]");
+Console.WriteLine();
+
+DemoConsole.Say("  Retry Start after Reset:");
+var ok = await faultEngine.TransitionAsync(car3, EngineTransition.Start);
+DemoConsole.Say($"  âœ“  {ok.PreviousState,-10} --[Start]-->  {ok.CurrentState}");
+
+// --------------------------------------------------------------------------
+//  4. MQTT-driven â€” same FSM, real broker (opt-in via --mqtt)
+// --------------------------------------------------------------------------
+if (enableMqtt)
+    await MqttSection.RunAsync(options);
+
+// -- Cleanup --------------------------------------------------------------
+await reader.DisposeAsync();
+await writer.DisposeAsync();
+
+Console.WriteLine();
+DemoConsole.Say("--------------------------------------------------------------");
+DemoConsole.Say("  Done.");
+DemoConsole.Say("--------------------------------------------------------------");
+
+// =========================================================================
+//  Helpers
+// =========================================================================
+
+static async Task Send(InMemoryChannelWriter<EngineTransition> w, CarContext ctx, EngineTransition t)
+{
+    var result = await w.SendAsync(ctx, t);
+    if (!result.Success)
+        Console.WriteLine($"  âœ—  SendAsync({t}) failed: {result.ErrorMessage}");
+
+    // Small delay so the background processor can drain
+    await Task.Delay(20);
 }
 
-static void Section(string title)
+// =========================================================================
+//  Domain
+// =========================================================================
+
+enum EngineState { Parked, Running, Idle, Moving }
+enum EngineTransition { Start, Drive, Halt, Park, Resume }
+enum EngineNotification { OverSpeed }
+
+// -- Context â€” plain IBaseContext, no IMqttContext, works everywhere -------
+
+sealed record CarContext : IBaseContext
 {
-    Console.WriteLine();
-    Console.ForegroundColor = ConsoleColor.Cyan;
-    Console.WriteLine($"-- {title}");
-    Console.ResetColor();
-    Console.WriteLine();
-}
-
-static void Say(string msg) => Console.WriteLine(msg);
-
-static void Dim(string msg)
-{
-    Console.ForegroundColor = ConsoleColor.DarkGray;
-    Console.WriteLine(msg);
-    Console.ResetColor();
-}
-
-static void PrintBanner()
-{
-    Console.WriteLine("--------------------------------------------------------------");
-    Console.WriteLine("  Ananke — StateMachineDemo  |  Support Ticket Lifecycle");
-    Console.WriteLine();
-    Console.WriteLine("   Open --[Assign]--? InProgress --[Resolve]--? Resolved");
-    Console.WriteLine("    ?                                            ¦    ¦");
-    Console.WriteLine("    ¦                                        [Reopen] ¦");
-    Console.WriteLine("    +--------------------------------------------+ [Close]");
-    Console.WriteLine("                                                       ¦");
-    Console.WriteLine("                                                    Closed");
-    Console.WriteLine("--------------------------------------------------------------");
-}
-
-// -- Domain enums ---------------------------------------------------------
-
-enum TicketState      { Open, InProgress, Resolved, Closed }
-enum TicketTransition { Assign, Resolve, Reopen, Close }
-enum TicketNotification { Escalated }
-
-// -- Context --------------------------------------------------------------
-
-sealed class TicketContext(string id) : IBaseContext
-{
-    public string Id { get; } = id;
-    public string Title { get; init; } = string.Empty;
-}
-
-// -- State machine ---------------------------------------------------------
-
-sealed class TicketMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
-    : AbstractStateMachine<TicketContext, TicketState, TicketTransition, TicketNotification>(
-        TicketState.Open, locker, store, options)
-{
-    /// <summary>
-    /// Guard condition for <see cref="TicketTransition.Resolve"/>.
-    /// Must be non-empty before a ticket can be marked resolved.
-    /// </summary>
-    public string? ResolutionNote { get; set; }
-
-    protected override Action<ITransitionBuilder<TicketState, TicketTransition>> Transitions => b => b
-        // -- Valid transitions -------------------------------------------------
-        .From(TicketState.Open)
-            .On(TicketTransition.Assign).To(TicketState.InProgress)
-        .From(TicketState.InProgress)
-            .On(TicketTransition.Resolve).To(TicketState.Resolved)
-                .When(() => !string.IsNullOrWhiteSpace(ResolutionNote))
-        .From(TicketState.Resolved)
-            .On(TicketTransition.Reopen).To(TicketState.Open)
-        .From(TicketState.Resolved)
-            .On(TicketTransition.Close).To(TicketState.Closed)
-        // -- Lifecycle hooks on InProgress -------------------------------------
-        .State(TicketState.InProgress)
-            .OnEnter(async () => Console.WriteLine("    ? [OnEnter] InProgress — work timer started"))
-            .OnExit(async () =>  Console.WriteLine("    ? [OnExit]  InProgress — work timer stopped"));
-
-    public override Task<TransitionResult<TicketState>> TransitionAsync(
-        TicketContext ctx, TicketTransition t) =>
-        InternalTransitionAsync(ctx, t);
-
-    public override Task NotifyAsync(TicketContext ctx, TicketNotification n) =>
-        Task.CompletedTask;
+    public required string Id { get; init; }
+    public string Model { get; init; } = string.Empty;
+    public double FuelLevel { get; init; }
 }
 

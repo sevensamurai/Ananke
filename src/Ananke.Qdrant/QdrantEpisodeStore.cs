@@ -33,6 +33,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
     private const string CompletedAtKey = "completed_at";
     private const string StepsKey = "steps";
     private const string MetadataKey = "metadata";
+    private const string EntityIdKey = "entity_id";
 
     // RFC 4122 §4.3 — predefined DNS namespace UUID used for deterministic v5 UUID generation
     private static readonly Guid UuidNamespaceDns = new("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
@@ -94,13 +95,19 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<Episode>> BrowseAsync(
-        int offset, int limit, CancellationToken ct = default)
+        int offset, int limit, string? entityId = null,
+        CancellationToken ct = default)
     {
         await EnsureCollectionAsync(ct);
 
-        // Scroll through all episodes; client-side sort by CompletedAt desc
+        Filter? filter = entityId is not null
+            ? new Filter { Must = { Conditions.MatchKeyword(EntityIdKey, entityId) } }
+            : null;
+
+        // Scroll through episodes; client-side sort by CompletedAt desc
         var result = await _client.ScrollAsync(
             _collectionName,
+            filter: filter,
             limit: (uint)(offset + limit),
             payloadSelector: true,
             cancellationToken: ct);
@@ -116,7 +123,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
     /// <inheritdoc />
     public async Task<IReadOnlyList<Episode>> BrowseByOutcomeAsync(
         float minReward, float maxReward, int offset, int limit,
-        CancellationToken ct = default)
+        string? entityId = null, CancellationToken ct = default)
     {
         await EnsureCollectionAsync(ct);
 
@@ -132,6 +139,9 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
                     })
             }
         };
+
+        if (entityId is not null)
+            filter.Must.Add(Conditions.MatchKeyword(EntityIdKey, entityId));
 
         var result = await _client.ScrollAsync(
             _collectionName,
@@ -180,6 +190,10 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, StartedAtKey,
                     PayloadSchemaType.Integer, cancellationToken: ct);
+
+                await _client.CreatePayloadIndexAsync(
+                    _collectionName, EntityIdKey,
+                    PayloadSchemaType.Keyword, cancellationToken: ct);
             }
 
             _initialized = true;
@@ -202,6 +216,9 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
             [StepsKey] = JsonSerializer.Serialize(episode.Steps, JsonOptions),
             [MetadataKey] = JsonSerializer.Serialize(episode.Metadata, JsonOptions)
         };
+
+        if (episode.EntityId is not null)
+            payload[EntityIdKey] = episode.EntityId;
 
         return new PointStruct
         {
@@ -235,7 +252,11 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
             TerminalReward = (float)GetDouble(payload, TerminalRewardKey),
             StartedAt = DateTimeOffset.FromUnixTimeSeconds(GetLong(payload, StartedAtKey)),
             CompletedAt = DateTimeOffset.FromUnixTimeSeconds(GetLong(payload, CompletedAtKey)),
-            Metadata = metadata
+            Metadata = metadata,
+            EntityId = payload.TryGetValue(EntityIdKey, out var eid)
+                && eid.KindCase == Value.KindOneofCase.StringValue
+                && eid.StringValue.Length > 0
+                ? eid.StringValue : null
         };
     }
 

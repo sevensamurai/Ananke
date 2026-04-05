@@ -36,7 +36,7 @@ using Ananke.Orchestration.Extensions;
 
 // Register everything via DI
 services.AddStateMachine();
-services.AddFlowOrchestration(o => o.UseCheckpointing());
+services.AddWorkflowOrchestration(o => o.UseCheckpointing());
 
 // Optional infrastructure — call order doesn't matter
 services.AddRedis(c => { c.Host = "localhost"; });

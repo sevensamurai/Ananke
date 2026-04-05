@@ -15,6 +15,12 @@ public static class Workflow
 
     public static string End => EndMarker;
 
+    /// <summary>
+    /// Type-safe sentinel for workflow termination. Equivalent to <see cref="End"/>
+    /// but returns a <see cref="JobRef"/> for use with the type-safe overloads.
+    /// </summary>
+    public static JobRef EndRef => new(EndMarker);
+
     public static IRouter<TState> Decide<TState>(Func<TState, string> route) =>
         new DelegateRouter<TState>(route);
 
@@ -47,6 +53,18 @@ public static class Workflow
     /// Creates a fork target with explicit cancellation mode for parallel execution.
     /// </summary>
     public static ForkTarget Fork(ForkMode mode, params string[] targets) => new(targets, mode);
+
+    /// <summary>
+    /// Creates a fork target for parallel execution using type-safe <see cref="JobRef"/> references.
+    /// </summary>
+    public static ForkTarget Fork(params JobRef[] targets) =>
+        new(targets.Select(t => t.Name).ToArray());
+
+    /// <summary>
+    /// Creates a fork target with explicit cancellation mode using type-safe <see cref="JobRef"/> references.
+    /// </summary>
+    public static ForkTarget Fork(ForkMode mode, params JobRef[] targets) =>
+        new(targets.Select(t => t.Name).ToArray(), mode);
 }
 
 /// <summary>
@@ -66,9 +84,11 @@ public sealed class Workflow<TState>
     private readonly List<Connection> _connections = [];
     private readonly Dictionary<string, Func<TState, Task>?> _onEnterActions = [];
     private readonly Dictionary<string, Func<TState, Task>?> _onExitActions = [];
+    private readonly Dictionary<string, Func<TState, Exception, Task>> _onFaultActions = [];
     private readonly Dictionary<string, TimeSpan> _timeouts = [];
     private readonly Dictionary<string, InterruptMode> _interrupts = [];
     private readonly List<JoinDescriptor<TState>> _joins = [];
+    private Func<TState, string, Exception, Task>? _onError;
     private string? _entryJob;
     private IWorkflowRunner? _runner;
     private ICheckpointStore? _checkpointStore;
@@ -111,6 +131,17 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>
+    /// Registers a delegate job and outputs a type-safe <see cref="JobRef"/> for use
+    /// in connection methods like <see cref="Then(JobRef, JobRef)"/> and <see cref="Chain(JobRef[])"/>.
+    /// </summary>
+    public Workflow<TState> Job(string name, Func<TState, CancellationToken, Task<TState>> execute, out JobRef jobRef)
+    {
+        Job(name, execute);
+        jobRef = new JobRef(name);
+        return this;
+    }
+
     public Workflow<TState> Job(string name, IJob<TState> job)
     {
         ThrowIfFrozen();
@@ -128,6 +159,17 @@ public sealed class Workflow<TState>
             Job = job
         };
 
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a named job and outputs a type-safe <see cref="JobRef"/> for use
+    /// in connection methods like <see cref="Then(JobRef, JobRef)"/> and <see cref="Chain(JobRef[])"/>.
+    /// </summary>
+    public Workflow<TState> Job(string name, IJob<TState> job, out JobRef jobRef)
+    {
+        Job(name, job);
+        jobRef = new JobRef(name);
         return this;
     }
 
@@ -164,6 +206,20 @@ public sealed class Workflow<TState>
         _connections.Add(new ForkConnection { From = from, Targets = fork.Targets, Mode = fork.Mode });
         return this;
     }
+
+    // ── JobRef overloads ────────────────────────────────────────────
+
+    /// <summary>Connects two jobs using type-safe <see cref="JobRef"/> references.</summary>
+    public Workflow<TState> Then(JobRef from, JobRef to) =>
+        Then(from.Name, to.Name);
+
+    /// <summary>Connects a job to a router using a type-safe <see cref="JobRef"/> reference.</summary>
+    public Workflow<TState> Then(JobRef from, IRouter<TState> router) =>
+        Then(from.Name, router);
+
+    /// <summary>Connects a job to a fork target using a type-safe <see cref="JobRef"/> reference.</summary>
+    public Workflow<TState> Then(JobRef from, ForkTarget fork) =>
+        Then(from.Name, fork);
 
     /// <summary>
     /// Creates a loop that cycles from <paramref name="from"/> back to
@@ -213,6 +269,17 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
+    /// Creates a loop using type-safe <see cref="JobRef"/> references.
+    /// </summary>
+    public Workflow<TState> Loop(
+        JobRef from,
+        JobRef loopTarget,
+        JobRef exitTarget,
+        Func<TState, bool> until,
+        int maxIterations = 10) =>
+        Loop(from.Name, loopTarget.Name, exitTarget.Name, until, maxIterations);
+
+    /// <summary>
     /// Defines a fan-in point where parallel branches converge. The <paramref name="merge"/>
     /// function reconciles the final state from each branch into a single state.
     /// For correct results, <typeparamref name="TState"/> should be immutable (e.g. a record).
@@ -230,6 +297,12 @@ public sealed class Workflow<TState>
         _joins.Add(new JoinDescriptor<TState>(sources, target, merge));
         return this;
     }
+
+    /// <summary>
+    /// Defines a fan-in point using type-safe <see cref="JobRef"/> references.
+    /// </summary>
+    public Workflow<TState> Join(JobRef[] sources, JobRef target, Func<TState[], TState> merge) =>
+        Join(sources.Select(s => s.Name).ToArray(), target.Name, merge);
 
     /// <summary>
     /// Registers a nested workflow as a job. The <paramref name="mapIn"/> function
@@ -253,6 +326,22 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
+    /// Registers a nested workflow as a job and outputs a type-safe <see cref="JobRef"/>.
+    /// </summary>
+    public Workflow<TState> SubFlow<TChild>(
+        string name,
+        Workflow<TChild> innerWorkflow,
+        Func<TState, TChild> mapIn,
+        Func<TState, TChild, TState> mapOut,
+        out JobRef jobRef,
+        int maxDepth = 5)
+    {
+        SubFlow(name, innerWorkflow, mapIn, mapOut, maxDepth);
+        jobRef = new JobRef(name);
+        return this;
+    }
+
+    /// <summary>
     /// Chains one or more jobs together in a linear sequence.
     /// </summary>
     /// <param name="jobNames"></param>
@@ -273,6 +362,13 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>
+    /// Chains one or more jobs together in a linear sequence using type-safe <see cref="JobRef"/> references.
+    /// The last element may be <see cref="Workflow.EndRef"/> to terminate the workflow.
+    /// </summary>
+    public Workflow<TState> Chain(params JobRef[] jobRefs) =>
+        Chain(jobRefs.Select(r => r.Name).ToArray());
+
     public Workflow<TState> OnEnter(string jobName, Func<TState, Task> action)
     {
         ThrowIfFrozen();
@@ -281,11 +377,55 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>Registers an on-enter lifecycle action using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> OnEnter(JobRef jobRef, Func<TState, Task> action) =>
+        OnEnter(jobRef.Name, action);
+
     public Workflow<TState> OnExit(string jobName, Func<TState, Task> action)
     {
         ThrowIfFrozen();
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         _onExitActions[jobName] = action;
+        return this;
+    }
+
+    /// <summary>Registers an on-exit lifecycle action using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> OnExit(JobRef jobRef, Func<TState, Task> action) =>
+        OnExit(jobRef.Name, action);
+
+    /// <summary>
+    /// Registers a per-job error handler invoked when the specified job throws.
+    /// The handler runs before the workflow terminates and receives the current state
+    /// and the exception. Use for cleanup, alerting, or logging.
+    /// </summary>
+    /// <param name="jobName">The job to attach the fault handler to.</param>
+    /// <param name="handler">Async callback receiving the state and the thrown exception.</param>
+    public Workflow<TState> OnFault(string jobName, Func<TState, Exception, Task> handler)
+    {
+        ThrowIfFrozen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+        ArgumentNullException.ThrowIfNull(handler);
+        _onFaultActions[jobName] = handler;
+        return this;
+    }
+
+    /// <summary>Registers a per-job fault handler using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> OnFault(JobRef jobRef, Func<TState, Exception, Task> handler) =>
+        OnFault(jobRef.Name, handler);
+
+    /// <summary>
+    /// Registers a workflow-level error handler invoked when <em>any</em> job throws
+    /// an unhandled exception. The handler runs after any per-job <see cref="OnFault(string, Func{TState, Exception, Task})"/>
+    /// handler and before the workflow terminates.
+    /// </summary>
+    /// <param name="handler">
+    /// Async callback receiving the current state, the faulting job name, and the exception.
+    /// </param>
+    public Workflow<TState> OnError(Func<TState, string, Exception, Task> handler)
+    {
+        ThrowIfFrozen();
+        ArgumentNullException.ThrowIfNull(handler);
+        _onError = handler;
         return this;
     }
 
@@ -297,6 +437,10 @@ public sealed class Workflow<TState>
         _timeouts[jobName] = timeout;
         return this;
     }
+
+    /// <summary>Sets a job timeout using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> Timeout(JobRef jobRef, TimeSpan timeout) =>
+        Timeout(jobRef.Name, timeout);
 
     /// <summary>
     /// Pauses workflow execution <em>before</em> the specified job runs.
@@ -312,6 +456,10 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>Pauses workflow execution <em>before</em> the specified job using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> InterruptBefore(JobRef jobRef) =>
+        InterruptBefore(jobRef.Name);
+
     /// <summary>
     /// Pauses workflow execution <em>after</em> the specified job completes.
     /// The execution is checkpointed with <see cref="ExecutionStatus.Interrupted"/> status
@@ -325,6 +473,10 @@ public sealed class Workflow<TState>
         _interrupts[jobName] = InterruptMode.After;
         return this;
     }
+
+    /// <summary>Pauses workflow execution <em>after</em> the specified job using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> InterruptAfter(JobRef jobRef) =>
+        InterruptAfter(jobRef.Name);
 
     public Workflow<TState> UseRunner(IWorkflowRunner runner)
     {
@@ -374,13 +526,51 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
-    /// Sets a cost budget for the workflow. If cumulative estimated cost exceeds
+    /// Sets a cost budget for the workflow, using model-specific rates from
+    /// <see cref="Agents.ModelProfile"/> for per-call costing. Ideal for multi-model
+    /// workflows where each model has different cost rates (including zero-cost local models).
+    /// If cumulative estimated cost exceeds <paramref name="maxCost"/>, the workflow
+    /// terminates with <see cref="ExecutionStatus.BudgetExceeded"/>.
+    /// </summary>
+    /// <param name="maxCost">Maximum allowed estimated cost.</param>
+    /// <example>
+    /// <code>
+    /// // Models provide their own cost rates via ModelProfile:
+    /// var router = new CapabilityModelRouter()
+    ///     .AddModel(new ModelProfile
+    ///     {
+    ///         Name = "gpt-4.1-mini", Model = miniModel,
+    ///         CostPer1KInputTokens = 0.0004m, CostPer1KOutputTokens = 0.0016m, ...
+    ///     })
+    ///     .AddModel(new ModelProfile
+    ///     {
+    ///         Name = "llama3.2:3b", Model = ollamaModel, // zero cost by default
+    ///         ...
+    ///     });
+    ///
+    /// workflow.WithBudget(maxCost: 0.50m);
+    /// </code>
+    /// </example>
+    public Workflow<TState> WithBudget(decimal maxCost)
+    {
+        ThrowIfFrozen();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxCost, 0);
+
+        _budget = new BudgetConfig { MaxCost = maxCost };
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a cost budget for the workflow with flat fallback cost rates.
+    /// These rates are used when model-specific rates are not available
+    /// (e.g. direct <c>IAgentModel</c> usage without
+    /// <see cref="Agents.ModelProfile"/>). If cumulative estimated cost exceeds
     /// <paramref name="maxCost"/>, the workflow terminates with
     /// <see cref="ExecutionStatus.BudgetExceeded"/>.
     /// </summary>
     /// <param name="maxCost">Maximum allowed estimated cost.</param>
-    /// <param name="costPer1KInputTokens">Cost per 1,000 input tokens.</param>
-    /// <param name="costPer1KOutputTokens">Cost per 1,000 output tokens.</param>
+    /// <param name="costPer1KInputTokens">Fallback cost per 1,000 input tokens.</param>
+    /// <param name="costPer1KOutputTokens">Fallback cost per 1,000 output tokens.</param>
     public Workflow<TState> WithBudget(
         decimal maxCost,
         decimal costPer1KInputTokens,
@@ -423,7 +613,7 @@ public sealed class Workflow<TState>
 
         ApplyLifecycleActions();
 
-        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins, _budget);
+        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins, _budget, _onError);
         _frozen = true;
         return _cachedDefinition;
     }
@@ -516,6 +706,13 @@ public sealed class Workflow<TState>
             if (!_jobs.TryGetValue(jobName, out var descriptor))
                 throw new InvalidOperationException($"OnExit references undefined job '{jobName}'.");
             _jobs[jobName] = descriptor with { OnExit = action };
+        }
+
+        foreach (var (jobName, handler) in _onFaultActions)
+        {
+            if (!_jobs.TryGetValue(jobName, out var descriptor))
+                throw new InvalidOperationException($"OnFault references undefined job '{jobName}'.");
+            _jobs[jobName] = descriptor with { OnFault = handler };
         }
 
         foreach (var (jobName, timeout) in _timeouts)

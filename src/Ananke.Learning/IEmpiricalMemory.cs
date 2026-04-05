@@ -61,11 +61,20 @@ public interface IEmpiricalMemory
     Task<EmpiricalEntry?> GetAsync(string entryId, CancellationToken ct = default);
 
     /// <summary>
-    /// Iterates entries in pages, optionally filtered by kind.
+    /// Iterates entries in pages, optionally filtered by kind and/or entity.
     /// Used by background processes for decay sweeps and exploration.
     /// </summary>
+    /// <param name="offset">Zero-based offset for paging.</param>
+    /// <param name="limit">Maximum number of entries to return.</param>
+    /// <param name="kind">When set, only entries of this kind are returned.</param>
+    /// <param name="entityId">
+    /// When set, only entries scoped to this entity are returned.
+    /// When <see langword="null"/>, all entries (entity-scoped and global) are returned.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
     Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
-        int offset, int limit, EmpiricalKind? kind = null, CancellationToken ct = default);
+        int offset, int limit, EmpiricalKind? kind = null,
+        string? entityId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Marks an entry as consolidated into a knowledge store document.

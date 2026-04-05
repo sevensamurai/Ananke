@@ -1,7 +1,5 @@
 using System.Runtime.CompilerServices;
 
-using Ananke.Abstractions.Agents;
-
 namespace Ananke.Orchestration.Agents;
 
 public sealed class ModelRouter : IModelRouter
@@ -47,22 +45,41 @@ public sealed class ModelRouter : IModelRouter
 public sealed class RoutedAgentModel : IStreamingAgentModel
 {
     private readonly IModelRouter _router;
+    private readonly IModelCostResolver? _costResolver;
 
     public RoutedAgentModel(IModelRouter router)
     {
         ArgumentNullException.ThrowIfNull(router);
         _router = router;
+        _costResolver = router as IModelCostResolver;
     }
 
-    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
-        _router.Select(request).GenerateAsync(request, ct);
+    public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
+    {
+        var response = await _router.Select(request).GenerateAsync(request, ct);
+        AccumulateCostIfAvailable(request, response);
+        return response;
+    }
 
     public IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(AgentRequest request, CancellationToken ct = default)
     {
         var model = _router.Select(request);
         return model is IStreamingAgentModel streaming
-            ? streaming.GenerateStreamAsync(request, ct)
+            ? WrapStreamForCost(streaming, request, ct)
             : BufferAsync(model, request, ct);
+    }
+
+    private async IAsyncEnumerable<AgentStreamChunk> WrapStreamForCost(
+        IStreamingAgentModel model,
+        AgentRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var chunk in model.GenerateStreamAsync(request, ct))
+        {
+            if (chunk.CompletedResponse is not null)
+                AccumulateCostIfAvailable(request, chunk.CompletedResponse);
+            yield return chunk;
+        }
     }
 
     private static async IAsyncEnumerable<AgentStreamChunk> BufferAsync(
@@ -74,6 +91,15 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         if (response.Text is not null)
             yield return new AgentStreamChunk { TextDelta = response.Text };
         yield return new AgentStreamChunk { CompletedResponse = response };
+    }
+
+    private void AccumulateCostIfAvailable(AgentRequest request, AgentResponse response)
+    {
+        if (_costResolver is null || response.Usage is null || TokenUsageCapture.Current.Value is null)
+            return;
+
+        var rates = _costResolver.ResolveCostRates(request);
+        TokenUsageCapture.Current.Value.AddCost(rates.EstimateCost(response.Usage));
     }
 }
 

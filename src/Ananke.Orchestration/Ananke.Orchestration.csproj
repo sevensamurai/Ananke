@@ -16,4 +16,18 @@
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- Bundle Roslyn analyzer into this package (analyzers must target netstandard2.0) -->
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Analyzers\Ananke.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="..\Ananke.Analyzers\bin\$(Configuration)\netstandard2.0\Ananke.Analyzers.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
 </Project>

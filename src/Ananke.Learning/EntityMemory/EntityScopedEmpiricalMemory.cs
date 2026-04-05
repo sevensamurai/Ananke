@@ -1,0 +1,45 @@
+namespace Ananke.Learning.EntityMemory;
+
+/// <summary>
+/// Decorator that scopes an <see cref="IEmpiricalMemory"/> to a specific entity
+/// by injecting <see cref="EmpiricalEntry.EntityId"/> on commits and adding entity
+/// filters on recall and browse operations.
+/// </summary>
+/// <param name="inner">The shared empirical memory store.</param>
+/// <param name="entityId">The entity to scope to.</param>
+public sealed class EntityScopedEmpiricalMemory(
+    IEmpiricalMemory inner, string entityId) : IEmpiricalMemory
+{
+    private readonly string _entityId = entityId;
+
+    /// <inheritdoc />
+    public Task<EmpiricalEntry> CommitAsync(EmpiricalEntry entry, CancellationToken ct = default) =>
+        inner.CommitAsync(entry with { EntityId = _entityId }, ct);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalMatch>> RecallAsync(
+        string situation, RecallOptions? options = null, CancellationToken ct = default) =>
+        inner.RecallAsync(situation, (options ?? new RecallOptions()) with { EntityId = _entityId }, ct);
+
+    /// <inheritdoc />
+    public Task ReinforceAsync(string entryId, Reinforcement reinforcement, CancellationToken ct = default) =>
+        inner.ReinforceAsync(entryId, reinforcement, ct);
+
+    /// <inheritdoc />
+    public Task ContradictAsync(string entryId, string reason, CancellationToken ct = default) =>
+        inner.ContradictAsync(entryId, reason, ct);
+
+    /// <inheritdoc />
+    public Task<EmpiricalEntry?> GetAsync(string entryId, CancellationToken ct = default) =>
+        inner.GetAsync(entryId, ct);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
+        int offset, int limit, EmpiricalKind? kind = null,
+        string? entityId = null, CancellationToken ct = default) =>
+        inner.BrowseAsync(offset, limit, kind, entityId ?? _entityId, ct);
+
+    /// <inheritdoc />
+    public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default) =>
+        inner.MarkConsolidatedAsync(entryId, knowledgeDocId, ct);
+}

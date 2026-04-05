@@ -92,10 +92,13 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
         lock (_writeLock)
         {
-            // Semantic dedup: search for a similar existing entry of the same kind
+            // Semantic dedup: search for a similar existing entry of the same kind and entity
             foreach (var (_, stored) in _entries)
             {
                 if (stored.Entry.Kind != entry.Kind)
+                    continue;
+
+                if (stored.Entry.EntityId != entry.EntityId)
                     continue;
 
                 var similarity = CosineSimilarity(embedding.Span, stored.Embedding.Span);
@@ -328,11 +331,14 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
     /// <inheritdoc />
     public Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
-        int offset, int limit, EmpiricalKind? kind = null, CancellationToken ct = default)
+        int offset, int limit, EmpiricalKind? kind = null,
+        string? entityId = null, CancellationToken ct = default)
     {
         var query = _entries.Values.Select(s => s.Entry).AsEnumerable();
         if (kind is not null)
             query = query.Where(e => e.Kind == kind.Value);
+        if (entityId is not null)
+            query = query.Where(e => e.EntityId == entityId);
 
         IReadOnlyList<EmpiricalEntry> result = query
             .Skip(offset)
@@ -368,6 +374,14 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     {
         if (entry.ConsolidatedInto is not null)
             return false;
+
+        if (options.EntityId is not null)
+        {
+            var isMatch = entry.EntityId == options.EntityId;
+            var isGlobal = entry.EntityId is null && options.IncludeGlobal;
+            if (!isMatch && !isGlobal)
+                return false;
+        }
 
         if (options.Kind is not null && entry.Kind != options.Kind)
             return false;

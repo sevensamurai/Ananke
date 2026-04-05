@@ -18,7 +18,7 @@ namespace Ananke.Orchestration.Execution;
 public sealed partial class WorkflowRunner : IWorkflowRunner
 {
     private readonly ICheckpointStore? _checkpointStore;
-    private readonly IReadOnlyList<IJobMiddleware<object>> _middlewares;
+    private readonly IReadOnlyList<IWorkflowJobMiddleware<object>> _middlewares;
     private readonly IWorkflowTracer _tracer;
     private readonly bool _storeCompletions;
     private readonly ILogger<WorkflowRunner> _logger;
@@ -26,7 +26,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
     public WorkflowRunner(
         ICheckpointStore? checkpointStore = null,
-        IEnumerable<IJobMiddleware<object>>? middlewares = null,
+        IEnumerable<IWorkflowJobMiddleware<object>>? middlewares = null,
         IWorkflowTracer? tracer = null,
         bool storeCompletions = true,
         ILoggerFactory? loggerFactory = null,
@@ -299,6 +299,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     jobSpan.RecordError(timeoutEx);
                     execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, timeoutMsg));
                     LogJobTimedOut(currentJobName, descriptor.Timeout!.Value.TotalSeconds);
+                    await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, execution.State, timeoutEx);
                     throw timeoutEx;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -307,6 +308,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     jobSpan.RecordError(ex);
                     execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, ex.Message));
                     LogJobFailed(ex, currentJobName, ex.Message);
+                    await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, execution.State, ex);
                     throw;
                 }
 
@@ -324,7 +326,11 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     if (definition.Budget is { } budget)
                     {
-                        execution.EstimatedCost = budget.EstimateCost(execution.CumulativeUsage);
+                        // Prefer model-specific per-call cost (from CapabilityModelRouter profiles).
+                        // Falls back to flat BudgetConfig rates when model cost isn't available.
+                        execution.EstimatedCost += usageAccumulator.HasModelBasedCost
+                            ? usageAccumulator.AccumulatedCost
+                            : budget.EstimateCost(jobUsage);
 
                         if (execution.EstimatedCost > budget.MaxCost)
                         {
@@ -506,8 +512,47 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         return await pipeline();
     }
 
+    /// <summary>
+    /// Invokes per-job <see cref="JobDescriptor{TState}.OnFault"/> and workflow-level
+    /// <see cref="WorkflowDefinition{TState}.OnError"/> handlers (in that order).
+    /// Exceptions thrown by handlers are logged but do not replace the original fault.
+    /// </summary>
+    private async Task InvokeFaultHandlersAsync<TState>(
+        JobDescriptor<TState> descriptor,
+        WorkflowDefinition<TState> definition,
+        string jobName,
+        TState state,
+        Exception exception)
+    {
+        if (descriptor.OnFault is not null)
+        {
+            try
+            {
+                await descriptor.OnFault(state, exception);
+            }
+            catch (Exception handlerEx)
+            {
+                _logger.LogError(handlerEx,
+                    "OnFault handler for job '{JobName}' threw an exception", jobName);
+            }
+        }
+
+        if (definition.OnError is not null)
+        {
+            try
+            {
+                await definition.OnError(state, jobName, exception);
+            }
+            catch (Exception handlerEx)
+            {
+                _logger.LogError(handlerEx,
+                    "OnError handler threw an exception for job '{JobName}'", jobName);
+            }
+        }
+    }
+
     private static async Task<TState> InvokeMiddlewareAsync<TState>(
-        IJobMiddleware<object> middleware,
+        IWorkflowJobMiddleware<object> middleware,
         string jobName,
         TState state,
         Func<Task<TState>> next,

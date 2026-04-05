@@ -217,7 +217,7 @@ public class WorkflowDiagramExtensionsTests
 
     private sealed class SimpleRouter : IRouter<ScaffoldState>
     {
-        public Task<string> RouteAsync(ScaffoldState state) =>
+        public Task<string> RouteAsync(ScaffoldState state, CancellationToken ct) =>
             Task.FromResult(state.Value >= 5 ? "high" : "low");
     }
 }

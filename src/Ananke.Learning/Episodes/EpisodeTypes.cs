@@ -25,6 +25,12 @@ public sealed record Episode
     /// <summary>Optional metadata (e.g. opponent, move count, domain context).</summary>
     public IReadOnlyDictionary<string, string> Metadata { get; init; }
         = new Dictionary<string, string>();
+
+    /// <summary>
+    /// The entity this episode belongs to, or <see langword="null"/>
+    /// for global/unscoped episodes.
+    /// </summary>
+    public string? EntityId { get; init; }
 }
 
 /// <summary>
