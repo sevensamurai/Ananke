@@ -6,7 +6,7 @@ namespace Ananke.Learning.Skills;
 /// <summary>
 /// Default <see cref="ISkillPackager"/> that streams entries through
 /// <see cref="ISkillPackageWriter"/> and <see cref="ISkillPackageReader"/>.
-/// Pages through <see cref="IEmpiricalMemory.BrowseAsync"/> on export,
+/// Pages through <see cref="IEmpiricalMemory.BrowseAsync(int, int, EmpiricalKind?, string?, CancellationToken)"/> on export,
 /// applying quality gates per entry.
 /// </summary>
 public sealed class SkillPackager : ISkillPackager

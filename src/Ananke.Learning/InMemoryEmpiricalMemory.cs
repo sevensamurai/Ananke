@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Catalog;
 using Ananke.Orchestration.Knowledge.Embeddings;
@@ -349,6 +350,29 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
+        BrowseOptions options, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        IReadOnlyList<EmpiricalEntry> result = ApplyBrowseFilters(options)
+            .Skip(options.Offset)
+            .Take(options.Limit)
+            .ToList();
+
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc />
+    public Task<int> CountAsync(BrowseOptions? options = null, CancellationToken ct = default)
+    {
+        if (options is null)
+            return Task.FromResult(_entries.Count);
+
+        return Task.FromResult(ApplyBrowseFilters(options).Count());
+    }
+
+    /// <inheritdoc />
     public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
@@ -399,6 +423,27 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         }
 
         return true;
+    }
+
+    private IEnumerable<EmpiricalEntry> ApplyBrowseFilters(BrowseOptions options)
+    {
+        var query = _entries.Values.Select(s => s.Entry).AsEnumerable();
+
+        if (options.Kind is not null)
+            query = query.Where(e => e.Kind == options.Kind.Value);
+        if (options.EntityId is not null)
+            query = query.Where(e => e.EntityId == options.EntityId);
+        if (options.MinConfidence > 0)
+            query = query.Where(e => e.Confidence >= options.MinConfidence);
+        if (options.ExcludeConsolidated)
+            query = query.Where(e => e.ConsolidatedInto is null);
+        if (options.RequiredTags is { Count: > 0 })
+        {
+            foreach (var tag in options.RequiredTags)
+                query = query.Where(e => e.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return query;
     }
 
     private static float CosineSimilarity(ReadOnlySpan<float> a, ReadOnlySpan<float> b)

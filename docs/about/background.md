@@ -1,18 +1,3 @@
-<p align="center">
-  <img src="ananke-creation.png" alt="Ananke — Stability Before Creation" width="680" />
-</p>
-
-<p align="center">
-  <em>"Even the gods bowed to Ananke, for she alone could not be moved."</em><br/>
-  — Adapted from Aeschylus & Plato
-</p>
-
-<p align="center">
-  <a href="https://www.nuget.org/packages/Ananke"><img src="https://img.shields.io/nuget/v/Ananke.svg?label=Ananke&color=5B4FCF" alt="NuGet" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
-  <img src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10" />
-</p>
-
 ## Background
 
 In Greek cosmology, **Ananke** (Ἀνάγκη) is the primordial goddess of necessity,

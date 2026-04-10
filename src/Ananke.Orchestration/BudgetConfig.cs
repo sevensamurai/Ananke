@@ -1,3 +1,5 @@
+using Ananke.Abstractions.Agents;
+
 namespace Ananke.Orchestration;
 
 /// <summary>
@@ -10,8 +12,8 @@ namespace Ananke.Orchestration;
 /// <remarks>
 /// <para>
 /// <b>Multi-model workflows:</b> When models are selected via
-/// <see cref="Agents.CapabilityModelRouter"/>, cost is computed per-call from the
-/// selected <see cref="Agents.ModelProfile"/>'s rates. The flat rates on this class
+/// <see cref="Agents.Routing.CapabilityModelRouter"/>, cost is computed per-call from the
+/// selected <see cref="Agents.Routing.ModelProfile"/>'s rates. The flat rates on this class
 /// serve as a fallback for models without profile cost data.
 /// </para>
 /// <para>
@@ -45,7 +47,7 @@ public sealed record BudgetConfig
     /// Calculates the estimated cost for the given <paramref name="usage"/> using
     /// the flat fallback rates on this config.
     /// </summary>
-    public decimal EstimateCost(Agents.TokenUsage usage) =>
+    public decimal EstimateCost(TokenUsage usage) =>
         (usage.InputTokens / 1000m * CostPer1KInputTokens) +
         (usage.OutputTokens / 1000m * CostPer1KOutputTokens);
 }

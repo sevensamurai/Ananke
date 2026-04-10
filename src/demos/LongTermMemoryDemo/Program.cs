@@ -1,6 +1,9 @@
 using Ananke.Documents;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
+using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Documents;
 using Ananke.Orchestration.Knowledge.Catalog;
@@ -17,7 +20,7 @@ using System.Text;
 
 
 // ---------------------------------------------------------------------
-//  LongTermMemoryDemo — end-to-end knowledge pipeline:
+//  LongTermMemoryDemo ï¿½ end-to-end knowledge pipeline:
 //    1. Extract a local PDF into Markdown (PdfExtractor)
 //    2. Chunk and embed into a knowledge store (in-memory or Qdrant)
 //    3. Optionally maintain a knowledge catalog with LLM-enriched metadata
@@ -54,7 +57,7 @@ var modelName = config["OpenAI:Model"] ?? "gpt-4.1-mini";
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.WriteLine("-----------------------------------------------------------");
-Console.WriteLine("  Ananke — Long-Term Memory Demo");
+Console.WriteLine("  Ananke ï¿½ Long-Term Memory Demo");
 Console.WriteLine($"  Store: {(useQdrant ? "Qdrant (localhost:6334)" : "In-Memory")}");
 if (useCatalog)
     Console.WriteLine("  Catalog: Enabled (LLM-enriched keywords + time decay)");
@@ -197,7 +200,7 @@ if (catalog is not null)
 var systemPrompt = """
     You are a senior software engineering assistant. You have access to a curated 
     knowledge base of reference materials. ALWAYS use search_knowledge to ground 
-    your answers when the question relates to any previously indexed document — 
+    your answers when the question relates to any previously indexed document ï¿½ 
     do not rely on summaries or prior tool results alone. For general topics 
     outside the knowledge base, answer from your own expertise. When asked to 
     index or import a URL, use the process_external_url tool.

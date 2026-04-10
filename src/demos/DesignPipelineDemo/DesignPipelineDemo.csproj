@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Design\Ananke.Design.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
   </ItemGroup>

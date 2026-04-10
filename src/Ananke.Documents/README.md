@@ -56,7 +56,7 @@ The same processor works from agent tool calls, background jobs, admin scripts, 
 
 ## Requirements
 
-- `Ananke.Orchestration` (transitive) — provides `IDocumentExtractor`, `DocumentProcessor`, `IKnowledgeStore`, `SlidingWindowChunker`
+- `Ananke.Orchestration.Knowledge` (transitive) — provides `IDocumentExtractor`, `DocumentProcessor`, `IKnowledgeStore`, `SlidingWindowChunker`
 - `PdfPig` ≥ 0.1.13 (transitive)
 - `Markdig` ≥ 0.40.0 (transitive)
 

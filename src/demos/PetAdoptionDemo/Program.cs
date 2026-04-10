@@ -6,6 +6,7 @@ using Ananke.AspNetCore.Sessions;
 using Ananke.MQTT;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Abstractions.Memory;
 using Ananke.Redis;

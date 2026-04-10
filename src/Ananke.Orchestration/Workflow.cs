@@ -527,7 +527,7 @@ public sealed class Workflow<TState>
 
     /// <summary>
     /// Sets a cost budget for the workflow, using model-specific rates from
-    /// <see cref="Agents.ModelProfile"/> for per-call costing. Ideal for multi-model
+    /// <see cref="Agents.Routing.ModelProfile"/> for per-call costing. Ideal for multi-model
     /// workflows where each model has different cost rates (including zero-cost local models).
     /// If cumulative estimated cost exceeds <paramref name="maxCost"/>, the workflow
     /// terminates with <see cref="ExecutionStatus.BudgetExceeded"/>.
@@ -564,7 +564,7 @@ public sealed class Workflow<TState>
     /// Sets a cost budget for the workflow with flat fallback cost rates.
     /// These rates are used when model-specific rates are not available
     /// (e.g. direct <c>IAgentModel</c> usage without
-    /// <see cref="Agents.ModelProfile"/>). If cumulative estimated cost exceeds
+    /// <see cref="Agents.Routing.ModelProfile"/>). If cumulative estimated cost exceeds
     /// <paramref name="maxCost"/>, the workflow terminates with
     /// <see cref="ExecutionStatus.BudgetExceeded"/>.
     /// </summary>

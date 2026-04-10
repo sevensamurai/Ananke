@@ -3,6 +3,7 @@ using Ananke.Learning.Episodes;
 using Ananke.Learning.Exploration;
 using Ananke.Learning.Offline;
 using Ananke.Learning.Skills;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.StateMachine;
 using Connect4Demo;

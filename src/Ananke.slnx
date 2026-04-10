@@ -4,14 +4,12 @@
   <Folder Name="/demos/">
     <Project Path="demos/AgenticDesignPatternsDemo/AgenticDesignPatternsDemo.csproj" Id="45077479-c130-4f53-9cca-1f43da49c235" />
     <Project Path="demos/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" Id="7acad539-35f2-41fb-933b-fb8b8348a6e8" />
-    <Project Path="demos/Connect4Demo/Connect4Demo.csproj">
-      <Build Solution="Debug|*" Project="false" />
-    </Project>
+    <Project Path="demos/ChannelsDiscordDemo/ChannelsDiscordDemo.csproj" />
+    <Project Path="demos/ChannelsSlackDemo/ChannelsSlackDemo.csproj" Id="dcc851cf-e3f0-40f8-a4cb-c7e79ccfba51" />
+    <Project Path="demos/Connect4Demo/Connect4Demo.csproj" />
     <Project Path="demos/EntityMemoryDemo/EntityMemoryDemo.csproj" Id="c5086923-5519-4c66-a42b-e45c231f8f0d" />
     <Project Path="demos/LogEventsDemo/LogEventsDemo.csproj" Id="23aa0734-a003-485b-a2ee-46367f61ad39" />
-    <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad">
-      <Build Solution="Debug|*" Project="false" />
-    </Project>
+    <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad" />
     <Project Path="demos/SkillCatalogDemo/SkillCatalogDemo.csproj" />
     <Project Path="demos\AgenticWebDemo\AgenticWebDemo.csproj" />
     <Project Path="demos\BasicAgentDemo\BasicAgentDemo.csproj" />
@@ -24,10 +22,9 @@
 
   <!-- Tests -->
   <Folder Name="/tests/">
-    <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f">
-      <Build Solution="Debug|*" Project="false" />
-    </Project>
+    <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
+    <Project Path="tests/Ananke.Platforms.Tests/Ananke.Platforms.Tests.csproj" />
     <Project Path="tests\Ananke.Design.Tests\Ananke.Design.Tests.csproj" />
     <Project Path="tests\Ananke.Documents.Tests\Ananke.Documents.Tests.csproj" />
     <Project Path="tests\Ananke.Orchestration.Tests\Ananke.Orchestration.Tests.csproj" />
@@ -43,9 +40,7 @@
   <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
   <Project Path="Ananke.Abstractions\Ananke.Abstractions.csproj" />
   <Project Path="Ananke.Analyzers/Ananke.Analyzers.csproj" />
-  <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85">
-    <Build Solution="Debug|*" Project="false" />
-  </Project>
+  <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85" />
   <Project Path="Ananke.Design\Ananke.Design.csproj" />
   <Project Path="Ananke.Documents\Ananke.Documents.csproj" />
   <Project Path="Ananke.Learning/Ananke.Learning.csproj" Id="4e1339be-51d1-4550-9474-76b3a4e82cf4" />
@@ -54,8 +49,12 @@
   <Project Path="Ananke.OpenTelemetry\Ananke.OpenTelemetry.csproj" />
   <Project Path="Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
   <Project Path="Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+  <Project Path="Ananke.Orchestration.Knowledge/Ananke.Orchestration.Knowledge.csproj" Id="42cc6757-2cac-4197-80dd-f37cc31d2a7b" />
   <Project Path="Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
   <Project Path="Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  <Project Path="Ananke.Platforms.Discord/Ananke.Platforms.Discord.csproj" />
+  <Project Path="Ananke.Platforms.Slack/Ananke.Platforms.Slack.csproj" />
+  <Project Path="Ananke.Platforms/Ananke.Platforms.csproj" />
   <Project Path="Ananke.Qdrant\Ananke.Qdrant.csproj" />
   <Project Path="Ananke.Redis\Ananke.Redis.csproj" />
   <Project Path="Ananke.Skills/Ananke.Skills.csproj" />

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Catalog;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
 using Microsoft.Extensions.Logging;
@@ -527,6 +528,42 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
+        BrowseOptions options, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        await EnsureCollectionAsync(ct);
+
+        var filter = BuildBrowseFilter(options);
+
+        var result = await _client.ScrollAsync(
+            _collectionName,
+            filter: filter,
+            limit: (uint)options.Limit,
+            offset: options.Offset > 0 ? new PointId { Num = (ulong)options.Offset } : null,
+            payloadSelector: true,
+            cancellationToken: ct);
+
+        return result.Result.Select(p => MapPayloadToEntry(p.Id.Uuid, p.Payload)).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountAsync(BrowseOptions? options = null, CancellationToken ct = default)
+    {
+        await EnsureCollectionAsync(ct);
+
+        var filter = options is not null ? BuildBrowseFilter(options) : null;
+
+        var result = await _client.CountAsync(
+            _collectionName,
+            filter: filter,
+            exact: true,
+            cancellationToken: ct);
+
+        return (int)result;
+    }
+
+    /// <inheritdoc />
     public async Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
@@ -725,6 +762,33 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             foreach (var tag in options.RequiredTags)
                 filter.Must.Add(Conditions.MatchKeyword(TagsKey, tag));
         }
+
+        return filter.Must.Count > 0 ? filter : null;
+    }
+
+    private static Filter? BuildBrowseFilter(BrowseOptions options)
+    {
+        var filter = new Filter();
+
+        if (options.EntityId is not null)
+            filter.Must.Add(Conditions.MatchKeyword(EntityIdKey, options.EntityId));
+
+        if (options.Kind is not null)
+            filter.Must.Add(Conditions.MatchKeyword(KindKey,
+                options.Kind.Value.ToString().ToLowerInvariant()));
+
+        if (options.MinConfidence > 0)
+            filter.Must.Add(Conditions.Range(ConfidenceKey,
+                new global::Qdrant.Client.Grpc.Range { Gte = options.MinConfidence }));
+
+        if (options.RequiredTags is { Count: > 0 })
+        {
+            foreach (var tag in options.RequiredTags)
+                filter.Must.Add(Conditions.MatchKeyword(TagsKey, tag));
+        }
+
+        if (options.ExcludeConsolidated)
+            filter.Must.Add(new Condition { IsEmpty = new IsEmptyCondition { Key = ConsolidatedIntoKey } });
 
         return filter.Must.Count > 0 ? filter : null;
     }

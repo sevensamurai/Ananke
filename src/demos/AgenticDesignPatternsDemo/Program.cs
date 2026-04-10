@@ -1,6 +1,9 @@
 using Ananke.Orchestration;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
+using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Routing;
 using Ananke.Orchestration.Streaming;
@@ -8,7 +11,7 @@ using Ananke.Orchestration.Tools;
 using AgenticDesignPatternsDemo;
 
 // -------------------------------------------------------------------
-//  Ananke — Agentic Design Patterns Demo
+//  Ananke ï¿½ Agentic Design Patterns Demo
 //
 //  Each section demonstrates a recognized agentic pattern using
 //  simulated models. No API keys required.
@@ -41,18 +44,18 @@ Console.WriteLine("-----------------------------------------------------------")
 
 
 // -----------------------------------------------------------------
-//  1. Single Agent — tool-calling ReAct loop
+//  1. Single Agent ï¿½ tool-calling ReAct loop
 // -----------------------------------------------------------------
 
 async Task Demo01_SingleAgent()
 {
     PrintHeader("1. Single Agent (ReAct tool-calling loop)");
 
-    var model = SimulatedModel.Fixed("""{"Answer":"The weather in Seattle is sunny and 22°C — great for a walk!"}""");
+    var model = SimulatedModel.Fixed("""{"Answer":"The weather in Seattle is sunny and 22ï¿½C ï¿½ great for a walk!"}""");
 
     var tools = new ToolKit("weather")
         .AddTool("get_weather", "Gets current weather for a city",
-            (string city) => ToolResult.Ok($"Sunny, 22°C in {city}"),
+            (string city) => ToolResult.Ok($"Sunny, 22ï¿½C in {city}"),
             "city", "City name");
 
     var agent = AgentJobFactory.Create<AgentState, AgentReply>("weather-agent", model)
@@ -73,7 +76,7 @@ async Task Demo01_SingleAgent()
 }
 
 // -----------------------------------------------------------------
-//  2. Sequential Chain — linear pipeline of jobs
+//  2. Sequential Chain ï¿½ linear pipeline of jobs
 // -----------------------------------------------------------------
 
 async Task Demo02_SequentialChain()
@@ -107,7 +110,7 @@ async Task Demo02_SequentialChain()
 }
 
 // -----------------------------------------------------------------
-//  3. Parallel Fork/Join — concurrent branches
+//  3. Parallel Fork/Join ï¿½ concurrent branches
 // -----------------------------------------------------------------
 
 async Task Demo03_ParallelForkJoin()
@@ -153,7 +156,7 @@ async Task Demo03_ParallelForkJoin()
 }
 
 // -----------------------------------------------------------------
-//  4. Router / Coordinator — LLM-driven dispatch
+//  4. Router / Coordinator ï¿½ LLM-driven dispatch
 // -----------------------------------------------------------------
 
 async Task Demo04_RouterCoordinator()
@@ -191,7 +194,7 @@ async Task Demo04_RouterCoordinator()
 }
 
 // -----------------------------------------------------------------
-//  5. Loop Primitive — manual loop with termination
+//  5. Loop Primitive ï¿½ manual loop with termination
 // -----------------------------------------------------------------
 
 async Task Demo05_LoopPrimitive()
@@ -219,7 +222,7 @@ async Task Demo05_LoopPrimitive()
 }
 
 // -----------------------------------------------------------------
-//  6. Review & Critique — AgenticPattern builder
+//  6. Review & Critique ï¿½ AgenticPattern builder
 // -----------------------------------------------------------------
 
 async Task Demo06_ReviewCritiquePattern()
@@ -244,7 +247,7 @@ async Task Demo06_ReviewCritiquePattern()
         .MapResult((s, r) =>
         {
             var score = Math.Min(1.0, 0.3 * iteration);
-            Console.WriteLine($"    Critic score: {score:F1} — {r.Feedback}");
+            Console.WriteLine($"    Critic score: {score:F1} ï¿½ {r.Feedback}");
             return s with { Score = score, Feedback = r.Feedback ?? "" };
         })
         .Build();
@@ -263,7 +266,7 @@ async Task Demo06_ReviewCritiquePattern()
 }
 
 // -----------------------------------------------------------------
-//  7. Iterative Refinement — single agent self-loop
+//  7. Iterative Refinement ï¿½ single agent self-loop
 // -----------------------------------------------------------------
 
 async Task Demo07_IterativeRefinementPattern()
@@ -296,7 +299,7 @@ async Task Demo07_IterativeRefinementPattern()
 }
 
 // -----------------------------------------------------------------
-//  8. Human-in-the-Loop — interrupt + resume
+//  8. Human-in-the-Loop ï¿½ interrupt + resume
 // -----------------------------------------------------------------
 
 async Task Demo08_HumanInTheLoop()
@@ -340,7 +343,7 @@ async Task Demo08_HumanInTheLoop()
 }
 
 // -----------------------------------------------------------------
-//  9. SubFlow Composition — nested workflows
+//  9. SubFlow Composition ï¿½ nested workflows
 // -----------------------------------------------------------------
 
 async Task Demo09_SubFlowComposition()
@@ -386,7 +389,7 @@ async Task Demo09_SubFlowComposition()
 }
 
 // -----------------------------------------------------------------
-//  10. Agent-Level Middleware — pre/post LLM call hooks
+//  10. Agent-Level Middleware ï¿½ pre/post LLM call hooks
 // -----------------------------------------------------------------
 
 async Task Demo10_AgentMiddleware()
@@ -419,7 +422,7 @@ async Task Demo10_AgentMiddleware()
 }
 
 // -----------------------------------------------------------------
-//  11. Context Strategy — sliding window + summarizing
+//  11. Context Strategy ï¿½ sliding window + summarizing
 // -----------------------------------------------------------------
 
 async Task Demo11_ContextStrategy()
@@ -455,7 +458,7 @@ async Task Demo11_ContextStrategy()
 }
 
 // -----------------------------------------------------------------
-//  12. Budget / Cost Tracking — per-workflow cost caps
+//  12. Budget / Cost Tracking ï¿½ per-workflow cost caps
 // -----------------------------------------------------------------
 
 async Task Demo12_BudgetTracking()
@@ -501,7 +504,7 @@ async Task Demo12_BudgetTracking()
     Console.WriteLine($"  Jobs completed: {result.History.Count}");
 
     Console.WriteLine();
-    Console.WriteLine("  [Budget exceeded scenario — tight budget]");
+    Console.WriteLine("  [Budget exceeded scenario ï¿½ tight budget]");
     var tightWorkflow = new Workflow<BudgetState>("budget-tight")
         .Job("agent-a", agentA)
         .Job("agent-b", agentB)
@@ -520,7 +523,7 @@ async Task Demo12_BudgetTracking()
 }
 
 // -----------------------------------------------------------------
-//  13. Streaming Chat — StreamingChatWorkflow with tool calling
+//  13. Streaming Chat ï¿½ StreamingChatWorkflow with tool calling
 // -----------------------------------------------------------------
 
 async Task Demo13_StreamingChat()
@@ -556,7 +559,7 @@ async Task Demo13_StreamingChat()
 }
 
 // -----------------------------------------------------------------
-//  14. Workflow Streaming — real-time orchestration events
+//  14. Workflow Streaming ï¿½ real-time orchestration events
 // -----------------------------------------------------------------
 
 async Task Demo14_WorkflowStreaming()

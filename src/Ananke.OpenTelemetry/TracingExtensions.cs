@@ -33,9 +33,12 @@ public static class TracingExtensions
         configure(options);
 
         services.AddOpenTelemetry()
-            .ConfigureResource(r => r.AddService(
-                serviceName: options.ServiceName,
-                serviceVersion: options.ServiceVersion))
+            .ConfigureResource(r =>
+            {
+                r.AddService(
+                    serviceName: options.ServiceName,
+                    serviceVersion: options.ServiceVersion);
+            })
             .WithTracing(t =>
             {
                 foreach (var name in options.ActivitySourceNames)

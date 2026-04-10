@@ -1,3 +1,5 @@
+using Ananke.Abstractions.Agents;
+
 namespace Ananke.Orchestration.Streaming;
 
 /// <summary>
@@ -115,5 +117,5 @@ public sealed record BudgetExceeded<TState> : WorkflowEvent<TState>
     public required decimal Budget { get; init; }
 
     /// <summary>Cumulative token usage across all LLM calls in this execution.</summary>
-    public required Agents.TokenUsage CumulativeUsage { get; init; }
+    public required TokenUsage CumulativeUsage { get; init; }
 }

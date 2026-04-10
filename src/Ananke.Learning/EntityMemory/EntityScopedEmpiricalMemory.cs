@@ -40,6 +40,15 @@ public sealed class EntityScopedEmpiricalMemory(
         inner.BrowseAsync(offset, limit, kind, entityId ?? _entityId, ct);
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
+        BrowseOptions options, CancellationToken ct = default) =>
+        inner.BrowseAsync(options with { EntityId = options.EntityId ?? _entityId }, ct);
+
+    /// <inheritdoc />
+    public Task<int> CountAsync(BrowseOptions? options = null, CancellationToken ct = default) =>
+        inner.CountAsync((options ?? new BrowseOptions()) with { EntityId = options?.EntityId ?? _entityId }, ct);
+
+    /// <inheritdoc />
     public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default) =>
         inner.MarkConsolidatedAsync(entryId, knowledgeDocId, ct);
 }
