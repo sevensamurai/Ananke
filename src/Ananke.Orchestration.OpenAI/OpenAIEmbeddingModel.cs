@@ -1,5 +1,5 @@
 using System.ClientModel;
-using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Abstractions.Agents;
 using OpenAI;
 using OpenAI.Embeddings;
 

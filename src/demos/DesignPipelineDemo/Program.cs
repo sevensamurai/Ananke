@@ -1,6 +1,9 @@
 using Ananke.Design;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
+using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Anthropic;
 using Ananke.Orchestration.OpenAI;
 using Ananke.Orchestration.Tools;
@@ -15,7 +18,7 @@ var config = new ConfigurationBuilder()
     .Build();
 
 Console.OutputEncoding = Encoding.UTF8;
-Console.WriteLine("??? Ananke.Design — YAML + Agents ? Workflow ???");
+Console.WriteLine("??? Ananke.Design ï¿½ YAML + Agents ? Workflow ???");
 Console.WriteLine();
 
 // -- 2. Load workflow YAML -------------------------------------------
@@ -45,7 +48,7 @@ Console.WriteLine($"  Discovered: {string.Join(", ", scaffold.JobNames)}");
 Console.WriteLine($"  Unbound:    {string.Join(", ", scaffold.UnboundJobs)}");
 Console.WriteLine();
 
-// -- Tools (code-only — implementations can't live in YAML) ----------
+// -- Tools (code-only ï¿½ implementations can't live in YAML) ----------
 var dataTools = new ToolKit("data-tools")
     .AddTool(
         "list_datasets",
@@ -74,7 +77,7 @@ foreach (var (jobName, jobDef) in manifest.Jobs.Where(j => j.Value.Type == "agen
         .MapResult((state, response) => ApplyAgentResult(jobName, state, response.Text ?? ""))
         .WithMaxToolRounds(jobDef.MaxToolRounds);
 
-    // Attach tools to specific jobs — tools are code, not YAML
+    // Attach tools to specific jobs ï¿½ tools are code, not YAML
     if (jobName == "plan")
         builder.WithTools(dataTools);
 

@@ -1,0 +1,57 @@
+{
+  "title": "Ananke",
+  "subtitle": "AI Agent Orchestration for .NET",
+  "logo": "ananke-logo.png",
+  "heroImage": "ananke-creation.png",
+  "repo": "https://github.com/sevensamurai/Ananke",
+  "nuget": "https://www.nuget.org/packages/Ananke",
+  "sections": [
+    {
+      "title": "Getting Started",
+      "items": [
+        { "title": "Overview & Learning Path", "path": "learning.md", "tags": ["introduction", "learning", "overview", "roadmap"] },
+        { "title": "FAQ", "path": "faq.md", "tags": ["questions", "help", "troubleshooting"] }
+      ]
+    },
+    {
+      "title": "Guides",
+      "items": [
+        { "title": "01 — Getting Started", "path": "guides/01-getting-started.md", "tags": ["install", "setup", "nuget", "hello world", "quickstart"] },
+        { "title": "02 — Workflows", "path": "guides/02-workflows.md", "tags": ["graph", "pipeline", "routing", "fork", "join", "parallel", "conditional", "fluent builder"] },
+        { "title": "03 — Agents", "path": "guides/03-agents.md", "tags": ["AI", "LLM", "OpenAI", "Anthropic", "Google", "chat", "provider", "structured output"] },
+        { "title": "04 — Tools", "path": "guides/04-tools.md", "tags": ["tool calling", "function calling", "plugins", "capabilities"] },
+        { "title": "05 — Streaming Chat", "path": "guides/05-streaming-chat.md", "tags": ["SSE", "streaming", "real-time", "chat", "async"] },
+        { "title": "06 — Long-Term Memory", "path": "guides/06-memory.md", "tags": ["vector", "embedding", "RAG", "document", "ingestion", "semantic search"] },
+        { "title": "07 — Human-in-the-Loop", "path": "guides/07-human-in-the-loop.md", "tags": ["approval", "pause", "resume", "checkpoint", "human review"] },
+        { "title": "08 — State Machine", "path": "guides/08-state-machine.md", "tags": ["interrupt", "middleware", "circuit breaker", "RedLock", "coordination"] },
+        { "title": "09 — Distributed", "path": "guides/09-distributed.md", "tags": ["Redis", "distributed", "scaling", "persistence", "cloud"] },
+        { "title": "10 — Observability", "path": "guides/10-observability.md", "tags": ["logging", "tracing", "metrics", "OpenTelemetry", "diagnostics"] },
+        { "title": "11 — Advanced Agents", "path": "guides/11-advanced-agents.md", "tags": ["multi-agent", "orchestration", "planning", "reasoning", "chain of thought"] },
+        { "title": "12 — MCP & Interop", "path": "guides/12-mcp-and-interop.md", "tags": ["MCP", "A2A", "protocol", "server", "interoperability", "model context"] },
+        { "title": "13 — Design Tooling", "path": "guides/13-design-tooling.md", "tags": ["visual", "designer", "graph editor", "diagramming"] },
+        { "title": "14 — Testing", "path": "guides/14-testing.md", "tags": ["unit test", "integration test", "NUnit", "mocking", "test harness"] },
+        { "title": "15 — Empirical Memory", "path": "guides/15-empirical-memory.md", "tags": ["learning", "episodes", "skills", "experience", "empirical"] },
+        { "title": "15a — Memory Tuning", "path": "guides/15a-empirical-memory-tuning.md", "tags": ["tuning", "decay", "importance", "parameters", "optimization"] },
+        { "title": "16 — Agentic Patterns", "path": "guides/16-agentic-patterns.md", "tags": ["patterns", "reflection", "planning", "ReAct", "multi-step"] },
+        { "title": "UV Setup (Python Interop)", "path": "guides/uv-setup-for-dotnet-developers.md", "tags": ["Python", "uv", "interop", "cross-language"] }
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        { "title": "Feature Index", "path": "reference/features.md", "tags": ["API", "capabilities", "feature list", "index"] },
+        { "title": "Tools Reference", "path": "reference/tools-reference.md", "tags": ["API", "tool calling", "function calling", "reference"] },
+        { "title": "Workflow DSL", "path": "reference/workflow-dsl.md", "tags": ["DSL", "fluent", "builder", "graph", "API"] },
+        { "title": "Advanced Agent Features", "path": "reference/advanced-agent-features.md", "tags": ["API", "agent", "structured output", "multi-provider"] }
+      ]
+    },
+    {
+      "title": "About",
+      "items": [
+        { "title": "Background & Philosophy", "path": "about/background.md", "tags": ["motivation", "design", "architecture", "philosophy"] },
+        { "title": "Framework Comparison", "path": "about/framework-comparison.md", "tags": ["AutoGen", "Semantic Kernel", "LangChain", "comparison", "alternatives"] },
+        { "title": "Why Not Orleans?", "path": "about/why-not-orleans.md", "tags": ["Orleans", "actor model", "comparison", "trade-offs"] }
+      ]
+    }
+  ]
+}

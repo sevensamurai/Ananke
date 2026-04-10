@@ -77,6 +77,30 @@ public interface IEmpiricalMemory
         string? entityId = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Iterates entries in pages using structured filter options.
+    /// Supports tag filtering, confidence thresholds, and consolidated-entry
+    /// exclusion in addition to the kind and entity filters.
+    /// </summary>
+    /// <param name="options">Structured browse options (paging, filters).</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<IReadOnlyList<EmpiricalEntry>> BrowseAsync(
+        BrowseOptions options, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the total number of entries matching the specified filters.
+    /// A non-vector alternative to <see cref="RecallAsync"/> for
+    /// count/aggregate queries (e.g., "how many incidents tagged
+    /// <c>release:v3.1.2</c>?").
+    /// </summary>
+    /// <param name="options">
+    /// Filters to apply. Only filtering properties are used;
+    /// <see cref="BrowseOptions.Offset"/> and <see cref="BrowseOptions.Limit"/>
+    /// are ignored.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<int> CountAsync(BrowseOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Marks an entry as consolidated into a knowledge store document.
     /// Consolidated entries are excluded from future recall and exploration.
     /// </summary>

@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
   </ItemGroup>
 
 </Project>

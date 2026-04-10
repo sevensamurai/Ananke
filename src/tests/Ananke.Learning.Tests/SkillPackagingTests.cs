@@ -2,6 +2,7 @@ using Ananke.Learning;
 using Ananke.Learning.Episodes;
 using Ananke.Learning.Features;
 using Ananke.Learning.Skills;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Shouldly;
 

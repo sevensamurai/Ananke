@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Platforms.Discord</PackageId>
+    <Description>Discord adapter for Ananke — bridges Discord Gateway events to Ananke agent workflows via IMessagePlatformAdapter. Provides services.AddAnankeDiscord() for DI registration.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Platforms.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Discord.Net.WebSocket" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\Ananke.Platforms\Ananke.Platforms.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -405,6 +405,46 @@ public sealed record RecallOptions
 }
 
 /// <summary>
+/// Options controlling <see cref="IEmpiricalMemory.BrowseAsync(BrowseOptions, CancellationToken)"/>
+/// and <see cref="IEmpiricalMemory.CountAsync"/> behavior.
+/// Mirrors the filtering capabilities of <see cref="RecallOptions"/> but for
+/// non-vector browsing and counting operations.
+/// </summary>
+public sealed record BrowseOptions
+{
+    /// <summary>Zero-based offset for paging. Default is 0.</summary>
+    public int Offset { get; init; }
+
+    /// <summary>Maximum number of entries to return. Default is 100.</summary>
+    public int Limit { get; init; } = 100;
+
+    /// <summary>Filter by empirical kind. When <see langword="null"/>, all kinds are returned.</summary>
+    public EmpiricalKind? Kind { get; init; }
+
+    /// <summary>
+    /// Filter by entity scope. When set, only entries scoped to this entity are returned.
+    /// When <see langword="null"/>, all entries (entity-scoped and global) are returned.
+    /// </summary>
+    public string? EntityId { get; init; }
+
+    /// <summary>
+    /// Filter by tags. Entries must contain all specified tags to be included.
+    /// When <see langword="null"/> or empty, no tag filtering is applied.
+    /// </summary>
+    public IReadOnlyList<string>? RequiredTags { get; init; }
+
+    /// <summary>Minimum confidence threshold. Entries below this are excluded.</summary>
+    public float MinConfidence { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, entries that have been consolidated
+    /// (i.e., <see cref="EmpiricalEntry.ConsolidatedInto"/> is set) are excluded.
+    /// Default is <see langword="false"/> (consolidated entries are included).
+    /// </summary>
+    public bool ExcludeConsolidated { get; init; }
+}
+
+/// <summary>
 /// Configuration for affect-driven learning mechanics:
 /// prediction-error reinforcement, decay, and priority boosting.
 /// </summary>

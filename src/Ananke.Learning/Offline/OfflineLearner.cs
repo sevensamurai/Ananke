@@ -1,5 +1,5 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Knowledge.Embeddings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 

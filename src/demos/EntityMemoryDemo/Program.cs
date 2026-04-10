@@ -1,8 +1,9 @@
-﻿using Ananke.Learning;
+using Ananke.Learning;
 using Ananke.Learning.EntityMemory;
 using Ananke.Learning.Episodes;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Orchestration.Memory;
 

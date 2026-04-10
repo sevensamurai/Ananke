@@ -5,7 +5,6 @@ using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Ananke.Abstractions.Agents;
-using Ananke.Orchestration.Agents;
 
 namespace Ananke.Orchestration.Anthropic;
 

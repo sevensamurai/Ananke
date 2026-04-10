@@ -1,0 +1,26 @@
+# Valkey — Recommended for production (open-source, Linux Foundation)
+# Redis 7.2 fork with AOF persistence enabled.
+# https://valkey.io/
+#
+# Usage:
+#   docker compose -f docker-compose.valkey.yml up -d
+#
+# Connect from Ananke:
+#   services.AddRedis(c => { c.Host = "localhost"; c.Port = 6379; });
+
+services:
+  valkey:
+    image: valkey/valkey:8
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey-data:/data
+    command: >
+      valkey-server
+      --appendonly yes
+      --appendfsync everysec
+      --dir /data
+    restart: unless-stopped
+
+volumes:
+  valkey-data:

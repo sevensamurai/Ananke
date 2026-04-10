@@ -59,8 +59,11 @@ services.AddWorkflowOrchestration(o => o
 
 | Package | What it adds |
 |---|---|
-| `Ananke.Orchestration.OpenAI` | OpenAI `IStreamingAgentModel` provider |
+| `Ananke.Orchestration.Knowledge` | Knowledge pipeline — vector stores, document processing, catalog, linking (included as transitive dep) |
+| `Ananke.Orchestration.OpenAI` | OpenAI `IStreamingAgentModel` + `IEmbeddingModel` provider |
 | `Ananke.Orchestration.Anthropic` | Anthropic / Claude `IStreamingAgentModel` provider |
+| `Ananke.Orchestration.Google` | Google Gemini `IStreamingAgentModel` + `IEmbeddingModel` provider |
+| `Ananke.Documents` | PDF and Markdown extractors for the knowledge pipeline |
 | `Ananke.MCP` | Expose workflows and tools as MCP server capabilities |
 | `Ananke.OpenTelemetry` | OTLP tracing export (BetterStack, Jaeger, Grafana Tempo) |
 | `Ananke` | Meta-package — includes Orchestration + StateMachine + Bridge |

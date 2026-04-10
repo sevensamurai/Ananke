@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
   </ItemGroup>
 
   <!-- Bundle Roslyn analyzer into this package (analyzers must target netstandard2.0) -->

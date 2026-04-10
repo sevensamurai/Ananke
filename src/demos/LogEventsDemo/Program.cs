@@ -1,11 +1,10 @@
-using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
 using Ananke.Learning.Offline;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using LogEventsDemo;
 
 // -------------------------------------------------------------------
-//  LogEventsDemo — Empirical Memory from Simulated Operations Logs
+//  LogEventsDemo ï¿½ Empirical Memory from Simulated Operations Logs
 //
 //  A simulated distributed system produces structured log events.
 //  Rule-based pattern detection finds cascading failures. The REPL
@@ -16,9 +15,9 @@ using LogEventsDemo;
 //  No LLM required. All detection is structural/tag-based.
 //
 //  Usage:
-//    LogEventsDemo                 — run simulation + interactive REPL
-//    LogEventsDemo --ticks 500     — generate 500 ticks of log data
-//    LogEventsDemo --auto          — run simulation, detect, learn, print report
+//    LogEventsDemo                 ï¿½ run simulation + interactive REPL
+//    LogEventsDemo --ticks 500     ï¿½ generate 500 ticks of log data
+//    LogEventsDemo --auto          ï¿½ run simulation, detect, learn, print report
 // -------------------------------------------------------------------
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -45,7 +44,7 @@ var embedder = new InMemoryEmbedder();
 var predictionSource = new TagOverlapPredictionSource(neighborCount: 5);
 var affectOptions = new AffectOptions
 {
-    // Log entries represent operational incidents — persist longer than game moves
+    // Log entries represent operational incidents ï¿½ persist longer than game moves
     BaseDecayRate = 0.995f,
     DeletionThreshold = 0.03f,
     ReinforcementCooldownHours = 0.01f
@@ -79,7 +78,7 @@ Console.WriteLine($"\n  ?? Running log simulation ({ticks} ticks)...");
 var simulator = new LogSimulator();
 await simulator.RunAsync(ticks);
 Console.WriteLine($"     Generated {simulator.History.Count} log events.");
-Console.WriteLine($"     Simulated time: {simulator.History[0].Timestamp:HH:mm:ss} – {simulator.CurrentTime:HH:mm:ss}");
+Console.WriteLine($"     Simulated time: {simulator.History[0].Timestamp:HH:mm:ss} ï¿½ {simulator.CurrentTime:HH:mm:ss}");
 
 // -- Phase 3: Pattern detection ----------------------------------
 Console.WriteLine("\n  ?? Running rule-based pattern detection...");
@@ -100,7 +99,7 @@ if (learnResult.Discoveries.Count > 0)
     Console.ForegroundColor = ConsoleColor.Cyan;
     Console.WriteLine("     ?? Initial discoveries:");
     foreach (var d in learnResult.Discoveries)
-        Console.WriteLine($"        • {d}");
+        Console.WriteLine($"        ï¿½ {d}");
     Console.ResetColor();
 }
 

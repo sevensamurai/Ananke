@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Knowledge;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
 using Ananke.Learning.Offline;
@@ -96,6 +97,205 @@ public class OfflineLearnerTests
         patterns[0].Kind.ShouldBe(EmpiricalKind.Pattern);
         skills.Count.ShouldBe(1);
         skills[0].Kind.ShouldBe(EmpiricalKind.Skill);
+    }
+
+    // ── BrowseAsync(BrowseOptions) ───────────────────────────────
+
+    [Test]
+    public async Task BrowseOptions_RequiredTags_FiltersEntries()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "api-gateway deployment to au-prod with connection pool refactor") with
+            { Tags = ["release:v3.1.2", "au-prod"] });
+        await _memory.CommitAsync(MakePattern("p2", "background-worker redis client upgrade for memory optimization") with
+            { Tags = ["release:v2.8.1", "nz-prod"] });
+        await _memory.CommitAsync(MakePattern("p3", "iot-ingestion firmware mqtt reconnect backoff logic update") with
+            { Tags = ["release:v3.1.2", "nz-prod"] });
+
+        var results = await _memory.BrowseAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1.2"]
+        });
+
+        results.Count.ShouldBe(2);
+        results.ShouldAllBe(e => e.Tags.Contains("release:v3.1.2"));
+    }
+
+    [Test]
+    public async Task BrowseOptions_MultipleRequiredTags_AppliesAndFilter()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "api-gateway au-prod deployment") with
+            { Tags = ["release:v3.1.2", "au-prod"] });
+        await _memory.CommitAsync(MakePattern("p2", "api-gateway nz-prod deployment") with
+            { Tags = ["release:v3.1.2", "nz-prod"] });
+
+        var results = await _memory.BrowseAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1.2", "au-prod"]
+        });
+
+        results.Count.ShouldBe(1);
+        results[0].Id.ShouldBe("p1");
+    }
+
+    [Test]
+    public async Task BrowseOptions_MinConfidence_ExcludesLowConfidence()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "strong api gateway pattern", confidence: 0.9f));
+        await _memory.CommitAsync(MakePattern("p2", "weak redis timeout pattern", confidence: 0.2f));
+
+        var results = await _memory.BrowseAsync(new BrowseOptions
+        {
+            MinConfidence = 0.5f
+        });
+
+        results.Count.ShouldBe(1);
+        results[0].Id.ShouldBe("p1");
+    }
+
+    [Test]
+    public async Task BrowseOptions_ExcludeConsolidated_FiltersConsolidated()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "active connection pool pattern"));
+        await _memory.CommitAsync(MakePattern("p2", "promoted redis latency pattern"));
+        await _memory.MarkConsolidatedAsync("p2", "doc-123");
+
+        var all = await _memory.BrowseAsync(new BrowseOptions());
+        var active = await _memory.BrowseAsync(new BrowseOptions { ExcludeConsolidated = true });
+
+        all.Count.ShouldBe(2);
+        active.Count.ShouldBe(1);
+        active[0].Id.ShouldBe("p1");
+    }
+
+    [Test]
+    public async Task BrowseOptions_CombinesKindAndTags()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "deployment pattern for api-gateway") with
+            { Tags = ["release:v3.1.2"] });
+        await _memory.CommitAsync(new EmpiricalEntry
+        {
+            Id = "s1",
+            Kind = EmpiricalKind.Skill,
+            Tags = ["release:v3.1.2"],
+            Source = "test",
+            Description = SemanticDescription.FromText("runbook skill for api-gateway"),
+            Confidence = 0.5f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        });
+
+        var results = await _memory.BrowseAsync(new BrowseOptions
+        {
+            Kind = EmpiricalKind.Pattern,
+            RequiredTags = ["release:v3.1.2"]
+        });
+
+        results.Count.ShouldBe(1);
+        results[0].Kind.ShouldBe(EmpiricalKind.Pattern);
+    }
+
+    [Test]
+    public async Task BrowseOptions_Pagination_Works()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "api-gateway v3.1 deployment to au-prod") with
+            { Tags = ["release:v3.1"] });
+        await _memory.CommitAsync(MakePattern("p2", "background-worker v3.1 redis upgrade") with
+            { Tags = ["release:v3.1"] });
+        await _memory.CommitAsync(MakePattern("p3", "iot-ingestion v3.1 mqtt reconnect") with
+            { Tags = ["release:v3.1"] });
+
+        var page1 = await _memory.BrowseAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1"],
+            Limit = 2
+        });
+        var page2 = await _memory.BrowseAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1"],
+            Offset = 2,
+            Limit = 2
+        });
+
+        page1.Count.ShouldBe(2);
+        page2.Count.ShouldBe(1);
+    }
+
+    // ── CountAsync ───────────────────────────────────────────────
+
+    [Test]
+    public async Task CountAsync_NoOptions_ReturnsTotalCount()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "alpha gc pause causes timeout"));
+        await _memory.CommitAsync(MakePattern("p2", "beta redis latency spike detected"));
+        await _memory.CommitAsync(MakePattern("p3", "gamma mqtt connection dropped unexpectedly"));
+
+        var count = await _memory.CountAsync();
+
+        count.ShouldBe(3);
+    }
+
+    [Test]
+    public async Task CountAsync_FilterByKind_ReturnsMatchingCount()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "deployment pattern for api-gateway"));
+        await _memory.CommitAsync(new EmpiricalEntry
+        {
+            Id = "s1",
+            Kind = EmpiricalKind.Skill,
+            Tags = [],
+            Source = "test",
+            Description = SemanticDescription.FromText("runbook skill for api-gateway incident"),
+            Confidence = 0.5f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        });
+
+        var patternCount = await _memory.CountAsync(new BrowseOptions { Kind = EmpiricalKind.Pattern });
+        var skillCount = await _memory.CountAsync(new BrowseOptions { Kind = EmpiricalKind.Skill });
+
+        patternCount.ShouldBe(1);
+        skillCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CountAsync_FilterByTags_ReturnsMatchingCount()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "api-gateway au-prod deployment event") with
+            { Tags = ["release:v3.1.2", "au-prod"] });
+        await _memory.CommitAsync(MakePattern("p2", "background-worker nz-prod redis upgrade") with
+            { Tags = ["release:v2.8.1", "nz-prod"] });
+        await _memory.CommitAsync(MakePattern("p3", "api-gateway nz-prod error timeout") with
+            { Tags = ["release:v3.1.2", "nz-prod"] });
+
+        var v312Count = await _memory.CountAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1.2"]
+        });
+        var v312AuProdCount = await _memory.CountAsync(new BrowseOptions
+        {
+            RequiredTags = ["release:v3.1.2", "au-prod"]
+        });
+
+        v312Count.ShouldBe(2);
+        v312AuProdCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CountAsync_ExcludeConsolidated_ExcludesPromoted()
+    {
+        await _memory.CommitAsync(MakePattern("p1", "active connection pool pattern entry"));
+        await _memory.CommitAsync(MakePattern("p2", "promoted redis latency pattern entry"));
+        await _memory.MarkConsolidatedAsync("p2", "doc-456");
+
+        var total = await _memory.CountAsync();
+        var active = await _memory.CountAsync(new BrowseOptions { ExcludeConsolidated = true });
+
+        total.ShouldBe(2);
+        active.ShouldBe(1);
     }
 
     // ── DecayAsync ───────────────────────────────────────────────

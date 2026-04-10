@@ -8,7 +8,7 @@ namespace Ananke.Orchestration.Middleware;
 /// </summary>
 /// <remarks>
 /// This operates at the workflow-job level (wrapping an entire job invocation).
-/// For LLM-call-level interception, see <see cref="Agents.IAgentModelMiddleware"/>.
+/// For LLM-call-level interception, see <see cref="Agents.Middleware.IAgentModelMiddleware"/>.
 /// </remarks>
 public interface IWorkflowJobMiddleware<TState>
 {

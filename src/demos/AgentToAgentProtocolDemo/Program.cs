@@ -3,12 +3,15 @@ using A2A;
 using Ananke.A2A.Client;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
+using Ananke.Orchestration.Agents.Routing;
 using AgentToAgentProtocolDemo;
 
 using AgentMessage = Ananke.Abstractions.Agents.AgentMessage;
 
 // ---------------------------------------------------------------------
-//  Ananke — Agent-to-Agent Protocol Demo
+//  Ananke ï¿½ Agent-to-Agent Protocol Demo
 //
 //  Demonstrates the A2A protocol with Ananke in two modes:
 //
@@ -18,7 +21,7 @@ using AgentMessage = Ananke.Abstractions.Agents.AgentMessage;
 //
 //  The server exposes an Ananke workflow and tools as an A2A-compliant
 //  agent. The client discovers the agent, inspects its skills, and
-//  sends messages — demonstrating cross-agent communication.
+//  sends messages ï¿½ demonstrating cross-agent communication.
 //
 //  Cross-language interop (no Ananke SDK required):
 //
@@ -103,7 +106,7 @@ async Task RunClientAsync(string url, string path)
     Console.WriteLine($"  Streaming:   {info.SupportsStreaming}");
     Console.WriteLine($"  Skills:      {info.Skills.Count}");
     foreach (var skill in info.Skills)
-        Console.WriteLine($"    • {skill.Name} — {skill.Description}");
+        Console.WriteLine($"    ï¿½ {skill.Name} ï¿½ {skill.Description}");
     Console.WriteLine();
 
     // -- 2. Use A2AAgentModel (IStreamingAgentModel) ------------------
@@ -116,7 +119,7 @@ async Task RunClientAsync(string url, string path)
         AgentUrl = new Uri($"{url}{path}")
     });
 
-    // 2a — Pipeline execution (plain text ? runs the workflow)
+    // 2a ï¿½ Pipeline execution (plain text ? runs the workflow)
     Console.WriteLine("  [Pipeline] Sending: \"Hello from the A2A client!\"");
     var response = await agentModel.GenerateAsync(new AgentRequest
     {
@@ -125,7 +128,7 @@ async Task RunClientAsync(string url, string path)
     Console.WriteLine($"  [Pipeline] Response: {response.Text}");
     Console.WriteLine();
 
-    // 2b — Tool dispatch (command: argument format)
+    // 2b ï¿½ Tool dispatch (command: argument format)
     Console.WriteLine("  [Tool] Sending: \"word_count: The quick brown fox jumps over the lazy dog\"");
     response = await agentModel.GenerateAsync(new AgentRequest
     {
@@ -152,14 +155,14 @@ async Task RunClientAsync(string url, string path)
 
     // -- 3. Show interoperability -------------------------------------
 
-    Console.WriteLine("-- Step 3: Interoperability — A2A agent as IAgentModel --");
+    Console.WriteLine("-- Step 3: Interoperability ï¿½ A2A agent as IAgentModel --");
     Console.WriteLine();
     Console.WriteLine("  The A2AAgentModel implements IStreamingAgentModel, so it");
     Console.WriteLine("  plugs into any Ananke workflow, AgentJob, or model router");
     Console.WriteLine("  exactly like a local OpenAI/Anthropic/Google model.");
     Console.WriteLine();
 
-    // 3a — Use in a direct request with system prompt
+    // 3a ï¿½ Use in a direct request with system prompt
     Console.WriteLine("  [WithSystemPrompt] Sending request with system context...");
     response = await agentModel.GenerateAsync(new AgentRequest
     {
@@ -207,7 +210,7 @@ async Task RunBothAsync(string url, string path)
 void PrintBanner(string title)
 {
     Console.WriteLine("----------------------------------------------------------");
-    Console.WriteLine($"  Ananke — {title}");
+    Console.WriteLine($"  Ananke ï¿½ {title}");
     Console.WriteLine("----------------------------------------------------------");
     Console.WriteLine();
 }
