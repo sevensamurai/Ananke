@@ -1,3 +1,4 @@
+<!-- topic: design-tooling, tags: dsl, manifest, yaml, topology, mermaid, scaffold, design, nnke -->
 # 13 — Design Tooling
 
 Define workflow topologies in a text DSL or YAML manifest, bind code at runtime,

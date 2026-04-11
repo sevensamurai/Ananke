@@ -10,6 +10,7 @@
     <Project Path="demos/EntityMemoryDemo/EntityMemoryDemo.csproj" Id="c5086923-5519-4c66-a42b-e45c231f8f0d" />
     <Project Path="demos/LogEventsDemo/LogEventsDemo.csproj" Id="23aa0734-a003-485b-a2ee-46367f61ad39" />
     <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad" />
+    <Project Path="demos/SelfImprovingWorkflowDemo/SelfImprovingWorkflowDemo.csproj" />
     <Project Path="demos/SkillCatalogDemo/SkillCatalogDemo.csproj" />
     <Project Path="demos\AgenticWebDemo\AgenticWebDemo.csproj" />
     <Project Path="demos\BasicAgentDemo\BasicAgentDemo.csproj" />
@@ -60,6 +61,7 @@
   <Project Path="Ananke.Skills/Ananke.Skills.csproj" />
   <Project Path="Ananke.StateMachine\Ananke.StateMachine.csproj" />
   <Project Path="Ananke\Ananke.csproj" />
+  <Project Path="dotnet-ananke/dotnet-ananke.csproj" />
   <Project Path="wiki/wiki.csproj" />
 
 </Solution>

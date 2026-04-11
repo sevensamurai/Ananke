@@ -1,3 +1,4 @@
+<!-- topic: advanced-agents, tags: caching, retries, decorator, local-llm, resilience -->
 # 11 — Advanced Agent Features
 
 Production-ready model decorators for response caching and resilient retries,

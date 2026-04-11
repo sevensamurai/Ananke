@@ -1,0 +1,53 @@
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration;
+
+// -------------------------------------------------------------------
+//  {{name}} — Router Pattern (LLM-Driven Decision Point)
+//
+//  A classify job examines input, then a Decide node routes to one of
+//  several branch jobs based on the category. Uses lambda routing —
+//  swap to Workflow.DecideWithAgent<T>(model) for LLM-driven routing.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Router");
+Console.WriteLine();
+
+var workflow = new Workflow<RouterState>("{{name}}")
+    .Job("classify", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        // Simple keyword classification — replace with an LLM call for production
+        var category = state.Input.Contains("code", StringComparison.OrdinalIgnoreCase)
+            ? "technical"
+            : "general";
+        Console.WriteLine($"    Classified as: {category}");
+        return state with { Category = category };
+    })
+    .Job("technical", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        return state with { Response = $"[Technical] Code solution for: {state.Input}" };
+    })
+    .Job("general", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        return state with { Response = $"[General] Information about: {state.Input}" };
+    })
+    .Then("classify", Workflow.Decide<RouterState>(state =>
+        state.Category == "technical" ? "technical" : "general"))
+    .Then("technical", Workflow.End)
+    .Then("general", Workflow.End);
+
+// --- To use LLM-driven routing instead of lambda, replace .Decide with: ---
+// .Then("classify", Workflow.DecideWithAgent<RouterState>(model)
+//     .WithPrompt(s => $"Classify this request: {s.Input}")
+//     .WithOptions("technical", "general")
+//     .Build())
+
+var result = await workflow.RunAsync(new RouterState { Input = "Write code for sorting" });
+
+Console.WriteLine();
+Console.WriteLine($"  Input:    {result.State.Input}");
+Console.WriteLine($"  Category: {result.State.Category}");
+Console.WriteLine($"  Response: {result.State.Response}");
+Console.WriteLine($"  Status:   {result.Status}");

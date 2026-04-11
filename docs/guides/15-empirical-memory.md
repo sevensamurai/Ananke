@@ -1,3 +1,4 @@
+<!-- topic: empirical-memory, tags: empirical-memory, patterns, skills, heuristics, learning, confidence, qdrant -->
 # 15 — Empirical Memory
 
 Give agents a third memory layer that accumulates **patterns, skills, and heuristics

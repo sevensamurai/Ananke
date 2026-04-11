@@ -1,3 +1,4 @@
+<!-- topic: streaming-chat, tags: streaming, chat, sse, web, session, ui -->
 # 05 — Streaming Chat
 
 Build streaming chat experiences with `StreamingChatWorkflow`, SSE endpoints,

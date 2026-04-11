@@ -1,0 +1,18 @@
+/// <summary>
+/// Immutable state record for the {{name}} review-critique workflow.
+/// Threaded through generator → critic → loop.
+/// </summary>
+public sealed record ReviewState
+{
+    /// <summary>Topic or prompt for the generator.</summary>
+    public string Topic { get; init; } = "";
+
+    /// <summary>Current draft produced by the generator.</summary>
+    public string Draft { get; init; } = "";
+
+    /// <summary>Critic's quality score (0.0 = poor, 1.0 = excellent).</summary>
+    public double Score { get; init; }
+
+    /// <summary>Critic's feedback for the next revision.</summary>
+    public string Feedback { get; init; } = "";
+}

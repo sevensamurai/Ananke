@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
@@ -63,6 +63,11 @@
 
             --copy-btn-bg:          color-mix(in srgb, var(--brand-sky) 30%, transparent);
             --copy-btn-hover:       color-mix(in srgb, var(--brand-teal) 20%, transparent);
+
+            --footer-bg:            var(--topbar-bg);
+            --footer-text:          #aebdc7;
+            --footer-border:        color-mix(in srgb, var(--brand-sky) 24%, transparent);
+            --footer-link:          var(--brand-sky);
         }
 
         [data-theme="dark"] {
@@ -94,6 +99,11 @@
 
             --copy-btn-bg:          color-mix(in srgb, var(--brand-navy) 60%, transparent);
             --copy-btn-hover:       color-mix(in srgb, var(--brand-teal) 30%, transparent);
+
+            --footer-bg:            var(--topbar-bg);
+            --footer-text:          #8899a4;
+            --footer-border:        #0a3554;
+            --footer-link:          var(--brand-sky);
         }
 
         /* ── Reset / base ──────────────────────────────────────── */
@@ -128,7 +138,7 @@
         }
 
         .topbar-logo {
-              height: 2.1rem;
+            height: 1.75rem;
             border-radius: 4px;
         }
 
@@ -257,12 +267,181 @@
         }
 
         .theme-toggle:hover { opacity: 1; }
+        /* top-nav-dropdown-styles */
+        .topnav {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
 
-        /* ── Content area ──────────────────────────────────────── */
+        .topnav-item {
+            position: relative;
+        }
+
+        .topnav-item > button {
+            background: none;
+            border: none;
+            color: var(--topbar-text);
+            cursor: pointer;
+            font-size: 0.82rem;
+            padding: 0.5rem 0.65rem;
+            text-decoration: none;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            opacity: 0.9;
+            transition: opacity 0.12s;
+            line-height: 1;
+        }
+
+        .topnav-item > a {
+            color: var(--topbar-text);
+            font-size: 0.82rem;
+            padding: 0.5rem 0.65rem;
+            text-decoration: none;
+            white-space: nowrap;
+            opacity: 0.9;
+            transition: opacity 0.12s;
+        }
+
+        .topnav-item > a:hover,
+        .topnav-item > button:hover { opacity: 1; color: var(--topbar-accent); }
+
+        .topnav-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 15rem;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--sidebar-border);
+            border-radius: 0.4rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            padding: 0.35rem 0;
+            z-index: 110;
+        }
+
+        .topnav-item.open > .topnav-dropdown { display: block; }
+
+        .topnav-dropdown a {
+            display: block;
+            padding: 0.38rem 1rem;
+            font-size: 0.84rem;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            line-height: 1.45;
+            transition: background 0.1s;
+        }
+
+        .topnav-dropdown a:hover {
+            background: var(--sidebar-hover-bg);
+            color: var(--sidebar-active-text);
+        }
+
+        .topnav-dropdown .dropdown-heading {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--sidebar-section);
+            padding: 0.55rem 1rem 0.2rem;
+            pointer-events: none;
+        }
+
+        .topnav-dropdown .dropdown-heading:first-child { padding-top: 0.25rem; }
+
+        .topnav-dropdown-wide {
+            min-width: 38rem;
+            padding: 0.5rem;
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.15rem 1.5rem;
+        }
+
+        .topnav-item.open > .topnav-dropdown-wide { display: grid; }
+
+        .topnav-dropdown-wide .dropdown-col { padding: 0.15rem 0; }
+
+        .topnav-dropdown-wide .dropdown-heading {
+            padding: 0.3rem 0.75rem 0.15rem;
+        }
+
+        .topnav-dropdown-wide a {
+            padding: 0.3rem 0.75rem;
+            font-size: 0.82rem;
+        }
+
+        /* collapsible-hamburger-sections */
+        .menu-section {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+
+        .menu-section::after {
+            content: '\25B8';
+            font-size: 0.65rem;
+            transition: transform 0.15s;
+            margin-right: 0.25rem;
+        }
+
+        .menu-section.expanded::after {
+            transform: rotate(90deg);
+        }
+
+        .menu-group {
+            display: none;
+        }
+
+        .menu-group.expanded {
+            display: block;
+        }
         .content-area {
             flex: 1;
             overflow-y: auto;
             scroll-behavior: smooth;
+        }
+
+        /* ── Footer ──────────────────────────────────────────── */
+        .site-footer {
+            flex-shrink: 0;
+            background: var(--footer-bg);
+            color: var(--footer-text);
+            border-top: 1px solid var(--footer-border);
+            padding: 0.6rem 1rem;
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .site-footer-inner {
+            max-width: calc(var(--content-max) + 14rem);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .site-footer a {
+            color: var(--footer-link);
+            text-decoration: none;
+        }
+
+        .site-footer a:hover { text-decoration: underline; }
+
+        .footer-love {
+            width: 0.9rem;
+            height: 0.9rem;
+            vertical-align: -0.12em;
+            margin: 0 0.2rem;
+            color: #EF4035;
+            fill: #EF4035;
+            stroke: #EF4035;
+            stroke-width: 1.8;
         }
 
         .content-wrap {
@@ -282,6 +461,7 @@
         /* Markdown content styling */
         .content h1 { font-size: 1.8rem; margin-top: 0; color: var(--brand-navy); border-bottom: 2px solid var(--sidebar-border); padding-bottom: 0.4rem; }
         .content h2 { font-size: 1.35rem; margin-top: 2rem; color: var(--brand-navy); }
+        .content h2 a, .content h3 a { color: var(--link-color); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--link-color) 40%, transparent); text-underline-offset: 2px; }
         .content h3 { font-size: 1.1rem; margin-top: 1.5rem; color: var(--brand-navy); }
 
         [data-theme="dark"] .content h1,
@@ -662,10 +842,12 @@
             .topbar-brand { margin-right: 0; }
             .topbar-title { font-size: 0.92rem; }
             .topbar-links { display: none; }
+            .topnav { display: none; }
             .search-btn kbd { display: none; }
 
             .content-wrap { padding: 1.25rem 1rem 3rem; }
             .toc { display: none; }
+            .site-footer { padding: 0.65rem 0.75rem; }
         }
 
         @media (max-width: 1100px) {
@@ -677,15 +859,14 @@
 <body>
     <!-- ── Top Bar ──────────────────────────────────────────── -->
     <div class="topbar">
-        <a class="topbar-brand" href="#learning.md">
+        <a class="topbar-brand" href="#welcome.md">
             <img class="topbar-logo" src="ananke-logo.png" alt="Ananke" id="topbar-logo">
             <span class="topbar-title">Ananke</span>
         </a>
+        <nav class="topnav" id="topnav"></nav>
         <span class="topbar-spacer"></span>
         <button class="search-btn" id="search-btn" aria-label="Search documentation"><i data-lucide="search" style="width:14px;height:14px"></i> Search</button>
         <div class="topbar-links">
-            <a href="#faq.md">FAQ</a>
-            <a href="#about/background.md">About</a>
             <a href="https://github.com/sevensamurai/Ananke" target="_blank" id="link-gh">GitHub</a>
             <a href="https://www.nuget.org/packages/Ananke" target="_blank">NuGet</a>
         </div>
@@ -704,6 +885,13 @@
             <aside class="toc" id="toc"></aside>
         </div>
     </div>
+
+    <footer class="site-footer">
+        <div class="site-footer-inner">
+            <span>Made with <i data-lucide="heart" class="footer-love" aria-hidden="true"></i> in Melbourne, Australia.</span>
+            <span><a href="https://github.com/sevensamurai/Ananke/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>. &copy; 2026 <a href="https://github.com/sevensamurai/" target="_blank">J Patricio Gonzalez S</a>.</span>
+        </div>
+    </footer>
 
     <!-- ── Search Overlay ───────────────────────────────────── -->
     <div class="search-overlay" id="search-overlay">
@@ -729,6 +917,7 @@
     const searchOverlay = document.getElementById('search-overlay');
     const searchInput   = document.getElementById('search-input');
     const searchResults = document.getElementById('search-results');
+    const topnavEl      = document.getElementById('topnav');
 
     let siteData   = null;
     let flatItems  = [];   // ordered list of { title, path } for prev/next
@@ -799,9 +988,10 @@
     };
 
     // Add ids to headings for TOC links
-    renderer.heading = function({ text, depth, raw }) {
+    renderer.heading = function({ text, depth, raw, tokens }) {
         const id = slugify(raw);
-        return `<h${depth} id="${id}">${text}</h${depth}>`;
+        const rendered = tokens ? this.parser.parseInline(tokens) : text;
+        return `<h${depth} id="${id}">${rendered}</h${depth}>`;
     };
 
     marked.setOptions({ renderer, breaks: false, gfm: true });
@@ -856,7 +1046,8 @@
         if (siteData.repo) ghLink.href = siteData.repo;
         if (siteData.logo) document.getElementById('topbar-logo').src = siteData.logo;
 
-        // Build menu and flatItems
+        // Build navigation
+        buildTopNav();
         buildMenu();
 
         // Navigate to hash or default
@@ -864,7 +1055,95 @@
         onHashChange();
     }
 
-    // ── Hamburger menu contents ────────────────────────────────
+    // ── Top navigation (desktop dropdowns) ─────────────────────
+    function buildTopNav() {
+        if (!siteData.topNav || !topnavEl) return;
+        topnavEl.innerHTML = '';
+
+        const sectionMap = {};
+        for (const sec of siteData.sections) { sectionMap[sec.title] = sec; }
+
+        for (const nav of siteData.topNav) {
+            const item = document.createElement('div');
+            item.className = 'topnav-item';
+
+            if (nav.path) {
+                const a = document.createElement('a');
+                a.href = '#' + nav.path;
+                a.textContent = nav.title;
+                item.appendChild(a);
+                topnavEl.appendChild(item);
+                continue;
+            }
+
+            const btn = document.createElement('button');
+            btn.innerHTML = nav.title + ' <i data-lucide="chevron-down" style="width:12px;height:12px"></i>';
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                closeAllDropdowns(item);
+                item.classList.toggle('open');
+            });
+            item.appendChild(btn);
+
+            const sections = (nav.sections || []).map(function(s) { return sectionMap[s]; }).filter(Boolean);
+            const isWide = sections.length > 2;
+            const dropdown = document.createElement('div');
+            dropdown.className = isWide ? 'topnav-dropdown topnav-dropdown-wide' : 'topnav-dropdown';
+
+            if (isWide) {
+                const mid = Math.ceil(sections.length / 2);
+                [sections.slice(0, mid), sections.slice(mid)].forEach(function(group) {
+                    const col = document.createElement('div');
+                    col.className = 'dropdown-col';
+                    group.forEach(function(sec) {
+                        const h = document.createElement('div');
+                        h.className = 'dropdown-heading';
+                        h.textContent = sec.title;
+                        col.appendChild(h);
+                        sec.items.forEach(function(it) {
+                            const a = document.createElement('a');
+                            a.href = '#' + it.path;
+                            a.textContent = it.title;
+                            a.addEventListener('click', function() { closeAllDropdowns(); });
+                            col.appendChild(a);
+                        });
+                    });
+                    dropdown.appendChild(col);
+                });
+            } else {
+                sections.forEach(function(sec) {
+                    if (sections.length > 1) {
+                        const h = document.createElement('div');
+                        h.className = 'dropdown-heading';
+                        h.textContent = sec.title;
+                        dropdown.appendChild(h);
+                    }
+                    sec.items.forEach(function(it) {
+                        const a = document.createElement('a');
+                        a.href = '#' + it.path;
+                        a.textContent = it.title;
+                        a.addEventListener('click', function() { closeAllDropdowns(); });
+                        dropdown.appendChild(a);
+                    });
+                });
+            }
+
+            item.appendChild(dropdown);
+            topnavEl.appendChild(item);
+        }
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function closeAllDropdowns(except) {
+        topnavEl.querySelectorAll('.topnav-item.open').forEach(function(el) {
+            if (el !== except) el.classList.remove('open');
+        });
+    }
+
+    document.addEventListener('click', function() { if (topnavEl) closeAllDropdowns(); });
+
+    // ── Hamburger menu contents (collapsible sections) ─────────
     function buildMenu() {
         menuPanel.innerHTML = '';
         flatItems = [];
@@ -873,30 +1152,47 @@
             const heading = document.createElement('div');
             heading.className = 'menu-section';
             heading.textContent = section.title;
+
+            const group = document.createElement('div');
+            group.className = 'menu-group';
+
+            heading.addEventListener('click', function() {
+                heading.classList.toggle('expanded');
+                group.classList.toggle('expanded');
+            });
+
             menuPanel.appendChild(heading);
 
             for (const item of section.items) {
                 const a = document.createElement('a');
-                a.href = `#${item.path}`;
+                a.href = '#' + item.path;
                 a.textContent = item.title;
                 a.dataset.path = item.path;
                 a.addEventListener('click', closeMenu);
-                menuPanel.appendChild(a);
+                group.appendChild(a);
                 flatItems.push({ title: item.title, path: item.path, section: section.title });
             }
+
+            menuPanel.appendChild(group);
         }
     }
 
     // ── Highlight active menu item ─────────────────────────────
     function highlightNav(path) {
-        menuPanel.querySelectorAll('a').forEach(a => {
+        menuPanel.querySelectorAll('a').forEach(function(a) {
             a.classList.toggle('active', a.dataset.path === path);
+        });
+        menuPanel.querySelectorAll('.menu-group').forEach(function(g) {
+            if (g.querySelector('a.active')) {
+                g.classList.add('expanded');
+                g.previousElementSibling.classList.add('expanded');
+            }
         });
     }
 
     // ── Navigation ────────────────────────────────────────────
     function onHashChange() {
-        let hash = location.hash.slice(1) || 'learning.md';
+        let hash = location.hash.slice(1) || 'welcome.md';
         // Strip query params for anchor scrolling
         let anchor = null;
         if (hash.includes('?anchor=')) {
@@ -914,7 +1210,7 @@
         content.innerHTML = '<div class="loading">Loading…</div>';
 
         // Check for landing page
-        if (path === 'learning.md') {
+        if (path === 'welcome.md') {
             await loadLandingPage();
             return;
         }
@@ -960,7 +1256,7 @@
     async function loadLandingPage() {
         // Fetch the learning.md and render it, but wrap with hero
         try {
-            const resp = await fetch('learning.md');
+            const resp = await fetch(activePath);
             if (!resp.ok) throw new Error('Failed to load');
             const md = await resp.text();
             const heroImage = siteData.heroImage || siteData.logo;
@@ -972,8 +1268,9 @@
                     <p class="tagline">Vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines.</p>
                     <div class="hero-actions">
                         <a class="btn-primary" href="#guides/01-getting-started.md"><i data-lucide="arrow-right" style="width:15px;height:15px"></i> Get Started</a>
+                        <a class="btn-secondary" href="#guides/00-nnke-tool.md"><i data-lucide="wand-sparkles" style="width:15px;height:15px"></i> nnke Tool</a>
+                        <a class="btn-secondary" href="#reference/features.md"><i data-lucide="list" style="width:15px;height:15px"></i> Feature Index</a>
                         <a class="btn-secondary" href="${siteData.repo}" target="_blank"><i data-lucide="github" style="width:15px;height:15px"></i> GitHub</a>
-                        <a class="btn-secondary" href="${siteData.nuget}" target="_blank"><i data-lucide="package" style="width:15px;height:15px"></i> NuGet</a>
                     </div>
                     <div class="hero-cards">
                         <div class="hero-card">
@@ -988,8 +1285,8 @@
                         </div>
                         <div class="hero-card">
                             <div class="card-icon"><i data-lucide="brain"></i></div>
-                            <h3>Long-Term Memory</h3>
-                            <p>Document ingestion, vector search, empirical learning, skill packages.</p>
+                            <h3>Memory & Learning</h3>
+                            <p>RAG document ingestion, empirical learning from interactions, skill package export/import.</p>
                         </div>
                         <div class="hero-card">
                             <div class="card-icon"><i data-lucide="hand"></i></div>
@@ -1005,6 +1302,21 @@
                             <div class="card-icon"><i data-lucide="radio"></i></div>
                             <h3>MCP & A2A</h3>
                             <p>Expose workflows as MCP servers. Agent-to-Agent protocol support.</p>
+                        </div>
+                        <div class="hero-card">
+                            <div class="card-icon"><i data-lucide="terminal"></i></div>
+                            <h3>nnke Design CLI</h3>
+                            <p>Scaffold projects, validate topologies, export diagrams. MCP companion for AI coding tools.</p>
+                        </div>
+                        <div class="hero-card">
+                            <div class="card-icon"><i data-lucide="repeat"></i></div>
+                            <h3>Agentic Patterns</h3>
+                            <p>Review &amp; Critique, Iterative Refinement — pre-wired builders for recognized patterns.</p>
+                        </div>
+                        <div class="hero-card">
+                            <div class="card-icon"><i data-lucide="book-open"></i></div>
+                            <h3>External Skill Catalog</h3>
+                            <p>Discover and run Python, Node.js, and Docker tools from registries — no install needed.</p>
                         </div>
                     </div>
                 </div>

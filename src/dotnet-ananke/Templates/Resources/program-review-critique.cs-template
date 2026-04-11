@@ -1,0 +1,76 @@
+using System.Text.Json;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration;
+using Ananke.Orchestration.Agents;
+
+// -------------------------------------------------------------------
+//  {{name}} — Review & Critique Pattern
+//
+//  A generator agent produces output, a critic evaluates it, and the
+//  loop repeats until the critic approves or the iteration cap is hit.
+//  Uses SimulatedModel — runs without API keys. Replace with real
+//  provider when ready: Ananke.Orchestration.OpenAI, .Anthropic, etc.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Review & Critique");
+Console.WriteLine();
+
+var iteration = 0;
+
+var generator = AgentJobFactory.Create<ReviewState, GeneratorResponse>("generator",
+        new SimulatedModel(_ => JsonSerializer.Serialize(
+            new GeneratorResponse { Draft = "AI agents can autonomously perform tasks using tool calling." })))
+    .WithSystemPrompt("You are a skilled writer. Produce a clear, detailed draft on the given topic.")
+    .WithPrompt(s => string.IsNullOrEmpty(s.Draft)
+        ? $"Write about: {s.Topic}"
+        : $"Revise based on feedback: {s.Feedback}\n\nCurrent draft: {s.Draft}")
+    .MapResult((s, r) =>
+    {
+        iteration++;
+        Console.WriteLine($"    Generator v{iteration}: {r.Draft?[..Math.Min(60, r.Draft?.Length ?? 0)]}...");
+        return s with { Draft = $"[v{iteration}] {r.Draft}" };
+    })
+    .Build();
+
+var critic = AgentJobFactory.Create<ReviewState, CriticResponse>("critic",
+        new SimulatedModel(_ => JsonSerializer.Serialize(
+            new CriticResponse { Score = 0.0, Feedback = "Needs more depth and examples." })))
+    .WithSystemPrompt("You are a demanding editor. Score the draft 0.0-1.0 and give specific feedback.")
+    .WithPrompt(s => $"Critique this draft (0-1 score):\n\n{s.Draft}")
+    .MapResult((s, r) =>
+    {
+        // Simulate improving scores across iterations
+        var score = Math.Min(1.0, 0.3 * iteration);
+        Console.WriteLine($"    Critic: score={score:F1} — {r.Feedback}");
+        return s with { Score = score, Feedback = r.Feedback ?? "" };
+    })
+    .Build();
+
+var workflow = AgenticPattern.ReviewCritique<ReviewState>("{{name}}")
+    .WithGenerator(generator)
+    .WithCritic(critic)
+    .Until(s => s.Score >= 0.9)
+    .MaxIterations(5)
+    .Build();
+
+var result = await workflow.RunAsync(new ReviewState { Topic = "AI Agents in Production" });
+
+Console.WriteLine();
+Console.WriteLine($"  Final draft: {result.State.Draft}");
+Console.WriteLine($"  Final score: {result.State.Score:F1}");
+Console.WriteLine($"  Status:      {result.Status}");
+
+// --- SimulatedModel: replace with real provider ---
+
+internal sealed class SimulatedModel(Func<AgentRequest, string> responder) : IAgentModel
+{
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse
+        {
+            Text = responder(request),
+            Usage = new TokenUsage { InputTokens = 100, OutputTokens = 50 }
+        });
+}
+
+internal sealed record GeneratorResponse { public string? Draft { get; init; } }
+internal sealed record CriticResponse { public double Score { get; init; } public string? Feedback { get; init; } }

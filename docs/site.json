@@ -1,31 +1,54 @@
-{
+﻿{
   "title": "Ananke",
   "subtitle": "AI Agent Orchestration for .NET",
   "logo": "ananke-logo.png",
   "heroImage": "ananke-creation.png",
   "repo": "https://github.com/sevensamurai/Ananke",
   "nuget": "https://www.nuget.org/packages/Ananke",
+  "topNav": [
+    { "title": "Getting Started", "sections": ["Getting Started"] },
+    { "title": "Guides", "sections": ["Foundation", "Building Applications", "Infrastructure", "Advanced"] },
+    { "title": "Reference", "sections": ["Reference"] },
+    { "title": "FAQ", "path": "faq.md" },
+    { "title": "About", "path": "about/background.md" }
+  ],
   "sections": [
     {
       "title": "Getting Started",
       "items": [
+        { "title": "Welcome", "path": "welcome.md", "tags": ["landing", "welcome", "start", "overview", "navigation"] },
         { "title": "Overview & Learning Path", "path": "learning.md", "tags": ["introduction", "learning", "overview", "roadmap"] },
-        { "title": "FAQ", "path": "faq.md", "tags": ["questions", "help", "troubleshooting"] }
+        { "title": "nnke Tool Companion", "path": "guides/00-nnke-tool.md", "tags": ["nnke", "dotnet tool", "copilot", "claude", "design", "tooling"] }
       ]
     },
     {
-      "title": "Guides",
+      "title": "Foundation",
       "items": [
         { "title": "01 — Getting Started", "path": "guides/01-getting-started.md", "tags": ["install", "setup", "nuget", "hello world", "quickstart"] },
         { "title": "02 — Workflows", "path": "guides/02-workflows.md", "tags": ["graph", "pipeline", "routing", "fork", "join", "parallel", "conditional", "fluent builder"] },
         { "title": "03 — Agents", "path": "guides/03-agents.md", "tags": ["AI", "LLM", "OpenAI", "Anthropic", "Google", "chat", "provider", "structured output"] },
-        { "title": "04 — Tools", "path": "guides/04-tools.md", "tags": ["tool calling", "function calling", "plugins", "capabilities"] },
+        { "title": "04 — Tools", "path": "guides/04-tools.md", "tags": ["tool calling", "function calling", "plugins", "capabilities"] }
+      ]
+    },
+    {
+      "title": "Building Applications",
+      "items": [
         { "title": "05 — Streaming Chat", "path": "guides/05-streaming-chat.md", "tags": ["SSE", "streaming", "real-time", "chat", "async"] },
         { "title": "06 — Long-Term Memory", "path": "guides/06-memory.md", "tags": ["vector", "embedding", "RAG", "document", "ingestion", "semantic search"] },
-        { "title": "07 — Human-in-the-Loop", "path": "guides/07-human-in-the-loop.md", "tags": ["approval", "pause", "resume", "checkpoint", "human review"] },
+        { "title": "07 — Human-in-the-Loop", "path": "guides/07-human-in-the-loop.md", "tags": ["approval", "pause", "resume", "checkpoint", "human review"] }
+      ]
+    },
+    {
+      "title": "Infrastructure",
+      "items": [
         { "title": "08 — State Machine", "path": "guides/08-state-machine.md", "tags": ["interrupt", "middleware", "circuit breaker", "RedLock", "coordination"] },
         { "title": "09 — Distributed", "path": "guides/09-distributed.md", "tags": ["Redis", "distributed", "scaling", "persistence", "cloud"] },
-        { "title": "10 — Observability", "path": "guides/10-observability.md", "tags": ["logging", "tracing", "metrics", "OpenTelemetry", "diagnostics"] },
+        { "title": "10 — Observability", "path": "guides/10-observability.md", "tags": ["logging", "tracing", "metrics", "OpenTelemetry", "diagnostics"] }
+      ]
+    },
+    {
+      "title": "Advanced",
+      "items": [
         { "title": "11 — Advanced Agents", "path": "guides/11-advanced-agents.md", "tags": ["multi-agent", "orchestration", "planning", "reasoning", "chain of thought"] },
         { "title": "12 — MCP & Interop", "path": "guides/12-mcp-and-interop.md", "tags": ["MCP", "A2A", "protocol", "server", "interoperability", "model context"] },
         { "title": "13 — Design Tooling", "path": "guides/13-design-tooling.md", "tags": ["visual", "designer", "graph editor", "diagramming"] },
@@ -46,11 +69,21 @@
       ]
     },
     {
+      "title": "FAQ",
+      "items": [
+        { "title": "FAQ Overview", "path": "faq.md", "tags": ["faq", "questions", "help", "troubleshooting"] },
+        { "title": "General & Installation", "path": "faq/general.md", "tags": ["faq", "general", "installation", "setup"] },
+        { "title": "LLM Providers", "path": "faq/providers.md", "tags": ["faq", "llm", "providers", "openai", "anthropic"] },
+        { "title": "Workflows & State Machine", "path": "faq/workflows.md", "tags": ["faq", "workflows", "state-machine", "routing"] },
+        { "title": "Memory & Learning", "path": "faq/memory.md", "tags": ["faq", "memory", "rag", "empirical", "skills"] },
+        { "title": "Integration & Interop", "path": "faq/integration.md", "tags": ["faq", "human-in-the-loop", "mcp", "a2a"] },
+        { "title": "Testing, Observability & Design", "path": "faq/operations.md", "tags": ["faq", "testing", "observability", "architecture", "orleans"] }
+      ]
+    },
+    {
       "title": "About",
       "items": [
-        { "title": "Background & Philosophy", "path": "about/background.md", "tags": ["motivation", "design", "architecture", "philosophy"] },
-        { "title": "Framework Comparison", "path": "about/framework-comparison.md", "tags": ["AutoGen", "Semantic Kernel", "LangChain", "comparison", "alternatives"] },
-        { "title": "Why Not Orleans?", "path": "about/why-not-orleans.md", "tags": ["Orleans", "actor model", "comparison", "trade-offs"] }
+        { "title": "Background & Philosophy", "path": "about/background.md", "tags": ["motivation", "design", "architecture", "philosophy"] }
       ]
     }
   ]

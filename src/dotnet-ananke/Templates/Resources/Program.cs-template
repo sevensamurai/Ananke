@@ -1,0 +1,42 @@
+using Ananke.Design;
+using Ananke.Abstractions.Agents;
+using Microsoft.Extensions.Configuration;
+
+// --- 1. Configuration ---
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("secrets.json", optional: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+// --- 2. Load workflow manifest ---
+var yamlPath = Path.Combine(AppContext.BaseDirectory, "{{name}}.ananke.yml");
+var manifest = WorkflowManifest.Load(yamlPath);
+
+Console.WriteLine($"  Workflow: {manifest.Name}");
+Console.WriteLine($"  Jobs:    {string.Join(", ", manifest.Jobs.Keys)}");
+Console.WriteLine();
+
+// --- 3. Resolve models from secrets ---
+// Uncomment and configure the providers your manifest uses.
+// var models = new ModelResolver()
+//     .Register("openai", "OpenAI", OpenAIChatAgentModel.Create)
+//     .Resolve(manifest, key => config[key]);
+
+// --- 4. Parse topology and bind jobs ---
+var scaffold = WorkflowScaffold.Parse<PipelineState>(manifest.Name, manifest.Connections);
+
+Console.WriteLine($"  Discovered: {string.Join(", ", scaffold.JobNames)}");
+Console.WriteLine($"  Unbound:    {string.Join(", ", scaffold.UnboundJobs)}");
+Console.WriteLine();
+
+// --- 5. Bind code jobs ---
+// TODO: Bind your code jobs here. Example:
+// scaffold.Bind("fetch_a", async (state, ct) => state with { /* ... */ });
+
+// --- 6. Build and run ---
+// var workflow = scaffold.Build();
+// var execution = await workflow.RunAsync(new PipelineState());
+// Console.WriteLine($"  Status: {execution.Status}");
+
+Console.WriteLine("  Scaffold ready — bind your jobs and uncomment the runner above.");

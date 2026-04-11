@@ -1,0 +1,41 @@
+# {{name}}.ananke.yml
+# ────────────────────────────────────────────────
+# Fan-out/fan-in pattern: parallel branches with merge.
+# ────────────────────────────────────────────────
+
+name: {{name}}
+
+models:
+  worker:
+    provider: {{provider}}
+    model: {{model}}
+
+jobs:
+  dispatch:
+    type: code
+
+  branch_a:
+    type: agent
+    model: worker
+    system_prompt: |
+      You process branch A data. Respond with a concise summary.
+
+  branch_b:
+    type: agent
+    model: worker
+    system_prompt: |
+      You process branch B data. Respond with a concise summary.
+
+  branch_c:
+    type: agent
+    model: worker
+    system_prompt: |
+      You process branch C data. Respond with a concise summary.
+
+  merge:
+    type: code
+
+connections:
+  - dispatch -> fork(branch_a, branch_b, branch_c)
+  - join(branch_a, branch_b, branch_c) -> merge
+  - merge -> End

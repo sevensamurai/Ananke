@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "ananke": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/dotnet-ananke/dotnet-ananke.csproj",
+        "--",
+        "mcp-server"
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+using System.Text.Json;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration;
+using Ananke.Orchestration.Agents;
+
+// -------------------------------------------------------------------
+//  {{name}} — Iterative Refinement Pattern
+//
+//  A single agent refines its output over multiple cycles until a
+//  quality threshold is met or the iteration cap is reached.
+//  Uses SimulatedModel — runs without API keys.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Iterative Refinement");
+Console.WriteLine();
+
+var round = 0;
+
+var refineAgent = AgentJobFactory.Create<RefinementState, RefinementResponse>("refine",
+        new SimulatedModel(_ => JsonSerializer.Serialize(
+            new RefinementResponse { Output = "Refined and improved output." })))
+    .WithSystemPrompt("You are a meticulous editor. Improve the output each round.")
+    .WithPrompt(s => $"Improve this output (round {s.Iteration + 1}):\n\n{s.Output}")
+    .MapResult((s, r) =>
+    {
+        round++;
+        var quality = Math.Min(1.0, 0.25 * round);
+        Console.WriteLine($"    Round {round}: quality={quality:F2}");
+        return s with
+        {
+            Output = $"[r{round}] {r.Output}",
+            QualityScore = quality,
+            Iteration = round
+        };
+    })
+    .Build();
+
+var workflow = AgenticPattern.IterativeRefinement<RefinementState>("{{name}}")
+    .WithAgent(refineAgent)
+    .Until(s => s.QualityScore >= 0.95)
+    .MaxIterations(8)
+    .Build();
+
+var result = await workflow.RunAsync(new RefinementState { Output = "Initial rough draft." });
+
+Console.WriteLine();
+Console.WriteLine($"  Final output:  {result.State.Output}");
+Console.WriteLine($"  Final quality: {result.State.QualityScore:F2}");
+Console.WriteLine($"  Iterations:    {result.State.Iteration}");
+Console.WriteLine($"  Status:        {result.Status}");
+
+// --- SimulatedModel: replace with real provider ---
+
+internal sealed class SimulatedModel(Func<AgentRequest, string> responder) : IAgentModel
+{
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse
+        {
+            Text = responder(request),
+            Usage = new TokenUsage { InputTokens = 100, OutputTokens = 50 }
+        });
+}
+
+internal sealed record RefinementResponse { public string? Output { get; init; } }

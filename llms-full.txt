@@ -1,0 +1,264 @@
+# Ananke
+
+> .NET 10 library for AI agent orchestration. Build workflows, agents, tools, and multi-agent systems with a fluent C# API and optional YAML manifest topology.
+
+This is the extended reference for LLMs. It includes detailed API summaries, key types, error codes, and pattern descriptions alongside all documentation links.
+
+---
+
+## Core Concepts
+
+### Workflow
+
+`Workflow<TState>` is the primary builder. `TState` is a C# record that carries all state between jobs.
+
+```csharp
+var workflow = new Workflow<MyState>("name")
+    .Job("step_a", async (state, ct) => state with { A = "done" })
+    .Job("step_b", async (state, ct) => state with { B = "done" })
+    .Then("step_a", "step_b")
+    .RunAsync(initialState, cancellationToken);
+```
+
+Key builder methods:
+- `.Job(name, func)` — register an async job
+- `.Job(name, IJob<TState>)` — register an `IJob<TState>` implementation
+- `.Then(from, to)` — direct connection
+- `.Fork(from, to[])` — fan-out to parallel branches
+- `.Join(from[], to, mergeFunc)` — fan-in from parallel branches
+- `.SubFlow(name, innerWorkflow, mapIn, mapOut)` — embed a nested workflow
+- `.Decide(name, func, branches)` — conditional routing with a predicate
+- `.DecideWithAgent(name, agentJob, branches)` — LLM-driven routing
+- `.Interrupt(name, InterruptMode.Before | After)` — mark a job for human review
+- `.RunAsync(state, ct)` — execute
+
+### AgentJob
+
+Wraps an `IStreamingAgentModel` as a workflow job with a system prompt, user prompt template, optional tools, and typed response mapping.
+
+```csharp
+var agentJob = new AgentJob<MyState, MyResponse>(
+    name: "analyze",
+    model: openAiModel,
+    systemPrompt: "You are an analyst.",
+    userPrompt: s => $"Analyze: {s.Input}",
+    tools: myToolKit,
+    mapResponse: (state, response) => state with { Result = response.Analysis }
+);
+```
+
+### ToolKit
+
+Groups named functions for LLM tool-calling.
+
+```csharp
+var tools = new ToolKit("my-tools")
+    .Add("search_web", "Search the web for recent information",
+        new { query = new ToolParameter<string>("Search query") },
+        async (p, ct) => ToolResult.Ok(await SearchAsync(p.query)));
+```
+
+### IStreamingAgentModel / Providers
+
+| Interface | Package | Type |
+|-----------|---------|------|
+| `IStreamingAgentModel` | `Ananke.Orchestration` | Base interface |
+| `OpenAIStreamingModel` | `Ananke.Orchestration.OpenAI` | OpenAI / Azure |
+| `AnthropicStreamingModel` | `Ananke.Orchestration.Anthropic` | Claude |
+| `GoogleStreamingModel` | `Ananke.Orchestration.Google` | Gemini |
+| `SimulatedModel` | `Ananke.Orchestration` | Testing (no API keys) |
+
+### Design DSL
+
+`Ananke.Design` separates topology (text) from behavior (code).
+
+```ananke-dsl
+plan -> fork(fetch_a, fetch_b)
+join(fetch_a, fetch_b) -> combine
+combine -> End
+```
+
+Parse and bind:
+```csharp
+var scaffold = WorkflowScaffold.Parse<MyState>(dslLines);
+scaffold.Bind("plan", planJob).Bind("fetch_a", fetchAJob)...;
+var workflow = scaffold.Build();
+```
+
+YAML manifest (`.ananke.yml`):
+```yaml
+name: my-pipeline
+models:
+  default: { provider: openai, model: gpt-4o }
+jobs:
+  plan: agent
+  fetch_a: code
+  fetch_b: code
+  combine: agent
+connections:
+  - plan -> fork(fetch_a, fetch_b)
+  - join(fetch_a, fetch_b) -> combine
+  - combine -> End
+```
+
+DSL connection syntax:
+
+| Syntax | Meaning |
+|--------|---------|
+| `a -> b` | Direct connection from a to b |
+| `a -> fork(b, c)` | Fan-out: a dispatches to b and c in parallel |
+| `join(b, c) -> d` | Fan-in: d runs after both b and c complete |
+| `a -> router(b, c, d)` | Dynamic routing via `IRouter<T>` |
+| `interrupt(name)` | Mark job `name` for human review |
+| `a -> End` | Terminate workflow |
+
+---
+
+## Agentic Patterns
+
+Pre-wired builders in `AgenticPattern`:
+
+### ReviewCritique
+```csharp
+var workflow = AgenticPattern.ReviewCritique<ReviewState>("review")
+    .WithGenerator(generatorAgent)
+    .WithCritic(criticAgent)
+    .Until(s => s.Score >= 0.9)
+    .MaxIterations(6)
+    .Build();
+```
+State: `{ Draft, Score, Feedback, Topic }`
+
+### IterativeRefinement
+```csharp
+var workflow = AgenticPattern.IterativeRefinement<RefinementState>("refine")
+    .WithRefiner(refinerAgent)
+    .Until(s => s.QualityScore >= threshold)
+    .MaxIterations(5)
+    .Build();
+```
+State: `{ Output, QualityScore, Iteration }`
+
+### Router
+```csharp
+var workflow = AgenticPattern.Router<RouterState>("route")
+    .WithClassifier(classifierAgent)
+    .AddBranch("technical", techAgent)
+    .AddBranch("billing", billingAgent)
+    .Build();
+```
+State: `{ Input, Category, Response }`
+
+### Handoff
+```csharp
+var workflow = AgenticPattern.Handoff<HandoffState>("triage")
+    .WithTriage(triageAgent)
+    .HandoffTo<SpecialistState>(channel, mapIn, mapOut)
+    .Build();
+```
+
+---
+
+## CLI Tooling — `nnke`
+
+Install: `dotnet tool install -g dotnet-ananke`
+
+### Commands
+
+| Command | Output | Purpose |
+|---------|--------|---------|
+| `nnke new workflow <name> --pattern <p>` | Files | Scaffold a complete runnable project |
+| `nnke new workflow <name> --pattern <p> --json` | JSON | Machine-readable scaffold report |
+| `nnke validate <file>` | Text | Validate `.ananke.yml` topology |
+| `nnke validate <file> --json` | JSON | Structured validation result |
+| `nnke inspect <dir> --json` | JSON | Full project health report |
+| `nnke docs <topic> --json` | JSON | Read a documentation topic |
+| `nnke docs --search "<q>" --json` | JSON | Search documentation with snippets |
+| `nnke explain <code> --json` | JSON | Explain a diagnostic error code |
+| `nnke patterns --json` | JSON | List all available patterns |
+| `nnke patterns <name> --json` | JSON | Pattern details with API example |
+| `nnke schema` | JSON | Full command catalog (agent self-discovery) |
+| `nnke mcp-server` | stdio | Run as MCP server |
+
+### Available Patterns
+
+| Pattern | Style | Topology |
+|---------|-------|---------|
+| `sequential` | manifest | `a -> b -> c -> End` |
+| `etl` | manifest | `extract -> fork(a, b) -> join -> combine -> End` |
+| `fan-out` | manifest | `dispatch -> fork(a, b, c) -> join -> merge -> End` |
+| `human-in-the-loop` | manifest | `process -> interrupt(review) -> publish -> End` |
+| `sub-workflow` | manifest | `prep -> subflow(inner) -> publish -> End` |
+| `review-critique` | code | Generator ↔ Critic loop until approved |
+| `iterative-refinement` | code | Single-agent self-refine loop |
+| `router` | code | LLM-driven decision routing |
+| `handoff` | code | Delegate to external agent, await response |
+
+### Diagnostic Error Codes
+
+| Code | Meaning | Fix |
+|------|---------|-----|
+| `ANANKE_TOPO_001` | Unreachable job | Ensure every job has at least one incoming connection |
+| `ANANKE_TOPO_002` | No path to `End` | All branches must terminate at `End` |
+| `ANANKE_TOPO_003` | Fork without matching join | Add `join(a, b) -> next` before the merge point |
+| `ANANKE_TOPO_004` | Undefined job referenced in connection | Declare the job in `jobs:` |
+| `ANANKE_MODEL_001` | Model alias not defined in `models:` | Add alias to `models:` block |
+| `ANANKE_MANIFEST_001` | YAML parse error | Check `.ananke.yml` syntax |
+
+---
+
+## Memory
+
+### Long-Term Memory (Knowledge)
+
+```csharp
+var processor = new DocumentProcessor(extractor, chunker, embedder, store);
+await processor.IngestAsync(document, ct);
+var results = await store.SearchAsync("query text", topK: 5, ct);
+```
+
+Interfaces: `IDocumentExtractor`, `IDocumentChunker`, `IEmbeddingModel`, `IKnowledgeStore`
+In-memory impl: `InMemoryKnowledgeStore`
+Qdrant impl: `QdrantKnowledgeStore` (`Ananke.Memory.Qdrant`)
+
+### Empirical Memory
+
+Three kinds: `EmpiricalKind.Pattern`, `EmpiricalKind.Skill`, `EmpiricalKind.Heuristic`
+
+```csharp
+var tools = new EmpiricalMemoryTools(empiricalMemory);
+// Exposes: recall_empirical, commit_insight, reinforce_empirical
+```
+
+Interface: `IEmpiricalMemory`
+In-memory impl: `InMemoryEmpiricalMemory`
+Qdrant impl: `QdrantEmpiricalMemory` (`Ananke.Learning`)
+
+---
+
+## Guides
+
+- [Getting Started](docs/guides/01-getting-started.md): Install, first workflow, first agent
+- [Workflows](docs/guides/02-workflows.md): Full `Workflow<T>` builder API
+- [Agents](docs/guides/03-agents.md): `AgentJob`, providers, structured output
+- [Tools](docs/guides/04-tools.md): `ToolKit` construction, parameter schema
+- [Streaming Chat](docs/guides/05-streaming-chat.md): `StreamingChatWorkflow`, SSE, web UI
+- [Long-Term Memory](docs/guides/06-memory.md): Knowledge pipeline, vector search
+- [Human-in-the-Loop](docs/guides/07-human-in-the-loop.md): Interrupt, checkpoint, resume
+- [State Machine](docs/guides/08-state-machine.md): `IStateMachine<S,T>`, distributed, middleware
+- [Distributed Systems](docs/guides/09-distributed.md): Redis, MQTT, handoff, Bridge
+- [Observability](docs/guides/10-observability.md): OpenTelemetry, OTLP
+- [Advanced Agent Features](docs/guides/11-advanced-agents.md): Caching, retries, decorators
+- [MCP & Interop](docs/guides/12-mcp-and-interop.md): MCP server, A2A protocol
+- [Design Tooling](docs/guides/13-design-tooling.md): DSL, YAML manifests, Mermaid
+- [Testing](docs/guides/14-testing.md): `SimulatedModel`, in-memory impls, test patterns
+- [Empirical Memory](docs/guides/15-empirical-memory.md): `IEmpiricalMemory`, confidence, Qdrant
+- [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md): Options and configuration
+- [Agentic Patterns](docs/guides/16-agentic-patterns.md): `AgenticPattern` builders
+
+## Reference
+
+- [DSL Syntax](docs/reference/workflow-dsl.md): Complete DSL connection syntax reference
+- [Feature Index](docs/reference/features.md): Every feature, package, demo in one table
+- [Tools Reference](docs/reference/tools-reference.md): Full `ToolKit` API
+- [Advanced Agent Features Reference](docs/reference/advanced-agent-features.md): Decorator API

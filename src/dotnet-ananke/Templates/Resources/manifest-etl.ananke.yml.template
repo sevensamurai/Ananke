@@ -1,0 +1,54 @@
+# {{name}}.ananke.yml
+# ────────────────────────────────────────────────
+# Declarative workflow: topology + agent config.
+# Job implementations are bound in code via Bind().
+# Agent jobs are auto-built from this config.
+# ────────────────────────────────────────────────
+
+name: {{name}}
+
+# Model aliases — resolved to IAgentModel instances at load time.
+# API keys come from secrets.json, not this file.
+models:
+  planner:
+    provider: {{provider}}
+    model: {{model}}
+  analyst:
+    provider: {{provider}}
+    model: {{model}}
+
+# Job declarations — "type: agent" jobs are auto-constructed from config.
+# "type: code" jobs must be bound in code via Bind().
+jobs:
+  plan:
+    type: agent
+    model: planner
+    system_prompt: |
+      You are a planning agent. Given a data request, produce a short
+      structured plan. Respond as JSON only.
+    max_tool_rounds: 1
+
+  fetch_a:
+    type: code
+
+  fetch_b:
+    type: code
+
+  transform:
+    type: agent
+    model: analyst
+    system_prompt: |
+      You receive raw data and produce a cleaned, normalized summary.
+      Respond with a concise plain-text summary (2-3 sentences).
+
+  combine:
+    type: code
+
+# Topology — DSL syntax.
+connections:
+  - plan -> fork(fetch_a, fetch_b)
+  - fetch_a -> transform
+  - fetch_b -> transform
+  - join(fetch_a, fetch_b) -> transform
+  - transform -> combine
+  - combine -> End

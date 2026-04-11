@@ -1,0 +1,15 @@
+/// <summary>
+/// Immutable state record for the {{name}} handoff workflow.
+/// Threaded through triage → [handoff to specialist] → finalize → End.
+/// </summary>
+public sealed record HandoffState
+{
+    /// <summary>Incoming request to triage.</summary>
+    public string Request { get; init; } = "";
+
+    /// <summary>The queue/agent the request was delegated to.</summary>
+    public string DelegatedTo { get; init; } = "";
+
+    /// <summary>Resolution from the external specialist.</summary>
+    public string Resolution { get; init; } = "";
+}

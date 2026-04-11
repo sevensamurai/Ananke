@@ -1,3 +1,4 @@
+<!-- topic: observability, tags: opentelemetry, tracing, otlp, metrics, spans -->
 # 10 — Observability
 
 Add distributed tracing to workflows, agents, and state machines with

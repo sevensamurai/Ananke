@@ -1,4 +1,7 @@
+<!-- topic: learning-path, tags: documentation, index, learning-path, guides, overview -->
 # Ananke Documentation
+
+New here? Start with the [Welcome page](welcome.md) for a quick orientation and navigation map.
 
 Welcome to the Ananke documentation. You can follow the guides in order as a
 **progressive learning path**, or jump directly to any topic that interests you.
@@ -69,6 +72,7 @@ If you know what you're looking for, jump straight to a topic:
 - **Empirical memory** — [Guide 15](guides/15-empirical-memory.md) · Patterns, skills, heuristics learned from interaction, confidence tracking
 
 ### Patterns
+- **nnke design companion** — [00 — nnke Tool Companion](guides/00-nnke-tool.md) · AI-assisted workflow design, topology iteration, design-time loop
 - **Streaming chat with web UI** — [Guide 05](guides/05-streaming-chat.md)
 - **Stateful multi-phase SSE chatbot** — [Guide 05](guides/05-streaming-chat.md) + [Guide 08](guides/08-state-machine.md) · `ChatSession<S,T>`, `IStateMachine<S,T>`, `InMemorySessionStore`
 - **Human-in-the-loop approval** — [Guide 07](guides/07-human-in-the-loop.md)
@@ -97,7 +101,6 @@ If you know what you're looking for, jump straight to a topic:
 |---|---|
 | [Feature Index](reference/features.md) | Every feature in one table — description, guide, package, and demo links |
 | [Background & Philosophy](about/background.md) | Why the framework is named Ananke and what "infrastructure first" means |
-| [Framework Comparison](about/framework-comparison.md) | Feature-by-feature comparison with LangGraph, Semantic Kernel, CrewAI, and others |
 | [Package READMEs](../README.md#packages) | Per-package API documentation and quick-start |
 | [Demo Projects](../src/demos/) | Runnable examples for every major feature |
 | [Release Notes](../releases/) | What changed in each version |

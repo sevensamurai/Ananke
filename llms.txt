@@ -1,0 +1,70 @@
+# Ananke
+
+> .NET 10 library for AI agent orchestration. Build workflows, agents, tools, and multi-agent systems with a fluent C# API and optional YAML manifest topology.
+
+## Getting Started
+
+- [Installation & First Workflow](docs/guides/01-getting-started.md): Install packages, build a workflow, make your first LLM call
+- [Learning Path](docs/learning.md): Numbered guide sequence, topic index, demo cross-references
+
+## Guides
+
+- [Workflows](docs/guides/02-workflows.md): `Workflow<TState>` builder, `Job`, `Then`, `Fork`, `Join`, `SubFlow`, `Decide`, `DecideWithAgent`, event streaming
+- [Agents](docs/guides/03-agents.md): `AgentJob`, OpenAI / Anthropic / Google / local providers, structured output, `ModelCapability`, multimodal messages
+- [Tools](docs/guides/04-tools.md): `ToolKit`, typed parameters, `ToolResult.Ok` / `ToolResult.Error`, effective descriptions
+- [Streaming Chat](docs/guides/05-streaming-chat.md): `StreamingChatWorkflow`, `ChatSession<S,T>`, SSE endpoints, web UI integration
+- [Long-Term Memory](docs/guides/06-memory.md): Knowledge pipeline (extract → chunk → embed → store), `KnowledgeBase`, catalog, time-decay reranking
+- [Human-in-the-Loop](docs/guides/07-human-in-the-loop.md): Interrupt before/after a job, checkpointing, resume with modified state
+- [State Machine](docs/guides/08-state-machine.md): `IStateMachine<S,T>` (in-process), `AbstractStateMachine` (distributed), guard conditions, middleware, circuit breaking
+- [Distributed Systems](docs/guides/09-distributed.md): Redis locking, MQTT pub/sub, agent handoff, Bridge layer
+- [Observability](docs/guides/10-observability.md): OpenTelemetry tracing, OTLP export, span attributes
+- [Advanced Agent Features](docs/guides/11-advanced-agents.md): Response caching, resilient retries, decorator composition, local LLM endpoints
+- [MCP & Interop](docs/guides/12-mcp-and-interop.md): Expose tools/workflows as MCP server, consume external MCP tools, A2A protocol
+- [Design Tooling](docs/guides/13-design-tooling.md): Text DSL, YAML manifests, `WorkflowScaffold`, Mermaid diagram export, `nnke` CLI
+- [Testing](docs/guides/14-testing.md): In-memory implementations, `SimulatedModel`, zero-config integration tests
+- [Empirical Memory](docs/guides/15-empirical-memory.md): `IEmpiricalMemory`, patterns / skills / heuristics, confidence tracking, `QdrantEmpiricalMemory`
+- [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md): `AffectOptions`, `OfflineLearnerOptions`, domain-specific configuration
+- [Agentic Patterns](docs/guides/16-agentic-patterns.md): `AgenticPattern.ReviewCritique`, `IterativeRefinement`, `Router`, `Handoff`
+
+## Reference
+
+- [DSL Syntax](docs/reference/workflow-dsl.md): Text DSL (`a -> b`, `fork(b,c)`, `join(b,c) -> d`, `interrupt(name)`, `router(...)`), YAML manifest format
+- [Feature Index](docs/reference/features.md): Every feature, package, and demo in one table
+- [Tools Reference](docs/reference/tools-reference.md): Full `ToolKit` API, parameter types, `ToolResult`, MCP/A2A exposure
+- [Advanced Agent Features Reference](docs/reference/advanced-agent-features.md): Decorator API, cache/retry configuration
+
+## CLI Tooling (`nnke`)
+
+The `nnke` .NET global tool (`src/dotnet-ananke`) provides scaffolding, validation, and self-diagnosis:
+
+- `nnke new workflow <name> --pattern <pattern>` — scaffold a complete runnable project
+- `nnke validate <file> --json` — validate an `.ananke.yml` manifest with structured error codes
+- `nnke inspect <dir> --json` — full project health report (topology, dependencies, patterns)
+- `nnke docs --search "<query>" --json` — search framework documentation
+- `nnke explain <code> --json` — explain a diagnostic error code (e.g. `ANANKE_TOPO_003`)
+- `nnke patterns --json` — list all available workflow and agentic patterns
+- `nnke schema` — emit JSON schema of all commands for agent self-discovery
+- `nnke mcp-server` — run as an MCP stdio server (configure in `.vscode/mcp.json`)
+
+## Key Packages
+
+| Package | Purpose |
+|---------|---------|
+| `Ananke` | Meta-package — installs everything |
+| `Ananke.Orchestration` | Core: `Workflow<T>`, `AgentJob`, `ToolKit`, `IStreamingAgentModel` |
+| `Ananke.Orchestration.OpenAI` | OpenAI / Azure OpenAI provider |
+| `Ananke.Orchestration.Anthropic` | Anthropic Claude provider |
+| `Ananke.Orchestration.Google` | Google Gemini provider |
+| `Ananke.Memory` | Knowledge pipeline: extract, chunk, embed, store |
+| `Ananke.Memory.Qdrant` | Qdrant vector store adapter |
+| `Ananke.Learning` | Empirical memory: patterns, skills, heuristics |
+| `Ananke.StateMachine` | `IStateMachine<S,T>`, `AbstractStateMachine` |
+| `Ananke.Design` | DSL + YAML manifest parser, `WorkflowScaffold`, Mermaid export |
+| `Ananke.MCP` | MCP server bridge (`WithAnankeTools`) |
+| `Ananke.OpenTelemetry` | OpenTelemetry tracing integration |
+
+## About
+
+- [Background](docs/about/background.md): Why the name Ananke, design philosophy
+- [Framework Comparison](docs/about/framework-comparison.md): Ananke vs LangChain/Graph, AutoGen, Semantic Kernel, CrewAI
+- [FAQ](docs/faq.md): Common questions and troubleshooting
