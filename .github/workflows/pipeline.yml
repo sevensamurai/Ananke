@@ -66,10 +66,17 @@ jobs:
           dotnet build src/Ananke.slnx --configuration Release
           dotnet pack src/Ananke.slnx --configuration Release --no-build --output ./packages
 
-      - name: Publish to NuGet
-        run: dotnet nuget push ./packages/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      - name: Publish Ananke packages to NuGet
+        run: |
+          for pkg in ./packages/Ananke*.nupkg; do
+            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
+
+      - name: Publish nnke tool to NuGet
+        run: |
+          for pkg in ./packages/nnke*.nupkg; do
+            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_NNKE }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
 
       - name: Read version from Directory.Build.props
         id: version
