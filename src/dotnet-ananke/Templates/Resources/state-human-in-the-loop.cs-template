@@ -1,0 +1,21 @@
+/// <summary>
+/// Immutable state record for the {{name}} human-in-the-loop workflow.
+/// Threaded through analyze → [interrupt/review] → execute → End.
+/// </summary>
+public sealed record ApprovalState
+{
+    /// <summary>Input data to process.</summary>
+    public string Data { get; init; } = "";
+
+    /// <summary>Analysis produced before the human review point.</summary>
+    public string Analysis { get; init; } = "";
+
+    /// <summary>Whether the human approved continuation.</summary>
+    public bool Approved { get; init; }
+
+    /// <summary>Notes from the human reviewer.</summary>
+    public string ReviewNotes { get; init; } = "";
+
+    /// <summary>Final result after execution.</summary>
+    public string Result { get; init; } = "";
+}

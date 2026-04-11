@@ -1,3 +1,4 @@
+<!-- topic: agents, tags: agent, llm, openai, anthropic, google, structured-output, model-routing, multimodal -->
 # 03 — Agents
 
 Integrate LLMs into workflows with `AgentJob`, structured output, multi-provider

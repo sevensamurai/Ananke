@@ -1,6 +1,7 @@
+<!-- topic: dsl-syntax, tags: dsl, topology, design, fork, join, router, subflow, interrupt, connections, manifest -->
 # Ananke.Design — Workflow DSL
 
-`Ananke.Design` provides a text-based DSL for declaring workflow topology separately from job implementations. 
+`Ananke.Design` provides a text-based DSL for declaring workflow topology separately from job implementations.
 The DSL defines the graph structure (connections, forks, joins, routers); 
 code supplies the behavior via `Bind` methods.
 

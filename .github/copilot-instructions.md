@@ -38,7 +38,24 @@ Ananke.Abstractions (zero deps) -> Ananke.Orchestration -> Ananke.Learning. Chec
 - Version lives in `Directory.Build.props` `<VersionPrefix>` â€” single source of truth
 - Add `releases/v{VERSION}.md` before merging (CI enforces this)
 
-## Tooling for Creating or Rewriting Files
+## Tooling — `nnke` CLI & MCP Server
+
+The `nnke` CLI tool (`src/dotnet-ananke`) provides Ananke framework tooling. When working with Ananke projects, use these commands for context:
+
+| Command | Purpose |
+|---------|---------|
+| `nnke inspect <dir> --json` | Project health report: manifests, topology, dependencies, pattern detection |
+| `nnke validate <file> --json` | Validate an `.ananke.yml` manifest |
+| `nnke docs --search "<query>" --json` | Search framework documentation |
+| `nnke docs <topic> --json` | Read a specific doc topic |
+| `nnke explain <code> --json` | Explain a diagnostic error code (e.g. `ANANKE_TOPO_003`) |
+| `nnke patterns --json` | List all workflow/agentic patterns |
+| `nnke patterns <name> --json` | Describe a pattern with API example |
+| `nnke schema` | Full command catalog for self-discovery |
+
+**MCP server:** `nnke mcp-server` exposes all commands as MCP tools. Configure in `.vscode/mcp.json` (already present in workspace) for VS Code Copilot, or add to `claude_desktop_config.json` for Claude Desktop.
+
+## Tooling — Creating or Rewriting Files
 
 - For new files: use `create_file` directly. Do NOT pre-create an empty file then try to edit it.
 - For replacing entire file content: use `replace_string_in_file` with old content matched from `get_file`. Read the file first to get exact current content.

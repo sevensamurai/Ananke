@@ -1,0 +1,15 @@
+/// <summary>
+/// Immutable state record for the {{name}} router workflow.
+/// Threaded through classify → [route] → branch → End.
+/// </summary>
+public sealed record RouterState
+{
+    /// <summary>Raw input to classify.</summary>
+    public string Input { get; init; } = "";
+
+    /// <summary>Category determined by the classifier.</summary>
+    public string Category { get; init; } = "";
+
+    /// <summary>Response produced by the selected branch.</summary>
+    public string Response { get; init; } = "";
+}

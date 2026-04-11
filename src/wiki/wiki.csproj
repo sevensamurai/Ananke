@@ -12,11 +12,11 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<None Include="..\..\README.md" />
-		<None Include="..\..\docs\**\*.md" LinkBase="docs" />
-		<None Include="..\..\internals\**\*.md" LinkBase="internals" />
-		<None Include="..\..\releases\**\*.md" LinkBase="releases" />
+		<None Include="..\..\docs\**" LinkBase="docs" />
+		<None Include="..\..\internals\**" LinkBase="internals" />
+		<None Include="..\..\releases\**" LinkBase="releases" />
 	</ItemGroup>
 	<ItemGroup>
-	  <None Remove="..\..\internals\adr-014-learning-improvements.md" />
+	  <None Remove="..\..\docs\about\logo.md" />
 	</ItemGroup>
 </Project>

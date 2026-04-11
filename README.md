@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="docs/ananke-creation.png" alt="Ananke — Stability Before Creation" width="680" />
 </p>
 
@@ -17,7 +17,7 @@
 
 ---
 
-**Ananke** is a vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines. It provides typed workflow orchestration, LLM tool calling, multi-provider AI model support, long-term memory (RAG + empirical learning), human-in-the-loop approval, distributed coordination, and OpenTelemetry observability — all with idiomatic C# and no external services required for testing.
+**Ananke** is a vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines. It provides typed workflow orchestration, LLM tool calling, multi-provider AI model support, long-term memory (RAG + empirical learning), agentic design patterns, human-in-the-loop approval, distributed coordination, an external skill catalog, a design-time CLI (`nnke`), and OpenTelemetry observability — all with idiomatic C# and no external services required for testing.
 
 Supports **OpenAI** (GPT-4.1, o-series), **Anthropic Claude**, **Google Gemini**, and any **OpenAI-compatible endpoint** including Ollama, Azure OpenAI, LM Studio, Groq, Deepseek, and Together AI.
 
@@ -57,6 +57,9 @@ Fluent graph-as-code builder · conditional & LLM-driven routing · fork/join pa
 ### 🤖 AI Agents
 `AgentJob` with tool calling + structured output · token-level streaming · multimodal messages (text, image, audio) · `ChatSessionEvent` async stream · multi-provider (OpenAI, Anthropic, Google Gemini + any OpenAI-compatible endpoint) · capability-based model routing · production decorators (429 retry with OTel, LLM response caching)
 
+### 🔄 Agentic Patterns
+`AgenticPattern.ReviewCritique<T>()` — generator → critic → loop until approved · `AgenticPattern.IterativeRefinement<T>()` — single-agent refinement loop · pre-wired builders for recognized design patterns on top of `Workflow<T>` primitives
+
 ### 🧠 Long-Term Memory
 Document ingestion pipeline (extract → chunk → embed → store) · vector-indexed semantic search · knowledge catalog with LLM-enriched metadata and time-decay reranking · empirical memory (patterns, skills, heuristics) · episode store with temporal trajectories · Monte Carlo reward propagation · tag importance tracking · **skill package export/import** — portable bundles of learned knowledge with quality gates and trust scaling
 
@@ -74,6 +77,9 @@ Expose any workflow or tool kit as an [MCP](https://modelcontextprotocol.io/) se
 
 ### 🎨 Design Tooling
 Plain-text DSL for workflow topology · runtime binding · Mermaid diagram export
+
+### 🛠️ nnke Design CLI
+Scaffold new workflow projects · validate `.ananke.yml` topology files · export Mermaid diagrams · inspect project health · browse docs from the terminal · `nnke mcp` exposes all capabilities as MCP tools for AI coding assistants (GitHub Copilot, Claude, etc.)
 
 ### 🗄️ Infrastructure
 Checkpointing (InMemory / File) · distributed locking (Redis) · MQTT pub/sub · OpenTelemetry tracing
@@ -201,6 +207,9 @@ The full documentation hub and progressive learning path are at **[docs/learning
 | [Observability](docs/guides/10-observability.md) | OpenTelemetry tracing, OTLP export, span attributes, retry event reporting |
 | [Advanced Agent Features](docs/guides/11-advanced-agents.md) | Local/custom endpoints, response caching, resilient retries, decorator composition |
 | [MCP & A2A Interop](docs/guides/12-mcp-and-interop.md) | Expose as MCP server, consume MCP tools, A2A agent-to-agent protocol |
+| [Design Tooling](docs/guides/13-design-tooling.md) | Visual workflow design, YAML manifests, Mermaid diagram export |
+| [Agentic Patterns](docs/guides/16-agentic-patterns.md) | Review & Critique, Iterative Refinement — pre-wired pattern builders |
+| [nnke Tool Companion](docs/guides/00-nnke-tool.md) | Design-time CLI — scaffold, validate, diagram, MCP companion for AI tools |
 | [Empirical Memory & Skill Packaging](docs/guides/15-empirical-memory.md) | Patterns, skills, heuristics, confidence tracking, offline learning, episode store, skill export/import |
 | [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md) | `AffectOptions`, `OfflineLearnerOptions`, domain-specific recipes (game agents, incident response) |
 | [Testing](docs/guides/14-testing.md) | In-memory implementations, zero-config integration tests |
@@ -232,6 +241,7 @@ Common questions are answered in the **[FAQ](docs/faq.md)**. Quick answers:
 - **Does it support the A2A agent protocol?** Yes — call remote A2A agents as drop-in `IAgentModel` implementations and expose Ananke workflows as A2A endpoints.
 - **Can learned knowledge be transferred between agents?** Yes — `ISkillPackager` exports empirical entries and linked episodes as a portable JSON package (quality gates: min confidence, min strength, min observations). Import into any other agent with configurable trust scaling. Tag importance weights are bundled so the receiving agent inherits feature correlations too.
 - **What is the OpenClaw skill catalog?** `Ananke.Skills` connects to the [OpenClaw/ClawHub](https://clawhub.io) registry of CLI-based tools. One call to `toolkit.AddFromCatalogAsync("airbnb search lodging")` discovers, caches, and resolves matching tools as `ToolDefinition` entries that any agent can call.
+- **What is nnke?** A .NET CLI tool (`dotnet tool install -g nnke`) for design-time workflow tasks: scaffold projects, validate topology files, export Mermaid diagrams, inspect project health, and browse docs. `nnke mcp` runs as an MCP server so AI coding tools (GitHub Copilot, Claude) can call these capabilities directly.
 - **What is the difference between a Workflow and a State Machine?** A workflow runs a directed pipeline end to end (best for task pipelines, document processing, batch jobs). A state machine models long-lived entities with stable states and event-driven transitions (best for conversation sessions, order lifecycle, device management). Both compose: state machines can invoke workflows, and workflows can interact with state machines.
 
 → **[Full FAQ →](docs/faq.md)**

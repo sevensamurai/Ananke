@@ -1,3 +1,4 @@
+<!-- topic: long-term-memory, tags: memory, knowledge, vector, embedding, search, ingestion, knowledge-base, catalog -->
 # 06 — Long-Term Memory
 
 Build a knowledge pipeline that extracts, chunks, embeds, and stores documents

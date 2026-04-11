@@ -1,0 +1,49 @@
+using Ananke.Orchestration;
+using Ananke.Orchestration.Checkpointing;
+
+// -------------------------------------------------------------------
+//  {{name}} — Human-in-the-Loop Pattern
+//
+//  Workflow runs analysis, then pauses (interrupts) so a human can
+//  review and approve before execution continues. Uses checkpointing
+//  to persist state across the pause.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Human-in-the-Loop");
+Console.WriteLine();
+
+var checkpointStore = new InMemoryCheckpointStore();
+
+var workflow = new Workflow<ApprovalState>("{{name}}")
+    .Job("analyze", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        Console.WriteLine($"    Analyzing: {state.Data}");
+        return state with { Analysis = $"Analysis complete for: {state.Data}" };
+    })
+    .Job("execute", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        var outcome = state.Approved
+            ? $"Executed: {state.Analysis}"
+            : $"Rejected: {state.Analysis}";
+        return state with { Result = outcome };
+    })
+    .Then("analyze", "execute")
+    .Then("execute", Workflow.End)
+    .InterruptAfter("analyze")
+    .UseCheckpointing(checkpointStore);
+
+// Run until interrupt
+var execution = await workflow.RunAsync(new ApprovalState { Data = "Process batch #42" });
+Console.WriteLine($"    Status after analyze: {execution.Status}");
+Console.WriteLine($"    Analysis: {execution.State.Analysis}");
+
+// Simulate human review — approve and resume
+Console.WriteLine("    [Human approves]");
+var resumed = await workflow.ResumeAsync(
+    execution.Id,
+    state => state with { Approved = true, ReviewNotes = "Looks good, proceed." });
+
+Console.WriteLine($"    Resumed status: {resumed.Status}");
+Console.WriteLine($"    Result: {resumed.State.Result}");

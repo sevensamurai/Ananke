@@ -1,3 +1,4 @@
+<!-- topic: mcp-and-interop, tags: mcp, interop, a2a, protocol, server, client -->
 # 12 — MCP & Interop
 
 Expose tools and workflows as an [MCP](https://modelcontextprotocol.io/) server,

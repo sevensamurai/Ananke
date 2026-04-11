@@ -1,0 +1,66 @@
+using Ananke.Orchestration;
+using Ananke.Orchestration.Jobs;
+
+// -------------------------------------------------------------------
+//  {{name}} — Handoff Pattern (Agent-to-Agent Delegation)
+//
+//  A triage job processes a request, then hands off to an external
+//  specialist agent via a channel and awaits a response.
+//  Uses InMemoryHandoffChannel — swap to MqttHandoffChannel for
+//  production cross-process handoffs.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Handoff");
+Console.WriteLine();
+
+var channel = new InMemoryHandoffChannel();
+
+// Register a simulated specialist that auto-responds
+channel.RegisterHandler<HandoffRequest, HandoffReply>(
+    "specialist-queue",
+    request =>
+    {
+        Console.WriteLine($"    Specialist received: {request.Summary}");
+        return new HandoffReply { Resolution = $"Resolved by specialist: {request.Summary}" };
+    });
+
+var workflow = new Workflow<HandoffState>("{{name}}")
+    .Job("triage", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        Console.WriteLine($"    Triaging: {state.Request}");
+        return state with { DelegatedTo = "specialist-queue" };
+    })
+    .Job("escalate", Handoff.To<HandoffState, HandoffRequest, HandoffReply>(
+        "specialist-queue",
+        channel,
+        state => new HandoffRequest { Summary = state.Request },
+        (state, reply) => state with { Resolution = reply.Resolution }))
+    .Job("finalize", async (state, ct) =>
+    {
+        await Task.Delay(10, ct);
+        return state with { Resolution = $"[Complete] {state.Resolution}" };
+    })
+    .Chain("triage", "escalate", "finalize", Workflow.End);
+
+var result = await workflow.RunAsync(new HandoffState { Request = "Complex billing dispute" });
+
+Console.WriteLine();
+Console.WriteLine($"  Request:    {result.State.Request}");
+Console.WriteLine($"  Delegated:  {result.State.DelegatedTo}");
+Console.WriteLine($"  Resolution: {result.State.Resolution}");
+Console.WriteLine($"  Status:     {result.Status}");
+
+await channel.DisposeAsync();
+
+// --- Message types for the handoff channel ---
+
+public sealed record HandoffRequest
+{
+    public string Summary { get; init; } = "";
+}
+
+public sealed record HandoffReply
+{
+    public string Resolution { get; init; } = "";
+}

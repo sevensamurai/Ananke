@@ -1,3 +1,4 @@
+<!-- topic: uv-setup, tags: python, uv, uvx, setup, tools, dotnet -->
 # uv & uvx Setup for .NET Developers
 
 A quick-start guide for C#/.NET developers who need to run Python-based CLI tools

@@ -1,0 +1,29 @@
+# {{name}}.ananke.yml
+# ────────────────────────────────────────────────
+# Sequential pipeline: simple chain of jobs.
+# ────────────────────────────────────────────────
+
+name: {{name}}
+
+models:
+  default:
+    provider: {{provider}}
+    model: {{model}}
+
+jobs:
+  start:
+    type: code
+
+  process:
+    type: agent
+    model: default
+    system_prompt: |
+      You process the input data and produce a result.
+
+  finish:
+    type: code
+
+connections:
+  - start -> process
+  - process -> finish
+  - finish -> End

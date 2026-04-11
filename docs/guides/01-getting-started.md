@@ -1,3 +1,4 @@
+<!-- topic: getting-started, tags: install, quickstart, workflow, agent, provider, openai, anthropic, google -->
 # 01 — Getting Started
 
 Install Ananke, build your first workflow, and make your first LLM call.

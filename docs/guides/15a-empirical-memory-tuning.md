@@ -1,3 +1,4 @@
+<!-- topic: empirical-memory-tuning, tags: empirical-memory, tuning, options, configuration, affect -->
 # 15a — Empirical Memory Tuning Guide
 
 Fine-tuning `AffectOptions`, `OfflineLearnerOptions`, and related parameters

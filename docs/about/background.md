@@ -1,3 +1,25 @@
+<!-- topic: background, tags: about, history, mythology, ananke -->
+## Why Ananke?
+
+The AI agent ecosystem is predominantly Python.
+For .NET teams shipping to production, that means either adopting a foreign ecosystem
+or assembling production infrastructure from scratch.
+Even within mature frameworks, capabilities that .NET developers take for granted —
+strong typing, real parallelism, dependency injection, structured concurrency —
+often require additional libraries, schema definitions, or workarounds.
+
+The landscape is also moving fast.
+Frameworks rebrand, merge, or shift direction between releases,
+making it risky to couple production systems to a single vendor's roadmap.
+
+Ananke starts from a different question:
+
+> *What does the infrastructure need to look like so that building any agentic system — at any scale — is straightforward for .NET developers?*
+
+The answer is a typed, testable, composable foundation where the infrastructure comes first and LLM providers are pluggable.
+
+---
+
 ## Background
 
 In Greek cosmology, **Ananke** (Ἀνάγκη) is the primordial goddess of necessity,
@@ -126,6 +148,3 @@ so the system does not start from zero every time.
 
 Ananke sets the rules. Aether learns them.
 
----
-
-← [Back to README](../../README.md)

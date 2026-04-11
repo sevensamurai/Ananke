@@ -16,7 +16,7 @@
   </ItemGroup>
   <ItemGroup Label="LLM Providers">
     <PackageVersion Include="OpenAI" Version="2.10.0" />
-    <PackageVersion Include="Anthropic" Version="12.11.0" />
+    <PackageVersion Include="Anthropic" Version="12.13.0" />
     <PackageVersion Include="Google.GenAI" Version="1.6.1" />
   </ItemGroup>
   <ItemGroup Label="Infrastructure">
@@ -37,16 +37,19 @@
   </ItemGroup>
   <ItemGroup Label="ASP.NET Core">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.13.20" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.13.22" />
   </ItemGroup>
   <ItemGroup Label="Documents">
     <PackageVersion Include="PdfPig" Version="0.1.14" />
     <PackageVersion Include="Markdig" Version="1.1.2" />
   </ItemGroup>
   <ItemGroup Label="Observability">
-    <PackageVersion Include="OpenTelemetry" Version="1.15.1" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.1" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.2" />
+  </ItemGroup>
+  <ItemGroup Label="CLI">
+    <PackageVersion Include="System.CommandLine" Version="2.0.5" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />

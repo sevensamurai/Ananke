@@ -1,0 +1,50 @@
+# expense-analyzer-v2.ananke.yml
+# ────────────────────────────────────────────────
+# Version 2 — fixed by the overseer's recommendation.
+# Adds a currency conversion code job before analysis,
+# so all amounts are normalized to USD before the agent sees them.
+# ────────────────────────────────────────────────
+
+name: expense-analyzer-v2
+
+models:
+  worker:
+    provider: openai
+    model: gpt-4.1-mini
+  overseer:
+    provider: openai
+    model: gpt-4.1-mini
+
+jobs:
+  extract:
+    type: code
+
+  convert_currencies:
+    type: code
+
+  analyze:
+    type: agent
+    model: worker
+    system_prompt: |
+      You are an expense analysis agent. You receive raw expense line items
+      and produce a normalized summary with all amounts in USD.
+      If you have tools available, use them. Respond as JSON with a
+      "summary" field and a "issues" array listing any problems.
+
+  review:
+    type: agent
+    model: overseer
+    system_prompt: |
+      You are a workflow overseer agent. You review the output of a
+      data-processing workflow and assess whether it completed correctly.
+      Check for: missing data, unconverted currencies, unresolved placeholders.
+      Respond as JSON with fields:
+        "passed": boolean,
+        "issues": string[] of problems found,
+        "suggestions": string[] of tools or changes that would fix the issues.
+
+connections:
+  - extract -> convert_currencies
+  - convert_currencies -> analyze
+  - analyze -> review
+  - review -> End

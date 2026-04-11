@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <g transform="translate(50 50) scale(1.19) translate(-50 -50)">
+    <!-- Red slash -->
+    <line x1="28" y1="80" x2="52" y2="20"
+          stroke="#EF4035"
+          stroke-width="9"
+          stroke-linecap="round" />
+    <!-- White slash -->
+    <line x1="48" y1="80" x2="72" y2="20"
+          stroke="#FFFFFF"
+          stroke-width="9"
+          stroke-linecap="round" />
+  </g>
+</svg>

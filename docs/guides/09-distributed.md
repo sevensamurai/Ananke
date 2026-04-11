@@ -1,3 +1,4 @@
+<!-- topic: distributed, tags: distributed, redis, mqtt, handoff, bridge, pub-sub -->
 # 09 — Distributed Systems
 
 Coordinate across processes with Redis distributed locking, MQTT pub/sub,

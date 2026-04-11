@@ -1,0 +1,15 @@
+/// <summary>
+/// Immutable state record for the {{name}} iterative refinement workflow.
+/// Threaded through refine → quality check → loop.
+/// </summary>
+public sealed record RefinementState
+{
+    /// <summary>Current output being refined.</summary>
+    public string Output { get; init; } = "";
+
+    /// <summary>Quality score (0.0 = poor, 1.0 = excellent).</summary>
+    public double QualityScore { get; init; }
+
+    /// <summary>Current iteration number.</summary>
+    public int Iteration { get; init; }
+}

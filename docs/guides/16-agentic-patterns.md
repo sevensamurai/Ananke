@@ -1,3 +1,4 @@
+<!-- topic: agentic-patterns, tags: agentic-patterns, review-critique, iterative-refinement, router, handoff, loop -->
 # 16 — Agentic Patterns
 
 Build recognized agentic design patterns with `AgenticPattern` — pre-wired

@@ -1,3 +1,4 @@
+<!-- topic: tools-reference, tags: tools, toolkit, api, parameters, function-calling -->
 # Tools & ToolKit Reference
 
 Ananke's tool system lets you define executable functions that LLMs can call during agent workflows. Tools are grouped into named `ToolKit` collections and wired into `AgentJob`, `StreamingChatWorkflow`, or exposed externally via MCP and A2A.

@@ -1,3 +1,4 @@
+<!-- topic: tools, tags: tools, toolkit, function-calling, parameters, tool-result -->
 # 04 — Tools
 
 Define callable functions that LLMs can invoke during agent workflows using
