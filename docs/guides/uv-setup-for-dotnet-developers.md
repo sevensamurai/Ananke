@@ -232,4 +232,3 @@ Default cache locations:
 - [uv documentation](https://docs.astral.sh/uv/)
 - [uvx tool runner](https://docs.astral.sh/uv/concepts/tools/)
 - [OpenClaw skills registry](https://github.com/openclaw/skills)
-- [ADR-001: Skill Catalog](../adr/001-skill-catalog.md) — how Ananke integrates these tools

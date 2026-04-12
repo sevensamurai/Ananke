@@ -36,6 +36,7 @@
   <Folder Name="/.pipeline/">
     <File Path="Directory.Build.props" />
     <File Path="../.github/copilot-instructions.md" />
+    <File Path="../.github/workflows/website.yml" />
     <File Path="..\.github\workflows\pipeline.yml" />
   </Folder>
   <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
