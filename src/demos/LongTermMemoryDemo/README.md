@@ -112,8 +112,6 @@ InMemoryKnowledgeStore          // vector storage
     → LinkedKnowledgeStore      // graph-expanded search (--linking)
 ```
 
-See [ADR-012](../../internals/adr-012-ars-contexta-cognitive-architecture-patterns.md) for the design rationale and the critical distinction between applying these patterns to authoritative documents (safe) vs. empirical agent memory (rejected).
-
 ## Security note
 
 `KnowledgeTools` includes `process_document`, which lets the agent fetch and index arbitrary URLs. **In production, grant `KnowledgeTools` only to trusted roles** (admins, knowledge curators). For untrusted users, use `KnowledgeSearchTool` instead — it provides search-only access with no ingestion capability.

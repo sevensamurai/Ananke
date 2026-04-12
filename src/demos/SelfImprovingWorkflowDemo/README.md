@@ -69,18 +69,3 @@ dotnet run --project demos/SelfImprovingWorkflowDemo
 ```
 
 No API keys needed — all models are simulated.
-
-## Connection to ADR-U004
-
-This demo is a proof-of-concept for the **agent self-improvement loop** described
-in [ADR-U004](../../internals/ADR-usability/adr-u004-cli-tooling-agent-friendly-scaffolding.md):
-
-| ADR-U004 Phase | Demo Equivalent |
-|---|---|
-| Phase 1 — `--json` structured output | Introspection tools return JSON that the overseer agent can parse |
-| Phase 2 — `nnke docs` | `search_docs` tool returns ranked documentation snippets |
-| Phase 3 — `nnke inspect` + `nnke explain` | `inspect_workflow` detects the missing capability; `suggest_fix` proposes the manifest change |
-| Phase 5 — MCP bridge | The introspection `ToolKit` could be exposed via `WithAnankeTools()` as MCP server tools |
-
-In production, these tools would be powered by the real `nnke` CLI (via MCP or
-in-process library), not simulated responses.
