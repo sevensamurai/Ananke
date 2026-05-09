@@ -7,7 +7,7 @@ namespace Ananke.Orchestration.Google;
 /// <summary>
 /// Google Gemini implementation of <see cref="IEmbeddingModel"/> using the
 /// <c>text-embedding-004</c> model via the official <c>Google.GenAI</c> SDK.
-/// Supports both the Gemini Developer API (API key) and Vertex AI.
+/// Supports both the Gemini Developer API (API key) and Gemini Enterprise Agent Platform.
 /// </summary>
 public sealed class GeminiEmbeddingModel : IEmbeddingModel
 {
@@ -36,7 +36,7 @@ public sealed class GeminiEmbeddingModel : IEmbeddingModel
         new(new Client(apiKey: apiKey), model);
 
     /// <summary>
-    /// Creates a <see cref="GeminiEmbeddingModel"/> for Google Vertex AI using
+    /// Creates a <see cref="GeminiEmbeddingModel"/> for Gemini Enterprise Agent Platform using
     /// Application Default Credentials.
     /// </summary>
     /// <param name="project">Google Cloud project ID.</param>

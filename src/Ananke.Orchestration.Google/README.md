@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Google.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Google)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
 
-Google Gemini provider for [Ananke.Orchestration](https://www.nuget.org/packages/Ananke.Orchestration) — `IStreamingAgentModel` implementation with tool calling, structured output, and token-level streaming via the official [Google GenAI SDK](https://googleapis.github.io/dotnet-genai/). Supports both the Gemini Developer API and Vertex AI.
+Google Gemini provider for [Ananke.Orchestration](https://www.nuget.org/packages/Ananke.Orchestration) — `IStreamingAgentModel` implementation with tool calling, structured output, and token-level streaming via the official [Google GenAI SDK](https://googleapis.github.io/dotnet-genai/). Supports both the Gemini Developer API and Gemini Enterprise Agent Platform (via ADC).
 
 ## Install
 
@@ -19,7 +19,7 @@ using Ananke.Orchestration.Google;
 // Gemini Developer API (API key)
 IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-2.5-flash");
 
-// Vertex AI (project + location, uses Application Default Credentials)
+// Gemini Enterprise Agent Platform (project + location, uses Application Default Credentials)
 IStreamingAgentModel model = GeminiAgentModel.CreateVertexAI(project, location, "gemini-2.5-flash");
 
 // Or from an existing Google.GenAI.Client
@@ -60,7 +60,7 @@ var models = new ModelResolver()
 - Tool calling with automatic function dispatch
 - Structured JSON output via `ResponseSchema`
 - Automatic JSON Schema to Google `Schema` conversion
-- Gemini Developer API (API key) and Vertex AI (ADC) support
+- Gemini Developer API (API key) and Gemini Enterprise Agent Platform (ADC) support
 
 ## Requirements
 

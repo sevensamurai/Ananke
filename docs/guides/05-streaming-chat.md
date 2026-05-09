@@ -4,7 +4,7 @@
 Build streaming chat experiences with `StreamingChatWorkflow`, SSE endpoints,
 and web UI integration.
 
-**Demo:** [AgenticWebDemo](../../src/demos/AgenticWebDemo/)
+**Demo:** [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo)
 
 ---
 
@@ -176,4 +176,4 @@ var execution = await StreamingChatWorkflow.Create("chat", model)
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

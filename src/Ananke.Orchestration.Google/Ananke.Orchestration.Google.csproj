@@ -3,8 +3,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Orchestration.Google</PackageId>
-    <Description>Google Gemini provider for Ananke.Orchestration — IStreamingAgentModel implementation with tool calling, structured output, and streaming via the official Google GenAI SDK. Supports both the Gemini Developer API and Vertex AI.</Description>
+    <Description>Google Gemini provider for Ananke.Orchestration â€” IStreamingAgentModel implementation with tool calling, structured output, and streaming via the official Google GenAI SDK. Supports both the Gemini Developer API and Vertex AI.</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Google" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Google.GenAI" />
@@ -12,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>
 
 </Project>

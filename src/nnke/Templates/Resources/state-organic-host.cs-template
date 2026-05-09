@@ -1,0 +1,13 @@
+/// <summary>
+/// State record for the {{name}} organic mesh.
+/// Extend with domain-specific fields as cells grow.
+/// </summary>
+public sealed record MeshState
+{
+    /// <summary>Active cell names managed by the organic host.</summary>
+    public IReadOnlyList<string> ActiveCells { get; init; } = [];
+
+    /// <summary>Latest capability snapshot per domain.</summary>
+    public IReadOnlyDictionary<string, string[]> DomainCapabilities { get; init; } =
+        new Dictionary<string, string[]>();
+}

@@ -1,0 +1,51 @@
+{
+  "platforms": {
+    "azure-ai": {
+      "displayName": "Microsoft Foundry Agent Service",
+      "aliases": [ "foundry" ],
+      "strengths": [ "enterprise_data", "governance", "browser", "deep_research" ],
+      "weaknesses": [ "bash", "shell" ],
+      "governance": {
+        "entraAgentId": true,
+        "rbac": true,
+        "privateNetworking": true,
+        "contentSafety": true
+      },
+      "costBand": "medium",
+      "latencyBand": "low",
+      "memoryMaturity": "preview",
+      "regions": [ "eastus", "westeurope", "swedencentral" ],
+      "linksTo": "https://learn.microsoft.com/en-us/azure/foundry/agents/overview"
+    },
+    "vertex-ai": {
+      "displayName": "Gemini Enterprise Agent Platform",
+      "aliases": [ "gemini-enterprise" ],
+      "strengths": [ "google_data", "memory_bank", "a2a", "model_variety" ],
+      "weaknesses": [ "devops_overhead" ],
+      "governance": {
+        "iamConditions": true,
+        "vpcServiceControls": true,
+        "contentSafety": true
+      },
+      "costBand": "low",
+      "latencyBand": "low",
+      "memoryMaturity": "ga",
+      "regions": [ "us-central1", "europe-west4" ],
+      "linksTo": "https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/overview"
+    },
+    "claude": {
+      "displayName": "Claude Managed Agents",
+      "aliases": [],
+      "strengths": [ "bash", "code_agentic_loop", "mcp", "managed_harness" ],
+      "weaknesses": [ "enterprise_data", "browser", "deep_research" ],
+      "governance": {
+        "workspacesRbac": true
+      },
+      "costBand": "medium",
+      "latencyBand": "medium",
+      "memoryMaturity": "ga",
+      "regions": [ "global" ],
+      "linksTo": "https://docs.anthropic.com/en/docs/claude-code/overview"
+    }
+  }
+}

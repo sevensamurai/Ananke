@@ -4,9 +4,9 @@
 Define callable functions that LLMs can invoke during agent workflows using
 `ToolKit`, typed parameters, and explicit success/error signaling.
 
-**Demo:** [BasicAgentDemo](../../src/demos/BasicAgentDemo/)
+**Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 
-→ **Full API reference:** [Tools & ToolKit Reference](../reference/tools-reference.md)
+→ **Full API reference:** [Tools & ToolKit Reference](reference/tools-reference.md)
 
 ---
 
@@ -191,7 +191,7 @@ If both kits contain a tool with the same name, the merged kit's tool wins.
 
 ## Real-World Example
 
-From the [SimpleWorkflowDemo](../../src/demos/SimpleWorkflowDemo/):
+From the [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo):
 
 ```csharp
 var stockTools = new ToolKit("stock")
@@ -217,7 +217,9 @@ var stockTools = new ToolKit("stock")
 | [05 — Streaming Chat](05-streaming-chat.md) | Build a streaming chat UI with tools |
 | [06 — Memory](06-memory.md) | Long-term knowledge pipeline |
 | [12 — MCP & Interop](12-mcp-and-interop.md) | Import/export tools via MCP |
+| [15 — Empirical Memory](15-empirical-memory.md) | `IToolMemory` for health tracking and semantic recall |
+| [16 — Agentic Patterns § Smart Tool Router](16-agentic-patterns.md#smart-tool-router) | Narrow the tool window with a multi-stage routing pipeline |
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

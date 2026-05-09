@@ -5,6 +5,12 @@ namespace Ananke.Design.Dsl;
 /// </summary>
 internal abstract record ConnectionLine
 {
+    /// <summary><c>tool(name, ...)</c> — declares portable tool metadata in the DSL preamble.</summary>
+    internal sealed record Tool(string Name, string Description, string[] Tags) : ConnectionLine;
+
+    /// <summary><c>use(job, tool_a, tool_b, semantic: true)</c> — attaches declared tools to a job.</summary>
+    internal sealed record Use(string JobName, string[] ToolNames, bool Semantic) : ConnectionLine;
+
     /// <summary><c>a -&gt; b</c></summary>
     internal sealed record Direct(string From, string To) : ConnectionLine;
 

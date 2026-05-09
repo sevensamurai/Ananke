@@ -1,0 +1,34 @@
+﻿# EditorConfig — enforced by Visual Studio, Roslyn, and dotnet format
+# https://editorconfig.org
+root = true
+
+# All files: UTF-8 with BOM (safe default for MSBuild/VS toolchain), LF line endings
+[*]
+charset                  = utf-8
+end_of_line              = crlf
+indent_style             = space
+insert_final_newline     = true
+trim_trailing_whitespace = true
+
+# C# source
+[*.cs]
+indent_size = 4
+
+# XML-based project/config files
+[*.{csproj,props,targets,slnx,config,nuspec,resx,xml}]
+indent_size = 2
+
+# JSON
+[*.json]
+indent_size = 2
+
+# Markdown — preserve trailing spaces (they mean <br>)
+[*.md]
+trim_trailing_whitespace = false
+
+# Shell / PowerShell scripts — keep LF so they work cross-platform
+[*.{sh,bash}]
+end_of_line = lf
+
+[*.ps1]
+end_of_line = crlf

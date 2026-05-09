@@ -1,49 +1,72 @@
 using Ananke.Abstractions.Memory;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Orchestration.Memory;
 
 /// <summary>
-/// Periodically calls <see cref="IConversationMemory.CleanupExpiredAsync"/> to remove
-/// sessions whose TTL has elapsed. Registered as a singleton via
+/// Hosted background service that periodically calls
+/// <see cref="IConversationMemory.CleanupExpiredAsync"/> to remove sessions whose
+/// TTL has elapsed. Registered automatically via
 /// <see cref="Extensions.OrchestrationOptions.UseMemoryCleanup"/>.
 /// </summary>
 /// <remarks>
-/// Uses <see cref="System.Threading.Timer"/> internally and implements <see cref="IDisposable"/>
-/// so the DI container stops the timer at shutdown.
+/// <para>
+/// Implements <see cref="BackgroundService"/> so the host starts and stops the
+/// cleanup loop as part of normal application lifetime — no manual
+/// <c>StartAsync()</c> call required.
+/// </para>
+/// <para>
+/// Uses <see cref="PeriodicTimer"/> so ticks never overlap: the next tick only
+/// fires after the previous <see cref="IConversationMemory.CleanupExpiredAsync"/>
+/// call has fully completed.
+/// </para>
 /// </remarks>
-internal sealed class ConversationMemoryCleanupTimer : IDisposable
+internal sealed class ConversationMemoryCleanupTimer(
+    IConversationMemory memory,
+    TimeSpan interval,
+    ILoggerFactory? loggerFactory = null,
+    TimeProvider? timeProvider = null) : BackgroundService
 {
-    private readonly IConversationMemory _memory;
-    private readonly ILogger _logger;
-    private readonly Timer _timer;
+    private readonly ILogger _logger = loggerFactory?.CreateLogger<ConversationMemoryCleanupTimer>()
+        ?? NullLogger<ConversationMemoryCleanupTimer>.Instance;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly TaskCompletionSource _timerReady =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public ConversationMemoryCleanupTimer(
-        IConversationMemory memory,
-        TimeSpan interval,
-        ILoggerFactory? loggerFactory = null)
+    /// <summary>
+    /// Completes once <see cref="PeriodicTimer.WaitForNextTickAsync"/> has been entered
+    /// for the first time and the service is ready to observe clock advances.
+    /// Intended for use in tests that need deterministic synchronisation with a fake
+    /// <see cref="TimeProvider"/>.
+    /// </summary>
+    internal Task TimerReady => _timerReady.Task;
+
+    /// <inheritdoc />
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         ArgumentNullException.ThrowIfNull(memory);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(interval, TimeSpan.Zero);
 
-        _memory = memory;
-        _logger = loggerFactory?.CreateLogger<ConversationMemoryCleanupTimer>()
-            ?? NullLogger<ConversationMemoryCleanupTimer>.Instance;
-        _timer = new Timer(OnTick, null, interval, interval);
-    }
+        using var timer = new PeriodicTimer(interval, _timeProvider);
+        _timerReady.TrySetResult();
 
-    private async void OnTick(object? state)
-    {
-        try
+        while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            await _memory.CleanupExpiredAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Conversation memory cleanup failed");
+            try
+            {
+                await memory.CleanupExpiredAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Conversation memory cleanup failed");
+            }
         }
     }
-
-    public void Dispose() => _timer.Dispose();
 }
+

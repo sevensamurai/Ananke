@@ -12,15 +12,25 @@ public sealed class InMemoryKnowledgeStore : IKnowledgeStore
 {
     private readonly ConcurrentDictionary<string, StoredDocument> _documents = new();
     private readonly IEmbeddingModel _embedder;
+    // 5.7: Hard cap prevents unbounded heap growth in long-running single-process scenarios.
+    private readonly int _maxDocuments;
 
     /// <summary>
     /// Creates a new in-memory knowledge store.
     /// </summary>
     /// <param name="embedder">The embedding model used to embed documents and queries.</param>
-    public InMemoryKnowledgeStore(IEmbeddingModel embedder)
+    /// <param name="maxDocuments">
+    /// Maximum number of documents retained. When the store is at capacity, calls to
+    /// <see cref="UpsertAsync"/> that would exceed the limit throw
+    /// <see cref="InvalidOperationException"/>. Default is <c>100_000</c>.
+    /// </param>
+    public InMemoryKnowledgeStore(IEmbeddingModel embedder, int maxDocuments = 100_000)
     {
         ArgumentNullException.ThrowIfNull(embedder);
+        if (maxDocuments <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxDocuments), "Must be positive.");
         _embedder = embedder;
+        _maxDocuments = maxDocuments;
     }
 
     /// <inheritdoc />
@@ -65,6 +75,13 @@ public sealed class InMemoryKnowledgeStore : IKnowledgeStore
 
         var docList = documents.ToList();
         if (docList.Count == 0) return;
+
+        // 5.7: Enforce capacity. Net-new = docs whose IDs don't already exist.
+        var netNew = docList.Count(d => !_documents.ContainsKey(d.Id));
+        if (_documents.Count + netNew > _maxDocuments)
+            throw new InvalidOperationException(
+                $"InMemoryKnowledgeStore is at capacity ({_maxDocuments:N0} documents). " +
+                "Delete documents before upserting more.");
 
         var texts = docList.Select(d => d.Text).ToList();
         var embeddings = await _embedder.EmbedBatchAsync(texts, ct);

@@ -1,0 +1,16 @@
+root = true
+
+[*]
+charset = utf-8-bom
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{cmd,bat,ps1,sln,slnx}]
+end_of_line = crlf
+
+[*.{cs,csproj,props,targets,editorconfig,gitattributes,json,md,yml,yaml,xml,config,txt}]
+charset = utf-8-bom

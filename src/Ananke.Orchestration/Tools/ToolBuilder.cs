@@ -2,15 +2,16 @@ namespace Ananke.Orchestration.Tools;
 
 /// <summary>
 /// Fluent builder for registering tools with 2+ parameters, metadata (<see cref="Tags"/>,
-/// <see cref="Examples"/>, <see cref="Requires"/>), or cancellation-aware handlers.
+/// <see cref="Examples"/>, <see cref="Requires"/>), execution modes, or cancellation-aware handlers.
 /// <para>
 /// For the common 0-param and 1-param cases, prefer the convenience overloads on
 /// <see cref="ToolKit"/> — they are more concise. Use the builder when you need
-/// multiple parameters, per-parameter examples, or tool-level metadata.
+/// multiple parameters, per-parameter examples, tool-level metadata, or remote-backed tools.
 /// </para>
 /// </summary>
 /// <example>
 /// <code>
+/// // Local lambda tool (default)
 /// toolkit.AddTool("buy_shares", "Buy shares of a stock", b =&gt; b
 ///     .Param("symbol", "Ticker symbol", examples: ["AAPL", "MSFT"])
 ///     .Param&lt;int&gt;("quantity", "Number of shares to buy")
@@ -21,6 +22,16 @@ namespace Ananke.Orchestration.Tools;
 ///         var qty = args.Get&lt;int&gt;("quantity");
 ///         return ToolResult.Ok($"Bought {qty} shares of {symbol}");
 ///     }));
+///
+/// // Callback-backed tool (platform calls your HTTP endpoint)
+/// toolkit.AddTool("get_price", "Gets stock price", b =&gt; b
+///     .Param("symbol", "Ticker")
+///     .Callback(new Uri("https://api.example.com/tools/get_price"))
+///     .OnExecute(args =&gt; ToolResult.Ok("42.50")));  // local fallback
+///
+/// // Platform-native tool (no user code)
+/// toolkit.AddTool("code_interpreter", "Run Python code", b =&gt; b
+///     .PlatformNative("code_execution"));
 /// </code>
 /// </example>
 public sealed class ToolBuilder
@@ -30,6 +41,9 @@ public sealed class ToolBuilder
     private readonly List<string> _examples = [];
     private readonly List<ToolPrerequisite> _requires = [];
     private Func<ToolArgs, CancellationToken, Task<ToolResult>>? _execute;
+    private ToolExecutionMode _executionMode = ToolExecutionMode.Local;
+    private ToolEndpoint? _endpoint;
+    private string? _platformCapability;
 
     /// <summary>
     /// Adds a string parameter to the tool.
@@ -92,6 +106,89 @@ public sealed class ToolBuilder
         return this;
     }
 
+    // ── Execution mode setters ──────────────────────────────────────
+
+    /// <summary>
+    /// Marks this tool as callback-backed: the platform POSTs tool calls to
+    /// <paramref name="callbackUri"/>. Pair with <see cref="OnExecute(Func{ToolArgs, ToolResult})"/>
+    /// for a local fallback used in local/hybrid mode.
+    /// </summary>
+    /// <param name="callbackUri">HTTP endpoint the platform calls to execute this tool.</param>
+    /// <param name="authHeader">Optional auth header name (e.g. <c>"Authorization"</c>). Value resolved at deploy time.</param>
+    /// <param name="verifyReachable">
+    /// When <see langword="true"/> (default), adds a <see cref="ToolPrerequisite.Endpoint"/>
+    /// check so <see cref="ToolKit.CheckPrerequisitesAsync"/> fails fast if the endpoint is down.
+    /// </param>
+    public ToolBuilder Callback(Uri callbackUri, string? authHeader = null, bool verifyReachable = true)
+    {
+        ArgumentNullException.ThrowIfNull(callbackUri);
+        _executionMode = ToolExecutionMode.Callback;
+        _endpoint = new ToolEndpoint { Uri = callbackUri, AuthHeader = authHeader };
+        if (verifyReachable)
+            _requires.Add(ToolPrerequisite.Endpoint(callbackUri,
+                $"Callback endpoint unreachable: {callbackUri}"));
+        return this;
+    }
+
+    /// <summary>
+    /// Marks this tool as MCP-backed: execution is delegated to an MCP server at
+    /// <paramref name="serverUri"/>. When used with <c>AddMcpServerToolsAsync</c>,
+    /// the <c>Execute</c> delegate calls the MCP client automatically.
+    /// </summary>
+    /// <param name="serverUri">MCP server URI (e.g. <c>http://localhost:3000/mcp</c>).</param>
+    /// <param name="authHeader">Optional auth header name. Value resolved at deploy time.</param>
+    /// <param name="verifyReachable">
+    /// When <see langword="true"/> (default), adds a <see cref="ToolPrerequisite.Endpoint"/>
+    /// check so <see cref="ToolKit.CheckPrerequisitesAsync"/> fails fast if the server is down.
+    /// </param>
+    public ToolBuilder Mcp(Uri serverUri, string? authHeader = null, bool verifyReachable = true)
+    {
+        ArgumentNullException.ThrowIfNull(serverUri);
+        _executionMode = ToolExecutionMode.Mcp;
+        _endpoint = new ToolEndpoint { Uri = serverUri, AuthHeader = authHeader };
+        if (verifyReachable)
+            _requires.Add(ToolPrerequisite.Endpoint(serverUri,
+                $"MCP server unreachable: {serverUri}"));
+        return this;
+    }
+
+    /// <summary>
+    /// Marks this tool as OpenAPI-backed: the platform reads the spec at
+    /// <paramref name="specUri"/> and calls the described API directly.
+    /// </summary>
+    /// <param name="specUri">URL of the OpenAPI specification document.</param>
+    /// <param name="authHeader">Optional auth header name. Value resolved at deploy time.</param>
+    /// <param name="verifyReachable">
+    /// When <see langword="true"/> (default), adds a <see cref="ToolPrerequisite.Endpoint"/>
+    /// check so <see cref="ToolKit.CheckPrerequisitesAsync"/> fails fast if the spec URL is unreachable.
+    /// </param>
+    public ToolBuilder OpenApi(Uri specUri, string? authHeader = null, bool verifyReachable = true)
+    {
+        ArgumentNullException.ThrowIfNull(specUri);
+        _executionMode = ToolExecutionMode.OpenApi;
+        _endpoint = new ToolEndpoint { Uri = specUri, AuthHeader = authHeader };
+        if (verifyReachable)
+            _requires.Add(ToolPrerequisite.Endpoint(specUri,
+                $"OpenAPI spec unreachable: {specUri}"));
+        return this;
+    }
+
+    /// <summary>
+    /// Marks this tool as a platform-native capability that requires no user code
+    /// or endpoint (e.g. <c>"code_execution"</c>, <c>"web_search"</c>,
+    /// <c>"vertex_extension:code_interpreter"</c>).
+    /// </summary>
+    /// <param name="capability">Platform capability identifier.</param>
+    public ToolBuilder PlatformNative(string capability)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
+        _executionMode = ToolExecutionMode.PlatformNative;
+        _platformCapability = capability;
+        return this;
+    }
+
+    // ── Execute handlers ────────────────────────────────────────────
+
     /// <summary>
     /// Sets a synchronous execute handler.
     /// </summary>
@@ -121,11 +218,16 @@ public sealed class ToolBuilder
 
     internal ToolDefinition Build(string name, string description)
     {
-        if (_execute is null)
+        if (_execute is null && _executionMode == ToolExecutionMode.Local)
             throw new InvalidOperationException(
                 $"Tool '{name}' has no execute handler. Call OnExecute(...) in the builder.");
 
-        var execute = _execute;
+        // For remote-backed tools without a local Execute, provide a stub that
+        // clearly indicates the tool must be invoked via its remote endpoint.
+        var execute = _execute ?? ((_, _) => Task.FromResult(
+            ToolResult.Error($"Tool '{name}' has no local execute handler " +
+                             $"(execution mode: {_executionMode}). " +
+                             "Run this tool via its remote endpoint or platform.")));
 
         return new ToolDefinition
         {
@@ -135,6 +237,9 @@ public sealed class ToolBuilder
             Tags = _tags,
             Examples = _examples,
             Requires = _requires,
+            ExecutionMode = _executionMode,
+            Endpoint = _endpoint,
+            PlatformCapability = _platformCapability,
             Execute = (args, ct) => execute(new ToolArgs(args), ct)
         };
     }

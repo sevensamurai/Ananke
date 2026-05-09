@@ -3,7 +3,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Qdrant</PackageId>
-    <Description>Qdrant vector database provider for Ananke — IKnowledgeStore implementation with dense vector search, metadata filtering, and automatic collection management.</Description>
+    <Description>Qdrant vector database provider for Ananke â€” IKnowledgeStore implementation with dense vector search, metadata filtering, and automatic collection management.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,8 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
     <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
     <ProjectReference Include="..\Ananke.Learning\Ananke.Learning.csproj" />
+    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
   </ItemGroup>
 
 </Project>

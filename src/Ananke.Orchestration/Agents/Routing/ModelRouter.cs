@@ -55,6 +55,12 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         _costResolver = router as IModelCostResolver;
     }
 
+    /// <summary>
+    /// <c>true</c> when the underlying router implements <see cref="IModelCostResolver"/>
+    /// and can supply per-call cost rates. Used by build-time budget validation.
+    /// </summary>
+    internal bool HasCostResolver => _costResolver is not null;
+
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
         var response = await _router.Select(request).GenerateAsync(request, ct);

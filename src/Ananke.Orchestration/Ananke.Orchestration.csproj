@@ -3,11 +3,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Orchestration</PackageId>
-    <Description>Workflow orchestration engine for .NET � fluent graph-as-code builder, AgentJob with tool calling, checkpointing, tracing, and LLM provider abstractions.</Description>
+    <Description>Workflow orchestration engine for .NET - fluent graph-as-code builder, AgentJob with tool calling, checkpointing, tracing, and LLM provider abstractions.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Polly" />
   </ItemGroup>
@@ -17,18 +18,15 @@
     <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
   </ItemGroup>
 
-  <!-- Bundle Roslyn analyzer into this package (analyzers must target netstandard2.0) -->
-  <ItemGroup>
-    <ProjectReference Include="..\Ananke.Analyzers\Ananke.Analyzers.csproj"
-                      ReferenceOutputAssembly="false"
-                      OutputItemType="Analyzer"
-                      SetTargetFramework="TargetFramework=netstandard2.0"
-                      PrivateAssets="all" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="..\Ananke.Analyzers\bin\$(Configuration)\netstandard2.0\Ananke.Analyzers.dll"
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Ananke.Orchestration.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

@@ -4,7 +4,7 @@
 Integrate LLMs into workflows with `AgentJob`, structured output, multi-provider
 support, and capability-based model routing.
 
-**Demo:** [BasicAgentDemo](../../src/demos/BasicAgentDemo/)
+**Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 
 ---
 
@@ -267,4 +267,4 @@ var workflow = StreamingChatWorkflow.Create("chat", model)
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

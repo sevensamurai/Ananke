@@ -4,7 +4,7 @@
 Build complex orchestration graphs with conditional routing, fork/join parallelism,
 sub-workflows, and real-time event streaming.
 
-**Demo:** [ExtendedFlowDemo](../../src/demos/ExtendedFlowDemo/)
+**Demo:** [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo)
 
 ---
 
@@ -209,4 +209,4 @@ Console.WriteLine(workflow.ToMermaid());
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

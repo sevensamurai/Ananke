@@ -3,7 +3,7 @@
 
 Install Ananke, build your first workflow, and make your first LLM call.
 
-**Demo:** [SimpleWorkflowDemo](../../src/demos/SimpleWorkflowDemo/)
+**Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 
 ---
 
@@ -154,4 +154,4 @@ MyProject/
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

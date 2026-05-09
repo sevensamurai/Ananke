@@ -1,4 +1,4 @@
-using Shouldly;
+﻿using Shouldly;
 
 namespace Ananke.StateMachine.Tests;
 
@@ -90,7 +90,7 @@ public class InsightSignalTests
             sequence.Add("insight-end");
         });
 
-        // Start insight — it will block inside the gate
+        // Start insight - it will block inside the gate
         var insightTask = machine.SignalInsightAsync("slow");
         await insightStarted.Task;
 

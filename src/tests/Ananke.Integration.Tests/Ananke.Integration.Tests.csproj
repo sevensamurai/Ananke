@@ -34,6 +34,7 @@
 	<ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
 	<ProjectReference Include="..\..\Ananke.Learning\Ananke.Learning.csproj" />
 	<ProjectReference Include="..\..\Ananke.Documents\Ananke.Documents.csproj" />
+	<ProjectReference Include="..\Ananke.TestHelpers\Ananke.TestHelpers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

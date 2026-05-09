@@ -1,4 +1,4 @@
-namespace Ananke.Orchestration.Checkpointing;
+﻿namespace Ananke.Orchestration.Checkpointing;
 
 /// <summary>
 /// Persistent storage for workflow checkpoints, enabling pause-and-resume semantics.
@@ -8,7 +8,6 @@ namespace Ananke.Orchestration.Checkpointing;
 /// Built-in implementations:
 /// <list type="bullet">
 ///   <item><see cref="InMemoryCheckpointStore"/> — tests and single-process scenarios (state lost on restart)</item>
-///   <item><see cref="FileCheckpointStore"/> — single-instance deployments (JSON files, survives restart, zero infra)</item>
 /// </list>
 /// </para>
 /// <para>
@@ -16,8 +15,7 @@ namespace Ananke.Orchestration.Checkpointing;
 /// or any durable store. A Redis implementation can delegate to <c>RedisDataAdapter</c> from
 /// <c>Ananke.Redis</c> for get/set/delete and use <c>EXPIREAT</c> for TTL-based expiry
 /// (maps to <see cref="Checkpoint{TState}.ExpiresAt"/>). Key format suggestion:
-/// <c>checkpoint:{executionId}</c>. Serialization: <see cref="System.Text.Json.JsonSerializer"/>
-/// (same as <see cref="FileCheckpointStore"/>).
+/// <c>checkpoint:{executionId}</c>. Serialization: <see cref="System.Text.Json.JsonSerializer"/>.
 /// </para>
 /// </remarks>
 public interface ICheckpointStore

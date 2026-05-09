@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<PackageId>Ananke.Organics</PackageId>
+		<Description>
+			Organic mesh architecture for Ananke — self-organizing workflow
+			ecosystems with cell division, heartbeat sensing, triage routing, domain-affine
+			memory, and evolutionary division policies.
+		</Description>
+		<PackageTags>ai;agents;mesh;organic;division;evolution;self-organization;workflows</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Ananke.Organics.Tests" />
+		<InternalsVisibleTo Include="OrganicMeshDemo" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Ananke.Learning\Ananke.Learning.csproj" />
+		<ProjectReference Include="..\Ananke.Design\Ananke.Design.csproj" />
+	</ItemGroup>
+
+</Project>

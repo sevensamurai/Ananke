@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Federation.LocalEmulators</PackageId>
+    <Description>Local emulators for Ananke Federation platform-native capabilities — enables the local design loop (bash, web_search, web_fetch, file_search, memory, code_execution, and more) without deploying to a managed agent platform.</Description>
+    <PackageTags>ai;agents;federation;local-emulation;devloop;testing;bash;web-search;memory</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Conformance.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation\Ananke.Federation.csproj" />
+  </ItemGroup>
+
+</Project>

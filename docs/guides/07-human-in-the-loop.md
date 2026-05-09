@@ -4,7 +4,7 @@
 Pause workflow execution at any step for human review, checkpoint the full state,
 and resume with optional modifications.
 
-**Demo:** [AgenticWebDemo](../../src/demos/AgenticWebDemo/)
+**Demo:** [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo)
 
 ---
 
@@ -82,7 +82,7 @@ var workflow = new Workflow<ContentState>("content-pipeline")
 
 ## Full Example — Content Approval
 
-From the [ExtendedFlowDemo](../../src/demos/ExtendedFlowDemo/):
+From the [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo):
 
 ```csharp
 var checkpointStore = new InMemoryCheckpointStore();
@@ -128,14 +128,11 @@ Console.WriteLine($"  Published: {resumed.State.Published}");  // true
 | Implementation | Use case |
 |---|---|
 | `InMemoryCheckpointStore` | Dev/test — state lives in memory |
-| `FileCheckpointStore` | Persist across restarts via local files |
+| *(custom)* `ICheckpointStore` | Implement to persist across restarts (database, blob storage, etc.) |
 
 ```csharp
 // In-memory (default for dev)
 var store = new InMemoryCheckpointStore();
-
-// File-based (survives process restarts)
-var store = new FileCheckpointStore("./checkpoints");
 ```
 
 ---
@@ -167,4 +164,4 @@ app.MapPost("/api/workflow/{id}/approve", async (string id, ApprovalRequest req)
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

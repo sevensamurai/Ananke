@@ -102,7 +102,10 @@ public sealed class DocumentProcessor
 
         // 2. Extract, chunk, store
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        return await ProcessAsync(stream, extension, uri.ToString(), description, enrichedTags, ct);
+        // 5.5: Wrap with a hard byte-cap so the limit applies regardless of whether
+        // Content-Length was present or accurate in the response headers.
+        await using var capped = new LimitedStream(stream, _maxContentLength, uri.ToString());
+        return await ProcessAsync(capped, extension, uri.ToString(), description, enrichedTags, ct);
     }
 
     /// <summary>

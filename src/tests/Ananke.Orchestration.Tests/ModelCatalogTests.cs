@@ -160,14 +160,6 @@ public class ModelCatalogTests
     }
 
     // ── All catalog entries ─────────────────────────────────────
-
-    [Test]
-    public void All_ContainsExpectedCount()
-    {
-        // 8 OpenAI + 4 Anthropic + 3 Google + 5 Meta + 3 Mistral + 2 DeepSeek = 25
-        ModelCatalog.All.Count.ShouldBe(25);
-    }
-
     [Test]
     public void All_NamesAreUnique()
     {

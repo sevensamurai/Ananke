@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Tools;
+using Ananke.Platforms;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
     private readonly IPlatformMessageHandler _handler;
     private readonly DiscordSocketClient _client;
     private readonly ILogger _logger;
+    private readonly BoundedDispatcher _dispatcher;
     private DiscordResponseSink? _responseSink;
     private bool _disposed;
 
@@ -36,6 +38,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
         _handler = handler;
         _client = client;
         _logger = logger ?? NullLogger<DiscordAdapter>.Instance;
+        _dispatcher = new BoundedDispatcher(logger: _logger);
     }
 
     /// <inheritdoc />
@@ -58,6 +61,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
 
         await _client.LoginAsync(TokenType.Bot, _options.BotToken).ConfigureAwait(false);
         await _client.StartAsync().ConfigureAwait(false);
+        await _dispatcher.StartAsync(ct).ConfigureAwait(false);
         _logger.LogInformation("Discord adapter started, connecting to Gateway...");
     }
 
@@ -90,6 +94,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
         _client.Ready -= OnReadyAsync;
         _client.Disconnected -= OnDisconnectedAsync;
 
+        await _dispatcher.StopAsync(ct).ConfigureAwait(false);
         await _client.StopAsync().ConfigureAwait(false);
         await _client.LogoutAsync().ConfigureAwait(false);
         IsConnected = false;
@@ -97,7 +102,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (!_disposed)
         {
@@ -109,7 +114,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
             _client.Dispose();
         }
 
-        return ValueTask.CompletedTask;
+        await _dispatcher.DisposeAsync().ConfigureAwait(false);
     }
 
     private Task OnMessageReceivedAsync(SocketMessage socketMessage)
@@ -121,9 +126,9 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
         if (socketMessage is not SocketUserMessage)
             return Task.CompletedTask;
 
-        // Fire-and-forget to avoid blocking the Discord Gateway event loop.
-        // DispatchAsync catches all exceptions internally.
-        _ = DispatchAsync(socketMessage);
+        // 5.4: Route through BoundedDispatcher instead of raw fire-and-forget so memory
+        // growth is bounded when messages arrive faster than the handler processes them.
+        _dispatcher.Enqueue(ct => DispatchAsync(socketMessage, ct));
         return Task.CompletedTask;
     }
 
@@ -168,7 +173,12 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
                 }
                 else
                 {
-                    _logger.LogWarning("Discord: guild {GuildId} not found — skipping slash command registration", guildId);
+                    // 5.4: Treat guild-not-found as a registration fault so it surfaces
+                    // at the same severity as any other registration failure.
+                    _logger.LogError(
+                        "Discord: slash command registration failed — guild {GuildId} not found. " +
+                        "Ensure the bot has been added to the guild before starting.",
+                        guildId);
                 }
             }
             else
@@ -187,12 +197,12 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
 
     private Task OnSlashCommandExecutedAsync(SocketSlashCommand command)
     {
-        // Fire-and-forget to avoid blocking the Discord Gateway event loop.
-        _ = HandleSlashCommandAsync(command);
+        // 5.4: Route through BoundedDispatcher for bounded memory and structured error handling.
+        _dispatcher.Enqueue(ct => HandleSlashCommandAsync(command, ct));
         return Task.CompletedTask;
     }
 
-    private async Task HandleSlashCommandAsync(SocketSlashCommand command)
+    private async Task HandleSlashCommandAsync(SocketSlashCommand command, CancellationToken ct = default)
     {
         if (_options.SlashCommandTools is not { } toolKit
             || !toolKit.Tools.TryGetValue(command.Data.Name, out var tool))

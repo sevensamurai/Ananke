@@ -1,5 +1,8 @@
+using Ananke.Design.Tools;
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Routing;
+using Ananke.Orchestration.Tools;
 using System.Text;
 
 namespace Ananke.Design;
@@ -50,6 +53,114 @@ namespace Ananke.Design;
 /// </remarks>
 public static class WorkflowTopologyExporter
 {
+    /// <summary>
+    /// Exports a manifest directly from a parsed <see cref="WorkflowManifest"/>.
+    /// Preserves tool declarations, per-job tool references, and the semantic routing hint.
+    /// </summary>
+    public static string ToYaml(this WorkflowManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"name: {manifest.Name}");
+        sb.AppendLine();
+
+        sb.AppendLine("models:");
+        foreach (var (alias, model) in manifest.Models)
+        {
+            sb.AppendLine($"  {alias}:");
+            sb.AppendLine($"    provider: {model.Provider}");
+            sb.AppendLine($"    model: {model.Model}");
+            if (!string.IsNullOrWhiteSpace(model.Endpoint))
+                sb.AppendLine($"    endpoint: {model.Endpoint}");
+        }
+
+        if (manifest.Tools.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("tools:");
+            foreach (var (key, tool) in manifest.Tools)
+            {
+                sb.AppendLine($"  {key}:");
+                sb.AppendLine($"    name: {tool.Name}");
+                sb.AppendLine($"    description: {tool.Description}");
+                sb.AppendLine("    tags:");
+                foreach (var tag in tool.Tags)
+                    sb.AppendLine($"      - {tag}");
+
+                if (!string.IsNullOrWhiteSpace(tool.Binding.Kind) || !string.IsNullOrWhiteSpace(tool.Binding.Reference))
+                {
+                    sb.AppendLine("    binding:");
+                    if (!string.IsNullOrWhiteSpace(tool.Binding.Kind))
+                        sb.AppendLine($"      kind: {tool.Binding.Kind}");
+                    if (!string.IsNullOrWhiteSpace(tool.Binding.Reference))
+                        sb.AppendLine($"      reference: {tool.Binding.Reference}");
+                }
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("jobs:");
+        foreach (var (name, job) in manifest.Jobs)
+        {
+            sb.AppendLine($"  {name}:");
+            sb.AppendLine($"    type: {job.Type}");
+            if (!string.IsNullOrWhiteSpace(job.ModelAlias))
+                sb.AppendLine($"    model: {job.ModelAlias}");
+            if (job.Tools.Count > 0)
+            {
+                sb.AppendLine("    tools:");
+                foreach (var tool in job.Tools)
+                    sb.AppendLine($"      - {tool}");
+            }
+            if (job.Semantic)
+                sb.AppendLine("    semantic: true");
+            if (!string.IsNullOrWhiteSpace(job.SystemPrompt))
+            {
+                if (job.SystemPrompt.Contains('\n'))
+                {
+                    sb.AppendLine("    system_prompt: |");
+                    foreach (var line in job.SystemPrompt.Split('\n'))
+                        sb.AppendLine($"      {line}");
+                }
+                else
+                {
+                    sb.AppendLine($"    system_prompt: {job.SystemPrompt}");
+                }
+            }
+
+            if (job.MaxToolRounds != 3)
+                sb.AppendLine($"    max_tool_rounds: {job.MaxToolRounds}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("connections:");
+        foreach (var line in manifest.Connections)
+            sb.AppendLine($"  - {line}");
+
+        if (manifest.Profiles.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("profiles:");
+            foreach (var (profileName, profile) in manifest.Profiles)
+            {
+                sb.AppendLine($"  {profileName}:");
+                sb.AppendLine("    tools:");
+                foreach (var (toolName, binding) in profile.Tools)
+                {
+                    sb.AppendLine($"      {toolName}:");
+                    sb.AppendLine($"        execute: {binding.Execute}");
+                    if (!string.IsNullOrWhiteSpace(binding.Platform))
+                        sb.AppendLine($"        platform: {binding.Platform}");
+                    if (!string.IsNullOrWhiteSpace(binding.Endpoint))
+                        sb.AppendLine($"        endpoint: {binding.Endpoint}");
+                }
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
     /// <summary>
     /// Exports the workflow topology as DSL connection lines.
     /// </summary>
@@ -190,4 +301,58 @@ public static class WorkflowTopologyExporter
     /// <inheritdoc cref="ToManifestYaml{TState}(WorkflowDefinition{TState})"/>
     public static string ToManifestYaml<TState>(this Workflow<TState> workflow) =>
         workflow.Build().ToManifestYaml();
+
+    /// <summary>
+    /// Creates a manifest from a parsed scaffold, preserving DSL-declared tools and semantic hints.
+    /// </summary>
+    public static WorkflowManifest ToManifest<TState>(this WorkflowScaffold<TState> scaffold)
+    {
+        ArgumentNullException.ThrowIfNull(scaffold);
+
+        var tools = scaffold.ToolDeclarations.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new Tools.ToolManifestEntry
+            {
+                Key = kvp.Key,
+                Name = kvp.Value.Name,
+                Description = kvp.Value.Description,
+                Tags = kvp.Value.Tags
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        var jobs = scaffold.JobNames.ToDictionary(
+            name => name,
+            name =>
+            {
+                scaffold.JobToolDeclarations.TryGetValue(name, out var use);
+                return new JobDefinition
+                {
+                    Tools = use?.ToolNames ?? [],
+                    Semantic = use?.Semantic ?? false
+                };
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        List<string> connections = [];
+        foreach (var line in scaffold.GetTopologyDsl())
+            connections.Add(line);
+
+        return new WorkflowManifest
+        {
+            Name = GetWorkflowName(scaffold),
+            Models = [],
+            Tools = tools,
+            Jobs = jobs,
+            Connections = connections,
+            Profiles = []
+        };
+    }
+
+    /// <summary>
+    /// Exports a parsed scaffold to manifest YAML, preserving DSL tool metadata and semantic hints.
+    /// </summary>
+    public static string ToManifestYaml<TState>(this WorkflowScaffold<TState> scaffold) =>
+        scaffold.ToManifest().ToYaml();
+
+    private static string GetWorkflowName<TState>(WorkflowScaffold<TState> scaffold) => scaffold.Name;
 }

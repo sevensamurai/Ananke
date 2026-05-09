@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Ananke.Abstractions;
 
 namespace Ananke.Orchestration.Tools;
 
@@ -11,10 +12,7 @@ namespace Ananke.Orchestration.Tools;
 /// </summary>
 public readonly record struct ToolResult(string Value, bool IsError)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
+    private static readonly JsonSerializerOptions JsonOptions = AnankeJson.Display;
 
     /// <summary>
     /// Whether this error is transient and the tool call could succeed on retry.
@@ -87,6 +85,37 @@ public sealed record ToolPrerequisite(string Name, Func<CancellationToken, Task<
                 return false;
             }
         }, installHint);
+
+    /// <summary>
+    /// Creates a prerequisite that verifies a network endpoint is reachable via HTTP HEAD.
+    /// Use for <see cref="ToolExecutionMode.Callback"/>, <see cref="ToolExecutionMode.Mcp"/>,
+    /// and <see cref="ToolExecutionMode.OpenApi"/> tools to fail fast at startup when the
+    /// remote service is unavailable.
+    /// </summary>
+    /// <param name="uri">The endpoint URI to probe.</param>
+    /// <param name="installHint">
+    /// Shown when the endpoint is unreachable.
+    /// Example: <c>"Start the MCP server: dotnet run --project McpServer"</c>
+    /// </param>
+    /// <param name="timeout">HTTP request timeout. Defaults to 5 seconds.</param>
+    public static ToolPrerequisite Endpoint(Uri uri, string installHint, TimeSpan? timeout = null) =>
+        new(uri.Authority, async ct =>
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(5) };
+                using var request = new HttpRequestMessage(HttpMethod.Head, uri);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
+                    .ConfigureAwait(false);
+                // Any response (even 4xx/5xx) means the endpoint is reachable.
+                // We're checking connectivity, not correctness.
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }, installHint);
 }
 
 /// <summary>
@@ -113,6 +142,29 @@ public record ToolDefinition
     public required string Name { get; init; }
     public required string Description { get; init; }
     public required IReadOnlyList<ToolParameter> Parameters { get; init; }
+
+    /// <summary>
+    /// How the tool's implementation is reached at runtime. Defaults to
+    /// <see cref="ToolExecutionMode.Local"/> (in-process delegate).
+    /// Federation deployers inspect this to determine deployability.
+    /// </summary>
+    public ToolExecutionMode ExecutionMode { get; init; } = ToolExecutionMode.Local;
+
+    /// <summary>
+    /// Network endpoint for remote-backed tools (<see cref="ToolExecutionMode.Callback"/>,
+    /// <see cref="ToolExecutionMode.Mcp"/>, <see cref="ToolExecutionMode.OpenApi"/>).
+    /// <see langword="null"/> for <see cref="ToolExecutionMode.Local"/> and
+    /// <see cref="ToolExecutionMode.PlatformNative"/> tools.
+    /// </summary>
+    public ToolEndpoint? Endpoint { get; init; }
+
+    /// <summary>
+    /// Platform-native capability identifier (e.g. <c>"code_execution"</c>,
+    /// <c>"web_search"</c>, <c>"vertex_extension:code_interpreter"</c>).
+    /// Only meaningful when <see cref="ExecutionMode"/> is
+    /// <see cref="ToolExecutionMode.PlatformNative"/>.
+    /// </summary>
+    public string? PlatformCapability { get; init; }
 
     /// <summary>
     /// Keywords for categorisation, filtering, and discovery.

@@ -257,6 +257,28 @@ public class WorkflowDslParserTests
         result[0].ShouldBeOfType<ConnectionLine.Interrupt>().JobName.ShouldBe("deploy");
     }
 
+    [Test]
+    public void Parse_ToolDirective_ReturnsTool()
+    {
+        var result = WorkflowDslParser.Parse("tool(web_search, tags: [search, web], description: \"Search the public web\")");
+
+        var tool = result[0].ShouldBeOfType<ConnectionLine.Tool>();
+        tool.Name.ShouldBe("web_search");
+        tool.Tags.ShouldBe(["search", "web"]);
+        tool.Description.ShouldBe("Search the public web");
+    }
+
+    [Test]
+    public void Parse_UseDirective_ReturnsJobToolsAndSemantic()
+    {
+        var result = WorkflowDslParser.Parse("use(plan, web_search, memory, semantic: true)");
+
+        var use = result[0].ShouldBeOfType<ConnectionLine.Use>();
+        use.JobName.ShouldBe("plan");
+        use.ToolNames.ShouldBe(["web_search", "memory"]);
+        use.Semantic.ShouldBeTrue();
+    }
+
     // ── IEnumerable<string> overload ─────────────────────────────────
 
     [Test]

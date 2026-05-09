@@ -1,0 +1,35 @@
+# local-platform-loop.ananke.yml
+# ──────────────────────────────────────────────────────────────────────
+#  Manifest used by LocalPlatformLoopDemo.
+#
+#  Three platform-native capabilities:
+#    code_execution  — runs code on the host platform
+#    web_search      — retrieves search results
+#    memory_bank     — persists and recalls key/value entries
+#
+#  The same manifest is validated and run against three targets:
+#    1. local-emulated:azure-ai   (via Ananke.Federation.LocalEmulators)
+#    2. local-emulated:claude     (same emulators, different structural rules)
+#    3. local-emulated:vertex-ai  (including the foundry alias demo)
+# ──────────────────────────────────────────────────────────────────────
+
+name: local-platform-loop
+
+jobs:
+  search:
+    type: code
+
+  execute:
+    type: code
+
+  remember:
+    type: code
+
+  summarise:
+    type: code
+
+connections:
+  - search   -> execute
+  - execute  -> remember
+  - remember -> summarise
+  - summarise -> End

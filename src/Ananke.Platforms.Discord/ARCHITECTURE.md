@@ -9,7 +9,7 @@ using Discord.Net, supporting Gateway (WebSocket) connections.
 
 ## Status
 
-**Skeleton project — no source files yet.** See ADR-U003 for the design plan.
+**Skeleton project — no source files yet.**
 
 ## Planned Dependencies
 

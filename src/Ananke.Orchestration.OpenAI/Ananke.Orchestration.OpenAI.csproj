@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿# Ananke - Copilot Instructions
+# Ananke - Copilot Instructions
 
 ## Project
 
@@ -20,6 +20,7 @@ Ananke.Abstractions (zero deps) -> Ananke.Orchestration -> Ananke.Learning. Chec
 - Every new interface must ship with a default implementation
 - Reserve the `InMemory` prefix for **store** interfaces that have (or will have) external-storage counterparts (e.g., `InMemoryEmpiricalMemory`, `InMemoryEpisodeStore`). Compute, orchestration, and I/O pipeline implementations use plain names (e.g., `TagImportanceTracker`, `OfflineLearner`, `SkillPackager`).
 - No breaking changes to established interfaces without an ADR
+- Never reference ADR (Architecture Decision Records) in code (comments, identifiers, doc strings) or public-facing documentation; ADRs are internal governance artifacts only
 
 ## Build Rules
 

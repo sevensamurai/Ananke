@@ -1,4 +1,4 @@
-using Ananke.Abstractions.Distributed;
+﻿using Ananke.Abstractions.Distributed;
 using Shouldly;
 
 namespace Ananke.StateMachine.Tests;
@@ -134,7 +134,7 @@ public class OperationalStatusTests
         var result = await machine2.TransitionAsync(ctx, LightAction.TurnOff);
 
         // The transition should be blocked because persisted status is Faulted
-        // (loaded inside TryExecuteTransitionAsync → GetPersistedContextAsync)
+        // (loaded inside TryExecuteTransitionAsync -> GetPersistedContextAsync)
         // OR succeed if the gate check uses the fresh instance status (Operative).
         // Either way, the persisted state records the fault.
         machine.OperationalStatus.ShouldBe(OperationalStatus.Faulted);

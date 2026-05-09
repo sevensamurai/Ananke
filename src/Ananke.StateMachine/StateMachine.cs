@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Ananke.Abstractions;
 using Ananke.StateMachine.Builder;
 
@@ -90,6 +91,9 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     private TaskCompletionSource? _transitionBridge;
     private readonly List<Func<object, S, Task>> _insightHandlers = [];
 
+    // Internal test hook — written by StartStateWork, read by WhenEnteredAsync.
+    private readonly Channel<S> _enteredChannel = Channel.CreateUnbounded<S>();
+
     /// <inheritdoc />
     public S CurrentState { get; private set; }
 
@@ -159,13 +163,34 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     /// Registers an <see cref="IInterruptSink{T}"/> to receive interrupt payloads.
     /// When an interrupt transition succeeds, the payload is delivered to the sink.
     /// </summary>
+    /// <remarks>
+    /// If the payload passed to <see cref="FireAsync"/> is not of type
+    /// <typeparamref name="TPayload"/>, an <see cref="InvalidCastException"/> is thrown
+    /// so the mismatch is surfaced immediately rather than silently dropped.
+    /// To allow null or missing payloads without throwing, pass <c>null</c> explicitly
+    /// and guard inside the sink implementation.
+    /// </remarks>
     public StateMachine<S, T> OnInterrupt<TPayload>(IInterruptSink<TPayload> sink)
     {
         ArgumentNullException.ThrowIfNull(sink);
         _onInterrupt = async (payload, ct) =>
         {
             if (payload is TPayload typed)
+            {
                 await sink.InterruptAsync(typed, ct);
+                return;
+            }
+
+            // 5.8: Null payload is permitted (interrupt fired without data).
+            if (payload is null)
+                return;
+
+            // 5.8: Non-null payload of the wrong type is a programming error — throw so
+            // the caller learns about the mismatch instead of silently discarding the signal.
+            throw new InvalidCastException(
+                $"Interrupt payload is of type '{payload.GetType().FullName}' but the registered " +
+                $"sink expects '{typeof(TPayload).FullName}'. Ensure FireAsync is called with the " +
+                "correct payload type.");
         };
         return this;
     }
@@ -383,14 +408,37 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
 
         var cts = new CancellationTokenSource();
         _currentStateCts = cts;
-        // Do not pass CT to Task.Run — the work must always start so it can
-        // observe cancellation and clean up. CT is only for the work itself.
-        _currentWork = Task.Run(() => work(cts.Token));
+        // Invoke work synchronously up to its first await (which runs any setup code
+        // the caller put before the first yield), then write to the hook channel so
+        // WhenEnteredAsync only resolves after that initial synchronous section has run.
+        _currentWork = Task.Run(async () =>
+        {
+            var workTask = work(cts.Token);
+            _enteredChannel.Writer.TryWrite(state);
+            await workTask;
+        });
+    }
+
+    // ── Internal test hook ────────────────────────────────────────────────
+    // Exposed to Ananke.StateMachine.Tests via the project-level InternalsVisibleTo.
+
+    /// <summary>
+    /// Returns a <see cref="Task"/> that completes the next time the machine enters
+    /// <paramref name="state"/> and background work is started for it.
+    /// Items written before this is called are never lost (unbounded channel).
+    /// Always pair with <c>WaitAsync(TimeSpan.FromSeconds(5))</c>.
+    /// </summary>
+    internal async Task WhenEnteredAsync(S state)
+    {
+        await foreach (var entered in _enteredChannel.Reader.ReadAllAsync())
+            if (EqualityComparer<S>.Default.Equals(entered, state))
+                return;
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        _enteredChannel.Writer.TryComplete();
         _transitionBridge?.TrySetCanceled();
         _transitionBridge = null;
         CancelCurrentWork();

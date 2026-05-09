@@ -139,14 +139,7 @@ public class ChatWithInterruptionTests
         while (true)
         {
             var work = machine.CurrentWork;
-            if (work is null)
-            {
-                // Brief retry — survives the race where CancelCurrentWork has
-                // nulled _currentWork but StartStateWork hasn't run yet.
-                await Task.Delay(150);
-                work = machine.CurrentWork;
-                if (work is null) break;
-            }
+            if (work is null) break;
 
             try { await work; }
             catch (OperationCanceledException) { }
@@ -263,7 +256,6 @@ public class ChatWithInterruptionTests
 
         // Wait for the tool to start executing, then fire the interrupt
         await toolStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        await Task.Delay(20);
 
         var interruptResult = await machine.FireAsync(
             Action.Interrupt, AgentMessage.User("also good for granny"));
@@ -330,7 +322,6 @@ public class ChatWithInterruptionTests
         var loopTask = Task.Run(() => RunEndpointLoop(machine));
 
         await streamingStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        await Task.Delay(20);
 
         await machine.FireAsync(Action.Interrupt, AgentMessage.User("wait, change that"));
 

@@ -5,7 +5,7 @@ Coordinate across processes with Redis distributed locking, MQTT pub/sub,
 agent-to-agent handoff, and the Bridge layer that wires state machines into
 workflows.
 
-**Demo:** [PetAdoptionDemo](../../src/demos/PetAdoptionDemo/)
+**Demo:** [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo)
 
 ---
 
@@ -193,7 +193,7 @@ var memory = new InMemoryConversationMemory(ttl: TimeSpan.FromHours(1));
 
 ## Full Demo Architecture
 
-The [PetAdoptionDemo](../../src/demos/PetAdoptionDemo/) shows distributed features
+The [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) shows distributed features
 in a full-stack application:
 
 - **MQTT handoff** — payment processing runs as a separate service (`dotnet run -- --payment-service`)
@@ -223,6 +223,8 @@ docker compose up -d    # starts Qdrant, MQTT, and Redis
 | [10 — Observability](10-observability.md) | OpenTelemetry tracing across distributed services |
 | [11 — Advanced Agents](11-advanced-agents.md) | Production resilience and caching |
 
+**Also see:** [ChannelsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/ChannelsDemo) — deploy a tool-calling agent as a Discord or Slack bot using `Ananke.Platforms` adapters.
+
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

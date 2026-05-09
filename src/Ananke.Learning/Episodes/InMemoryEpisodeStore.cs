@@ -10,11 +10,40 @@ namespace Ananke.Learning.Episodes;
 public sealed class InMemoryEpisodeStore : IEpisodeStore
 {
     private readonly ConcurrentDictionary<string, Episode> _episodes = new();
+    // 5.7: Hard cap prevents unbounded heap growth in long-running scenarios.
+    private readonly int _maxEpisodes;
+
+    /// <summary>
+    /// Creates a new in-memory episode store.
+    /// </summary>
+    /// <param name="maxEpisodes">
+    /// Maximum number of episodes retained. When the store is at capacity, the oldest
+    /// episode (by <see cref="Episode.CompletedAt"/>) is evicted before the new one is
+    /// written. Default is <c>50_000</c>.
+    /// </param>
+    public InMemoryEpisodeStore(int maxEpisodes = 50_000)
+    {
+        if (maxEpisodes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxEpisodes), "Must be positive.");
+        _maxEpisodes = maxEpisodes;
+    }
 
     /// <inheritdoc />
     public Task<Episode> CommitAsync(Episode episode, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(episode);
+
+        // 5.7: Evict the oldest episode (by CompletedAt) before storing, if at capacity.
+        if (!_episodes.ContainsKey(episode.Id) && _episodes.Count >= _maxEpisodes)
+        {
+            var oldest = _episodes.Values
+                .OrderBy(e => e.CompletedAt)
+                .Select(e => e.Id)
+                .FirstOrDefault();
+            if (oldest is not null)
+                _episodes.TryRemove(oldest, out _);
+        }
+
         _episodes[episode.Id] = episode;
         return Task.FromResult(episode);
     }

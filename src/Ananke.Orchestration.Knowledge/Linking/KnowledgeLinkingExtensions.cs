@@ -11,7 +11,7 @@ namespace Ananke.Orchestration.Knowledge.Linking;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This implements ADR-012's "Option C: Plugin registration via DI". The linking layer
+/// This implements Option C: Plugin registration via DI. The linking layer
 /// is entirely opt-in — the base <see cref="IKnowledgeStore"/> contract is unchanged.
 /// </para>
 /// <para>

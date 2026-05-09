@@ -1,4 +1,4 @@
-name: Build and Deployment Pipeline
+﻿name: Build and Deployment Pipeline
 
 on:
   pull_request:
@@ -33,7 +33,7 @@ jobs:
         run: dotnet build src/Ananke.slnx --configuration Release
 
       - name: Test
-        run: dotnet test src/Ananke.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test src/Ananke.slnx --configuration Release --no-build --verbosity normal -- RunConfiguration.FailFast=true
 
       - name: Check release notes
         run: |
@@ -72,7 +72,9 @@ jobs:
             [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
-      - name: Publish nnke tool to NuGet
+      - name: Publish nnke tools to NuGet
+        # Covers: nnke, nnke-platform, nnke-platform-azure, nnke-platform-google,
+        #         nnke-platform-anthropic, nnke-platform-all
         run: |
           for pkg in ./packages/nnke*.nupkg; do
             [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_NNKE }} --source https://api.nuget.org/v3/index.json --skip-duplicate

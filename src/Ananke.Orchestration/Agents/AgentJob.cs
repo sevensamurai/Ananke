@@ -15,7 +15,7 @@ using Ananke.Abstractions.Agents;
 
 namespace Ananke.Orchestration.Agents;
 
-public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse : class
+public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob where TResponse : class
 {
     private readonly IAgentModel _model;
     private readonly Func<TState, string> _promptBuilder;
@@ -36,6 +36,10 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
     {
         PropertyNameCaseInsensitive = true
     };
+
+    // 4.6: Cache the generated JSON schema once per (TResponse, TState) pair to avoid
+    // redundant reflection work on every structured agent call.
+    private static readonly string CachedResponseSchema = JsonSchemaGenerator.Generate<TResponse>();
 
     private AgentJob(
         string name,
@@ -90,6 +94,9 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
     }
 
     public string Name { get; }
+
+    bool IProfileAwareJob.HasProfileAwareModel =>
+        _model is Routing.RoutedAgentModel rm && rm.HasCostResolver;
 
     private Dictionary<string, string> BuildMetadata()
     {
@@ -166,7 +173,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
             Messages = messages,
             ResponseFormat = new AgentResponseFormat(
                 typeof(TResponse).Name,
-                JsonSchemaGenerator.Generate<TResponse>()),
+                CachedResponseSchema),
             Metadata = BuildMetadata(),
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
         };
@@ -249,17 +256,27 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState> where TResponse :
                     "Do not call those tools again. Proceed with your best answer using any information you already have."));
             }
 
+            // 4.6: Check context-token budget before assembling the next request so we
+            // surface the limit before an avoidably large call is dispatched.
             if (_maxContextTokens.HasValue)
             {
-                var estimated = EstimateTokens(request);
+                var preFlight = new AgentRequest
+                {
+                    SystemPrompt = _systemPrompt,
+                    Messages = messages,
+                    Tools = _tools,
+                    Metadata = BuildMetadata(),
+                    StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true,
+                };
+                var estimated = EstimateTokens(preFlight);
                 if (estimated > _maxContextTokens.Value)
                     throw new InvalidOperationException(
                         $"[{Name}] Estimated context ({estimated:N0} tokens) exceeds the configured limit " +
-                        $"of {_maxContextTokens.Value:N0} tokens after tool round {toolRound}.");
+                        $"of {_maxContextTokens.Value:N0} tokens before tool round {toolRound + 1}.");
                 if (estimated > (int)(_maxContextTokens.Value * 0.8))
                     _logger.LogWarning(
-                        "[{AgentName}] Context approaching limit: ~{Estimated:N0}/{Max:N0} estimated tokens (round {Round})",
-                        Name, estimated, _maxContextTokens.Value, toolRound);
+                        "[{AgentName}] Context approaching limit: ~{Estimated:N0}/{Max:N0} estimated tokens (pre-round {Round})",
+                        Name, estimated, _maxContextTokens.Value, toolRound + 1);
             }
 
             // Apply context strategy before re-requesting in the tool loop

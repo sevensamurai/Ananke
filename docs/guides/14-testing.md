@@ -22,7 +22,7 @@ no Docker containers, and no network access.
 | `IKnowledgeStore` | `QdrantKnowledgeStore` | `InMemoryKnowledgeStore` |
 | `IKnowledgeCatalog` | `QdrantKnowledgeCatalog` | `InMemoryKnowledgeCatalog` |
 | `IConversationMemory` | `RedisConversationMemory` | `InMemoryConversationMemory` |
-| `ICheckpointStore` | `FileCheckpointStore` | `InMemoryCheckpointStore` |
+| `ICheckpointStore` | *(bring your own)* | `InMemoryCheckpointStore` |
 | `IHandoffChannel` | `MqttHandoffChannel` | `InMemoryHandoffChannel` |
 | `IKeyValueDataAdapter` | `RedisDataAdapter` | (in-memory via `Dictionary`) |
 
@@ -237,4 +237,4 @@ public async Task Handoff_round_trip()
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

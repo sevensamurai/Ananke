@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Federation.Anthropic</PackageId>
+    <Description>Anthropic Claude Managed Agents adapter for Ananke Federation — deploy workflows to Claude, monitor managed agents, and translate manifests to Claude-native configuration.</Description>
+    <PackageTags>ai;agents;federation;anthropic;claude;deployment</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Anthropic.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation\Ananke.Federation.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
+  </ItemGroup>
+
+</Project>

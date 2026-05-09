@@ -5,7 +5,7 @@ Give agents a third memory layer that accumulates **patterns, skills, and heuris
 learned from repeated interactions** — alongside the semantic knowledge store
 (Guide 06) and episodic conversation memory.
 
-**Demo:** [Connect4Demo](../../src/demos/Connect4Demo/)
+**Demo:** [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo)
 
 ---
 
@@ -286,5 +286,11 @@ builder.Services.AddOpenTelemetry()
 - [Guide 06 — Long-Term Memory](06-memory.md) — the semantic knowledge layer this complements
 - [Guide 08 — State Machine](08-state-machine.md) — `IStateMachine<S,T>` for coordinating the analysis loop
 - [Guide 14 — Testing](14-testing.md) — use `InMemoryEmpiricalMemory` + `InMemoryEmbedder` for zero-dependency tests
+- [Guide 16 — Agentic Patterns § Smart Tool Router](16-agentic-patterns.md#smart-tool-router) — `IToolMemory` powers the `SemanticRecallStage` and inflammation advisories in the routing pipeline
 
-← [Learning Path](../learning.md)
+**Also see:**
+- [EntityMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/EntityMemoryDemo) — per-entity memory isolation; same workflow, different empirical + knowledge stores per customer
+- [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) — OpenClaw skill pipeline and UCB-based adaptive routing evolution in isolation
+- [SelfImprovingWorkflowDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/SelfImprovingWorkflowDemo) — a workflow that records its own performance and uses empirical memory to refine its strategy across runs
+
+← [Learning Path](learning-path.md)

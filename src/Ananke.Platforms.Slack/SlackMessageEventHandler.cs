@@ -15,6 +15,9 @@ internal sealed class SlackMessageEventHandler(SlackAdapter adapter) : IEventHan
         if (string.IsNullOrEmpty(slackEvent.User))
             return Task.CompletedTask;
 
-        return adapter.DispatchAsync(slackEvent);
+        // 5.4: Route through BoundedDispatcher so message dispatch is bounded in memory
+        // and observed errors are logged rather than silently dropped.
+        adapter.EnqueueDispatch(slackEvent);
+        return Task.CompletedTask;
     }
 }

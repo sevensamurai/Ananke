@@ -6,6 +6,9 @@ using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Orchestration.Memory;
 using Shouldly;
 
+
+using Ananke.Learning.EmpiricalMemory;
+
 namespace Ananke.Learning.Tests;
 
 [TestFixture]

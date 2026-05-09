@@ -9,12 +9,15 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- ANANKE_ASYNC_001: existing codebase pre-dates the rule; suppressed globally until
+         a dedicated ConfigureAwait migration pass is complete. New code must comply. -->
+    <NoWarn>$(NoWarn);ANANKE_ASYNC_001</NoWarn>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <!-- Coordinated version across all packages -->
   <PropertyGroup>
-    <VersionPrefix>0.7.2</VersionPrefix>
+    <VersionPrefix>0.8.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- NuGet package metadata (applies when IsPackable=true in individual csproj) -->
@@ -22,7 +25,7 @@
     <Authors>sevensamurai</Authors>
     <Company>sevensamurai</Company>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/sevensamurai/Ananke</PackageProjectUrl>
+    <PackageProjectUrl>https://nnke.io/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/sevensamurai/Ananke</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -31,6 +34,20 @@
     <PackageTags>state-machine;orchestration;workflow;agents;distributed;llm;ai;mcp;dotnet</PackageTags>
     <Copyright>Copyright © sevensamurai</Copyright>
   </PropertyGroup>
+
+  <!-- Wire Ananke.Analyzers into every project except itself and its test project.
+       OutputItemType="Analyzer" ensures it runs as a Roslyn analyzer rather than a
+       compile-time reference. ReferenceOutputAssembly="false" keeps it out of the
+       output directory. The condition excludes the analyzer project itself
+       (IsRoslynComponent=true) and the analyzer test project (IsTestProject=true
+       combined with a direct ProjectReference to the analyzer csproj). -->
+  <ItemGroup Condition="'$(IsRoslynComponent)' != 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Ananke.Analyzers\Ananke.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      PrivateAssets="all" />
+  </ItemGroup>
 
   <!-- Include per-project README if present, otherwise fall back to repo-root README -->
   <ItemGroup Condition="'$(IsPackable)' == 'true'">

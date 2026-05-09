@@ -48,7 +48,7 @@ services.AddRedis(c => { c.Host = "localhost"; });
 |---|---|
 | `Ananke.Orchestration.OpenAI` | OpenAI / GPT provider |
 | `Ananke.Orchestration.Anthropic` | Anthropic / Claude provider |
-| `Ananke.Orchestration.Google` | Google Gemini + Vertex AI provider |
+| `Ananke.Orchestration.Google` | Google Gemini + Gemini Enterprise Agent Platform provider |
 | `Ananke.MCP` | Expose tools and workflows as MCP server capabilities |
 | `Ananke.Redis` | Redis-backed distributed lock and key-value store |
 | `Ananke.MQTT` | MQTT-backed pub/sub channels |

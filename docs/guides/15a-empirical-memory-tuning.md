@@ -228,6 +228,6 @@ contradiction = (1−surprise) × (1−coherence) × ContradictionPenaltyWeight
 
 - [Guide 15 — Empirical Memory](15-empirical-memory.md) — core concepts, API, backends
 - [Guide 14 — Testing](14-testing.md) — use `InMemoryEmpiricalMemory` + `InMemoryEmbedder` for zero-dependency tests
-- [Connect4Demo](../../src/demos/Connect4Demo/) — working example of game-agent tuning
+[Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) — working example of game-agent tuning
 
-← [Learning Path](../learning.md)
+← [Learning Path](learning-path.md)

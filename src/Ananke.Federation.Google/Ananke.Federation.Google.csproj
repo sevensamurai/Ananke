@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Federation.Google</PackageId>
+    <Description>Gemini Enterprise Agent Platform adapter for Ananke Federation — deploy workflows to Agent Runtime, monitor agents via Agent Observability, and translate manifests to Gemini-native configuration.</Description>
+    <PackageTags>ai;agents;federation;gemini-enterprise-agent-platform;agent-runtime;google;gemini;deployment;vertex-ai</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Google.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation\Ananke.Federation.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+  </ItemGroup>
+
+</Project>

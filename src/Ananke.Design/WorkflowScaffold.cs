@@ -1,5 +1,6 @@
 using Ananke.Design.Dsl;
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Routing;
 
@@ -42,6 +43,8 @@ public sealed class WorkflowScaffold<TState>
 {
     private readonly string _name;
     private readonly List<ConnectionLine> _connections;
+    private readonly Dictionary<string, ToolDirective> _toolDeclarations;
+    private readonly Dictionary<string, JobToolDirective> _jobToolDeclarations;
     private readonly HashSet<string> _jobNames;
     private readonly HashSet<string> _subFlowNames;
     private readonly HashSet<string> _interruptJobs;
@@ -55,6 +58,8 @@ public sealed class WorkflowScaffold<TState>
     {
         _name = name;
         _connections = connections;
+        _toolDeclarations = DiscoverTools(connections);
+        _jobToolDeclarations = DiscoverJobToolDeclarations(connections);
         _jobNames = DiscoverJobNames(connections);
 
         if (_jobNames.Count == 0)
@@ -84,7 +89,31 @@ public sealed class WorkflowScaffold<TState>
     /// <summary>
     /// All job names discovered from the parsed topology.
     /// </summary>
+    public string Name => _name;
+
+    /// <summary>
+    /// All job names discovered from the parsed topology.
+    /// </summary>
     public IReadOnlySet<string> JobNames => _jobNames;
+
+    /// <summary>
+    /// Manifest-style tool declarations discovered from DSL <c>tool(...)</c> directives.
+    /// </summary>
+    public IReadOnlyDictionary<string, ToolDirective> ToolDeclarations => _toolDeclarations;
+
+    /// <summary>
+    /// Per-job tool usage directives discovered from DSL <c>use(...)</c> lines.
+    /// </summary>
+    public IReadOnlyDictionary<string, JobToolDirective> JobToolDeclarations => _jobToolDeclarations;
+
+    /// <summary>
+    /// Returns only topology DSL lines, excluding non-topology directives such as <c>tool(...)</c> and <c>use(...)</c>.
+    /// </summary>
+    public IReadOnlyList<string> GetTopologyDsl() =>
+        _connections
+            .Where(static c => c is not ConnectionLine.Tool && c is not ConnectionLine.Use)
+            .Select(ToDslLine)
+            .ToList();
 
     /// <summary>
     /// Job names that have not yet been bound to an implementation.
@@ -286,6 +315,8 @@ public sealed class WorkflowScaffold<TState>
 
                 case ConnectionLine.SubFlow:
                 case ConnectionLine.Interrupt:
+                case ConnectionLine.Tool:
+                case ConnectionLine.Use:
                     break; // node annotations — handled separately
             }
         }
@@ -380,6 +411,8 @@ public sealed class WorkflowScaffold<TState>
 
                 case ConnectionLine.SubFlow:
                 case ConnectionLine.Interrupt:
+                case ConnectionLine.Tool:
+                case ConnectionLine.Use:
                     break; // node annotations — don't introduce new names
             }
         }
@@ -389,7 +422,48 @@ public sealed class WorkflowScaffold<TState>
 
     private static HashSet<string> DiscoverJobNames(List<ConnectionLine> connections) =>
         [.. DiscoverOrderedJobNames(connections)];
+
+    private static string ToDslLine(ConnectionLine connection) => connection switch
+    {
+        ConnectionLine.Direct d => $"{d.From} -> {d.To}",
+        ConnectionLine.Fork f => f.Mode is null
+            ? $"{f.From} -> fork({string.Join(", ", f.Targets)})"
+            : $"{f.From} -> fork({string.Join(", ", f.Targets)}, mode: {f.Mode})",
+        ConnectionLine.Join j => $"join({string.Join(", ", j.Sources)}) -> {j.Target}",
+        ConnectionLine.Router r => $"{r.From} -> router({string.Join(", ", r.Options)})",
+        ConnectionLine.SubFlow s => $"subflow({s.Name})",
+        ConnectionLine.Interrupt i => $"interrupt({i.JobName})",
+        _ => throw new InvalidOperationException($"Unsupported connection line type: {connection.GetType().Name}")
+    };
+
+    private static Dictionary<string, ToolDirective> DiscoverTools(List<ConnectionLine> connections) =>
+        connections
+            .OfType<ConnectionLine.Tool>()
+            .GroupBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => new ToolDirective(g.Key, g.Last().Description, g.Last().Tags),
+                StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, JobToolDirective> DiscoverJobToolDeclarations(List<ConnectionLine> connections) =>
+        connections
+            .OfType<ConnectionLine.Use>()
+            .GroupBy(u => u.JobName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => new JobToolDirective(g.Key, g.Last().ToolNames, g.Last().Semantic),
+                StringComparer.OrdinalIgnoreCase);
 }
+
+/// <summary>
+/// Portable tool metadata declared in workflow DSL.
+/// </summary>
+public sealed record ToolDirective(string Name, string Description, IReadOnlyList<string> Tags);
+
+/// <summary>
+/// Per-job tool usage metadata declared in workflow DSL.
+/// </summary>
+public sealed record JobToolDirective(string JobName, IReadOnlyList<string> ToolNames, bool Semantic);
 
 /// <summary>
 /// Factory methods for parsing the workflow topology DSL into a <see cref="WorkflowScaffold{TState}"/>.

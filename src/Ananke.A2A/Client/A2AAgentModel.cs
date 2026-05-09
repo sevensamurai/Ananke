@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using A2A;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
@@ -125,26 +126,51 @@ public sealed class A2AAgentModel : IStreamingAgentModel
 
     private MessageSendParams BuildSendParams(AgentRequest request)
     {
-        var lastUserMessage = request.Messages
-            .LastOrDefault(m => m.Role == AgentRole.User);
+        // Build the current user turn, fusing the system prompt as a leading context block.
+        var currentParts = new List<Part>();
 
-        var textContent = lastUserMessage?.Content ?? string.Empty;
-
-        // Prepend system prompt as context when present
         if (!string.IsNullOrEmpty(request.SystemPrompt))
-            textContent = $"[System: {request.SystemPrompt}]\n\n{textContent}";
+            currentParts.Add(new global::A2A.TextPart { Text = $"[System: {request.SystemPrompt}]" });
+
+        var lastUserMessage = request.Messages.LastOrDefault(m => m.Role == AgentRole.User);
+        var userText = lastUserMessage?.Content ?? string.Empty;
+        if (!string.IsNullOrEmpty(userText))
+            currentParts.Add(new global::A2A.TextPart { Text = userText });
 
         var a2aMessage = new global::A2A.AgentMessage
         {
             Role = MessageRole.User,
             MessageId = Guid.NewGuid().ToString(),
-            Parts = [new global::A2A.TextPart { Text = textContent }]
+            Parts = currentParts
         };
 
-        return new MessageSendParams
+        // Count prior history turns so the server can retrieve them.
+        var historyCount = request.Messages.Count(m => m != lastUserMessage);
+
+        var config = new MessageSendConfiguration
         {
-            Message = a2aMessage
+            HistoryLength = historyCount > 0 ? historyCount : null,
+            Blocking = true
         };
+
+        var sendParams = new MessageSendParams
+        {
+            Message = a2aMessage,
+            Configuration = config
+        };
+
+        // Advertise available tools via metadata so A2A-aware remotes can reflect them back.
+        if (request.Tools is { Count: > 0 })
+        {
+            var toolNames = JsonSerializer.SerializeToElement(
+                request.Tools.Select(t => t.Name).ToArray());
+            sendParams.Metadata = new Dictionary<string, JsonElement>
+            {
+                ["ananke.tools"] = toolNames
+            };
+        }
+
+        return sendParams;
     }
 
     private static AgentResponse MapResponse(A2AResponse response)

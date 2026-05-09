@@ -1,3 +1,4 @@
+using Ananke.TestHelpers;
 using Shouldly;
 
 namespace Ananke.StateMachine.Tests;
@@ -186,7 +187,7 @@ public class SimpleStateMachineTests
             .OnEnter(SimplePhase.Paperwork, async ct =>
             {
                 entered.SetResult();
-                await Task.Delay(Timeout.Infinite, ct);
+                await WorkflowLoops.Park(ct);
             });
 
         await machine.FireAsync(SimpleAction.StartPaperwork);
@@ -213,7 +214,7 @@ public class SimpleStateMachineTests
                 started.SetResult();
                 try
                 {
-                    await Task.Delay(Timeout.Infinite, ct);
+                    await WorkflowLoops.Park(ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -227,7 +228,7 @@ public class SimpleStateMachineTests
         // Wait for work to actually start before transitioning out
         await started.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        // Transition out — should cancel the work
+        // Transition out - should cancel the work
         await machine.FireAsync(SimpleAction.Complete);
 
         await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -239,6 +240,7 @@ public class SimpleStateMachineTests
     {
         var enterCount = 0;
         var cancelCount = 0;
+        var cancelledTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
@@ -249,28 +251,31 @@ public class SimpleStateMachineTests
                 Interlocked.Increment(ref enterCount);
                 try
                 {
-                    await Task.Delay(Timeout.Infinite, ct);
+                    await WorkflowLoops.Park(ct);
                 }
                 catch (OperationCanceledException)
                 {
                     Interlocked.Increment(ref cancelCount);
+                    cancelledTcs.TrySetResult();
                     throw;
                 }
             });
 
         // Start initial work (machine starts in Searching, but OnEnter only fires on transition)
-        // Manually trigger by interrupting — this pushes Searching, goes to Searching,
+        // Manually trigger by interrupting - this pushes Searching, goes to Searching,
         // cancels old work, starts new OnEnter
         await machine.FireAsync(SimpleAction.Interrupt);
 
         // Wait for OnEnter to start
-        await Task.Delay(100);
+        await machine.WhenEnteredAsync(SimplePhase.Searching).WaitAsync(TimeSpan.FromSeconds(5));
         enterCount.ShouldBe(1);
 
-        // Interrupt again — should cancel first OnEnter, start second
+        // Interrupt again - should cancel first OnEnter, start second
         await machine.FireAsync(SimpleAction.Interrupt);
 
-        await Task.Delay(100);
+        await machine.WhenEnteredAsync(SimplePhase.Searching).WaitAsync(TimeSpan.FromSeconds(5));
+        // Wait for the first work's cancellation to propagate before asserting.
+        await cancelledTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         enterCount.ShouldBe(2);
         cancelCount.ShouldBe(1);
     }
@@ -278,22 +283,25 @@ public class SimpleStateMachineTests
     [Test]
     public async Task OnEnter_CompletedWorkIsObservableViaCurrentWork()
     {
+        var workGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
                 .From(SimplePhase.Searching).On(SimpleAction.StartPaperwork).To(SimplePhase.Paperwork))
             .OnEnter(SimplePhase.Paperwork, async _ =>
             {
-                await Task.Delay(50);
-                // work completes normally
+                await workGate.Task; // blocks until test releases it
             });
 
         await machine.FireAsync(SimpleAction.StartPaperwork);
+        await machine.WhenEnteredAsync(SimplePhase.Paperwork).WaitAsync(TimeSpan.FromSeconds(5));
 
-        // Should be able to await the work
-#pragma warning disable CS4014
-        machine.CurrentWork.ShouldNotBeNull();
-#pragma warning restore CS4014
-        await machine.CurrentWork!.WaitAsync(TimeSpan.FromSeconds(2));
+        // Work is running — CurrentWork must be non-null.
+        var currentWork = machine.CurrentWork;
+        ((object?)currentWork).ShouldNotBeNull();
+
+        // Release the work and await its completion.
+        workGate.TrySetResult();
+        await currentWork.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Test]
@@ -331,8 +339,8 @@ public class SimpleStateMachineTests
                 SimplePhase.Searching, b => b
                     .From(SimplePhase.Searching).On(SimpleAction.StartPaperwork).To(SimplePhase.Paperwork)
                     .From(SimplePhase.Paperwork).On(SimpleAction.Complete).To(SimplePhase.Done))
-            .OnEnter(SimplePhase.Searching, async ct => await Task.Delay(10, ct))
-            .OnEnter(SimplePhase.Paperwork, async ct => await Task.Delay(10, ct))
+            .OnEnter(SimplePhase.Searching, async ct => { await Task.Yield(); })
+            .OnEnter(SimplePhase.Paperwork, async ct => { await Task.Yield(); })
             .OnExit(SimplePhase.Searching, () => Task.CompletedTask);
 
         machine.ShouldBeAssignableTo<IStateMachine<SimplePhase, SimpleAction>>();
@@ -345,7 +353,7 @@ public class SimpleStateMachineTests
     [Test]
     public async Task Create_MatchesAbstractStateMachineBehavior()
     {
-        // New way — 5 lines, no types
+        // New way - 5 lines, no types
         var simple = StateMachine.Create<Light, LightAction>(Light.Off, b => b
             .From(Light.Off).On(LightAction.TurnOn).To(Light.On)
             .From(Light.On).On(LightAction.TurnOff).To(Light.Off)
@@ -369,7 +377,7 @@ public class SimpleStateMachineTests
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  Phase 3: OnInterrupt — callback + IInterruptSink
+    //  Phase 3: OnInterrupt - callback + IInterruptSink
     // ══════════════════════════════════════════════════════════════
 
     [Test]
@@ -443,6 +451,7 @@ public class SimpleStateMachineTests
     {
         var events = new List<string>();
         var workStarted = new TaskCompletionSource();
+        var cancelledTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
@@ -452,8 +461,8 @@ public class SimpleStateMachineTests
             {
                 events.Add("work-started");
                 workStarted.TrySetResult();
-                try { await Task.Delay(Timeout.Infinite, ct); }
-                catch (OperationCanceledException) { events.Add("work-cancelled"); throw; }
+                try { await WorkflowLoops.Park(ct); }
+                catch (OperationCanceledException) { events.Add("work-cancelled"); cancelledTcs.TrySetResult(); throw; }
             })
             .OnInterrupt((payload, _) =>
             {
@@ -469,12 +478,12 @@ public class SimpleStateMachineTests
         // Reset for second interrupt
         workStarted = new TaskCompletionSource();
 
-        // Second interrupt — cancels old work, delivers payload, starts new work
+        // Second interrupt - cancels old work, delivers payload, starts new work
         await machine.FireAsync(SimpleAction.Interrupt, "second");
         await workStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        // Allow background cancellation to complete
-        await Task.Delay(50);
+        // Wait for background cancellation to fully propagate.
+        await cancelledTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Both interrupts delivered
         events.ShouldContain("interrupt:first");
@@ -505,8 +514,10 @@ public class SimpleStateMachineTests
     }
 
     [Test]
-    public async Task OnInterrupt_WithSink_IgnoresMismatchedPayloadType()
+    public async Task OnInterrupt_WithSink_ThrowsOnMismatchedPayloadType()
     {
+        // a non-null payload of the wrong type is a programming error
+        // the machine throws InvalidCastException so the caller learns about the mismatch.
         var sink = new TestInterruptSink();
 
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
@@ -515,10 +526,9 @@ public class SimpleStateMachineTests
                 .From(SimplePhase.Searching).On(SimpleAction.Resume).ToResume())
             .OnInterrupt(sink);
 
-        // Pass an int payload when sink expects string — should not throw
-        await machine.FireAsync(SimpleAction.Interrupt, 42);
-
-        sink.ReceivedPayloads.ShouldBeEmpty();
+        // int payload when sink expects string must throw, not silently discard.
+        await Should.ThrowAsync<InvalidCastException>(
+            () => machine.FireAsync(SimpleAction.Interrupt, 42));
     }
 
     private sealed class TestInterruptSink : Ananke.Abstractions.IInterruptSink<string>

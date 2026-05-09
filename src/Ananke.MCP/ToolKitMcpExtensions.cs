@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Tools;
+using Ananke.Orchestration.Tools.Gating;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using System.Text.Json;
@@ -62,6 +63,7 @@ public static class ToolKitMcpExtensions
             Name = toolName,
             Description = protocolTool.Description ?? string.Empty,
             Parameters = parameters,
+            ExecutionMode = ToolExecutionMode.Mcp,
             Execute = async (args, ct) =>
             {
                 var mcpArgs = ToMcpArguments(args);
@@ -69,6 +71,70 @@ public static class ToolKitMcpExtensions
                 var text = ExtractText(result);
                 return result.IsError == true ? ToolResult.Error(text) : ToolResult.Ok(text);
             }
+        };
+    }
+
+    /// <summary>
+    /// Discovers all tools from a pool of MCP servers and registers them as
+    /// <see cref="ToolDefinition"/> entries that are load-balanced across the pool
+    /// at call time.
+    /// </summary>
+    /// <param name="toolkit">The toolkit to populate.</param>
+    /// <param name="clients">
+    /// Two or more connected MCP clients forming the pool. Caller owns their lifetime.
+    /// </param>
+    /// <param name="faultObserver">
+    /// Optional fault observer. When set, server-side call failures are reported so
+    /// health state and affinity tracking stay current.
+    /// </param>
+    /// <param name="faultThreshold">
+    /// Consecutive failures before a server is skipped in rotation. Defaults to 3.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The same <paramref name="toolkit"/> for fluent chaining.</returns>
+    /// <remarks>
+    /// Tool discovery uses the first client in the pool (all replicas are assumed to
+    /// expose identical tool schemas). Execution is distributed across the pool.
+    /// </remarks>
+    public static async Task<ToolKit> AddMcpPoolAsync(
+        this ToolKit toolkit,
+        IReadOnlyList<McpClient> clients,
+        IToolFaultObserver? faultObserver = null,
+        int faultThreshold = 3,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(toolkit);
+        if (clients is null || clients.Count == 0)
+            throw new ArgumentException("At least one MCP client is required.", nameof(clients));
+
+        var invoker = new McpToolInvoker(clients, faultObserver, faultThreshold);
+
+        // Discover tool schemas from the first client (all replicas expose identical schemas)
+        var mcpTools = await clients[0].ListToolsAsync(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var mcpTool in mcpTools)
+        {
+            var tool = CreatePoolToolDefinition(mcpTool.ProtocolTool, toolkit.Name, invoker);
+            toolkit.AddTool(tool);
+        }
+
+        return toolkit;
+    }
+
+    private static ToolDefinition CreatePoolToolDefinition(
+        Tool protocolTool, string kitName, McpToolInvoker invoker)
+    {
+        var parameters = ParseParameters(protocolTool.InputSchema);
+        var toolName = protocolTool.Name;
+
+        return new ToolDefinition
+        {
+            Name = toolName,
+            Description = protocolTool.Description ?? string.Empty,
+            Parameters = parameters,
+            ExecutionMode = ToolExecutionMode.Mcp,
+            Execute = (args, ct) => invoker.InvokeAsync(kitName, toolName, args, ct)
         };
     }
 

@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Workflows;
 using System.Text.Json;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
@@ -29,6 +30,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
     private readonly IReadOnlyList<AgentTool>? _tools;
     private readonly IReadOnlyDictionary<string, ToolDefinition>? _toolExecutors;
     private readonly int _maxToolRounds;
+    private readonly int _maxRoutingRetries;
 
     internal AgentRouter(
         IAgentModel model,
@@ -37,7 +39,8 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         string? systemPrompt,
         IReadOnlyList<AgentTool>? tools,
         IReadOnlyDictionary<string, ToolDefinition>? toolExecutors,
-        int maxToolRounds)
+        int maxToolRounds,
+        int maxRoutingRetries)
     {
         _model = model;
         _promptBuilder = promptBuilder;
@@ -46,6 +49,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         _tools = tools;
         _toolExecutors = toolExecutors;
         _maxToolRounds = maxToolRounds;
+        _maxRoutingRetries = maxRoutingRetries;
     }
 
     public async Task<string> RouteAsync(TState state, CancellationToken ct)
@@ -67,6 +71,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         };
 
         var response = await _model.GenerateAsync(request, ct);
+        TokenUsageCapture.Accumulate(response);
 
         var round = 0;
         while (response.RequiresAction && _toolExecutors is not null)
@@ -87,28 +92,44 @@ public sealed class AgentRouter<TState> : IRouter<TState>
 
             request = request with { Messages = messages };
             response = await _model.GenerateAsync(request, ct);
+            TokenUsageCapture.Accumulate(response);
         }
 
         var choice = response.Text?.Trim() ?? string.Empty;
-        return MatchOption(choice, optionsList);
+        var matched = TryMatchOption(choice);
+        if (matched is not null)
+            return matched;
+
+        // Retry: ask the model again up to _maxRoutingRetries additional times.
+        for (var retry = 0; retry < _maxRoutingRetries; retry++)
+        {
+            messages.Add(AgentMessage.User(
+                $"'{choice}' is not a valid option. You must respond with exactly one of: {optionsList}. No explanation."));
+            request = request with { Messages = messages };
+            response = await _model.GenerateAsync(request, ct);
+            TokenUsageCapture.Accumulate(response);
+            choice = response.Text?.Trim() ?? string.Empty;
+            matched = TryMatchOption(choice);
+            if (matched is not null)
+                return matched;
+        }
+
+        throw new AgentRoutingException(choice, _options);
     }
 
-    private string MatchOption(string choice, string optionsList)
+    private string? TryMatchOption(string choice)
     {
+        // 1. Exact match
         foreach (var option in _options)
-        {
             if (string.Equals(option, choice, StringComparison.OrdinalIgnoreCase))
                 return option;
-        }
 
+        // 2. Prefix match — model may echo the option followed by punctuation/explanation
         foreach (var option in _options)
-        {
-            if (choice.Contains(option, StringComparison.OrdinalIgnoreCase))
+            if (choice.StartsWith(option, StringComparison.OrdinalIgnoreCase))
                 return option;
-        }
 
-        throw new InvalidOperationException(
-            $"Agent router returned '{choice}', which does not match any available option: {optionsList}.");
+        return null;
     }
 
     private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
@@ -129,6 +150,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         private string? _systemPrompt;
         private ToolKit? _toolKit;
         private int _maxToolRounds = 3;
+        private int _maxRoutingRetries = 2;
 
         public Builder(IAgentModel model)
         {
@@ -172,12 +194,32 @@ public sealed class AgentRouter<TState> : IRouter<TState>
             return this;
         }
 
+        /// <summary>
+        /// Maximum number of additional LLM calls when the model returns an unrecognized
+        /// option. After <c>MaxRoutingRetries + 1</c> total attempts,
+        /// <see cref="AgentRoutingException"/> is thrown. Default is 2.
+        /// </summary>
+        public Builder WithMaxRoutingRetries(int max)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(max);
+            _maxRoutingRetries = max;
+            return this;
+        }
+
         public AgentRouter<TState> Build()
         {
             ArgumentNullException.ThrowIfNull(_promptBuilder, "Prompt builder is required. Call WithPrompt().");
 
             if (_options.Count == 0)
                 throw new InvalidOperationException("At least one routing option is required. Call WithOptions().");
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var opt in _options)
+            {
+                if (!seen.Add(opt))
+                    throw new InvalidOperationException(
+                        $"Duplicate routing option '{opt}'. Each option name must be unique (case-insensitive).");
+            }
 
             IReadOnlyList<AgentTool>? tools = null;
             IReadOnlyDictionary<string, ToolDefinition>? toolExecutors = null;
@@ -192,7 +234,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
 
             return new AgentRouter<TState>(
                 _model, _promptBuilder, _options, _systemPrompt,
-                tools, toolExecutors, _maxToolRounds);
+                tools, toolExecutors, _maxToolRounds, _maxRoutingRetries);
         }
     }
 }

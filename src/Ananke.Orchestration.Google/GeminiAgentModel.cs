@@ -10,7 +10,7 @@ namespace Ananke.Orchestration.Google;
 /// <summary>
 /// Google Gemini implementation of <see cref="IStreamingAgentModel"/>.
 /// Wraps the official <c>Google.GenAI</c> SDK and supports both the
-/// Gemini Developer API (API key) and Vertex AI (project + location + ADC).
+/// Gemini Developer API (API key) and Gemini Enterprise Agent Platform (project + location + ADC).
 /// </summary>
 public sealed class GeminiAgentModel : IStreamingAgentModel
 {
@@ -39,7 +39,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         new(new Client(apiKey: apiKey), model);
 
     /// <summary>
-    /// Creates a <see cref="GeminiAgentModel"/> for Google Vertex AI using
+    /// Creates a <see cref="GeminiAgentModel"/> for Gemini Enterprise Agent Platform using
     /// Application Default Credentials.
     /// </summary>
     /// <param name="project">Google Cloud project ID.</param>
@@ -119,7 +119,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 if (part.FunctionCall is not null)
                 {
                     toolCalls.Add(new AgentToolCall(
-                        $"call_{toolCalls.Count}",
+                        Guid.NewGuid().ToString("N"),
                         part.FunctionCall.Name!,
                         SerializeArgs(part.FunctionCall.Args)));
                 }
@@ -329,7 +329,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                     if (part.FunctionCall is not null)
                     {
                         toolCalls.Add(new AgentToolCall(
-                            $"call_{toolCalls.Count}",
+                            Guid.NewGuid().ToString("N"),
                             part.FunctionCall.Name!,
                             SerializeArgs(part.FunctionCall.Args)));
                     }

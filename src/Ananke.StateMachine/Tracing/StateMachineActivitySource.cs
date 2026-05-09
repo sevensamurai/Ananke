@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Ananke.Abstractions;
 
 namespace Ananke.StateMachine.Tracing;
 
@@ -9,7 +10,8 @@ namespace Ananke.StateMachine.Tracing;
 /// </summary>
 public static class StateMachineActivitySource
 {
-    public const string Name = "Ananke.StateMachine";
+    /// <summary>The activity source name. Mirrors <see cref="AnankeSourceNames.StateMachine"/>.</summary>
+    public const string Name = AnankeSourceNames.StateMachine;
 
     public static ActivitySource Source { get; } = new(Name);
 }

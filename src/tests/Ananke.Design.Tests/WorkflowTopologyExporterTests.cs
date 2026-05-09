@@ -1,6 +1,8 @@
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Routing;
 using Shouldly;
+using Ananke.Design.Tools;
 
 namespace Ananke.Design.Tests;
 
@@ -199,6 +201,61 @@ public class WorkflowTopologyExporterTests
         var fromDefinition = workflow.Build().ToManifestYaml();
 
         fromWorkflow.ShouldBe(fromDefinition);
+    }
+
+    [Test]
+    public void ToYaml_Manifest_PreservesToolsAndSemantic()
+    {
+        var manifest = new WorkflowManifest
+        {
+            Name = "portable-tools",
+            Models = [],
+            Tools = new Dictionary<string, ToolManifestEntry>
+            {
+                ["web_search"] = new()
+                {
+                    Key = "web_search",
+                    Name = "web_search",
+                    Description = "Search the web",
+                    Tags = ["search", "web"],
+                    Binding = new ToolManifestBinding { Kind = "mcp", Reference = "web.search" }
+                }
+            },
+            Jobs = new Dictionary<string, JobDefinition>
+            {
+                ["plan"] = new()
+                {
+                    Type = "agent",
+                    Tools = ["web_search"],
+                    Semantic = true
+                }
+            },
+            Connections = ["plan -> End"],
+            Profiles = []
+        };
+
+        var yaml = manifest.ToYaml();
+
+        yaml.ShouldContain("tools:");
+        yaml.ShouldContain("binding:");
+        yaml.ShouldContain("semantic: true");
+        yaml.ShouldContain("- web_search");
+    }
+
+    [Test]
+    public void ToManifestYaml_Scaffold_PreservesDslToolMetadata()
+    {
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("portable-tools", """
+            tool(web_search, tags: [search, web], description: "Search the web")
+            use(plan, web_search, semantic: true)
+            plan -> End
+            """);
+
+        var yaml = scaffold.ToManifestYaml();
+
+        yaml.ShouldContain("tools:");
+        yaml.ShouldContain("web_search:");
+        yaml.ShouldContain("semantic: true");
     }
 
     // ── Test helpers ─────────────────────────────────────────────────

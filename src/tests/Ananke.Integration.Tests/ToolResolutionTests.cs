@@ -1,8 +1,5 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
-using Ananke.Orchestration.Agents.Context;
-using Ananke.Orchestration.Agents.Middleware;
-using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Catalog;
 using Ananke.Orchestration.Knowledge.Embeddings;
@@ -10,6 +7,7 @@ using Ananke.Orchestration.Tools;
 using Shouldly;
 using System.Runtime.CompilerServices;
 using System.Text;
+
 
 namespace Ananke.Integration.Tests;
 

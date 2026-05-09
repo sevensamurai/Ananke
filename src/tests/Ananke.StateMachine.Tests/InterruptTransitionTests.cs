@@ -1,4 +1,4 @@
-using Ananke.Abstractions.Distributed;
+﻿using Ananke.Abstractions.Distributed;
 using Ananke.StateMachine.Builder;
 using Shouldly;
 
@@ -127,38 +127,38 @@ public class InterruptTransitionTests
         var machine = new DeepInterruptMachine(_lock, _lock);
         var ctx = new TestContext("1");
 
-        // A → interrupt → B
+        // A -> interrupt -> B
         var r1 = await machine.TransitionAsync(ctx, DeepAction.InterruptToB);
         r1.Success.ShouldBeTrue();
         r1.WasInterrupt.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.B);
         machine.IsInterrupted.ShouldBeTrue();
 
-        // B → interrupt → C
+        // B -> interrupt -> C
         var r2 = await machine.TransitionAsync(ctx, DeepAction.InterruptToC);
         r2.Success.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.C);
         machine.IsInterrupted.ShouldBeTrue();
 
-        // C → interrupt → D
+        // C -> interrupt -> D
         var r3 = await machine.TransitionAsync(ctx, DeepAction.InterruptToD);
         r3.Success.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.D);
 
-        // D → resume → C
+        // D -> resume -> C
         var r4 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r4.Success.ShouldBeTrue();
         r4.WasResume.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.C);
         machine.IsInterrupted.ShouldBeTrue();
 
-        // C → resume → B
+        // C -> resume -> B
         var r5 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r5.Success.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.B);
         machine.IsInterrupted.ShouldBeTrue();
 
-        // B → resume → A
+        // B -> resume -> A
         var r6 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r6.Success.ShouldBeTrue();
         machine.CurrentState.ShouldBe(DeepState.A);
@@ -194,11 +194,11 @@ public class InterruptTransitionTests
         var machine = new DeepInterruptMachine(_lock, _lock, options);
         var ctx = new TestContext("1");
 
-        // A → interrupt → B (depth 1)
+        // A -> interrupt -> B (depth 1)
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
-        // B → interrupt → C (depth 2)
+        // B -> interrupt -> C (depth 2)
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToC)).Success.ShouldBeTrue();
-        // C → interrupt → D (depth 3 — exceeds limit of 2)
+        // C -> interrupt -> D (depth 3 - exceeds limit of 2)
         var result = await machine.TransitionAsync(ctx, DeepAction.InterruptToD);
 
         result.Success.ShouldBeFalse();
@@ -215,7 +215,7 @@ public class InterruptTransitionTests
         var machine = new DeepInterruptMachine(_lock, _lock);
         var ctx = new TestContext("1");
 
-        // Try to resume from A without any interrupt — but Resume is only defined from B, C, D.
+        // Try to resume from A without any interrupt - but Resume is only defined from B, C, D.
         // Let's interrupt first, resume, then try resuming again.
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue();
@@ -229,8 +229,8 @@ public class InterruptTransitionTests
         // Interrupt once more, then try resume from B where stack is empty after first resume
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToC)).Success.ShouldBeTrue();
-        (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // C → B
-        (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // B → A
+        (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // C -> B
+        (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // B -> A
         machine.IsInterrupted.ShouldBeFalse();
     }
 
@@ -265,21 +265,21 @@ public class InterruptTransitionTests
         var machine = new DeepInterruptMachine(_lock, _lock);
         var ctx = new TestContext("42");
 
-        // Build up a stack: A → B → C
+        // Build up a stack: A -> B -> C
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToC)).Success.ShouldBeTrue();
 
         // Create a new machine instance pointing at the same lock store
         var machine2 = new DeepInterruptMachine(_lock, _lock);
 
-        // Resume should pop C → B (reading stack from persisted context)
+        // Resume should pop C -> B (reading stack from persisted context)
         var result = await machine2.TransitionAsync(ctx, DeepAction.Resume);
         result.Success.ShouldBeTrue();
         result.WasResume.ShouldBeTrue();
         machine2.CurrentState.ShouldBe(DeepState.B);
         machine2.IsInterrupted.ShouldBeTrue();
 
-        // Resume again: B → A
+        // Resume again: B -> A
         var result2 = await machine2.TransitionAsync(ctx, DeepAction.Resume);
         result2.Success.ShouldBeTrue();
         machine2.CurrentState.ShouldBe(DeepState.A);

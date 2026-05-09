@@ -13,8 +13,7 @@ namespace Ananke.Redis;
 /// <see cref="Checkpoint{TState}.ExpiresAt"/> is set.
 /// </summary>
 /// <remarks>
-/// Serialization uses <see cref="JsonSerializer"/> with case-insensitive deserialization,
-/// matching <see cref="FileCheckpointStore"/>.
+/// Serialization uses <see cref="JsonSerializer"/> with case-insensitive deserialization.
 /// </remarks>
 public sealed class RedisCheckpointStore : ICheckpointStore
 {
@@ -54,12 +53,16 @@ public sealed class RedisCheckpointStore : ICheckpointStore
         var json = JsonSerializer.Serialize(checkpoint, WriteOptions);
         var key = Key(checkpoint.ExecutionId);
 
-        await db.StringSetAsync(key, json);
+        TimeSpan? ttl = checkpoint.ExpiresAt != DateTimeOffset.MaxValue
+            ? checkpoint.ExpiresAt.UtcDateTime - DateTime.UtcNow
+            : null;
 
-        if (checkpoint.ExpiresAt != DateTimeOffset.MaxValue)
-        {
-            await db.KeyExpireAsync(key, checkpoint.ExpiresAt.UtcDateTime);
-        }
+        // Use atomic SET with optional expiry — avoids a TTL-less key if the process
+        // crashes between a bare StringSetAsync and a subsequent KeyExpireAsync.
+        if (ttl is { } t && t > TimeSpan.Zero)
+            await db.StringSetAsync(key, json, t);
+        else
+            await db.StringSetAsync(key, json);
     }
 
     /// <inheritdoc />

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('secrets.json')">
+    <Content Remove="secrets.json" />
+    <None Include="secrets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="data\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="ingestion.ananke.yml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="secrets.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Ananke\Ananke.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.AspNetCore\Ananke.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Design\Ananke.Design.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Documents\Ananke.Documents.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.MQTT\Ananke.MQTT.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Qdrant\Ananke.Qdrant.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Redis\Ananke.Redis.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\media\" />
+  </ItemGroup>
+
+</Project>

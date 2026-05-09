@@ -4,7 +4,7 @@
 Production-ready model decorators for response caching and resilient retries,
 decorator composition, and local/custom LLM endpoints.
 
-→ **Full reference:** [Advanced Agent Features](../reference/advanced-agent-features.md)
+→ **Full reference:** [Advanced Agent Features](reference/advanced-agent-features.md)
 
 ---
 
@@ -187,4 +187,4 @@ var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Federation</PackageId>
+    <Description>Federation hub for Ananke — deploy, monitor, and supervise agentic workflows across cloud platforms (Vertex AI, Claude Managed Agents) with organic mesh coordination.</Description>
+    <PackageTags>ai;agents;federation;deployment;hybrid;supervisor;organic;vertex-ai;claude</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Tests" />
+    <InternalsVisibleTo Include="Ananke.Federation.Conformance.Tests" />
+    <InternalsVisibleTo Include="Ananke.Federation.LocalEmulators" />
+    <InternalsVisibleTo Include="nnke-platform.Tests" />
+    <InternalsVisibleTo Include="nnke-platform-adapters.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Validation\platform-capabilities.json" LogicalName="Ananke.Federation.platform-capabilities.json" />
+    <EmbeddedResource Include="Recommendation\platform-profiles.json" LogicalName="Ananke.Federation.Recommendation.platform-profiles.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
+    <ProjectReference Include="..\Ananke.Design\Ananke.Design.csproj" />
+  </ItemGroup>
+
+</Project>

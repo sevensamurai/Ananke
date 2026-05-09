@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>OrganicKernelDemo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Ananke.Organics\Ananke.Organics.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Learning\Ananke.Learning.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="*.mesh.yml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

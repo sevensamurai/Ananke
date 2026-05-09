@@ -1,4 +1,4 @@
-<!-- topic: faq-general, tags: faq, general, installation, setup, install, nuget, requirements -->
+﻿<!-- topic: faq-general, tags: faq, general, installation, setup, install, nuget, requirements -->
 # FAQ — General & Installation
 
 ← [Back to all FAQs](../faq.md)
@@ -56,7 +56,7 @@ Yes. Ananke is designed with production requirements first:
 
 ### Is Ananke open source?
 
-Yes. Ananke is licensed under the [Apache 2.0 License](../../LICENSE).
+Yes. Ananke is licensed under the [Apache 2.0 License](LICENSE).
 
 ---
 
@@ -97,7 +97,7 @@ dotnet add package Ananke.Documents              # PDF + Markdown extraction
 ### How many packages are there?
 
 Ananke is split into focused NuGet packages so you only take the dependencies you need.
-The full list is in the [README packages table](../../README.md#packages) and the
+The full list is in the [README packages table](README.md#packages) and the
 [Feature Index](../reference/features.md).
 
 ---

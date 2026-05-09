@@ -1,8 +1,6 @@
-using Ananke.Analyzers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
-using Shouldly;
 
 namespace Ananke.Analyzers.Tests;
 
@@ -15,16 +13,17 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Job("b", (s, ct) => Task.FromResult(s))
                         .Then("a", "b")
-                        .Then("b", Ananke.Orchestration.Workflow.End)
+                        .Then("b", Workflow.End)
                         .Build();
                 }
             }
@@ -39,12 +38,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Then("a", {|#0:"typo"|})
                         .Build();
@@ -64,12 +64,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Job("b", (s, ct) => Task.FromResult(s))
                         .Then({|#0:"typo"|}, "b")
@@ -91,12 +92,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Then("a", "__end__")
                         .Build();
@@ -113,12 +115,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Job("b", (s, ct) => Task.FromResult(s))
                         .Chain("a", "b", "__end__")
@@ -136,12 +139,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .Chain("a", {|#0:"missing"|}, "__end__")
                         .Build();
@@ -161,12 +165,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .OnEnter({|#0:"missing"|}, s => Task.CompletedTask)
                         .Then("a", "__end__")
@@ -187,12 +192,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .OnEnter("a", s => Task.CompletedTask)
                         .Then("a", "__end__")
@@ -211,12 +217,13 @@ public class UndefinedJobNameAnalyzerTests
             using System;
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .OnFault({|#0:"missing"|}, (s, ex) => Task.CompletedTask)
                         .Then("a", "__end__")
@@ -238,12 +245,13 @@ public class UndefinedJobNameAnalyzerTests
             using System;
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test")
+                    var w = new Workflow<string>("test")
                         .Job("a", (s, ct) => Task.FromResult(s))
                         .OnFault("a", (s, ex) => Task.CompletedTask)
                         .Then("a", "__end__")
@@ -264,12 +272,13 @@ public class UndefinedJobNameAnalyzerTests
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
+            using Ananke.Orchestration.Workflows;
 
             class Program
             {
                 void Build()
                 {
-                    var w = new Ananke.Orchestration.Workflow<string>("test");
+                    var w = new Workflow<string>("test");
                     w.Job("a", (string s, CancellationToken ct) => Task.FromResult(s));
                     w.Then("a", "b");
                 }
@@ -287,7 +296,7 @@ public class UndefinedJobNameAnalyzerTests
             ReferenceAssemblies = Net10Reference
         };
         test.TestState.AdditionalReferences.Add(
-            typeof(Ananke.Orchestration.Workflow).Assembly);
+            typeof(Ananke.Orchestration.Workflows.Workflow).Assembly);
         test.TestState.AdditionalReferences.Add(
             typeof(Ananke.Abstractions.IBaseContext).Assembly);
         await test.RunAsync();
@@ -303,7 +312,7 @@ public class UndefinedJobNameAnalyzerTests
             ReferenceAssemblies = Net10Reference
         };
         test.TestState.AdditionalReferences.Add(
-            typeof(Ananke.Orchestration.Workflow).Assembly);
+            typeof(Ananke.Orchestration.Workflows.Workflow).Assembly);
         test.TestState.AdditionalReferences.Add(
             typeof(Ananke.Abstractions.IBaseContext).Assembly);
         test.ExpectedDiagnostics.AddRange(expected);

@@ -1,3 +1,5 @@
+using Ananke.Orchestration.Workflows;
+using Ananke.TestHelpers;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -143,7 +145,7 @@ public class OnFaultTests
         var exec = await new Workflow<CounterState>("fault-timeout")
             .Job("slow", async (s, ct) =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                await WorkflowLoops.Park(ct);
                 return s;
             })
             .OnFault("slow", (_, ex) => { captured = ex; return Task.CompletedTask; })
@@ -159,12 +161,14 @@ public class OnFaultTests
     [Test]
     public void OnFault_UndefinedJob_ThrowsOnBuild()
     {
-        var workflow = new Workflow<CounterState>("fault-undefined")
-            .Job("a", (s, _) => Task.FromResult(s))
-            .OnFault("missing", (_, _) => Task.CompletedTask)
-            .Then("a", Workflow.End);
+        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined OnFault target
+                var workflow = new Workflow<CounterState>("fault-undefined")
+                    .Job("a", (s, _) => Task.FromResult(s))
+                    .OnFault("missing", (_, _) => Task.CompletedTask)
+                    .Then("a", Workflow.End);
+        #pragma warning restore ANANKE001
 
-        Should.Throw<InvalidOperationException>(() => workflow.Build());
+                Should.Throw<InvalidOperationException>(() => workflow.Build());
     }
 
     [Test]

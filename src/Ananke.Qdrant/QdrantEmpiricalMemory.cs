@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Ananke.Abstractions;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Catalog;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
+using Ananke.Learning.EmpiricalMemory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Qdrant.Client;
@@ -78,8 +80,8 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private static readonly Guid UuidNamespaceDns = new("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
 
     // ── Observability ────────────────────────────────────────────
-    private static readonly ActivitySource ActivitySrc = new("Ananke.EmpiricalMemory");
-    private static readonly Meter Meter = new("Ananke.EmpiricalMemory");
+    private static readonly ActivitySource ActivitySrc = new(AnankeSourceNames.EmpiricalMemory);
+    private static readonly Meter Meter = new(AnankeSourceNames.EmpiricalMemoryMeter);
     private static readonly Counter<long> CommitCounter = Meter.CreateCounter<long>("empirical.commits", description: "Total entries committed");
     private static readonly Counter<long> DedupCounter = Meter.CreateCounter<long>("empirical.dedup_merges", description: "Entries merged via semantic dedup");
     private static readonly Counter<long> RecallCounter = Meter.CreateCounter<long>("empirical.recalls", description: "Total recall queries");
