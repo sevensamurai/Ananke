@@ -44,7 +44,7 @@ public class WorkflowManifestTests
             "    model: gpt-4.1-mini",
             "  smart:",
             "    provider: anthropic",
-            "    model: claude-sonnet-4-20250514",
+            "    model: claude-sonnet-4",
             "jobs:",
             "connections:",
         ]);
@@ -55,7 +55,7 @@ public class WorkflowManifestTests
         manifest.Models["fast"].Model.ShouldBe("gpt-4.1-mini");
 
         manifest.Models["smart"].Provider.ShouldBe("anthropic");
-        manifest.Models["smart"].Model.ShouldBe("claude-sonnet-4-20250514");
+        manifest.Models["smart"].Model.ShouldBe("claude-sonnet-4");
     }
 
     [Test]
@@ -146,7 +146,59 @@ public class WorkflowManifestTests
 
         manifest.Jobs["minimal"].ModelAlias.ShouldBeNull();
         manifest.Jobs["minimal"].SystemPrompt.ShouldBeNull();
+        manifest.Jobs["minimal"].Tools.ShouldBeEmpty();
+        manifest.Jobs["minimal"].Semantic.ShouldBeFalse();
         manifest.Jobs["minimal"].MaxToolRounds.ShouldBe(3);
+    }
+
+    [Test]
+    public void Parse_Tools_ExtractsMetadataAndBinding()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "tools:",
+            "  web_search:",
+            "    name: web_search",
+            "    description: Search the public web",
+            "    tags: [search, web, retrieval]",
+            "    binding:",
+            "      kind: mcp",
+            "      reference: web.search",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Tools.Count.ShouldBe(1);
+        manifest.Tools["web_search"].Key.ShouldBe("web_search");
+        manifest.Tools["web_search"].Name.ShouldBe("web_search");
+        manifest.Tools["web_search"].Description.ShouldBe("Search the public web");
+        manifest.Tools["web_search"].Tags.ShouldBe(["search", "web", "retrieval"]);
+        manifest.Tools["web_search"].Binding.Kind.ShouldBe("mcp");
+        manifest.Tools["web_search"].Binding.Reference.ShouldBe("web.search");
+    }
+
+    [Test]
+    public void Parse_JobToolsAndSemantic_Extracted()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "tools:",
+            "  web_search:",
+            "    name: web_search",
+            "    description: Search the public web",
+            "jobs:",
+            "  plan:",
+            "    type: agent",
+            "    tools:",
+            "      - web_search",
+            "    semantic: true",
+            "connections:",
+        ]);
+
+        manifest.Jobs["plan"].Tools.ShouldBe(["web_search"]);
+        manifest.Jobs["plan"].Semantic.ShouldBeTrue();
     }
 
     // ── System prompt (inline) ───────────────────────────────────────
@@ -276,5 +328,91 @@ public class WorkflowManifestTests
         manifest.Models.Count.ShouldBe(1);
         manifest.Jobs.Count.ShouldBe(2);
         manifest.Connections.Count.ShouldBe(2);
+    }
+
+    // ── Profiles section ─────────────────────────────────────────────
+
+    [Test]
+    public void Parse_Profiles_InlineFormat()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "jobs:",
+            "connections:",
+            "profiles:",
+            "  azure-ai:",
+            "    tools:",
+            "      search: { platform: bing_search }",
+            "      code: { platform: code_interpreter }",
+        ]);
+
+        manifest.Profiles.Count.ShouldBe(1);
+        manifest.Profiles["azure-ai"].Tools.Count.ShouldBe(2);
+        manifest.Profiles["azure-ai"].Tools["search"].Execute.ShouldBe("platform");
+        manifest.Profiles["azure-ai"].Tools["search"].Platform.ShouldBe("bing_search");
+        manifest.Profiles["azure-ai"].Tools["code"].Platform.ShouldBe("code_interpreter");
+    }
+
+    [Test]
+    public void Parse_Profiles_BlockFormat()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "jobs:",
+            "connections:",
+            "profiles:",
+            "  local:",
+            "    tools:",
+            "      search:",
+            "        execute: local",
+            "      code:",
+            "        execute: callback",
+            "        endpoint: https://example.com/code",
+        ]);
+
+        manifest.Profiles["local"].Tools["search"].Execute.ShouldBe("local");
+        manifest.Profiles["local"].Tools["code"].Execute.ShouldBe("callback");
+        manifest.Profiles["local"].Tools["code"].Endpoint.ShouldBe("https://example.com/code");
+    }
+
+    [Test]
+    public void Parse_Profiles_MultipleProfiles()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "jobs:",
+            "connections:",
+            "profiles:",
+            "  azure-ai:",
+            "    tools:",
+            "      search: { platform: bing_search }",
+            "  vertex-ai:",
+            "    tools:",
+            "      search: { platform: google_search }",
+            "  local:",
+            "    tools:",
+            "      search: { execute: local }",
+        ]);
+
+        manifest.Profiles.Count.ShouldBe(3);
+        manifest.Profiles["azure-ai"].Tools["search"].Platform.ShouldBe("bing_search");
+        manifest.Profiles["vertex-ai"].Tools["search"].Platform.ShouldBe("google_search");
+        manifest.Profiles["local"].Tools["search"].Execute.ShouldBe("local");
+    }
+
+    [Test]
+    public void Parse_NoProfiles_DefaultsToEmpty()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Profiles.ShouldBeEmpty();
     }
 }

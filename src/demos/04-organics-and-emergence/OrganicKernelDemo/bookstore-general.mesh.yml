@@ -1,0 +1,37 @@
+# bookstore-general.mesh.yml
+# ────────────────────────────────────────────────────────
+# Genesis cell for the Organic Kernel Demo.
+# Defines a single generalist bookstore agent with catalog
+# tools. Load with HostSnapshotExporter.FromYaml() and
+# hydrate with WorkflowActivator to get a live Workflow<T>.
+# ────────────────────────────────────────────────────────
+
+kernel: bookstore
+version: 1
+taken_at: 2025-01-01T00:00:00Z
+
+cells:
+  bookstore-general:
+    domain: bookstore
+    tools:
+      - search_catalog
+      - get_book_details
+      - check_inventory
+      - get_recommendations
+    models:
+      default:
+        provider: openai
+        model: gpt-4o-mini
+    jobs:
+      handle-request:
+        type: agent
+        model: default
+        system_prompt: |
+          You are a helpful bookstore assistant. You can search the catalog,
+          look up book details by ISBN, check inventory levels, and recommend
+          books by genre. Use the available tools to answer customer questions.
+          Be concise and friendly.
+      respond:
+        type: code
+    connections:
+      - handle-request -> respond

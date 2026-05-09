@@ -6,6 +6,7 @@ using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Tools;
 using Ananke.StateMachine;
+using Ananke.TestHelpers;
 using Shouldly;
 
 using SM = Ananke.StateMachine.StateMachine;
@@ -70,7 +71,7 @@ public class MessageFlowTests
         foreach (var part in parts)
         {
             yield return new AgentStreamChunk { TextDelta = part };
-            await Task.Delay(5, ct);
+            await Task.Yield();
         }
         yield return new AgentStreamChunk
         {
@@ -86,7 +87,7 @@ public class MessageFlowTests
         if (!string.IsNullOrEmpty(preamble))
         {
             yield return new AgentStreamChunk { TextDelta = preamble };
-            await Task.Delay(5, ct);
+            await Task.Yield();
         }
         yield return new AgentStreamChunk
         {
@@ -112,12 +113,7 @@ public class MessageFlowTests
         while (!EqualityComparer<Phase>.Default.Equals(machine.CurrentState, terminal))
         {
             var work = machine.CurrentWork;
-            if (work is null)
-            {
-                await Task.Delay(150);
-                work = machine.CurrentWork;
-                if (work is null) break;
-            }
+            if (work is null) break;
 
             try { await work; }
             catch (OperationCanceledException) { }
@@ -412,7 +408,7 @@ public class MessageFlowTests
                 {
                     toolStarted.TrySetResult();
                     // Slow enough for the interrupt to arrive
-                    await Task.Delay(500, ct);
+                    await WorkflowLoops.Park(ct);
                     return "Daisy the rabbit";
                 }
             });
@@ -464,7 +460,6 @@ public class MessageFlowTests
 
         // Wait for tool to start, then interrupt
         await toolStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        await Task.Delay(20);
 
         var interruptResult = await machine.FireAsync(
             Action.Interrupt, AgentMessage.User("also good for granny"));

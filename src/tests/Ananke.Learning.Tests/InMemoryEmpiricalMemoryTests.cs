@@ -2,6 +2,9 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Shouldly;
 
+
+using Ananke.Learning.EmpiricalMemory;
+
 namespace Ananke.Learning.Tests;
 
 [TestFixture]

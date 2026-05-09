@@ -2,6 +2,7 @@ using Ananke.Orchestration.Knowledge;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
+using Ananke.Learning.EmpiricalMemory;
 using Shouldly;
 
 namespace Ananke.Learning.Tests;

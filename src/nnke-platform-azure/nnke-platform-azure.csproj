@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nnke-platform-azure</AssemblyName>
+    <RootNamespace>Ananke.Tool.Platform.Azure</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nnke-platform-azure</ToolCommandName>
+    <PackageId>nnke-platform-azure</PackageId>
+    <Description>Azure AI Agent Service adapter for nnke-platform. Install alongside nnke-platform to enable 'deploy --platform azure-ai'.</Description>
+    <PackageTags>ananke;cli;dotnet-tool;federation;azure;azure-ai;agents</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="nnke-platform-adapters.Tests" />
+    <InternalsVisibleTo Include="nnke-platform-all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation.Azure\Ananke.Federation.Azure.csproj" />
+  </ItemGroup>
+
+</Project>

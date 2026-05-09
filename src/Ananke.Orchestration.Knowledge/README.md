@@ -1,4 +1,4 @@
-# Ananke.Orchestration.Knowledge
+﻿# Ananke.Orchestration.Knowledge
 
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Knowledge.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Knowledge)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
@@ -144,24 +144,6 @@ This package has **no dependency on `Ananke.Orchestration`** — it is independe
 | `Ananke.Qdrant` | Distributed vector store implementations via Qdrant |
 | `Ananke.Orchestration.OpenAI` | `OpenAIEmbeddingModel` for production embeddings |
 | `Ananke.Orchestration.Google` | `GeminiEmbeddingModel` for production embeddings |
-
-## License
-
-[Apache 2.0](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
-- `Markdig` ≥ 0.40.0 (transitive)
-
-## Related packages
-
-| Package | What it adds |
-|---|---|
-| `Ananke.Orchestration` | Core knowledge pipeline: `DocumentProcessor`, `IKnowledgeStore`, `InMemoryKnowledgeStore` |
-| `Ananke.Orchestration.OpenAI` | `OpenAIEmbeddingModel` for generating embeddings |
-| `Ananke.Qdrant` | Qdrant-backed `IKnowledgeStore` for persistent, distributed storage |
-| `Ananke` | Meta-package — includes everything |
-
-## Documentation
-
-Full docs, demos, and architecture: **[github.com/sevensamurai/Ananke](https://github.com/sevensamurai/Ananke)**
 
 ## License
 

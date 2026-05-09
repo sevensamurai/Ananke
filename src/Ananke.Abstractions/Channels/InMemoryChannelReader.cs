@@ -45,17 +45,18 @@ public sealed class InMemoryChannelReader<M, A> : IChannelReader<M, A>
     }
 
     /// <inheritdoc />
-    public Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M, A> consumer, CancellationToken token = default)
+    public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M, A> consumer, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(consumer);
 
-        _processor?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        if (_processor is not null)
+            await _processor.DisposeAsync().ConfigureAwait(false);
 
         _processor = new BackgroundProcessor<M, A>(consumer);
         _processor.Start(token);
 
-        return Task.FromResult(true);
+        return true;
     }
 
     /// <inheritdoc />

@@ -1,4 +1,6 @@
+using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Routing;
+using Ananke.TestHelpers;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -40,7 +42,7 @@ public class ForkJoinTests
             .Job("start", (s, _) => Task.FromResult(s))
             .Job("ok-branch", async (s, ct) =>
             {
-                await Task.Delay(2000, ct);
+                await WorkflowLoops.Park(ct);
                 return s with { Trail = [.. s.Trail, "ok"] };
             })
             .Job("bad-branch", (_, _) => throw new InvalidOperationException("branch failed"))
@@ -107,12 +109,14 @@ public class ForkJoinTests
     [Test]
     public void Build_ForkWithUndefinedTarget_Throws()
     {
-        var workflow = new Workflow<CounterState>("bad-fork")
-            .Job("start", (s, _) => Task.FromResult(s))
-            .Job("branch-a", (s, _) => Task.FromResult(s))
-            .Then("start", Workflow.Fork("branch-a", "nonexistent"))
-            .Join(["branch-a", "nonexistent"], "end", states => states[0]);
+        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined fork target
+                var workflow = new Workflow<CounterState>("bad-fork")
+                    .Job("start", (s, _) => Task.FromResult(s))
+                    .Job("branch-a", (s, _) => Task.FromResult(s))
+                    .Then("start", Workflow.Fork("branch-a", "nonexistent"))
+                    .Join(["branch-a", "nonexistent"], "end", states => states[0]);
+        #pragma warning restore ANANKE001
 
-        Should.Throw<InvalidOperationException>(() => workflow.Build());
+                Should.Throw<InvalidOperationException>(() => workflow.Build());
     }
 }

@@ -23,6 +23,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit.Analyzers">
       <PrivateAssets>all</PrivateAssets>
@@ -35,6 +37,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <ProjectReference Include="..\..\Ananke\Ananke.csproj" />
+    <ProjectReference Include="..\..\Ananke.Skills\Ananke.Skills.csproj" />
+    <ProjectReference Include="..\..\Ananke.MCP\Ananke.MCP.csproj" />
+    <ProjectReference Include="..\..\Ananke.MQTT\Ananke.MQTT.csproj" />
+    <ProjectReference Include="..\..\Ananke.A2A\Ananke.A2A.csproj" />
+    <ProjectReference Include="..\Ananke.TestHelpers\Ananke.TestHelpers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

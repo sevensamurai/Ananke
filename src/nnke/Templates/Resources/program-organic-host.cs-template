@@ -1,0 +1,47 @@
+using Ananke.Orchestration.Tools;
+using Ananke.Organics.Kernel;
+using Ananke.Organics.Division;
+using Ananke.Organics.Sensing;
+using Microsoft.Extensions.Configuration;
+
+// --- 1. Configuration ---
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("secrets.json", optional: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+// --- 2. Tool kit ---
+var tools = new ToolKit("{{name}}");
+// tools.AddTool("search", "Search the web", async (string query) => { ... });
+
+// --- 3. Capability map (landscape) ---
+var landscape = new InMemoryCapabilityMap(signalTimeout: TimeSpan.FromMinutes(5));
+
+// --- 4. Colony host ---
+await using var colony = new InProcessWorkflowHost();
+
+// --- 5. Growth options ---
+var options = new OrganicGrowthOptions
+{
+    Policy = new ThresholdDivisionPolicy(toolThreshold: 8),
+};
+
+// --- 6. Organic host ---
+await using var host = new OrganicHost(colony, landscape, options);
+
+// --- 7. Register a workflow cell ---
+host.Register("{{name}}-cell", tools);
+
+// --- 8. Run ---
+Console.WriteLine("  Organic host running. Press Ctrl+C to stop.");
+await colony.StartAsync("{{name}}-cell", async ct =>
+{
+    while (!ct.IsCancellationRequested)
+    {
+        Console.WriteLine("  [tick] cell alive");
+        await Task.Delay(TimeSpan.FromSeconds(10), ct);
+    }
+});
+
+Console.ReadLine();

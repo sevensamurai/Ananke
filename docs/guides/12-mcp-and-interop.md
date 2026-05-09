@@ -5,7 +5,7 @@ Expose tools and workflows as an [MCP](https://modelcontextprotocol.io/) server,
 consume external MCP tools in agents, and use the A2A protocol for agent-to-agent
 communication.
 
-**Demo:** [McpServerDemo](../../src/demos/McpServerDemo/)
+**Demo:** [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo)
 
 ---
 
@@ -170,6 +170,8 @@ var tool = new ToolDefinition
 | [13 — Design Tooling](13-design-tooling.md) | Text DSL, YAML manifests, Mermaid export |
 | [14 — Testing](14-testing.md) | Test without infrastructure |
 
+**Also see:** [AgentToAgentProtocolDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/AgentToAgentProtocolDemo) — a runnable A2A server with a matching Python client showing the raw JSON-RPC wire format.
+
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

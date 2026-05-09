@@ -4,9 +4,9 @@
 Define workflow topologies in a text DSL or YAML manifest, bind code at runtime,
 and export validated graphs as Mermaid diagrams.
 
-**Demo:** [DesignPipelineDemo](../../src/demos/DesignPipelineDemo/)
+**Demo:** [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo)
 
-→ **Full DSL reference:** [Workflow DSL Reference](../reference/workflow-dsl.md)
+→ **Full DSL reference:** [Workflow DSL Reference](reference/workflow-dsl.md)
 
 ---
 
@@ -137,7 +137,7 @@ models:
     config_key: OpenAI:ApiKey
   analyst:
     provider: anthropic
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-4
     config_key: Anthropic:ApiKey
 
 jobs:
@@ -246,4 +246,4 @@ graph TD
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

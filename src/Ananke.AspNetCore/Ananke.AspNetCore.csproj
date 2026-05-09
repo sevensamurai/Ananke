@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
 	<IsPackable>true</IsPackable>
@@ -10,9 +10,10 @@
 	<FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup>
+	<ItemGroup>
 	<ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
 	<ProjectReference Include="..\Ananke.StateMachine\Ananke.StateMachine.csproj" />
-  </ItemGroup>
+	<ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
+	</ItemGroup>
 
 </Project>

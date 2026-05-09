@@ -1,35 +1,64 @@
 <Solution>
 
-  <!-- Demos -->
-  <Folder Name="/demos/">
-    <Project Path="demos/AgenticDesignPatternsDemo/AgenticDesignPatternsDemo.csproj" Id="45077479-c130-4f53-9cca-1f43da49c235" />
-    <Project Path="demos/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" Id="7acad539-35f2-41fb-933b-fb8b8348a6e8" />
-    <Project Path="demos/ChannelsDiscordDemo/ChannelsDiscordDemo.csproj" />
-    <Project Path="demos/ChannelsSlackDemo/ChannelsSlackDemo.csproj" Id="dcc851cf-e3f0-40f8-a4cb-c7e79ccfba51" />
-    <Project Path="demos/Connect4Demo/Connect4Demo.csproj" />
-    <Project Path="demos/EntityMemoryDemo/EntityMemoryDemo.csproj" Id="c5086923-5519-4c66-a42b-e45c231f8f0d" />
-    <Project Path="demos/LogEventsDemo/LogEventsDemo.csproj" Id="23aa0734-a003-485b-a2ee-46367f61ad39" />
-    <Project Path="demos/PetAdoptionDemo/PetAdoptionDemo.csproj" Id="6601b5b6-b40c-4029-a813-980671103dad" />
-    <Project Path="demos/SelfImprovingWorkflowDemo/SelfImprovingWorkflowDemo.csproj" />
-    <Project Path="demos/SkillCatalogDemo/SkillCatalogDemo.csproj" />
-    <Project Path="demos\AgenticWebDemo\AgenticWebDemo.csproj" />
-    <Project Path="demos\BasicAgentDemo\BasicAgentDemo.csproj" />
-    <Project Path="demos\DesignPipelineDemo\DesignPipelineDemo.csproj" />
-    <Project Path="demos\LongTermMemoryDemo\LongTermMemoryDemo.csproj" />
-    <Project Path="demos\McpServerDemo\McpServerDemo.csproj" />
-    <Project Path="demos\SimpleWorkflowDemo\SimpleWorkflowDemo.csproj" />
-    <Project Path="demos\StateMachineDemo\StateMachineDemo.csproj" />
+<Folder Name="/demos/">
+</Folder>
+
+  <Folder Name="/demos/01-foundations/">
+    <Project Path="demos/01-foundations/BasicAgentDemo/BasicAgentDemo.csproj" />
+    <Project Path="demos/01-foundations/StateMachineDemo/StateMachineDemo.csproj" />
   </Folder>
+  <Folder Name="/demos/02-workflow-patterns/">
+    <Project Path="demos/02-workflow-patterns/AgenticDesignPatternsDemo/AgenticDesignPatternsDemo.csproj" />
+    <Project Path="demos/02-workflow-patterns/DesignPipelineDemo/DesignPipelineDemo.csproj" />
+    <Project Path="demos/02-workflow-patterns/SelfImprovingWorkflowDemo/SelfImprovingWorkflowDemo.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/03-memory-and-knowledge/">
+    <Project Path="demos/03-memory-and-knowledge/EntityMemoryDemo/EntityMemoryDemo.csproj" />
+    <Project Path="demos/03-memory-and-knowledge/LearningPrimitivesDemo/LearningPrimitivesDemo.csproj" />
+    <Project Path="demos/03-memory-and-knowledge/LongTermMemoryDemo/LongTermMemoryDemo.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/04-organics-and-emergence/">
+    <Project Path="demos/04-organics-and-emergence/Connect4Demo/Connect4Demo.csproj" />
+    <Project Path="demos/04-organics-and-emergence/LogEventsDemo/LogEventsDemo.csproj" />
+    <Project Path="demos/04-organics-and-emergence/OrganicKernelDemo/OrganicKernelDemo.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/05-applications/">
+    <Project Path="demos/05-applications/AgenticWebDemo/AgenticWebDemo.csproj" />
+    <Project Path="demos/05-applications/PetAdoptionDemo/PetAdoptionDemo.csproj" />
+  </Folder>
+
+  <Folder Name="/demos/06-interop-and-channels/">
+    <Project Path="demos/06-interop-and-channels/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" />
+    <Project Path="demos/06-interop-and-channels/ChannelsDemo/ChannelsDemo.csproj" />
+    <Project Path="demos/06-interop-and-channels/LocalPlatformLoopDemo/LocalPlatformLoopDemo.csproj" />
+    <Project Path="demos/06-interop-and-channels/McpServerDemo/McpServerDemo.csproj" />
+  </Folder>
+
 
   <!-- Tests -->
   <Folder Name="/tests/">
+    <Project Path="tests/Ananke.Abstractions.Tests/Ananke.Abstractions.Tests.csproj" />
+    <Project Path="tests/Ananke.Analyzers.Tests/Ananke.Analyzers.Tests.csproj" />
+    <Project Path="tests/Ananke.AspNetCore.Tests/Ananke.AspNetCore.Tests.csproj" />
+    <Project Path="tests/Ananke.Design.Tests/Ananke.Design.Tests.csproj" />
+    <Project Path="tests/Ananke.Documents.Tests/Ananke.Documents.Tests.csproj" />
+    <Project Path="tests/Ananke.Federation.Anthropic.Tests/Ananke.Federation.Anthropic.Tests.csproj" />
+    <Project Path="tests/Ananke.Federation.Azure.Tests/Ananke.Federation.Azure.Tests.csproj" />
+    <Project Path="tests/Ananke.Federation.Conformance.Tests/Ananke.Federation.Conformance.Tests.csproj" />
+    <Project Path="tests/Ananke.Federation.Google.Tests/Ananke.Federation.Google.Tests.csproj" />
+    <Project Path="tests/Ananke.Federation.Tests/Ananke.Federation.Tests.csproj" />
     <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
+    <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
+    <Project Path="tests/Ananke.Orchestration.Tests/Ananke.Orchestration.Tests.csproj" />
+    <Project Path="tests/Ananke.Organics.Tests/Ananke.Organics.Tests.csproj" />
     <Project Path="tests/Ananke.Platforms.Tests/Ananke.Platforms.Tests.csproj" />
-    <Project Path="tests\Ananke.Design.Tests\Ananke.Design.Tests.csproj" />
-    <Project Path="tests\Ananke.Documents.Tests\Ananke.Documents.Tests.csproj" />
-    <Project Path="tests\Ananke.Orchestration.Tests\Ananke.Orchestration.Tests.csproj" />
-    <Project Path="tests\Ananke.StateMachine.Tests\Ananke.StateMachine.Tests.csproj" />
+    <Project Path="tests/Ananke.Skills.Tests/Ananke.Skills.Tests.csproj" />
+    <Project Path="tests/Ananke.StateMachine.Tests/Ananke.StateMachine.Tests.csproj" />
+    <Project Path="tests/Ananke.TestHelpers/Ananke.TestHelpers.csproj" />
   </Folder>
 
   <!-- Pipeline / build configuration -->
@@ -37,32 +66,44 @@
     <File Path="Directory.Build.props" />
     <File Path="../.github/copilot-instructions.md" />
     <File Path="../.github/workflows/website.yml" />
-    <File Path="..\.github\workflows\pipeline.yml" />
+    <File Path="../.github/workflows/pipeline.yml" />
   </Folder>
-  <Project Path="Ananke.A2A\Ananke.A2A.csproj" />
-  <Project Path="Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  <Project Path="Ananke.A2A/Ananke.A2A.csproj" />
+  <Project Path="Ananke.Abstractions/Ananke.Abstractions.csproj" />
   <Project Path="Ananke.Analyzers/Ananke.Analyzers.csproj" />
   <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85" />
-  <Project Path="Ananke.Design\Ananke.Design.csproj" />
-  <Project Path="Ananke.Documents\Ananke.Documents.csproj" />
+  <Project Path="Ananke.Design/Ananke.Design.csproj" />
+  <Project Path="Ananke.Documents/Ananke.Documents.csproj" />
+  <Project Path="Ananke.Federation.Anthropic/Ananke.Federation.Anthropic.csproj" Id="934625fb-9b2a-4264-9704-db8daff92a0c" />
+  <Project Path="Ananke.Federation.Azure/Ananke.Federation.Azure.csproj" />
+  <Project Path="Ananke.Federation.Google/Ananke.Federation.Google.csproj" Id="4ae473a1-950a-422e-9fe9-e953f1832cf7" />
+  <Project Path="Ananke.Federation.LocalEmulators/Ananke.Federation.LocalEmulators.csproj" />
+  <Project Path="Ananke.Federation/Ananke.Federation.csproj" Id="ba69f556-2154-465b-b613-b2dbb59336d7" />
   <Project Path="Ananke.Learning/Ananke.Learning.csproj" Id="4e1339be-51d1-4550-9474-76b3a4e82cf4" />
-  <Project Path="Ananke.MCP\Ananke.MCP.csproj" />
-  <Project Path="Ananke.MQTT\Ananke.MQTT.csproj" />
-  <Project Path="Ananke.OpenTelemetry\Ananke.OpenTelemetry.csproj" />
-  <Project Path="Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
-  <Project Path="Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+  <Project Path="Ananke.MCP/Ananke.MCP.csproj" />
+  <Project Path="Ananke.MQTT/Ananke.MQTT.csproj" />
+  <Project Path="Ananke.OpenTelemetry/Ananke.OpenTelemetry.csproj" />
+  <Project Path="Ananke.Orchestration.Anthropic/Ananke.Orchestration.Anthropic.csproj" />
+  <Project Path="Ananke.Orchestration.Google/Ananke.Orchestration.Google.csproj" />
   <Project Path="Ananke.Orchestration.Knowledge/Ananke.Orchestration.Knowledge.csproj" Id="42cc6757-2cac-4197-80dd-f37cc31d2a7b" />
-  <Project Path="Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
-  <Project Path="Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  <Project Path="Ananke.Orchestration.OpenAI/Ananke.Orchestration.OpenAI.csproj" />
+  <Project Path="Ananke.Orchestration/Ananke.Orchestration.csproj" />
+  <Project Path="Ananke.Organics/Ananke.Organics.csproj" Id="32a1086e-a1aa-4810-98e2-c39eabb3ffed" />
   <Project Path="Ananke.Platforms.Discord/Ananke.Platforms.Discord.csproj" />
   <Project Path="Ananke.Platforms.Slack/Ananke.Platforms.Slack.csproj" />
   <Project Path="Ananke.Platforms/Ananke.Platforms.csproj" />
-  <Project Path="Ananke.Qdrant\Ananke.Qdrant.csproj" />
-  <Project Path="Ananke.Redis\Ananke.Redis.csproj" />
+  <Project Path="Ananke.Qdrant/Ananke.Qdrant.csproj" />
+  <Project Path="Ananke.Redis/Ananke.Redis.csproj" />
   <Project Path="Ananke.Skills/Ananke.Skills.csproj" />
-  <Project Path="Ananke.StateMachine\Ananke.StateMachine.csproj" />
-  <Project Path="Ananke\Ananke.csproj" />
-  <Project Path="dotnet-ananke/dotnet-ananke.csproj" />
+  <Project Path="Ananke.StateMachine/Ananke.StateMachine.csproj" />
+  <Project Path="Ananke.Tool.Shared/Ananke.Tool.Shared.csproj" />
+  <Project Path="Ananke/Ananke.csproj" />
+  <Project Path="nnke-platform-all/nnke-platform-all.csproj" />
+  <Project Path="nnke-platform-anthropic/nnke-platform-anthropic.csproj" />
+  <Project Path="nnke-platform-azure/nnke-platform-azure.csproj" />
+  <Project Path="nnke-platform-google/nnke-platform-google.csproj" />
+  <Project Path="nnke-platform/nnke-platform.csproj" />
+  <Project Path="nnke/nnke.csproj" />
   <Project Path="wiki/wiki.csproj" />
 
 </Solution>

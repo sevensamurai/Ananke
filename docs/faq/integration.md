@@ -1,4 +1,4 @@
-<!-- topic: faq-integration, tags: faq, human-in-the-loop, mcp, a2a, interop, approval, checkpoint -->
+﻿<!-- topic: faq-integration, tags: faq, human-in-the-loop, mcp, a2a, interop, approval, checkpoint -->
 # FAQ — Integration & Interop
 
 ← [Back to all FAQs](../faq.md)
@@ -35,9 +35,8 @@ var resumed = await workflow.ResumeAsync(
 `ICheckpointStore` serializes the full workflow state. Two implementations are provided:
 
 - `InMemoryCheckpointStore` — for tests and single-process scenarios
-- `FileCheckpointStore` — persists to disk for local dev and simple deployments
 
-Implement `ICheckpointStore` to back checkpoints with a database or cloud storage.
+Implement `ICheckpointStore` to back checkpoints with a database, filesystem, or cloud storage.
 
 ---
 

@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Workflows;
 using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Agents;
@@ -114,8 +115,15 @@ public abstract class ConversationalMessageHandler(
         builder = ConfigureWorkflow(builder, message);
 
         var sessionId = GetSessionId(message);
-        await builder.RunAsync(sessionId, [message.Message], ct).ConfigureAwait(false);
-
-        await bridge.FinalizeAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await builder.RunAsync(sessionId, [message.Message], ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            // 5.2: Always finalize the bridge so the platform receives the last partial
+            // chunk even when the workflow throws or is cancelled.
+            await bridge.FinalizeAsync(ct).ConfigureAwait(false);
+        }
     }
 }

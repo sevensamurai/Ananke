@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nnke-platform-all</AssemblyName>
+    <RootNamespace>Ananke.Tool.Platform.All</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nnke-platform-all</ToolCommandName>
+    <PackageId>nnke-platform-all</PackageId>
+    <Description>Meta-package that installs all nnke-platform adapters (Azure AI, Google Vertex AI, Anthropic Claude) in one command.</Description>
+    <PackageTags>ananke;cli;dotnet-tool;federation;azure;vertex-ai;claude;agents</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\nnke-platform-azure\nnke-platform-azure.csproj" />
+    <ProjectReference Include="..\nnke-platform-google\nnke-platform-google.csproj" />
+    <ProjectReference Include="..\nnke-platform-anthropic\nnke-platform-anthropic.csproj" />
+  </ItemGroup>
+
+</Project>

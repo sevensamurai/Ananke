@@ -5,7 +5,7 @@ Build a knowledge pipeline that extracts, chunks, embeds, and stores documents
 for semantic search — with agent-driven ingestion, catalog discovery, and
 time-decay reranking.
 
-**Demo:** [LongTermMemoryDemo](../../src/demos/LongTermMemoryDemo/)
+**Demo:** [LongTermMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LongTermMemoryDemo)
 
 ---
 
@@ -233,6 +233,8 @@ IKnowledgeCatalog catalog = new QdrantKnowledgeCatalog(
 | [07 — Human-in-the-Loop](07-human-in-the-loop.md) | Pause workflows for human approval |
 | [08 — State Machine](08-state-machine.md) | Production FSM for long-running services |
 
+**Also see:** [EntityMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/EntityMemoryDemo) — per-entity memory isolation using `EntityMemoryProvider`; the same workflow handles multiple customers with fully isolated empirical and knowledge stores.
+
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

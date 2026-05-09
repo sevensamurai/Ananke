@@ -15,7 +15,7 @@
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/bash.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/json.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/yaml.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@1.14.0/dist/umd/lucide.min.js"></script>
 
     <!--
         ============================================================
@@ -889,7 +889,11 @@
     <footer class="site-footer">
         <div class="site-footer-inner">
             <span>Made with <i data-lucide="heart" class="footer-love" aria-hidden="true"></i> in Melbourne, Australia.</span>
-            <span><a href="https://github.com/sevensamurai/Ananke/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>. &copy; 2026 <a href="https://github.com/sevensamurai/" target="_blank">J Patricio Gonzalez S</a>.</span>
+            <span style="display:flex;gap:1.1rem;align-items:center;flex-wrap:wrap;">
+                <a href="#faq.md">FAQ</a>
+                <a href="https://github.com/sevensamurai/Ananke/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>
+                <span>&copy; 2026 <a href="#about/creator.md">J Patricio Gonzalez S</a></span>
+            </span>
         </div>
     </footer>
 
@@ -903,629 +907,674 @@
         </div>
     </div>
 
-<script>
-(() => {
-    // ── Elements ──────────────────────────────────────────────
-    const content       = document.getElementById('content');
-    const contentArea   = document.getElementById('content-area');
-    const tocEl         = document.getElementById('toc');
-    const themeBtn      = document.getElementById('theme-toggle');
-    const hamburgerBtn  = document.getElementById('hamburger');
-    const menuPanel     = document.getElementById('menu-panel');
-    const menuBackdrop  = document.getElementById('menu-backdrop');
-    const searchBtn     = document.getElementById('search-btn');
-    const searchOverlay = document.getElementById('search-overlay');
-    const searchInput   = document.getElementById('search-input');
-    const searchResults = document.getElementById('search-results');
-    const topnavEl      = document.getElementById('topnav');
+    <script>
+        (() => {
+            // ── Elements ──────────────────────────────────────────────
+            const content = document.getElementById('content');
+            const contentArea = document.getElementById('content-area');
+            const tocEl = document.getElementById('toc');
+            const themeBtn = document.getElementById('theme-toggle');
+            const hamburgerBtn = document.getElementById('hamburger');
+            const menuPanel = document.getElementById('menu-panel');
+            const menuBackdrop = document.getElementById('menu-backdrop');
+            const searchBtn = document.getElementById('search-btn');
+            const searchOverlay = document.getElementById('search-overlay');
+            const searchInput = document.getElementById('search-input');
+            const searchResults = document.getElementById('search-results');
+            const topnavEl = document.getElementById('topnav');
 
-    let siteData   = null;
-    let flatItems  = [];   // ordered list of { title, path } for prev/next
-    let activePath = '';
+            let siteData = null;
+            let flatItems = [];   // ordered list of { title, path } for prev/next
+            let activePath = '';
 
-    // ── Hamburger menu ────────────────────────────────────────
-    function closeMenu() { menuPanel.classList.remove('open'); menuBackdrop.classList.remove('open'); }
-    function toggleMenu() { menuPanel.classList.toggle('open'); menuBackdrop.classList.toggle('open'); }
-    hamburgerBtn.addEventListener('click', toggleMenu);
-    menuBackdrop.addEventListener('click', closeMenu);
+            // ── Hamburger menu ────────────────────────────────────────
+            function closeMenu() { menuPanel.classList.remove('open'); menuBackdrop.classList.remove('open'); }
+            function toggleMenu() { menuPanel.classList.toggle('open'); menuBackdrop.classList.toggle('open'); }
+            hamburgerBtn.addEventListener('click', toggleMenu);
+            menuBackdrop.addEventListener('click', closeMenu);
 
-    // ── Theme ─────────────────────────────────────────────────
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        themeBtn.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}" style="width:16px;height:16px"></i>`;
-        if (window.lucide) lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
-        localStorage.setItem('ananke-theme', theme);
+            // ── Theme ─────────────────────────────────────────────────
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                themeBtn.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}" style="width:16px;height:16px"></i>`;
+                lucide.createIcons();
+                localStorage.setItem('ananke-theme', theme);
 
-        // Swap highlight.js stylesheets
-        const light = document.getElementById('hljs-light');
-        const dark  = document.getElementById('hljs-dark');
-        if (light) light.media = theme === 'dark' ? 'not all' : 'all';
-        if (dark)  dark.media  = theme === 'dark' ? 'all' : 'not all';
-    }
-
-    const savedTheme = localStorage.getItem('ananke-theme')
-        || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    applyTheme(savedTheme);
-
-    themeBtn.addEventListener('click', () => {
-        applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-    });
-
-    // ── Markdown setup ────────────────────────────────────────
-    const renderer = new marked.Renderer();
-
-    // Rewrite .md links to hash routes
-    renderer.link = function({ href, title, tokens }) {
-        const text = this.parser.parseInline(tokens);
-        if (href && href.endsWith('.md') && !href.startsWith('http')) {
-            // Resolve relative paths based on the currently viewed page
-            const resolved = resolveRelativeLink(href);
-            const t = title ? ` title="${escapeAttr(title)}"` : '';
-            return `<a href="#${resolved}"${t}>${text}</a>`;
-        }
-        if (href && !href.startsWith('http') && !href.startsWith('#') && !href.startsWith('mailto:')) {
-            // Handle relative links to .md files with anchors: "file.md#section"
-            const [filePart, anchor] = href.split('#');
-            if (filePart.endsWith('.md')) {
-                const resolved = resolveRelativeLink(filePart);
-                const t = title ? ` title="${escapeAttr(title)}"` : '';
-                const a = anchor ? `?anchor=${anchor}` : '';
-                return `<a href="#${resolved}${a}"${t}>${text}</a>`;
-            }
-        }
-        const t = title ? ` title="${escapeAttr(title)}"` : '';
-        const ext = href && href.startsWith('http') ? ' target="_blank" rel="noopener"' : '';
-        return `<a href="${href}"${t}${ext}>${text}</a>`;
-    };
-
-    // Rewrite relative image src
-    renderer.image = function({ href, title, text }) {
-        if (href && !href.startsWith('http') && !href.startsWith('data:')) {
-            href = resolveRelativePath(href);
-        }
-        const t = title ? ` title="${escapeAttr(title)}"` : '';
-        return `<img src="${href}" alt="${escapeAttr(text)}"${t}>`;
-    };
-
-    // Add ids to headings for TOC links
-    renderer.heading = function({ text, depth, raw, tokens }) {
-        const id = slugify(raw);
-        const rendered = tokens ? this.parser.parseInline(tokens) : text;
-        return `<h${depth} id="${id}">${rendered}</h${depth}>`;
-    };
-
-    marked.setOptions({ renderer, breaks: false, gfm: true });
-
-    function resolveRelativeLink(href) {
-        // Combine current page directory with relative href
-        const base = activePath.includes('/') ? activePath.substring(0, activePath.lastIndexOf('/') + 1) : '';
-        const parts = (base + href).split('/');
-        const resolved = [];
-        for (const p of parts) {
-            if (p === '..') resolved.pop();
-            else if (p !== '.' && p !== '') resolved.push(p);
-        }
-        return resolved.join('/');
-    }
-
-    function resolveRelativePath(href) {
-        const base = activePath.includes('/') ? activePath.substring(0, activePath.lastIndexOf('/') + 1) : '';
-        const parts = (base + href).split('/');
-        const resolved = [];
-        for (const p of parts) {
-            if (p === '..') resolved.pop();
-            else if (p !== '.' && p !== '') resolved.push(p);
-        }
-        return resolved.join('/');
-    }
-
-    function slugify(text) {
-        return text.toLowerCase()
-            .replace(/<[^>]+>/g, '')
-            .replace(/[^\w\s-]/g, '')
-            .trim()
-            .replace(/\s+/g, '-');
-    }
-
-    function escapeAttr(s) {
-        return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    }
-
-    // ── Load site manifest ────────────────────────────────────
-    async function init() {
-        try {
-            const resp = await fetch('site.json');
-            siteData = await resp.json();
-        } catch (e) {
-            content.innerHTML = '<p>⚠️ Failed to load <code>site.json</code>.</p>';
-            return;
-        }
-
-        // Update topbar links from manifest
-        const ghLink = document.getElementById('link-gh');
-        if (siteData.repo) ghLink.href = siteData.repo;
-        if (siteData.logo) document.getElementById('topbar-logo').src = siteData.logo;
-
-        // Build navigation
-        buildTopNav();
-        buildMenu();
-
-        // Navigate to hash or default
-        window.addEventListener('hashchange', onHashChange);
-        onHashChange();
-    }
-
-    // ── Top navigation (desktop dropdowns) ─────────────────────
-    function buildTopNav() {
-        if (!siteData.topNav || !topnavEl) return;
-        topnavEl.innerHTML = '';
-
-        const sectionMap = {};
-        for (const sec of siteData.sections) { sectionMap[sec.title] = sec; }
-
-        for (const nav of siteData.topNav) {
-            const item = document.createElement('div');
-            item.className = 'topnav-item';
-
-            if (nav.path) {
-                const a = document.createElement('a');
-                a.href = '#' + nav.path;
-                a.textContent = nav.title;
-                item.appendChild(a);
-                topnavEl.appendChild(item);
-                continue;
+                // Swap highlight.js stylesheets
+                const light = document.getElementById('hljs-light');
+                const dark = document.getElementById('hljs-dark');
+                if (light) light.media = theme === 'dark' ? 'not all' : 'all';
+                if (dark) dark.media = theme === 'dark' ? 'all' : 'not all';
             }
 
-            const btn = document.createElement('button');
-            btn.innerHTML = nav.title + ' <i data-lucide="chevron-down" style="width:12px;height:12px"></i>';
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                closeAllDropdowns(item);
-                item.classList.toggle('open');
+            const savedTheme = localStorage.getItem('ananke-theme')
+                || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(savedTheme);
+
+            themeBtn.addEventListener('click', () => {
+                applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
             });
-            item.appendChild(btn);
 
-            const sections = (nav.sections || []).map(function(s) { return sectionMap[s]; }).filter(Boolean);
-            const isWide = sections.length > 2;
-            const dropdown = document.createElement('div');
-            dropdown.className = isWide ? 'topnav-dropdown topnav-dropdown-wide' : 'topnav-dropdown';
+            // ── Markdown setup ────────────────────────────────────────
+            const renderer = new marked.Renderer();
 
-            if (isWide) {
-                const mid = Math.ceil(sections.length / 2);
-                [sections.slice(0, mid), sections.slice(mid)].forEach(function(group) {
-                    const col = document.createElement('div');
-                    col.className = 'dropdown-col';
-                    group.forEach(function(sec) {
-                        const h = document.createElement('div');
-                        h.className = 'dropdown-heading';
-                        h.textContent = sec.title;
-                        col.appendChild(h);
-                        sec.items.forEach(function(it) {
-                            const a = document.createElement('a');
-                            a.href = '#' + it.path;
-                            a.textContent = it.title;
-                            a.addEventListener('click', function() { closeAllDropdowns(); });
-                            col.appendChild(a);
-                        });
-                    });
-                    dropdown.appendChild(col);
-                });
-            } else {
-                sections.forEach(function(sec) {
-                    if (sections.length > 1) {
-                        const h = document.createElement('div');
-                        h.className = 'dropdown-heading';
-                        h.textContent = sec.title;
-                        dropdown.appendChild(h);
+            // Rewrite .md links to hash routes
+            renderer.link = function ({ href, title, tokens }) {
+                const text = this.parser.parseInline(tokens);
+                if (href && href.endsWith('.md') && !href.startsWith('http')) {
+                    // Resolve relative paths based on the currently viewed page
+                    const resolved = resolveRelativeLink(href);
+                    const t = title ? ` title="${escapeAttr(title)}"` : '';
+                    return `<a href="#${resolved}"${t}>${text}</a>`;
+                }
+                if (href && !href.startsWith('http') && !href.startsWith('#') && !href.startsWith('mailto:')) {
+                    // Handle relative links to .md files with anchors: "file.md#section"
+                    const [filePart, anchor] = href.split('#');
+                    if (filePart.endsWith('.md')) {
+                        const resolved = resolveRelativeLink(filePart);
+                        const t = title ? ` title="${escapeAttr(title)}"` : '';
+                        const a = anchor ? `?anchor=${anchor}` : '';
+                        return `<a href="#${resolved}${a}"${t}>${text}</a>`;
                     }
-                    sec.items.forEach(function(it) {
+                    // Relative non-.md link (e.g. src/demos/..., LICENSE) —
+                    // resolve against the GitHub repo tree so it opens on GitHub,
+                    // not as a broken site-relative URL.
+                    const resolved = resolveRelativePath(filePart);
+                    const repo = (siteData && siteData.repo) || '';
+                    const ghHref = repo ? `${repo}/tree/main/${resolved}` : href;
+                    const a = anchor ? `#${anchor}` : '';
+                    const t = title ? ` title="${escapeAttr(title)}"` : '';
+                    return `<a href="${ghHref}${a}"${t} target="_blank" rel="noopener">${text}</a>`;
+                }
+                const t = title ? ` title="${escapeAttr(title)}"` : '';
+                const ext = href && href.startsWith('http') ? ' target="_blank" rel="noopener"' : '';
+                return `<a href="${href}"${t}${ext}>${text}</a>`;
+            };
+
+            // Rewrite relative image src
+            renderer.image = function ({ href, title, text }) {
+                if (href && !href.startsWith('http') && !href.startsWith('data:')) {
+                    href = resolveRelativePath(href);
+                }
+                const t = title ? ` title="${escapeAttr(title)}"` : '';
+                return `<img src="${href}" alt="${escapeAttr(text)}"${t}>`;
+            };
+
+            // Add ids to headings for TOC links
+            renderer.heading = function ({ text, depth, raw, tokens }) {
+                const id = slugify(raw);
+                const rendered = tokens ? this.parser.parseInline(tokens) : text;
+                return `<h${depth} id="${id}">${rendered}</h${depth}>`;
+            };
+
+            marked.setOptions({ renderer, breaks: false, gfm: true });
+
+            function resolveRelativeLink(href) {
+                // Combine current page directory with relative href
+                const base = activePath.includes('/') ? activePath.substring(0, activePath.lastIndexOf('/') + 1) : '';
+                const parts = (base + href).split('/');
+                const resolved = [];
+                for (const p of parts) {
+                    if (p === '..') resolved.pop();
+                    else if (p !== '.' && p !== '') resolved.push(p);
+                }
+                return resolved.join('/');
+            }
+
+            function resolveRelativePath(href) {
+                const base = activePath.includes('/') ? activePath.substring(0, activePath.lastIndexOf('/') + 1) : '';
+                const parts = (base + href).split('/');
+                const resolved = [];
+                for (const p of parts) {
+                    if (p === '..') resolved.pop();
+                    else if (p !== '.' && p !== '') resolved.push(p);
+                }
+                return resolved.join('/');
+            }
+
+            function slugify(text) {
+                return text.toLowerCase()
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/[^\w\s-]/g, '')
+                    .trim()
+                    .replace(/\s+/g, '-');
+            }
+
+            function escapeAttr(s) {
+                return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            }
+
+            // ── Load site manifest ────────────────────────────────────
+            async function init() {
+                try {
+                    const resp = await fetch('site.json');
+                    siteData = await resp.json();
+                } catch (e) {
+                    console.error('Error loading site.json:', e);
+                    content.innerHTML = '<p>⚠️ Failed to load <code>site.json</code>.</p>';
+                    return;
+                }
+
+                // Update topbar links from manifest
+                const ghLink = document.getElementById('link-gh');
+                if (siteData.repo) ghLink.href = siteData.repo;
+                if (siteData.logo) document.getElementById('topbar-logo').src = siteData.logo;
+
+                // Build navigation
+                buildTopNav();
+                buildMenu();
+
+                // Navigate to hash or default
+                window.addEventListener('hashchange', onHashChange);
+                onHashChange();
+            }
+
+            // ── Top navigation (desktop dropdowns) ─────────────────────
+            function buildTopNav() {
+                if (!siteData.topNav || !topnavEl) return;
+                topnavEl.innerHTML = '';
+
+                // Build a section lookup for legacy entries that still use sections[]
+                const sectionMap = {};
+                for (const sec of siteData.sections) { sectionMap[sec.title] = sec; }
+
+                for (const nav of siteData.topNav) {
+                    const item = document.createElement('div');
+                    item.className = 'topnav-item';
+
+                    // Plain link — no dropdown
+                    if (nav.path) {
                         const a = document.createElement('a');
-                        a.href = '#' + it.path;
-                        a.textContent = it.title;
-                        a.addEventListener('click', function() { closeAllDropdowns(); });
-                        dropdown.appendChild(a);
+                        a.href = '#' + nav.path;
+                        a.textContent = nav.title;
+                        item.appendChild(a);
+                        topnavEl.appendChild(item);
+                        continue;
+                    }
+
+                    // Dropdown button
+                    const btn = document.createElement('button');
+                    btn.innerHTML = nav.title + ' <i data-lucide="chevron-down" style="width:12px;height:12px"></i>';
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        closeAllDropdowns(item);
+                        item.classList.toggle('open');
                     });
+                    item.appendChild(btn);
+
+                    const dropdown = document.createElement('div');
+
+                    // New schema: children[] is a flat list of { title, path } items
+                    if (nav.children && nav.children.length) {
+                        dropdown.className = 'topnav-dropdown';
+                        nav.children.forEach(function (child) {
+                            const a = document.createElement('a');
+                            a.href = '#' + child.path;
+                            a.textContent = child.title;
+                            a.addEventListener('click', function () { closeAllDropdowns(); });
+                            dropdown.appendChild(a);
+                        });
+
+                    // Legacy schema: sections[] resolved from the sections map
+                    } else {
+                        const sections = (nav.sections || []).map(function (s) { return sectionMap[s]; }).filter(Boolean);
+                        const isWide = sections.length > 2;
+                        dropdown.className = isWide ? 'topnav-dropdown topnav-dropdown-wide' : 'topnav-dropdown';
+
+                        if (isWide) {
+                            const mid = Math.ceil(sections.length / 2);
+                            [sections.slice(0, mid), sections.slice(mid)].forEach(function (group) {
+                                const col = document.createElement('div');
+                                col.className = 'dropdown-col';
+                                group.forEach(function (sec) {
+                                    const h = document.createElement('div');
+                                    h.className = 'dropdown-heading';
+                                    h.textContent = sec.title;
+                                    col.appendChild(h);
+                                    sec.items.forEach(function (it) {
+                                        const a = document.createElement('a');
+                                        a.href = '#' + it.path;
+                                        a.textContent = it.title;
+                                        a.addEventListener('click', function () { closeAllDropdowns(); });
+                                        col.appendChild(a);
+                                    });
+                                });
+                                dropdown.appendChild(col);
+                            });
+                        } else {
+                            sections.forEach(function (sec) {
+                                if (sections.length > 1) {
+                                    const h = document.createElement('div');
+                                    h.className = 'dropdown-heading';
+                                    h.textContent = sec.title;
+                                    dropdown.appendChild(h);
+                                }
+                                sec.items.forEach(function (it) {
+                                    const a = document.createElement('a');
+                                    a.href = '#' + it.path;
+                                    a.textContent = it.title;
+                                    a.addEventListener('click', function () { closeAllDropdowns(); });
+                                    dropdown.appendChild(a);
+                                });
+                            });
+                        }
+                    }
+
+                    item.appendChild(dropdown);
+                    topnavEl.appendChild(item);
+                }
+
+                lucide.createIcons();
+            }
+
+            function closeAllDropdowns(except) {
+                topnavEl.querySelectorAll('.topnav-item.open').forEach(function (el) {
+                    if (el !== except) el.classList.remove('open');
                 });
             }
 
-            item.appendChild(dropdown);
-            topnavEl.appendChild(item);
-        }
+            document.addEventListener('click', function () { if (topnavEl) closeAllDropdowns(); });
 
-        if (window.lucide) lucide.createIcons();
-    }
+            // ── Hamburger menu contents (collapsible sections) ─────────
+            function buildMenu() {
+                menuPanel.innerHTML = '';
+                flatItems = [];
 
-    function closeAllDropdowns(except) {
-        topnavEl.querySelectorAll('.topnav-item.open').forEach(function(el) {
-            if (el !== except) el.classList.remove('open');
-        });
-    }
+                for (const section of siteData.sections) {
+                    const heading = document.createElement('div');
+                    heading.className = 'menu-section';
+                    heading.textContent = section.title;
 
-    document.addEventListener('click', function() { if (topnavEl) closeAllDropdowns(); });
+                    const group = document.createElement('div');
+                    group.className = 'menu-group';
 
-    // ── Hamburger menu contents (collapsible sections) ─────────
-    function buildMenu() {
-        menuPanel.innerHTML = '';
-        flatItems = [];
+                    heading.addEventListener('click', function () {
+                        heading.classList.toggle('expanded');
+                        group.classList.toggle('expanded');
+                    });
 
-        for (const section of siteData.sections) {
-            const heading = document.createElement('div');
-            heading.className = 'menu-section';
-            heading.textContent = section.title;
+                    menuPanel.appendChild(heading);
 
-            const group = document.createElement('div');
-            group.className = 'menu-group';
+                    for (const item of section.items) {
+                        const a = document.createElement('a');
+                        a.href = '#' + item.path;
+                        a.textContent = item.title;
+                        a.dataset.path = item.path;
+                        a.addEventListener('click', closeMenu);
+                        group.appendChild(a);
+                        flatItems.push({ title: item.title, path: item.path, section: section.title });
+                    }
 
-            heading.addEventListener('click', function() {
-                heading.classList.toggle('expanded');
-                group.classList.toggle('expanded');
-            });
-
-            menuPanel.appendChild(heading);
-
-            for (const item of section.items) {
-                const a = document.createElement('a');
-                a.href = '#' + item.path;
-                a.textContent = item.title;
-                a.dataset.path = item.path;
-                a.addEventListener('click', closeMenu);
-                group.appendChild(a);
-                flatItems.push({ title: item.title, path: item.path, section: section.title });
-            }
-
-            menuPanel.appendChild(group);
-        }
-    }
-
-    // ── Highlight active menu item ─────────────────────────────
-    function highlightNav(path) {
-        menuPanel.querySelectorAll('a').forEach(function(a) {
-            a.classList.toggle('active', a.dataset.path === path);
-        });
-        menuPanel.querySelectorAll('.menu-group').forEach(function(g) {
-            if (g.querySelector('a.active')) {
-                g.classList.add('expanded');
-                g.previousElementSibling.classList.add('expanded');
-            }
-        });
-    }
-
-    // ── Navigation ────────────────────────────────────────────
-    function onHashChange() {
-        let hash = location.hash.slice(1) || 'welcome.md';
-        // Strip query params for anchor scrolling
-        let anchor = null;
-        if (hash.includes('?anchor=')) {
-            const parts = hash.split('?anchor=');
-            hash = parts[0];
-            anchor = parts[1];
-        }
-        loadPage(hash, anchor);
-    }
-
-    async function loadPage(path, scrollAnchor) {
-        activePath = path;
-        highlightNav(path);
-
-        content.innerHTML = '<div class="loading">Loading…</div>';
-
-        // Check for landing page
-        if (path === 'welcome.md') {
-            await loadLandingPage();
-            return;
-        }
-
-        try {
-            const resp = await fetch(path);
-            if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-            let md = await resp.text();
-
-            content.innerHTML = marked.parse(md);
-
-            // Syntax highlighting
-            content.querySelectorAll('pre code').forEach(block => {
-                hljs.highlightElement(block);
-            });
-
-            // Add copy buttons to code blocks
-            addCopyButtons();
-
-            // Build TOC
-            buildToc();
-
-            // Build prev/next
-            buildPageNav();
-
-            // Set page title
-            const h1 = content.querySelector('h1');
-            if (h1) document.title = `${h1.textContent} — Ananke`;
-
-            // Scroll
-            contentArea.scrollTop = 0;
-            if (scrollAnchor) {
-                const target = document.getElementById(scrollAnchor);
-                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-
-        } catch (e) {
-            content.innerHTML = `<h1>Page not found</h1><p>Could not load <code>${path}</code>.</p><p>${e.message}</p>`;
-        }
-    }
-
-    // ── Landing page ──────────────────────────────────────────
-    async function loadLandingPage() {
-        // Fetch the learning.md and render it, but wrap with hero
-        try {
-            const resp = await fetch(activePath);
-            if (!resp.ok) throw new Error('Failed to load');
-            const md = await resp.text();
-            const heroImage = siteData.heroImage || siteData.logo;
-
-            // Extract the title and intro, then render the rest
-            content.innerHTML = `
-                <div class="hero">
-                    <img src="${heroImage}" alt="Ananke">
-                    <p class="tagline">Vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines.</p>
-                    <div class="hero-actions">
-                        <a class="btn-primary" href="#guides/01-getting-started.md"><i data-lucide="arrow-right" style="width:15px;height:15px"></i> Get Started</a>
-                        <a class="btn-secondary" href="#guides/00-nnke-tool.md"><i data-lucide="wand-sparkles" style="width:15px;height:15px"></i> nnke Tool</a>
-                        <a class="btn-secondary" href="#reference/features.md"><i data-lucide="list" style="width:15px;height:15px"></i> Feature Index</a>
-                        <a class="btn-secondary" href="${siteData.repo}" target="_blank"><i data-lucide="github" style="width:15px;height:15px"></i> GitHub</a>
-                    </div>
-                    <div class="hero-cards">
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="git-merge"></i></div>
-                            <h3>Workflow Orchestration</h3>
-                            <p>Fluent graph builder, conditional routing, fork/join parallelism, sub-workflows, streaming.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="bot"></i></div>
-                            <h3>AI Agents</h3>
-                            <p>Tool calling, structured output, multi-provider (OpenAI, Anthropic, Google, local).</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="brain"></i></div>
-                            <h3>Memory & Learning</h3>
-                            <p>RAG document ingestion, empirical learning from interactions, skill package export/import.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="hand"></i></div>
-                            <h3>Human-in-the-Loop</h3>
-                            <p>Pause, checkpoint, resume with approval. Full state persistence.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="cog"></i></div>
-                            <h3>State Machine</h3>
-                            <p>Interrupt stack, RedLock coordination, middleware pipeline, circuit breaking.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="radio"></i></div>
-                            <h3>MCP & A2A</h3>
-                            <p>Expose workflows as MCP servers. Agent-to-Agent protocol support.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="terminal"></i></div>
-                            <h3>nnke Design CLI</h3>
-                            <p>Scaffold projects, validate topologies, export diagrams. MCP companion for AI coding tools.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="repeat"></i></div>
-                            <h3>Agentic Patterns</h3>
-                            <p>Review &amp; Critique, Iterative Refinement — pre-wired builders for recognized patterns.</p>
-                        </div>
-                        <div class="hero-card">
-                            <div class="card-icon"><i data-lucide="book-open"></i></div>
-                            <h3>External Skill Catalog</h3>
-                            <p>Discover and run Python, Node.js, and Docker tools from registries — no install needed.</p>
-                        </div>
-                    </div>
-                </div>
-                <hr>
-                ${marked.parse(md)}
-            `;
-
-            content.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-            addCopyButtons();
-            buildToc();
-            buildPageNav();
-            lucide.createIcons();
-            document.title = 'Ananke — AI Agent Orchestration for .NET';
-            contentArea.scrollTop = 0;
-
-        } catch (e) {
-            content.innerHTML = `<p>⚠️ Could not load landing page.</p>`;
-        }
-    }
-
-    // ── Table of Contents (right rail) ────────────────────────
-    let tocObserver = null;
-
-    function buildToc() {
-        // Disconnect previous observer
-        if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
-        tocEl.innerHTML = '';
-
-        const headings = content.querySelectorAll('h2, h3');
-        if (headings.length < 2) return;
-
-        let html = '<div class="toc-title">On this page</div>';
-        headings.forEach(h => {
-            const level = h.tagName === 'H3' ? ' toc-h3' : '';
-            html += `<a class="${level}" data-target="${h.id}">${h.textContent}</a>`;
-        });
-        tocEl.innerHTML = html;
-
-        // Click handler: scroll heading into view without changing hash
-        tocEl.querySelectorAll('a[data-target]').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const target = document.getElementById(link.dataset.target);
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-
-        // Intersection observer for active TOC highlighting
-        tocObserver = new IntersectionObserver(entries => {
-            for (const entry of entries) {
-                if (entry.isIntersecting) {
-                    tocEl.querySelectorAll('a').forEach(a => a.classList.remove('active'));
-                    const link = tocEl.querySelector(`a[data-target="${entry.target.id}"]`);
-                    if (link) link.classList.add('active');
+                    menuPanel.appendChild(group);
                 }
             }
-        }, { root: contentArea, rootMargin: '-10px 0px -80% 0px', threshold: 0 });
 
-        headings.forEach(h => tocObserver.observe(h));
-    }
-
-    // ── Search ────────────────────────────────────────────────
-    function openSearch() {
-        searchOverlay.classList.add('open');
-        searchInput.value = '';
-        searchInput.focus();
-        renderSearchResults('');
-    }
-
-    function closeSearch() {
-        searchOverlay.classList.remove('open');
-    }
-
-    searchBtn.addEventListener('click', openSearch);
-
-    searchOverlay.addEventListener('click', (e) => {
-        if (e.target === searchOverlay) closeSearch();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        // Cmd/Ctrl + K to open search
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-            e.preventDefault();
-            searchOverlay.classList.contains('open') ? closeSearch() : openSearch();
-        }
-        // Escape to close
-        if (e.key === 'Escape' && searchOverlay.classList.contains('open')) {
-            closeSearch();
-        }
-    });
-
-    let searchSelectedIdx = -1;
-
-    searchInput.addEventListener('input', () => {
-        searchSelectedIdx = -1;
-        renderSearchResults(searchInput.value.trim());
-    });
-
-    searchInput.addEventListener('keydown', (e) => {
-        const items = searchResults.querySelectorAll('.search-item');
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            searchSelectedIdx = Math.min(searchSelectedIdx + 1, items.length - 1);
-            updateSearchSelection(items);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0);
-            updateSearchSelection(items);
-        } else if (e.key === 'Enter' && searchSelectedIdx >= 0 && items[searchSelectedIdx]) {
-            e.preventDefault();
-            items[searchSelectedIdx].click();
-        }
-    });
-
-    function updateSearchSelection(items) {
-        items.forEach((el, i) => el.classList.toggle('selected', i === searchSelectedIdx));
-        if (items[searchSelectedIdx]) items[searchSelectedIdx].scrollIntoView({ block: 'nearest' });
-    }
-
-    function renderSearchResults(query) {
-        if (!query) {
-            searchResults.innerHTML = '<div class="search-empty">Type to search across all pages…</div>';
-            return;
-        }
-
-        const q = query.toLowerCase();
-        const matches = [];
-
-        for (const section of siteData.sections) {
-            for (const item of section.items) {
-                const haystack = [
-                    item.title,
-                    section.title,
-                    ...(item.tags || [])
-                ].join(' ').toLowerCase();
-                if (haystack.includes(q)) {
-                    matches.push({ title: item.title, path: item.path, section: section.title });
-                }
+            // ── Highlight active menu item ─────────────────────────────
+            function highlightNav(path) {
+                menuPanel.querySelectorAll('a').forEach(function (a) {
+                    a.classList.toggle('active', a.dataset.path === path);
+                });
+                menuPanel.querySelectorAll('.menu-group').forEach(function (g) {
+                    if (g.querySelector('a.active')) {
+                        g.classList.add('expanded');
+                        g.previousElementSibling.classList.add('expanded');
+                    }
+                });
             }
-        }
 
-        if (matches.length === 0) {
-            searchResults.innerHTML = `<div class="search-empty">No pages matching "${escapeAttr(query)}"</div>`;
-            return;
-        }
+            // ── Navigation ────────────────────────────────────────────
+            function onHashChange() {
+                let hash = location.hash.slice(1) || 'welcome.md';
+                // Strip query params for anchor scrolling
+                let anchor = null;
+                if (hash.includes('?anchor=')) {
+                    const parts = hash.split('?anchor=');
+                    hash = parts[0];
+                    anchor = parts[1];
+                }
+                loadPage(hash, anchor);
+            }
 
-        searchResults.innerHTML = matches.map(m =>
-            `<a class="search-item" href="#${m.path}"><span class="search-section">${m.section}</span> ${m.title}</a>`
-        ).join('');
+            async function loadPage(path, scrollAnchor) {
+                activePath = path;
+                highlightNav(path);
 
-        searchResults.querySelectorAll('.search-item').forEach(a => {
-            a.addEventListener('click', closeSearch);
-        });
-    }
+                content.innerHTML = '<div class="loading">Loading…</div>';
 
-    // ── Prev / Next ───────────────────────────────────────────
-    function buildPageNav() {
-        const idx = flatItems.findIndex(i => i.path === activePath);
-        if (idx === -1) return;
+                // Check for landing page
+                if (path === 'welcome.md') {
+                    await loadLandingPage();
+                    return;
+                }
 
-        const prev = idx > 0 ? flatItems[idx - 1] : null;
-        const next = idx < flatItems.length - 1 ? flatItems[idx + 1] : null;
-
-        if (!prev && !next) return;
-
-        let html = '<div class="page-nav">';
-        if (prev) {
-            html += `<a href="#${prev.path}" class="prev">
-                <span class="nav-label">← Previous</span>
-                <span class="nav-title">${prev.title}</span>
-            </a>`;
-        }
-        if (next) {
-            html += `<a href="#${next.path}" class="next">
-                <span class="nav-label">Next →</span>
-                <span class="nav-title">${next.title}</span>
-            </a>`;
-        }
-        html += '</div>';
-        content.insertAdjacentHTML('beforeend', html);
-    }
-
-    // ── Copy buttons ──────────────────────────────────────────
-    function addCopyButtons() {
-        content.querySelectorAll('pre').forEach(pre => {
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = 'Copy';
-            btn.addEventListener('click', async () => {
-                const code = pre.querySelector('code');
-                const text = code ? code.textContent : pre.textContent;
                 try {
-                    await navigator.clipboard.writeText(text);
-                    btn.textContent = '✓ Copied';
-                    setTimeout(() => btn.textContent = 'Copy', 1500);
-                } catch {
-                    btn.textContent = 'Failed';
-                    setTimeout(() => btn.textContent = 'Copy', 1500);
+                    const resp = await fetch(path);
+                    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+                    let md = await resp.text();
+
+                    content.innerHTML = marked.parse(md);
+
+                    // Syntax highlighting
+                    content.querySelectorAll('pre code').forEach(block => {
+                        hljs.highlightElement(block);
+                    });
+
+                    // Add copy buttons to code blocks
+                    addCopyButtons();
+
+                    // Build TOC
+                    buildToc();
+
+                    // Build prev/next
+                    buildPageNav();
+
+                    // Set page title
+                    const h1 = content.querySelector('h1');
+                    if (h1) document.title = `${h1.textContent} — Ananke`;
+
+                    // Scroll
+                    contentArea.scrollTop = 0;
+                    if (scrollAnchor) {
+                        const target = document.getElementById(scrollAnchor);
+                        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+
+                    lucide.createIcons();
+
+                } catch (e) {
+                    content.innerHTML = `<h1>Page not found</h1><p>Could not load <code>${path}</code>.</p><p>${e.message}</p>`;
+                }
+            }
+
+            // ── Landing page ──────────────────────────────────────────
+            async function loadLandingPage() {
+                // Fetch the active markdown page and render it, wrapping the landing page with the hero
+                try {
+                    const resp = await fetch(activePath);
+                    if (!resp.ok) throw new Error('Failed to load');
+                    const md = await resp.text();
+                    const heroImage = siteData.heroImage || siteData.logo;
+
+                    // Extract the title and intro, then render the rest
+                    content.innerHTML = `
+                    <div class="hero">
+                        <img src="${heroImage}" alt="Ananke">
+                        <p class="tagline">Vendor-agnostic, production-ready .NET framework for building AI agents and automated multi-step pipelines.</p>
+                        <div class="hero-actions">
+                            <a class="btn-primary" href="#quickstart.md"><i data-lucide="arrow-right" style="width:15px;height:15px"></i> Quickstart</a>
+                            <a class="btn-secondary" href="#concepts.md"><i data-lucide="layers" style="width:15px;height:15px"></i> Concepts</a>
+                            <a class="btn-secondary" href="#cli/overview.md"><i data-lucide="code-2" style="width:15px;height:15px"></i> CLI</a>
+                            <a class="btn-secondary" href="${siteData.repo}" target="_blank"><i data-lucide="github" style="width:15px;height:15px"></i> GitHub</a>
+                        </div>
+                        <div class="hero-cards">
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="git-merge"></i></div>
+                                <h3>Workflow Orchestration</h3>
+                                <p>Fluent graph builder, conditional routing, fork/join parallelism, sub-workflows, streaming.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="bot"></i></div>
+                                <h3>AI Agents</h3>
+                                <p>Tool calling, structured output, multi-provider (OpenAI, Anthropic, Google, local).</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="brain"></i></div>
+                                <h3>Memory &amp; Learning</h3>
+                                <p>RAG document ingestion, empirical learning from interactions, skill package export/import.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="hand"></i></div>
+                                <h3>Human-in-the-Loop</h3>
+                                <p>Pause, checkpoint, resume with approval. Full state persistence.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="cog"></i></div>
+                                <h3>State Machine</h3>
+                                <p>Interrupt stack, RedLock coordination, middleware pipeline, circuit breaking.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="radio"></i></div>
+                                <h3>MCP &amp; A2A</h3>
+                                <p>Expose workflows as MCP servers. Agent-to-Agent protocol support.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="repeat"></i></div>
+                                <h3>Agentic Patterns</h3>
+                                <p>Review &amp; Critique, Iterative Refinement — pre-wired builders for recognized patterns.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="book-open"></i></div>
+                                <h3>External Skill Catalog</h3>
+                                <p>Discover and run Python, Node.js, and Docker tools from registries — no install needed.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="network"></i></div>
+                                <h3>Federation</h3>
+                                <p>Cross-org federated workflows. Multi-node mesh with shared agent pool and unified telemetry.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="leaf"></i></div>
+                                <h3>Organics</h3>
+                                <p>Autonomous agent ecosystems that self-organise, adapt, and evolve policies over time.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="terminal"></i></div>
+                                <h3>nnke CLI</h3>
+                                <p>Scaffold projects, validate topologies, export Mermaid diagrams. MCP companion for AI coding tools.</p>
+                            </div>
+                            <div class="hero-card">
+                                <div class="card-icon"><i data-lucide="cloud"></i></div>
+                                <h3>nnke-platform CLI</h3>
+                                <p>Deploy to Azure / Google / Anthropic, scale replicas, roll back, and manage the federation mesh.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    ${marked.parse(md)}
+                `;
+
+                    content.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                    addCopyButtons();
+                    buildToc();
+                    buildPageNav();
+                    lucide.createIcons();
+                    document.title = 'Ananke — AI Agent Orchestration for .NET';
+                    contentArea.scrollTop = 0;
+
+                } catch (e) {
+                    content.innerHTML = `<p>⚠️ Could not load landing page.</p>`;
+                }
+            }
+
+            // ── Table of Contents (right rail) ────────────────────────
+            let tocObserver = null;
+
+            function buildToc() {
+                // Disconnect previous observer
+                if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+                tocEl.innerHTML = '';
+
+                const headings = content.querySelectorAll('h2, h3');
+                if (headings.length < 2) return;
+
+                let html = '<div class="toc-title">On this page</div>';
+                headings.forEach(h => {
+                    const level = h.tagName === 'H3' ? ' toc-h3' : '';
+                    html += `<a class="${level}" data-target="${h.id}">${h.textContent}</a>`;
+                });
+                tocEl.innerHTML = html;
+
+                // Click handler: scroll heading into view without changing hash
+                tocEl.querySelectorAll('a[data-target]').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const target = document.getElementById(link.dataset.target);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    });
+                });
+
+                // Intersection observer for active TOC highlighting
+                tocObserver = new IntersectionObserver(entries => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting) {
+                            tocEl.querySelectorAll('a').forEach(a => a.classList.remove('active'));
+                            const link = tocEl.querySelector(`a[data-target="${entry.target.id}"]`);
+                            if (link) link.classList.add('active');
+                        }
+                    }
+                }, { root: contentArea, rootMargin: '-10px 0px -80% 0px', threshold: 0 });
+
+                headings.forEach(h => tocObserver.observe(h));
+            }
+
+            // ── Search ────────────────────────────────────────────────
+            function openSearch() {
+                searchOverlay.classList.add('open');
+                searchInput.value = '';
+                searchInput.focus();
+                renderSearchResults('');
+            }
+
+            function closeSearch() {
+                searchOverlay.classList.remove('open');
+            }
+
+            searchBtn.addEventListener('click', openSearch);
+
+            searchOverlay.addEventListener('click', (e) => {
+                if (e.target === searchOverlay) closeSearch();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                // Cmd/Ctrl + K to open search
+                if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                    e.preventDefault();
+                    searchOverlay.classList.contains('open') ? closeSearch() : openSearch();
+                }
+                // Escape to close
+                if (e.key === 'Escape' && searchOverlay.classList.contains('open')) {
+                    closeSearch();
                 }
             });
-            pre.appendChild(btn);
-        });
-    }
 
-    // ── Go ────────────────────────────────────────────────────
-    init().then(() => lucide.createIcons());
-})();
-</script>
+            let searchSelectedIdx = -1;
+
+            searchInput.addEventListener('input', () => {
+                searchSelectedIdx = -1;
+                renderSearchResults(searchInput.value.trim());
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                const items = searchResults.querySelectorAll('.search-item');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    searchSelectedIdx = Math.min(searchSelectedIdx + 1, items.length - 1);
+                    updateSearchSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0);
+                    updateSearchSelection(items);
+                } else if (e.key === 'Enter' && searchSelectedIdx >= 0 && items[searchSelectedIdx]) {
+                    e.preventDefault();
+                    items[searchSelectedIdx].click();
+                }
+            });
+
+            function updateSearchSelection(items) {
+                items.forEach((el, i) => el.classList.toggle('selected', i === searchSelectedIdx));
+                if (items[searchSelectedIdx]) items[searchSelectedIdx].scrollIntoView({ block: 'nearest' });
+            }
+
+            function renderSearchResults(query) {
+                if (!query) {
+                    searchResults.innerHTML = '<div class="search-empty">Type to search across all pages…</div>';
+                    return;
+                }
+
+                const q = query.toLowerCase();
+                const matches = [];
+
+                for (const section of siteData.sections) {
+                    for (const item of section.items) {
+                        const haystack = [
+                            item.title,
+                            section.title,
+                            ...(item.tags || [])
+                        ].join(' ').toLowerCase();
+                        if (haystack.includes(q)) {
+                            matches.push({ title: item.title, path: item.path, section: section.title });
+                        }
+                    }
+                }
+
+                if (matches.length === 0) {
+                    searchResults.innerHTML = `<div class="search-empty">No pages matching "${escapeAttr(query)}"</div>`;
+                    return;
+                }
+
+                searchResults.innerHTML = matches.map(m =>
+                    `<a class="search-item" href="#${m.path}"><span class="search-section">${m.section}</span> ${m.title}</a>`
+                ).join('');
+
+                searchResults.querySelectorAll('.search-item').forEach(a => {
+                    a.addEventListener('click', closeSearch);
+                });
+            }
+
+            // ── Prev / Next ───────────────────────────────────────────
+            function buildPageNav() {
+                const idx = flatItems.findIndex(i => i.path === activePath);
+                if (idx === -1) return;
+
+                const prev = idx > 0 ? flatItems[idx - 1] : null;
+                const next = idx < flatItems.length - 1 ? flatItems[idx + 1] : null;
+
+                if (!prev && !next) return;
+
+                let html = '<div class="page-nav">';
+                if (prev) {
+                    html += `<a href="#${prev.path}" class="prev">
+                    <span class="nav-label">← Previous</span>
+                    <span class="nav-title">${prev.title}</span>
+                </a>`;
+                }
+                if (next) {
+                    html += `<a href="#${next.path}" class="next">
+                    <span class="nav-label">Next →</span>
+                    <span class="nav-title">${next.title}</span>
+                </a>`;
+                }
+                html += '</div>';
+                content.insertAdjacentHTML('beforeend', html);
+            }
+
+            // ── Copy buttons ──────────────────────────────────────────
+            function addCopyButtons() {
+                content.querySelectorAll('pre').forEach(pre => {
+                    const btn = document.createElement('button');
+                    btn.className = 'copy-btn';
+                    btn.textContent = 'Copy';
+                    btn.addEventListener('click', async () => {
+                        const code = pre.querySelector('code');
+                        const text = code ? code.textContent : pre.textContent;
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            btn.textContent = '✓ Copied';
+                            setTimeout(() => btn.textContent = 'Copy', 1500);
+                        } catch {
+                            btn.textContent = 'Failed';
+                            setTimeout(() => btn.textContent = 'Copy', 1500);
+                        }
+                    });
+                    pre.appendChild(btn);
+                });
+            }
+
+            // ── Go ────────────────────────────────────────────────────
+            init().then(() => lucide.createIcons());
+        })();
+    </script>
 </body>
 </html>

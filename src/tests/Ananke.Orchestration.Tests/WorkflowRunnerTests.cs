@@ -1,3 +1,5 @@
+using Ananke.Orchestration.Workflows;
+using Ananke.TestHelpers;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -139,7 +141,7 @@ public class WorkflowRunnerTests
         var execution = await new Workflow<CounterState>("timeout-test")
             .Job("slow", async (s, ct) =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                await WorkflowLoops.Park(ct);
                 return s;
             })
             .Then("slow", Workflow.End)
@@ -229,7 +231,7 @@ public class WorkflowRunnerTests
         var execution = await new Workflow<CounterState>("timed")
             .Job("wait", async (s, _) =>
             {
-                await Task.Delay(10);
+                await Task.Yield();
                 return s;
             })
             .Then("wait", Workflow.End)

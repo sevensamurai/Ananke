@@ -1,0 +1,14 @@
+/// <summary>
+/// Conversation state for the {{name}} streaming chat workflow.
+/// </summary>
+public sealed record ChatState
+{
+    /// <summary>The latest message from the user.</summary>
+    public required string UserInput { get; init; }
+
+    /// <summary>The most recent agent response.</summary>
+    public string? LastResponse { get; init; }
+
+    /// <summary>Full conversation history (user + agent turns).</summary>
+    public IReadOnlyList<string> History { get; init; } = [];
+}

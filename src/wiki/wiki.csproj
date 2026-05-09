@@ -16,7 +16,4 @@
 		<None Include="..\..\internals\**" LinkBase="internals" />
 		<None Include="..\..\releases\**" LinkBase="releases" />
 	</ItemGroup>
-	<ItemGroup>
-	  <None Remove="..\..\docs\about\logo.md" />
-	</ItemGroup>
 </Project>

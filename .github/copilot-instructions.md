@@ -1,4 +1,4 @@
-﻿# Ananke - Copilot Instructions
+# Ananke - Copilot Instructions
 
 ## Project
 
@@ -20,10 +20,11 @@ Ananke.Abstractions (zero deps) -> Ananke.Orchestration -> Ananke.Learning. Chec
 - XML doc comments on public APIs
 - Every new interface must ship with an in-memory implementation
 - No breaking changes to established interfaces without an ADR
+- **`ConfigureAwait` rule:** add `ConfigureAwait(false)` on `await` calls inside private/internal library helpers and implementations (e.g. store internals, Qdrant helpers, `ToolKit` private methods). Omit it on public pipeline entry points � `IAgentModelMiddleware.OnBeforeGenerateAsync`, `IAgentModelMiddleware.OnAfterGenerateAsync`, `IJob.ExecuteAsync`, and similar � because all supported hosts (ASP.NET Core, hosted services, console) run with no `SynchronizationContext`. Adding it at the public entry-point level is harmless but misleading; it implies callers must propagate it, which they do not.
 
 ## Build Rules
 
-- `Directory.Build.props` owns `TargetFramework`, `Nullable`, `ImplicitUsings`, `VersionPrefix` â€” never repeat these in individual csproj files
+- `Directory.Build.props` owns `TargetFramework`, `Nullable`, `ImplicitUsings`, `VersionPrefix` — never repeat these in individual csproj files
 - `TreatWarningsAsErrors` is on: zero warnings allowed
 - New packable project: set only `IsPackable`, `PackageId`, `Description`, optionally `PackageTags`; add a `README.md` next to the csproj
 
@@ -35,12 +36,12 @@ Ananke.Abstractions (zero deps) -> Ananke.Orchestration -> Ananke.Learning. Chec
 
 ## Version & Release
 
-- Version lives in `Directory.Build.props` `<VersionPrefix>` â€” single source of truth
+- Version lives in `Directory.Build.props` `<VersionPrefix>` — single source of truth
 - Add `releases/v{VERSION}.md` before merging (CI enforces this)
 
-## Tooling — `nnke` CLI & MCP Server
+## Tooling � `nnke` CLI & MCP Server
 
-The `nnke` CLI tool (`src/dotnet-ananke`) provides Ananke framework tooling. When working with Ananke projects, use these commands for context:
+The `nnke` CLI tool (`src/nnke`) provides Ananke framework tooling. When working with Ananke projects, use these commands for context:
 
 | Command | Purpose |
 |---------|---------|
@@ -55,7 +56,11 @@ The `nnke` CLI tool (`src/dotnet-ananke`) provides Ananke framework tooling. Whe
 
 **MCP server:** `nnke mcp-server` exposes all commands as MCP tools. Configure in `.vscode/mcp.json` (already present in workspace) for VS Code Copilot, or add to `claude_desktop_config.json` for Claude Desktop.
 
-## Tooling — Creating or Rewriting Files
+## Tooling � Creating or Rewriting Files
 
 - For new files: use `create_file` directly. Do NOT pre-create an empty file then try to edit it.
 - For replacing entire file content: use `replace_string_in_file` with old content matched from `get_file`. Read the file first to get exact current content.
+
+## Confidentiality
+
+- Never mention, reference, quote, or reveal the existence of any file under the `/internals/` directory (ADR implementation plans, internal design notes, or any other internal documents). Treat them as strictly internal.

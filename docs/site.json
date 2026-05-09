@@ -1,90 +1,678 @@
-﻿{
-  "title": "Ananke",
-  "subtitle": "AI Agent Orchestration for .NET",
-  "logo": "ananke-logo.png",
-  "heroImage": "ananke-creation.png",
-  "repo": "https://github.com/sevensamurai/Ananke",
-  "nuget": "https://www.nuget.org/packages/Ananke",
-  "topNav": [
-    { "title": "Getting Started", "sections": ["Getting Started"] },
-    { "title": "Guides", "sections": ["Foundation", "Building Applications", "Infrastructure", "Advanced"] },
-    { "title": "Reference", "sections": ["Reference"] },
-    { "title": "FAQ", "path": "faq.md" },
-    { "title": "About", "path": "about/background.md" }
-  ],
-  "sections": [
-    {
-      "title": "Getting Started",
-      "items": [
-        { "title": "Welcome", "path": "welcome.md", "tags": ["landing", "welcome", "start", "overview", "navigation"] },
-        { "title": "Overview & Learning Path", "path": "learning.md", "tags": ["introduction", "learning", "overview", "roadmap"] },
-        { "title": "nnke Tool Companion", "path": "guides/00-nnke-tool.md", "tags": ["nnke", "dotnet tool", "copilot", "claude", "design", "tooling"] }
-      ]
-    },
-    {
-      "title": "Foundation",
-      "items": [
-        { "title": "01 — Getting Started", "path": "guides/01-getting-started.md", "tags": ["install", "setup", "nuget", "hello world", "quickstart"] },
-        { "title": "02 — Workflows", "path": "guides/02-workflows.md", "tags": ["graph", "pipeline", "routing", "fork", "join", "parallel", "conditional", "fluent builder"] },
-        { "title": "03 — Agents", "path": "guides/03-agents.md", "tags": ["AI", "LLM", "OpenAI", "Anthropic", "Google", "chat", "provider", "structured output"] },
-        { "title": "04 — Tools", "path": "guides/04-tools.md", "tags": ["tool calling", "function calling", "plugins", "capabilities"] }
-      ]
-    },
-    {
-      "title": "Building Applications",
-      "items": [
-        { "title": "05 — Streaming Chat", "path": "guides/05-streaming-chat.md", "tags": ["SSE", "streaming", "real-time", "chat", "async"] },
-        { "title": "06 — Long-Term Memory", "path": "guides/06-memory.md", "tags": ["vector", "embedding", "RAG", "document", "ingestion", "semantic search"] },
-        { "title": "07 — Human-in-the-Loop", "path": "guides/07-human-in-the-loop.md", "tags": ["approval", "pause", "resume", "checkpoint", "human review"] }
-      ]
-    },
-    {
-      "title": "Infrastructure",
-      "items": [
-        { "title": "08 — State Machine", "path": "guides/08-state-machine.md", "tags": ["interrupt", "middleware", "circuit breaker", "RedLock", "coordination"] },
-        { "title": "09 — Distributed", "path": "guides/09-distributed.md", "tags": ["Redis", "distributed", "scaling", "persistence", "cloud"] },
-        { "title": "10 — Observability", "path": "guides/10-observability.md", "tags": ["logging", "tracing", "metrics", "OpenTelemetry", "diagnostics"] }
-      ]
-    },
-    {
-      "title": "Advanced",
-      "items": [
-        { "title": "11 — Advanced Agents", "path": "guides/11-advanced-agents.md", "tags": ["multi-agent", "orchestration", "planning", "reasoning", "chain of thought"] },
-        { "title": "12 — MCP & Interop", "path": "guides/12-mcp-and-interop.md", "tags": ["MCP", "A2A", "protocol", "server", "interoperability", "model context"] },
-        { "title": "13 — Design Tooling", "path": "guides/13-design-tooling.md", "tags": ["visual", "designer", "graph editor", "diagramming"] },
-        { "title": "14 — Testing", "path": "guides/14-testing.md", "tags": ["unit test", "integration test", "NUnit", "mocking", "test harness"] },
-        { "title": "15 — Empirical Memory", "path": "guides/15-empirical-memory.md", "tags": ["learning", "episodes", "skills", "experience", "empirical"] },
-        { "title": "15a — Memory Tuning", "path": "guides/15a-empirical-memory-tuning.md", "tags": ["tuning", "decay", "importance", "parameters", "optimization"] },
-        { "title": "16 — Agentic Patterns", "path": "guides/16-agentic-patterns.md", "tags": ["patterns", "reflection", "planning", "ReAct", "multi-step"] },
-        { "title": "UV Setup (Python Interop)", "path": "guides/uv-setup-for-dotnet-developers.md", "tags": ["Python", "uv", "interop", "cross-language"] }
-      ]
-    },
-    {
-      "title": "Reference",
-      "items": [
-        { "title": "Feature Index", "path": "reference/features.md", "tags": ["API", "capabilities", "feature list", "index"] },
-        { "title": "Tools Reference", "path": "reference/tools-reference.md", "tags": ["API", "tool calling", "function calling", "reference"] },
-        { "title": "Workflow DSL", "path": "reference/workflow-dsl.md", "tags": ["DSL", "fluent", "builder", "graph", "API"] },
-        { "title": "Advanced Agent Features", "path": "reference/advanced-agent-features.md", "tags": ["API", "agent", "structured output", "multi-provider"] }
-      ]
-    },
-    {
-      "title": "FAQ",
-      "items": [
-        { "title": "FAQ Overview", "path": "faq.md", "tags": ["faq", "questions", "help", "troubleshooting"] },
-        { "title": "General & Installation", "path": "faq/general.md", "tags": ["faq", "general", "installation", "setup"] },
-        { "title": "LLM Providers", "path": "faq/providers.md", "tags": ["faq", "llm", "providers", "openai", "anthropic"] },
-        { "title": "Workflows & State Machine", "path": "faq/workflows.md", "tags": ["faq", "workflows", "state-machine", "routing"] },
-        { "title": "Memory & Learning", "path": "faq/memory.md", "tags": ["faq", "memory", "rag", "empirical", "skills"] },
-        { "title": "Integration & Interop", "path": "faq/integration.md", "tags": ["faq", "human-in-the-loop", "mcp", "a2a"] },
-        { "title": "Testing, Observability & Design", "path": "faq/operations.md", "tags": ["faq", "testing", "observability", "architecture", "orleans"] }
-      ]
-    },
-    {
-      "title": "About",
-      "items": [
-        { "title": "Background & Philosophy", "path": "about/background.md", "tags": ["motivation", "design", "architecture", "philosophy"] }
-      ]
-    }
-  ]
+{
+    "title": "Ananke",
+    "subtitle": "AI Agent Orchestration for .NET",
+    "logo": "ananke-logo.png",
+    "heroImage": "ananke-creation.png",
+    "repo": "https://github.com/sevensamurai/Ananke",
+    "nuget": "https://www.nuget.org/packages/Ananke",
+    "topNav": [
+        {
+            "title": "Home",
+            "path": "welcome.md"
+        },
+        {
+            "title": "Quickstart",
+            "path": "quickstart.md"
+        },
+        {
+            "title": "Learning",
+            "path": "learning-path.md"
+        },
+        {
+            "title": "Docs",
+            "children": [
+                {
+                    "title": "Concepts",
+                    "path": "concepts.md"
+                },
+                {
+                    "title": "Demos",
+                    "path": "demos.md"
+                },
+                {
+                    "title": "Demo — Multi-Agent",
+                    "path": "demos/multi-agent.md"
+                },
+                {
+                    "title": "Demo — Tools",
+                    "path": "demos/tools.md"
+                },
+                {
+                    "title": "Feature Index",
+                    "path": "reference/features.md"
+                },
+                {
+                    "title": "Tools Reference",
+                    "path": "reference/tools-reference.md"
+                },
+                {
+                    "title": "Workflow DSL",
+                    "path": "reference/workflow-dsl.md"
+                },
+                {
+                    "title": "Advanced Agent Features",
+                    "path": "reference/advanced-agent-features.md"
+                },
+                {
+                    "title": "FAQ",
+                    "path": "faq.md"
+                }
+            ]
+        },
+        {
+            "title": "CLI",
+            "children": [
+                {
+                    "title": "CLI Overview",
+                    "path": "cli/overview.md"
+                },
+                {
+                    "title": "nnke Tools",
+                    "path": "cli/nnke-tools.md"
+                },
+                {
+                    "title": "nnke CLI",
+                    "path": "cli/nnke-tool.md"
+                },
+                {
+                    "title": "nnke-platform CLI",
+                    "path": "cli/nnke-platform-tool.md"
+                }
+            ]
+        },
+        {
+            "title": "Roadmap",
+            "path": "about/roadmap.md"
+        },
+        {
+            "title": "About",
+            "path": "about/background.md"
+        }
+    ],
+    "sections": [
+        {
+            "title": "Start",
+            "items": [
+                {
+                    "title": "Home",
+                    "path": "welcome.md",
+                    "tags": [
+                        "landing",
+                        "welcome",
+                        "overview"
+                    ]
+                },
+                {
+                    "title": "Quickstart",
+                    "path": "quickstart.md",
+                    "tags": [
+                        "install",
+                        "quickstart",
+                        "workflow",
+                        "agent",
+                        "hello world",
+                        "start"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Docs",
+            "items": [
+                {
+                    "title": "Concepts",
+                    "path": "concepts.md",
+                    "tags": [
+                        "concepts",
+                        "overview",
+                        "workflow",
+                        "agent",
+                        "tools",
+                        "memory",
+                        "mcp"
+                    ]
+                },
+                {
+                    "title": "Demos",
+                    "path": "demos.md",
+                    "tags": [
+                        "demos",
+                        "examples",
+                        "catalog",
+                        "runnable projects"
+                    ]
+                },
+                {
+                    "title": "Demo — Multi-Agent",
+                    "path": "demos/multi-agent.md",
+                    "tags": [
+                        "demo",
+                        "multi-agent",
+                        "router",
+                        "worker",
+                        "reviewer",
+                        "agentic-patterns"
+                    ]
+                },
+                {
+                    "title": "Demo — Tools",
+                    "path": "demos/tools.md",
+                    "tags": [
+                        "demo",
+                        "tools",
+                        "toolkit",
+                        "function-calling",
+                        "typed-parameters",
+                        "async"
+                    ]
+                },
+                {
+                    "title": "Feature Index",
+                    "path": "reference/features.md",
+                    "tags": [
+                        "API",
+                        "capabilities",
+                        "feature list",
+                        "index"
+                    ]
+                },
+                {
+                    "title": "Tools Reference",
+                    "path": "reference/tools-reference.md",
+                    "tags": [
+                        "API",
+                        "tool calling",
+                        "function calling",
+                        "reference"
+                    ]
+                },
+                {
+                    "title": "Workflow DSL",
+                    "path": "reference/workflow-dsl.md",
+                    "tags": [
+                        "DSL",
+                        "fluent",
+                        "builder",
+                        "graph",
+                        "API"
+                    ]
+                },
+                {
+                    "title": "Advanced Agent Features",
+                    "path": "reference/advanced-agent-features.md",
+                    "tags": [
+                        "API",
+                        "agent",
+                        "structured output",
+                        "multi-provider"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Learning",
+            "items": [
+                {
+                    "title": "Learning Path",
+                    "path": "learning-path.md",
+                    "tags": [
+                        "tutorials",
+                        "guides",
+                        "index",
+                        "learning",
+                        "all guides"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "CLI",
+            "items": [
+                {
+                    "title": "CLI Overview",
+                    "path": "cli/overview.md",
+                    "tags": [
+                        "nnke",
+                        "cli",
+                        "scaffold",
+                        "validate",
+                        "run",
+                        "serve",
+                        "mcp"
+                    ]
+                },
+                {
+                    "title": "nnke Tools",
+                    "path": "cli/nnke-tools.md",
+                    "tags": [
+                        "nnke",
+                        "nnke-platform",
+                        "dotnet tool",
+                        "cli",
+                        "tooling",
+                        "design",
+                        "federation",
+                        "deployment",
+                        "run",
+                        "serve",
+                        "local execution"
+                    ]
+                },
+                {
+                    "title": "nnke CLI",
+                    "path": "cli/nnke-tool.md",
+                    "tags": [
+                        "nnke",
+                        "dotnet tool",
+                        "copilot",
+                        "claude",
+                        "design",
+                        "tooling",
+                        "scaffold",
+                        "mcp",
+                        "run",
+                        "serve",
+                        "local execution",
+                        "FED061",
+                        "platform native"
+                    ]
+                },
+                {
+                    "title": "nnke-platform CLI",
+                    "path": "cli/nnke-platform-tool.md",
+                    "tags": [
+                        "nnke-platform",
+                        "dotnet tool",
+                        "federation",
+                        "deployment",
+                        "cloud",
+                        "azure",
+                        "google",
+                        "vertex-ai",
+                        "anthropic",
+                        "claude",
+                        "mesh",
+                        "organics",
+                        "adapters",
+                        "credentials",
+                        "module initializer",
+                        "install",
+                        "local-loop",
+                        "local design loop",
+                        "emulators",
+                        "local-emulated",
+                        "foundry",
+                        "gemini-enterprise",
+                        "platform-native",
+                        "FED060",
+                        "FED061",
+                        "FED062",
+                        "run",
+                        "serve",
+                        "local execution"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Foundation",
+            "items": [
+                {
+                    "title": "01 — Getting Started",
+                    "path": "guides/01-getting-started.md",
+                    "tags": [
+                        "install",
+                        "setup",
+                        "nuget",
+                        "hello world",
+                        "quickstart"
+                    ]
+                },
+                {
+                    "title": "02 — Workflows",
+                    "path": "guides/02-workflows.md",
+                    "tags": [
+                        "graph",
+                        "pipeline",
+                        "routing",
+                        "fork",
+                        "join",
+                        "parallel",
+                        "conditional",
+                        "fluent builder"
+                    ]
+                },
+                {
+                    "title": "03 — Agents",
+                    "path": "guides/03-agents.md",
+                    "tags": [
+                        "AI",
+                        "LLM",
+                        "OpenAI",
+                        "Anthropic",
+                        "Google",
+                        "chat",
+                        "provider",
+                        "structured output"
+                    ]
+                },
+                {
+                    "title": "04 — Tools",
+                    "path": "guides/04-tools.md",
+                    "tags": [
+                        "tool calling",
+                        "function calling",
+                        "plugins",
+                        "capabilities"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Building Applications",
+            "items": [
+                {
+                    "title": "05 — Streaming Chat",
+                    "path": "guides/05-streaming-chat.md",
+                    "tags": [
+                        "SSE",
+                        "streaming",
+                        "real-time",
+                        "chat",
+                        "async"
+                    ]
+                },
+                {
+                    "title": "06 — Long-Term Memory",
+                    "path": "guides/06-memory.md",
+                    "tags": [
+                        "vector",
+                        "embedding",
+                        "RAG",
+                        "document",
+                        "ingestion",
+                        "semantic search"
+                    ]
+                },
+                {
+                    "title": "07 — Human-in-the-Loop",
+                    "path": "guides/07-human-in-the-loop.md",
+                    "tags": [
+                        "approval",
+                        "pause",
+                        "resume",
+                        "checkpoint",
+                        "human review"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Infrastructure",
+            "items": [
+                {
+                    "title": "08 — State Machine",
+                    "path": "guides/08-state-machine.md",
+                    "tags": [
+                        "interrupt",
+                        "middleware",
+                        "circuit breaker",
+                        "RedLock",
+                        "coordination"
+                    ]
+                },
+                {
+                    "title": "09 — Distributed",
+                    "path": "guides/09-distributed.md",
+                    "tags": [
+                        "Redis",
+                        "distributed",
+                        "scaling",
+                        "persistence",
+                        "cloud"
+                    ]
+                },
+                {
+                    "title": "10 — Observability",
+                    "path": "guides/10-observability.md",
+                    "tags": [
+                        "logging",
+                        "tracing",
+                        "metrics",
+                        "OpenTelemetry",
+                        "diagnostics"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "Advanced",
+            "items": [
+                {
+                    "title": "11 — Advanced Agents",
+                    "path": "guides/11-advanced-agents.md",
+                    "tags": [
+                        "multi-agent",
+                        "orchestration",
+                        "planning",
+                        "reasoning",
+                        "chain of thought"
+                    ]
+                },
+                {
+                    "title": "12 — MCP & Interop",
+                    "path": "guides/12-mcp-and-interop.md",
+                    "tags": [
+                        "MCP",
+                        "A2A",
+                        "protocol",
+                        "server",
+                        "interoperability",
+                        "model context"
+                    ]
+                },
+                {
+                    "title": "13 — Design Tooling",
+                    "path": "guides/13-design-tooling.md",
+                    "tags": [
+                        "visual",
+                        "designer",
+                        "graph editor",
+                        "diagramming"
+                    ]
+                },
+                {
+                    "title": "14 — Testing",
+                    "path": "guides/14-testing.md",
+                    "tags": [
+                        "unit test",
+                        "integration test",
+                        "NUnit",
+                        "mocking",
+                        "test harness"
+                    ]
+                },
+                {
+                    "title": "15 — Empirical Memory",
+                    "path": "guides/15-empirical-memory.md",
+                    "tags": [
+                        "learning",
+                        "episodes",
+                        "skills",
+                        "experience",
+                        "empirical"
+                    ]
+                },
+                {
+                    "title": "15a — Memory Tuning",
+                    "path": "guides/15a-empirical-memory-tuning.md",
+                    "tags": [
+                        "tuning",
+                        "decay",
+                        "importance",
+                        "parameters",
+                        "optimization"
+                    ]
+                },
+                {
+                    "title": "16 — Agentic Patterns",
+                    "path": "guides/16-agentic-patterns.md",
+                    "tags": [
+                        "patterns",
+                        "reflection",
+                        "planning",
+                        "ReAct",
+                        "multi-step",
+                        "router",
+                        "tool-routing",
+                        "cascade",
+                        "smart-tool-router"
+                    ]
+                },
+                {
+                    "title": "UV Setup (Python Interop)",
+                    "path": "guides/uv-setup-for-dotnet-developers.md",
+                    "tags": [
+                        "Python",
+                        "uv",
+                        "interop",
+                        "cross-language",
+                        "skills",
+                        "openclaw"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "FAQ",
+            "items": [
+                {
+                    "title": "FAQ Overview",
+                    "path": "faq.md",
+                    "tags": [
+                        "faq",
+                        "questions",
+                        "help",
+                        "troubleshooting"
+                    ]
+                },
+                {
+                    "title": "General & Installation",
+                    "path": "faq/general.md",
+                    "tags": [
+                        "faq",
+                        "general",
+                        "installation",
+                        "setup"
+                    ]
+                },
+                {
+                    "title": "LLM Providers",
+                    "path": "faq/providers.md",
+                    "tags": [
+                        "faq",
+                        "llm",
+                        "providers",
+                        "openai",
+                        "anthropic"
+                    ]
+                },
+                {
+                    "title": "Workflows & State Machine",
+                    "path": "faq/workflows.md",
+                    "tags": [
+                        "faq",
+                        "workflows",
+                        "state-machine",
+                        "routing"
+                    ]
+                },
+                {
+                    "title": "Memory & Learning",
+                    "path": "faq/memory.md",
+                    "tags": [
+                        "faq",
+                        "memory",
+                        "rag",
+                        "empirical",
+                        "skills"
+                    ]
+                },
+                {
+                    "title": "Integration & Interop",
+                    "path": "faq/integration.md",
+                    "tags": [
+                        "faq",
+                        "human-in-the-loop",
+                        "mcp",
+                        "a2a"
+                    ]
+                },
+                {
+                    "title": "Testing, Observability & Design",
+                    "path": "faq/operations.md",
+                    "tags": [
+                        "faq",
+                        "testing",
+                        "observability",
+                        "architecture",
+                        "orleans"
+                    ]
+                },
+                {
+                    "title": "Organic Colony & Cell Division",
+                    "path": "faq/organics.md",
+                    "tags": [
+                        "faq",
+                        "organics",
+                        "cell division",
+                        "emergence",
+                        "organic host",
+                        "complexity",
+                        "colony"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "About",
+            "items": [
+                {
+                    "title": "Background & Philosophy",
+                    "path": "about/background.md",
+                    "tags": [
+                        "motivation",
+                        "design",
+                        "architecture",
+                        "philosophy"
+                    ]
+                },
+                {
+                    "title": "Roadmap & License",
+                    "path": "about/roadmap.md",
+                    "tags": [
+                        "roadmap",
+                        "versioning",
+                        "releases",
+                        "open source",
+                        "MIT",
+                        "license",
+                        "free",
+                        "commercial"
+                    ]
+                },
+                {
+                    "title": "The Creator",
+                    "path": "about/creator.md",
+                    "tags": [
+                        "about",
+                        "creator",
+                        "biography",
+                        "background",
+                        "skills"
+                    ]
+                }
+            ]
+        }
+    ]
 }

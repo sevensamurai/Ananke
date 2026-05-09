@@ -14,7 +14,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     private readonly string _model;
     private readonly int _maxTokens;
 
-    public AnthropicAgentModel(AnthropicClient client, string model = "claude-sonnet-4-20250514", int maxTokens = 4096)
+    public AnthropicAgentModel(AnthropicClient client, string model = "claude-sonnet-4", int maxTokens = 4096)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -103,13 +103,29 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     private static AgentResponse MapMessage(Message message)
     {
         var toolCalls = new List<AgentToolCall>();
-        string? text = null;
+        var textBuilder = new StringBuilder();
+        var responseParts = new List<ContentPart>();
 
         foreach (var block in message.Content)
         {
             block.Match<object?>(
-                t => { text = t.Text; return null; },
-                _ => null,
+                t =>
+                {
+                    if (t.Text is { Length: > 0 })
+                    {
+                        if (textBuilder.Length > 0) textBuilder.Append('\n');
+                        textBuilder.Append(t.Text);
+                        responseParts.Add(new TextPart(t.Text));
+                    }
+                    return null;
+                },
+                t =>
+                {
+                    // Preserve extended-thinking content as a text part
+                    if (t.Thinking is { Length: > 0 })
+                        responseParts.Add(new TextPart(t.Thinking));
+                    return null;
+                },
                 _ => null,
                 t => { toolCalls.Add(new AgentToolCall(t.ID, t.Name, ToJsonString(t.Input))); return null; },
                 _ => null,
@@ -122,9 +138,12 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
                 _ => null);
         }
 
+        var text = textBuilder.Length > 0 ? textBuilder.ToString() : null;
+
         return new AgentResponse
         {
             Text = text,
+            Parts = responseParts.Count > 0 ? responseParts : null,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
             Usage = message.Usage is not null
                 ? new TokenUsage

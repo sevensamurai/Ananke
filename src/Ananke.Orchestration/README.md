@@ -50,8 +50,9 @@ services.AddWorkflowOrchestration(o => o
 - **Conditional routing** — `Workflow.Decide()` for lambda-based, `DecideWithAgent()` for LLM-driven
 - **Fork / Join** — fan-out to parallel branches, fan-in with merge function
 - **Human-in-the-loop** — `.InterruptBefore()` / `.InterruptAfter()` with `ResumeAsync()`
-- **Checkpointing** — persist and resume workflow state (`InMemoryCheckpointStore`, `FileCheckpointStore`, or custom `ICheckpointStore` — see interface remarks for Redis/SQL guidance)
+- **Checkpointing** — persist and resume workflow state (`InMemoryCheckpointStore` or custom `ICheckpointStore` — see interface remarks for Redis/SQL guidance)
 - **Resilience** — Polly-based retry built into the runner
+- **Smart Tool Router** — `CompositeSmartToolRouter` pipeline with heuristic-tag, semantic-recall, affinity re-rank, health-filter, and LLM routing stages; controlled via `SmartToolRouterMiddleware`
 - **Model decorators** — `ResilientAgentModel` (429 retry + OTel) and `CachingAgentModel` (LLM response caching)
 - **Tracing** — `IWorkflowTracer` for OpenTelemetry integration
 
@@ -66,7 +67,7 @@ services.AddWorkflowOrchestration(o => o
 | `Ananke.Documents` | PDF and Markdown extractors for the knowledge pipeline |
 | `Ananke.MCP` | Expose workflows and tools as MCP server capabilities |
 | `Ananke.OpenTelemetry` | OTLP tracing export (BetterStack, Jaeger, Grafana Tempo) |
-| `Ananke` | Meta-package — includes Orchestration + StateMachine + Bridge |
+| `Ananke` | Meta-package — includes Orchestration + StateMachine in one step |
 
 ## Documentation
 

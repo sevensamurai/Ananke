@@ -32,14 +32,17 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     private readonly ConcurrentDictionary<string, Func<string, byte[], CancellationToken, Task>> _subscriptions = new();
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    private const int MaxReconnectAttempts = 10;
+
     private IMqttClient? _client;
     private MqttClientOptions? _options;
     private string _namespace = string.Empty;
     private bool _configured;
     private bool _disposed;
+    private bool _reconnectFailed;
 
     /// <summary>Whether the channel is connected to the MQTT broker.</summary>
-    public bool IsConnected => _configured && _client?.IsConnected == true;
+    public bool IsConnected => _configured && !_reconnectFailed && _client?.IsConnected == true;
 
     /// <summary>
     /// Connects to the MQTT broker. Must be called before <see cref="SendAsync{TMessage, TResponse}"/>
@@ -70,21 +73,37 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
 
             var delay = TimeSpan.FromSeconds(1);
             var maxDelay = TimeSpan.FromSeconds(30);
+            var attempt = 0;
 
-            while (!_disposed)
+            while (!_disposed && attempt < MaxReconnectAttempts)
             {
                 try
                 {
+                    attempt++;
                     await Task.Delay(delay);
                     await _client.ConnectAsync(_options, CancellationToken.None);
-                    _logger.LogInformation("Handoff channel reconnected");
+                    _logger.LogInformation("Handoff channel reconnected after {Attempt} attempt(s)", attempt);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Handoff channel reconnection failed, retrying in {Delay}s", delay.TotalSeconds);
+                    _logger.LogWarning(ex, "Handoff channel reconnection attempt {Attempt}/{Max} failed",
+                        attempt, MaxReconnectAttempts);
                     delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, maxDelay.Ticks));
                 }
+            }
+
+            if (!_disposed)
+            {
+                _reconnectFailed = true;
+                _logger.LogError(
+                    "Handoff channel permanently disconnected after {Max} reconnect attempts",
+                    MaxReconnectAttempts);
+
+                // Fail all pending requests so callers are not blocked indefinitely
+                foreach (var kvp in _pending)
+                    kvp.Value.TrySetException(
+                        new InvalidOperationException("MQTT handoff channel lost connection permanently."));
             }
         };
 
@@ -261,7 +280,6 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Handoff subscription handler failed for {Topic}", topic);
-                        Console.Error.WriteLine($"[Handoff] Subscription handler failed for {topic}: {ex.Message}");
                     }
                 });
                 return Task.CompletedTask;

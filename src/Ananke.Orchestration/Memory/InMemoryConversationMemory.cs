@@ -16,10 +16,15 @@ namespace Ananke.Orchestration.Memory;
 /// written to within this duration are eligible for cleanup via
 /// <see cref="CleanupExpiredAsync"/>. When <see langword="null"/>, sessions never expire.
 /// </param>
-public sealed class InMemoryConversationMemory(TimeSpan? ttl = null) : IConversationMemory
+/// <param name="timeProvider">
+/// Clock used for TTL evaluation. Defaults to <see cref="TimeProvider.System"/>.
+/// Pass a fake <see cref="TimeProvider"/> in tests to control expiry deterministically.
+/// </param>
+public sealed class InMemoryConversationMemory(TimeSpan? ttl = null, TimeProvider? timeProvider = null) : IConversationMemory
 {
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
     private readonly TimeSpan? _ttl = ttl;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     /// <inheritdoc />
     public Task AddAsync(string sessionId, IEnumerable<AgentMessage> messages, CancellationToken ct = default)
@@ -31,7 +36,7 @@ public sealed class InMemoryConversationMemory(TimeSpan? ttl = null) : IConversa
         lock (session.Lock)
         {
             session.Messages.AddRange(messages);
-            session.LastWriteUtc = DateTimeOffset.UtcNow;
+            session.LastWriteUtc = _timeProvider.GetUtcNow();
         }
 
         return Task.CompletedTask;
@@ -47,7 +52,7 @@ public sealed class InMemoryConversationMemory(TimeSpan? ttl = null) : IConversa
         lock (session.Lock)
         {
             session.Messages.Add(message);
-            session.LastWriteUtc = DateTimeOffset.UtcNow;
+            session.LastWriteUtc = _timeProvider.GetUtcNow();
         }
 
         return Task.CompletedTask;
@@ -99,12 +104,12 @@ public sealed class InMemoryConversationMemory(TimeSpan? ttl = null) : IConversa
     public int SessionCount => _sessions.Count;
 
     private bool IsExpired(Session session) =>
-        _ttl.HasValue && session.LastWriteUtc + _ttl.Value < DateTimeOffset.UtcNow;
+        _ttl.HasValue && session.LastWriteUtc + _ttl.Value < _timeProvider.GetUtcNow();
 
     private sealed class Session
     {
         public readonly object Lock = new();
         public readonly List<AgentMessage> Messages = [];
-        public DateTimeOffset LastWriteUtc = DateTimeOffset.UtcNow;
+        public DateTimeOffset LastWriteUtc = DateTimeOffset.MinValue;
     }
 }

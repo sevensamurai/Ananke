@@ -219,7 +219,7 @@ public class ModelResolverTests
             "    model: gpt-4.1-mini",
             "  smart:",
             "    provider: anthropic",
-            "    model: claude-sonnet-4-20250514",
+            "    model: claude-sonnet-4",
             "jobs:",
             "connections:",
         ]);

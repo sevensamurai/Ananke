@@ -30,3 +30,7 @@ Human-in-the-loop approval, checkpointing, MCP servers, A2A protocol, and remote
 ### [Testing, Observability & Design](faq/operations.md)
 
 Zero-config in-memory testing, OpenTelemetry tracing, architecture decisions, Orleans comparison, and extensibility.
+
+### [Organic Colony & Cell Division](faq/organics.md)
+
+Why agents hit a generalist ceiling, how cell division solves tool confusion, surface tension triggers, shared memory with domain affinity, and colony self-regulation.

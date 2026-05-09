@@ -1,10 +1,10 @@
-<!-- topic: agentic-patterns, tags: agentic-patterns, review-critique, iterative-refinement, router, handoff, loop -->
+﻿<!-- topic: agentic-patterns, tags: agentic-patterns, review-critique, iterative-refinement, router, handoff, loop -->
 # 16 — Agentic Patterns
 
 Build recognized agentic design patterns with `AgenticPattern` — pre-wired
 workflow builders for review-and-critique, iterative refinement, and more.
 
-**Demo:** [ReviewCritiqueDemo](../../src/demos/ReviewCritiqueDemo/) *(coming soon)*
+**Demo:** [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) — all 14 patterns, no API keys required
 
 ---
 
@@ -220,3 +220,131 @@ The `AgenticPattern` layer is an on-ramp, not a cage.
 - [Guide 03 — Agents](03-agents.md) — `AgentJob` for LLM-powered jobs
 - [Guide 05 — Streaming Chat](05-streaming-chat.md) — `StreamingChatWorkflow` pattern
 - [Guide 07 — Human-in-the-Loop](07-human-in-the-loop.md) — interrupts and resume
+
+---
+
+## Smart Tool Router
+
+> **Also see:** [Guide 04 — Tools](04-tools.md#smart-tool-router) for `ToolKit` wiring, and [Guide 15 — Empirical Memory](15-empirical-memory.md#tool-memory) for `IToolMemory`.
+
+### What and why
+
+LLMs perform better when they see only the tools relevant to the current turn. A 128-tool kit sent on every call wastes context, inflates cost, and increases the chance the model picks the wrong function. The **Smart Tool Router** solves this with a composable, multi-stage pipeline that narrows the tool window *before* the model request is sent.
+
+Each stage is a lightweight `ISmartToolRouter` that receives the current candidate list and returns a filtered or re-ranked subset. Stages chain left-to-right inside a `CompositeSmartToolRouter`; the final selected set replaces `AgentRequest.Tools` in the middleware layer.
+
+### Pipeline stages
+
+```
+User message
+     │
+     ▼
+┌─────────────┐   always-on tools bypass all scoring
+│ PinnedTool  │──────────────────────────────────────┐
+└─────────────┘                                       │
+     │ remaining candidates                           │
+     ▼                                                │
+┌──────────────┐  drop Offline / Cooldown tools       │
+│ HealthFilter │                                      │
+└──────────────┘                                      │
+     │                                                │
+     ▼                                                │
+┌───────────────┐  BM25-style keyword recall          │
+│ SemanticRecall│  from IToolMemory                   │
+└───────────────┘                                     │
+     │ top-k candidates                               │
+     ▼                                                │
+┌──────────────┐  UCB affinity re-rank                │
+│AffinityRerank│  (rewards successful calls)          │
+└──────────────┘                                      │
+     │                                                │
+     ▼                                                │
+┌────────────┐   cheap LLM final selection            │
+│  LlmStage  │   (optional, highest fidelity)         │
+└────────────┘                                        │
+     │                                                │
+     ▼                                                │
+ selected tools ◄─────────────────────────────────────┘
+     │
+     ▼
+SmartToolRouterMiddleware → AgentRequest.Tools
+```
+
+The biological analogy (from ADR-arch-013): `PinnedToolStage` = autonomic reflex, `HealthFilterStage` = immune exclusion, `SemanticRecallStage` = thalamic gating, `AffinityRerankStage` = synaptic reinforcement, `LlmRouterStage` = prefrontal cortex deliberation.
+
+### Code-first wiring
+
+```csharp
+var memory = new InMemoryToolMemory();
+var kit = new ToolKit("agent")
+    .WithMemory(memory)
+    .WithRouter(new CompositeSmartToolRouter([
+        new PinnedToolStage(["list_tools"]),
+        new HealthFilterStage(),
+        new SemanticRecallStage(memory, topK: 8),
+        new AffinityRerankStage(tracker),
+    ]));
+
+await kit.PopulateMemoryAsync();
+
+var model = MiddlewareAgentModel.Wrap(innerModel,
+    new SmartToolRouterMiddleware(kit));
+```
+
+`PassThroughRouter.Instance` is the default when no router is configured — all tools are forwarded unchanged, preserving full backward compatibility.
+
+### Manifest-first wiring (`.ananke.yml`)
+
+```yaml
+jobs:
+  plan:
+    type: agent
+    model: fast
+    tools:
+      - search
+      - list_tools
+      - buy_stock
+      - send_email
+    router:
+      - kind: pinned
+        tools: [list_tools]
+      - kind: health_filter
+      - kind: semantic_recall
+        top_k: 8
+      - kind: affinity_rerank
+      - kind: llm
+        model: fast
+        max_selected: 3
+```
+
+`WorkflowToolResolver` builds the `CompositeSmartToolRouter` from the descriptor list and calls `kit.WithRouter(...)` automatically.
+
+### Supported stage kinds
+
+| Kind | Class | Key options |
+|---|---|---|
+| `pinned` | `PinnedToolStage` | `tools: [name, ...]` |
+| `health_filter` | `HealthFilterStage` | *(none)* |
+| `semantic_recall` | `SemanticRecallStage` | `top_k: 8` |
+| `affinity_rerank` | `AffinityRerankStage` | *(uses shared `ToolAffinityTracker`)* |
+| `heuristic_tags` | `HeuristicTagStage` | *(none — token-overlap heuristic)* |
+| `llm` | `LlmRouterStage` | `model: <alias>`, `max_selected: 3` |
+
+### Inflammation advisories
+
+When `ToolKit.Memory` is set, `SmartToolRouterMiddleware` appends a plain-English advisory to the system prompt for any selected tool whose health is `Degraded`, `Cooldown`, or `Offline` — so the model stops calling broken tools within the same turn without any extra prompt engineering.
+
+```
+NOTE: `buy_stock` is in cooldown after recent failures — do not call it this turn.
+NOTE: `send_email` is currently degraded — it may fail; prefer an alternative if available.
+```
+
+### When to use which stage
+
+| Situation | Recommended stages |
+|---|---|
+| ≤ 12 tools, latency critical | No router (use `PassThroughRouter`) |
+| 12–40 tools, known categories | `pinned` + `semantic_recall` |
+| 40–100 tools, health matters | add `health_filter` before recall |
+| Repeated calls, want learning | add `affinity_rerank` after recall |
+| 100+ tools or high cost budget | full chain ending with `llm` |

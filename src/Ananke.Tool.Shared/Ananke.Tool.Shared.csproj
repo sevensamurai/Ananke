@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Ananke.Tool.Shared</AssemblyName>
+    <RootNamespace>Ananke.Tool.Shared</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
+  </ItemGroup>
+
+</Project>

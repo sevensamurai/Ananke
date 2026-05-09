@@ -1,25 +1,34 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-
-using Ananke.Abstractions.Agents;
 
 namespace Ananke.Orchestration.Agents;
 
 public static class JsonSchemaGenerator
 {
+    private const int MaxDepth = 10;
+
     public static string Generate<T>() =>
         JsonSerializer.Serialize(GenerateForType(typeof(T)));
 
-    public static Dictionary<string, object> GenerateForType(Type type)
+    public static Dictionary<string, object> GenerateForType(Type type) =>
+        GenerateForType(type, depth: 0);
+
+    private static Dictionary<string, object> GenerateForType(Type type, int depth)
     {
+        if (depth > MaxDepth)
+            return new Dictionary<string, object> { ["type"] = "object" };
+
         var properties = new Dictionary<string, object>();
         var required = new List<string>();
 
         foreach (var prop in type.GetProperties().Where(p => p.CanRead))
         {
+            if (prop.GetCustomAttribute<JsonIgnoreAttribute>() is not null)
+                continue;
+
             var propName = GetJsonPropertyName(prop);
-            properties[propName] = GetPropertySchema(prop.PropertyType);
+            properties[propName] = GetPropertySchema(prop.PropertyType, depth + 1);
             required.Add(propName);
         }
 
@@ -38,7 +47,10 @@ public static class JsonSchemaGenerator
         return attr?.Name ?? prop.Name;
     }
 
-    internal static Dictionary<string, object> GetPropertySchema(Type type)
+    internal static Dictionary<string, object> GetPropertySchema(Type type) =>
+        GetPropertySchema(type, depth: 0);
+
+    private static Dictionary<string, object> GetPropertySchema(Type type, int depth)
     {
         var underlying = Nullable.GetUnderlyingType(type);
         var isNullable = underlying is not null;
@@ -76,6 +88,17 @@ public static class JsonSchemaGenerator
             };
         }
 
+        // Dictionary<TKey, TValue> → additionalProperties
+        var dictValueType = GetDictionaryValueType(actual);
+        if (dictValueType is not null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["type"] = isNullable ? new object[] { "object", "null" } : (object)"object",
+                ["additionalProperties"] = GetPropertySchema(dictValueType, depth + 1)
+            };
+        }
+
         // Array / collection
         var elementType = GetCollectionElementType(actual);
         if (elementType is not null)
@@ -83,18 +106,35 @@ public static class JsonSchemaGenerator
             return new Dictionary<string, object>
             {
                 ["type"] = isNullable ? new object[] { "array", "null" } : (object)"array",
-                ["items"] = GetPropertySchema(elementType)
+                ["items"] = GetPropertySchema(elementType, depth + 1)
             };
         }
+
+        // Depth guard for nested objects
+        if (depth >= MaxDepth)
+            return new Dictionary<string, object> { ["type"] = "object" };
 
         // Nested object (non-primitive class or struct, not abstract, not object itself)
         if (!actual.IsPrimitive && actual != typeof(object) && !actual.IsAbstract &&
             (actual.IsClass || (actual.IsValueType && !actual.IsEnum)))
         {
-            return GenerateForType(actual);
+            return GenerateForType(actual, depth + 1);
         }
 
         return Typed("string", isNullable);
+    }
+
+    private static Type? GetDictionaryValueType(Type type)
+    {
+        if (!type.IsGenericType)
+            return null;
+
+        var def = type.GetGenericTypeDefinition();
+        if (def == typeof(Dictionary<,>) || def == typeof(IDictionary<,>) ||
+            def == typeof(IReadOnlyDictionary<,>))
+            return type.GetGenericArguments()[1];
+
+        return null;
     }
 
     private static Type? GetCollectionElementType(Type type)

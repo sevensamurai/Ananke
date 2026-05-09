@@ -7,7 +7,7 @@ namespace Ananke.Orchestration.Knowledge.Linking;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This implements the "dual retrieval" pattern from ADR-012: vector similarity finds
+/// This implements the "dual retrieval" pattern: vector similarity finds
 /// chunks that are <em>about</em> similar topics, while graph traversal finds chunks
 /// that are <em>structurally connected</em> via relationships established during
 /// post-ingestion analysis. The two modalities have complementary failure modes.

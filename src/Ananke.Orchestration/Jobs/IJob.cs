@@ -13,3 +13,13 @@ public interface IJob<TState>
     /// <summary>Executes the job against the current state and returns the updated state.</summary>
     Task<TState> ExecuteAsync(TState state, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Internal marker interface used by the workflow builder's <c>Build()</c> method to detect whether
+/// a job is backed by a profile-aware model router that can supply per-call cost rates.
+/// This enables the budget build-time validation check (Phase 4.2).
+/// </summary>
+internal interface IProfileAwareJob
+{
+    bool HasProfileAwareModel { get; }
+}

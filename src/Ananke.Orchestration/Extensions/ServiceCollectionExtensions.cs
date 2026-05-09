@@ -4,6 +4,7 @@ using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Execution;
 using Ananke.Orchestration.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Ananke.Orchestration.Extensions;
@@ -61,11 +62,12 @@ public static class ServiceCollectionExtensions
 
         if (options.MemoryCleanupInterval is { } interval)
         {
-            services.AddSingleton(sp =>
+            services.AddHostedService(sp =>
             {
                 var memory = sp.GetRequiredService<IConversationMemory>();
                 var loggerFactory = sp.GetService<ILoggerFactory>();
-                return new ConversationMemoryCleanupTimer(memory, interval, loggerFactory);
+                var timeProvider = sp.GetService<TimeProvider>();
+                return new ConversationMemoryCleanupTimer(memory, interval, loggerFactory, timeProvider);
             });
         }
 

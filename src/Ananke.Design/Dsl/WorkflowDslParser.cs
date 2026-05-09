@@ -8,6 +8,8 @@ namespace Ananke.Design.Dsl;
 /// <remarks>
 /// Supported syntax:
 /// <list type="bullet">
+///   <item><c>tool(name, tags: [a, b], description: "...")</c> — portable tool declaration</item>
+///   <item><c>use(job, tool_a, tool_b, semantic: true)</c> — attach tools to a job</item>
 ///   <item><c>a -&gt; b</c> — direct connection</item>
 ///   <item><c>a -&gt; End</c> — terminal connection</item>
 ///   <item><c>a -&gt; fork(b, c)</c> — parallel fork (FailFast)</item>
@@ -20,39 +22,49 @@ namespace Ananke.Design.Dsl;
 /// </remarks>
 internal static partial class WorkflowDslParser
 {
+    // Identifier pattern: word chars with optional hyphens (e.g. handle-request, fetch_a)
+    // Anchored so hyphens don't conflict with the -> arrow operator.
+    private const string Id = @"\w+(?:-\w+)*";
+
     // a -> fork(b, c)  or  a -> fork(b, c, mode: best-effort)
     [GeneratedRegex(
-        @"^(?<from>\w+)\s*->\s*fork\((?<args>[^)]+)\)$",
+        @$"^(?<from>{Id})\s*->\s*fork\((?<args>[^)]+)\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex ForkPattern();
 
     // join(a, b) -> c
     [GeneratedRegex(
-        @"^join\((?<sources>[^)]+)\)\s*->\s*(?<target>\w+)$",
+        @$"^join\((?<sources>[^)]+)\)\s*->\s*(?<target>{Id})$",
         RegexOptions.IgnoreCase)]
     private static partial Regex JoinPattern();
 
     // a -> router(b, c, End)
     [GeneratedRegex(
-        @"^(?<from>\w+)\s*->\s*router\((?<options>[^)]+)\)$",
+        @$"^(?<from>{Id})\s*->\s*router\((?<options>[^)]+)\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex RouterPattern();
 
     // subflow(name)
     [GeneratedRegex(
-        @"^subflow\((?<name>\w+)\)$",
+        @$"^subflow\((?<name>{Id})\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex SubFlowPattern();
 
     // interrupt(name)
     [GeneratedRegex(
-        @"^interrupt\((?<job>\w+)\)$",
+        @$"^interrupt\((?<job>{Id})\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex InterruptPattern();
 
+    private static Regex ToolDirectivePattern() =>
+        new(@"^tool\((?<args>.+)\)$", RegexOptions.IgnoreCase);
+
+    private static Regex UseDirectivePattern() =>
+        new(@"^use\((?<args>.+)\)$", RegexOptions.IgnoreCase);
+
     // a -> b  (simple direct, including End)
     [GeneratedRegex(
-        @"^(?<from>\w+)\s*->\s*(?<to>\w+)$",
+        @$"^(?<from>{Id})\s*->\s*(?<to>{Id})$",
         RegexOptions.IgnoreCase)]
     private static partial Regex DirectPattern();
 
@@ -104,6 +116,14 @@ internal static partial class WorkflowDslParser
         match = InterruptPattern().Match(line);
         if (match.Success)
             return new ConnectionLine.Interrupt(match.Groups["job"].Value);
+
+        match = ToolDirectivePattern().Match(line);
+        if (match.Success)
+            return ParseTool(match, line);
+
+        match = UseDirectivePattern().Match(line);
+        if (match.Success)
+            return ParseUse(match, line);
 
         match = DirectPattern().Match(line);
         if (match.Success)
@@ -161,6 +181,114 @@ internal static partial class WorkflowDslParser
         return new ConnectionLine.Router(from, options);
     }
 
+    private static ConnectionLine.Tool ParseTool(Match match, string line)
+    {
+        var args = SplitDslArgs(match.Groups["args"].Value);
+        if (args.Count == 0)
+            throw new FormatException($"Tool directive requires a name: '{line}'");
+
+        var name = args[0];
+        string description = string.Empty;
+        string[] tags = [];
+
+        foreach (var part in args.Skip(1))
+        {
+            if (part.StartsWith("description:", StringComparison.OrdinalIgnoreCase))
+            {
+                description = Unquote(part["description:".Length..].Trim());
+            }
+            else if (part.StartsWith("tags:", StringComparison.OrdinalIgnoreCase))
+            {
+                tags = ParseDslList(part["tags:".Length..].Trim());
+            }
+        }
+
+        return new ConnectionLine.Tool(name, description, tags);
+    }
+
+    private static ConnectionLine.Use ParseUse(Match match, string line)
+    {
+        var args = SplitDslArgs(match.Groups["args"].Value);
+        if (args.Count < 2)
+            throw new FormatException($"Use directive requires a job name and at least one tool: '{line}'");
+
+        var jobName = args[0];
+        var semantic = false;
+        var tools = new List<string>();
+
+        foreach (var part in args.Skip(1))
+        {
+            if (part.StartsWith("semantic:", StringComparison.OrdinalIgnoreCase))
+            {
+                semantic = bool.Parse(part["semantic:".Length..].Trim());
+            }
+            else
+            {
+                tools.Add(part);
+            }
+        }
+
+        if (tools.Count == 0)
+            throw new FormatException($"Use directive requires at least one tool: '{line}'");
+
+        return new ConnectionLine.Use(jobName, [.. tools], semantic);
+    }
+
     private static string[] SplitArgs(string value) =>
         value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static List<string> SplitDslArgs(string value)
+    {
+        var results = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var bracketDepth = 0;
+        var inQuotes = false;
+
+        foreach (var ch in value)
+        {
+            switch (ch)
+            {
+                case '"':
+                    inQuotes = !inQuotes;
+                    current.Append(ch);
+                    break;
+                case '[' when !inQuotes:
+                    bracketDepth++;
+                    current.Append(ch);
+                    break;
+                case ']' when !inQuotes:
+                    bracketDepth--;
+                    current.Append(ch);
+                    break;
+                case ',' when !inQuotes && bracketDepth == 0:
+                    results.Add(current.ToString().Trim());
+                    current.Clear();
+                    break;
+                default:
+                    current.Append(ch);
+                    break;
+            }
+        }
+
+        if (current.Length > 0)
+            results.Add(current.ToString().Trim());
+
+        return results;
+    }
+
+    private static string[] ParseDslList(string value)
+    {
+        if (!value.StartsWith('[') || !value.EndsWith(']'))
+            return [];
+
+        var inner = value[1..^1].Trim();
+        return inner.Length == 0
+            ? []
+            : inner.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static string Unquote(string value) =>
+        value.Length >= 2 && value.StartsWith('"') && value.EndsWith('"')
+            ? value[1..^1]
+            : value;
 }

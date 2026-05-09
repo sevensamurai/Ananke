@@ -119,6 +119,7 @@ public static class ModelCatalog
         Anthropic.Claude3_7Sonnet, Anthropic.Claude3_5Haiku,
 
         // Google
+        Google.Gemini3_1Pro, Google.Gemini3_1Flash,
         Google.Gemini2_5Pro, Google.Gemini2_5Flash, Google.Gemini2_0Flash,
 
         // Meta (open-weight — self-hosted)
@@ -291,6 +292,27 @@ public static class ModelCatalog
     /// <summary>Google Gemini model templates.</summary>
     public static class Google
     {
+        /// <summary>Gemini 3.1 Pro — Agent Platform GA flagship, frontier reasoning with 2M context.</summary>
+        public static ModelProfileTemplate Gemini3_1Pro { get; } = new()
+        {
+            Name = "gemini-3.1-pro",
+            Capabilities = FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput,
+            IntelligenceTier = 5,
+            MaxContextTokens = 2_097_152,
+            SpeedTier = 2
+        };
+
+        /// <summary>Gemini 3.1 Flash — Agent Platform GA fast model with reasoning and multimodal input.</summary>
+        public static ModelProfileTemplate Gemini3_1Flash { get; } = new()
+        {
+            Name = "gemini-3.1-flash",
+            Capabilities = FullModel | ModelCapability.Reasoning | ModelCapability.Vision
+                         | ModelCapability.AudioInput | ModelCapability.VideoInput,
+            IntelligenceTier = 4,
+            MaxContextTokens = 1_048_576,
+            SpeedTier = 4
+        };
+
         /// <summary>Gemini 2.5 Pro — frontier reasoning model with 1M context.</summary>
         public static ModelProfileTemplate Gemini2_5Pro { get; } = new()
         {

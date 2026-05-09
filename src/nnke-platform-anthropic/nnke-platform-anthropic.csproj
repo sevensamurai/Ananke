@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nnke-platform-anthropic</AssemblyName>
+    <RootNamespace>Ananke.Tool.Platform.Anthropic</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nnke-platform-anthropic</ToolCommandName>
+    <PackageId>nnke-platform-anthropic</PackageId>
+    <Description>Anthropic Claude Managed Agents adapter for nnke-platform. Install alongside nnke-platform to enable 'deploy --platform claude'. Targets the Anthropic Beta API (agents-2025-05-14).</Description>
+    <PackageTags>ananke;cli;dotnet-tool;federation;anthropic;claude;agents</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="nnke-platform-adapters.Tests" />
+    <InternalsVisibleTo Include="nnke-platform-all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation.Anthropic\Ananke.Federation.Anthropic.csproj" />
+  </ItemGroup>
+
+</Project>

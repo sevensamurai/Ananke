@@ -19,6 +19,7 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
     private readonly IPlatformMessageHandler _handler;
     private readonly ILogger _logger;
     private readonly ISlackServiceProvider _slackServices;
+    private readonly BoundedDispatcher _dispatcher;
     private ISlackSocketModeClient? _socketClient;
     private SlackResponseSink? _responseSink;
     private bool _disposed;
@@ -38,6 +39,7 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
         _handler = handler;
         _slackServices = slackServices;
         _logger = logger ?? NullLogger<SlackAdapter>.Instance;
+        _dispatcher = new BoundedDispatcher(logger: _logger);
     }
 
     /// <inheritdoc />
@@ -53,6 +55,7 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _responseSink = new SlackResponseSink(_slackServices.GetApiClient(), _logger);
+        await _dispatcher.StartAsync(ct).ConfigureAwait(false);
 
         if (_options.UseSocketMode)
         {
@@ -77,6 +80,13 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
     }
 
     /// <summary>
+    /// Enqueues a Slack <see cref="MessageEvent"/> for dispatch through the
+    /// <see cref="BoundedDispatcher"/>. Called from <see cref="SlackMessageEventHandler"/>.
+    /// </summary>
+    internal void EnqueueDispatch(MessageEvent messageEvent) =>
+        _dispatcher.Enqueue(ct => DispatchAsync(messageEvent, ct));
+
+    /// <summary>
     /// Dispatches a Slack <see cref="MessageEvent"/> to the registered handler.
     /// Called internally by the <see cref="SlackMessageEventHandler"/> and can also
     /// be called from Events API HTTP endpoints.
@@ -99,17 +109,17 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
     }
 
     /// <inheritdoc />
-    public Task StopAsync(CancellationToken ct = default)
+    public async Task StopAsync(CancellationToken ct = default)
     {
         IsConnected = false;
         _socketClient?.Disconnect();
         _socketClient = null;
+        await _dispatcher.StopAsync(ct).ConfigureAwait(false);
         _logger.LogInformation("Slack adapter stopped");
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (!_disposed)
         {
@@ -117,6 +127,6 @@ public sealed class SlackAdapter : IMessagePlatformAdapter
             _socketClient?.Dispose();
         }
 
-        return ValueTask.CompletedTask;
+        await _dispatcher.DisposeAsync().ConfigureAwait(false);
     }
 }

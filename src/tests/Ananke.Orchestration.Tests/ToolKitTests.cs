@@ -77,7 +77,7 @@ public class ToolKitTests
         var kit = new ToolKit("test")
             .AddTool("ping", "Async ping", async () =>
             {
-                await Task.Delay(1);
+                await Task.Yield();
                 return "pong";
             });
 
@@ -92,7 +92,7 @@ public class ToolKitTests
             .AddTool("fetch", "Fetches data",
                 async (string url) =>
                 {
-                    await Task.Delay(1);
+                    await Task.Yield();
                     return $"data from {url}";
                 },
                 "url", "The URL to fetch");
@@ -111,7 +111,7 @@ public class ToolKitTests
                 .Param("b", "Second")
                 .OnExecute(async args =>
                 {
-                    await Task.Delay(1);
+                    await Task.Yield();
                     return ToolResult.Ok($"{args.Get("a")}:{args.Get("b")}");
                 }));
 
@@ -206,7 +206,7 @@ public class ToolKitTests
             .AddTool<int>("square", "Squares a number",
                 async (int n) =>
                 {
-                    await Task.Delay(1);
+                    await Task.Yield();
                     return (n * n).ToString();
                 },
                 "value", "The number to square");
@@ -225,7 +225,7 @@ public class ToolKitTests
                 .Param<bool>("round", "Whether to round")
                 .OnExecute(async args =>
                 {
-                    await Task.Delay(1);
+                    await Task.Yield();
                     var n = args.Get<double>("number");
                     var round = args.Get<bool>("round");
                     return ToolResult.Ok(round ? Math.Round(n).ToString() : n.ToString());
@@ -570,6 +570,93 @@ public class ToolKitTests
         ok.ShouldBeFalse();
     }
 
+    [Test]
+    public async Task EndpointPrerequisite_UnreachableUri_ReturnsFalse()
+    {
+        var prereq = ToolPrerequisite.Endpoint(
+            new Uri("http://localhost:19999"),
+            "Start the server",
+            timeout: TimeSpan.FromSeconds(1));
+
+        var ok = await prereq.Check(CancellationToken.None);
+
+        ok.ShouldBeFalse();
+    }
+
+    [Test]
+    public void EndpointPrerequisite_UsesAuthority_AsName()
+    {
+        var prereq = ToolPrerequisite.Endpoint(
+            new Uri("https://api.example.com:8443/tools"),
+            "Deploy the API");
+
+        prereq.Name.ShouldBe("api.example.com:8443");
+    }
+
+    [Test]
+    public void Builder_Callback_AutoAddsEndpointPrerequisite()
+    {
+        var uri = new Uri("https://api.example.com/tools/echo");
+        var kit = new ToolKit("test")
+            .AddTool("echo", "Echo", b => b
+                .Param("text", "Input")
+                .Callback(uri)
+                .OnExecute(args => ToolResult.Ok(args.Get("text"))));
+
+        var tool = kit.Tools["echo"];
+        tool.Requires.Count.ShouldBe(1);
+        tool.Requires[0].Name.ShouldBe("api.example.com");
+        tool.Requires[0].InstallHint.ShouldContain("api.example.com");
+    }
+
+    [Test]
+    public void Builder_Mcp_AutoAddsEndpointPrerequisite()
+    {
+        var uri = new Uri("http://localhost:3000/mcp");
+        var kit = new ToolKit("test")
+            .AddTool("search", "Search", b => b
+                .Param("q", "Query")
+                .Mcp(uri)
+                .OnExecute(args => ToolResult.Ok("results")));
+
+        kit.Tools["search"].Requires.Count.ShouldBe(1);
+        kit.Tools["search"].Requires[0].Name.ShouldBe("localhost:3000");
+    }
+
+    [Test]
+    public void Builder_OpenApi_AutoAddsEndpointPrerequisite()
+    {
+        var uri = new Uri("https://petstore.swagger.io/v3/openapi.json");
+        var kit = new ToolKit("test")
+            .AddTool("petstore", "Pets", b => b
+                .OpenApi(uri));
+
+        kit.Tools["petstore"].Requires.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public void Builder_Callback_VerifyReachableFalse_SkipsPrerequisite()
+    {
+        var uri = new Uri("https://api.example.com/tools/echo");
+        var kit = new ToolKit("test")
+            .AddTool("echo", "Echo", b => b
+                .Param("text", "Input")
+                .Callback(uri, verifyReachable: false)
+                .OnExecute(args => ToolResult.Ok(args.Get("text"))));
+
+        kit.Tools["echo"].Requires.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Builder_PlatformNative_NoAutoPrerequisite()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("code", "Code", b => b
+                .PlatformNative("code_execution"));
+
+        kit.Tools["code"].Requires.ShouldBeEmpty();
+    }
+
     // --- ToolBuilder ---
 
     [Test]
@@ -714,5 +801,168 @@ public class ToolKitTests
 
         kit.Tools["need_bin"].Requires.Count.ShouldBe(1);
         kit.Tools["need_bin"].Requires[0].Name.ShouldBe("test-bin");
+    }
+
+    // --- Execution modes ---
+
+    [Test]
+    public void ToolDefinition_ExecutionMode_DefaultsToLocal()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "test", Description = "desc", Parameters = [],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.Local);
+        tool.Endpoint.ShouldBeNull();
+        tool.PlatformCapability.ShouldBeNull();
+    }
+
+    [Test]
+    public void ToolKit_ConvenienceOverloads_AreLocal()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("ping", "Ping", () => "pong");
+
+        kit.Tools["ping"].ExecutionMode.ShouldBe(ToolExecutionMode.Local);
+    }
+
+    [Test]
+    public async Task Builder_Callback_SetsExecutionModeAndEndpoint()
+    {
+        var uri = new Uri("https://api.example.com/tools/get_price");
+        var kit = new ToolKit("test")
+            .AddTool("get_price", "Gets price", b => b
+                .Param("symbol", "Ticker")
+                .Callback(uri, authHeader: "Authorization")
+                .OnExecute(args => ToolResult.Ok("42.50")));
+
+        var tool = kit.Tools["get_price"];
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.Callback);
+        tool.Endpoint.ShouldNotBeNull();
+        tool.Endpoint!.Uri.ShouldBe(uri);
+        tool.Endpoint.AuthHeader.ShouldBe("Authorization");
+
+        // Local execute still works
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object?> { ["symbol"] = "AAPL" });
+        result.Value.ShouldBe("42.50");
+    }
+
+    [Test]
+    public void Builder_Mcp_SetsExecutionModeAndEndpoint()
+    {
+        var uri = new Uri("http://localhost:3000/mcp");
+        var kit = new ToolKit("test")
+            .AddTool("search", "Search docs", b => b
+                .Param("query", "Query")
+                .Mcp(uri)
+                .OnExecute(args => ToolResult.Ok("results")));
+
+        var tool = kit.Tools["search"];
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.Mcp);
+        tool.Endpoint.ShouldNotBeNull();
+        tool.Endpoint!.Uri.ShouldBe(uri);
+        tool.Endpoint.AuthHeader.ShouldBeNull();
+    }
+
+    [Test]
+    public void Builder_OpenApi_SetsExecutionModeAndEndpoint()
+    {
+        var uri = new Uri("https://petstore.swagger.io/v3/openapi.json");
+        var kit = new ToolKit("test")
+            .AddTool("petstore", "Pet operations", b => b
+                .OpenApi(uri));
+
+        var tool = kit.Tools["petstore"];
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.OpenApi);
+        tool.Endpoint.ShouldNotBeNull();
+        tool.Endpoint!.Uri.ShouldBe(uri);
+    }
+
+    [Test]
+    public void Builder_PlatformNative_SetsCapability()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("code_interpreter", "Run Python code", b => b
+                .PlatformNative("code_execution"));
+
+        var tool = kit.Tools["code_interpreter"];
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.PlatformNative);
+        tool.PlatformCapability.ShouldBe("code_execution");
+        tool.Endpoint.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Builder_PlatformNative_NoOnExecute_ReturnsErrorStub()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("web_search", "Search the web", b => b
+                .PlatformNative("web_search"));
+
+        var tool = kit.Tools["web_search"];
+        var result = await tool.ExecuteAsync(new Dictionary<string, object?>());
+        result.IsError.ShouldBeTrue();
+        result.Value.ShouldContain("no local execute handler");
+    }
+
+    [Test]
+    public void Builder_Local_NoOnExecute_StillThrows()
+    {
+        var kit = new ToolKit("test");
+        Should.Throw<InvalidOperationException>(() =>
+            kit.AddTool("broken", "No handler", b => b
+                .Param("x", "A param")));
+    }
+
+    [Test]
+    public async Task Builder_CallbackWithLocalFallback_BothWork()
+    {
+        var uri = new Uri("https://api.example.com/echo");
+        var kit = new ToolKit("test")
+            .AddTool("echo", "Echo", b => b
+                .Param("text", "Input")
+                .Callback(uri)
+                .OnExecute(args => ToolResult.Ok(args.Get("text"))));
+
+        var tool = kit.Tools["echo"];
+
+        // Has remote endpoint metadata
+        tool.ExecutionMode.ShouldBe(ToolExecutionMode.Callback);
+        tool.Endpoint!.Uri.ShouldBe(uri);
+
+        // But also runs locally
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object?> { ["text"] = "hello" });
+        result.Value.ShouldBe("hello");
+    }
+
+    [Test]
+    public void Builder_Callback_NullUri_Throws()
+    {
+        var builder = new ToolBuilder();
+        Should.Throw<ArgumentNullException>(() => builder.Callback(null!));
+    }
+
+    [Test]
+    public void Builder_Mcp_NullUri_Throws()
+    {
+        var builder = new ToolBuilder();
+        Should.Throw<ArgumentNullException>(() => builder.Mcp(null!));
+    }
+
+    [Test]
+    public void Builder_PlatformNative_NullCapability_Throws()
+    {
+        var builder = new ToolBuilder();
+        Should.Throw<ArgumentException>(() => builder.PlatformNative(null!));
+    }
+
+    [Test]
+    public void Builder_PlatformNative_EmptyCapability_Throws()
+    {
+        var builder = new ToolBuilder();
+        Should.Throw<ArgumentException>(() => builder.PlatformNative(""));
     }
 }

@@ -1,0 +1,47 @@
+{
+  "GeneratedAt": "2026-05-08T13:58:55.0669028+00:00",
+  "NodeCount": 7,
+  "EdgeCount": 8,
+  "GodNodes": [
+    {
+      "NodeId": "cell:bookstore-general-catalog",
+      "CellId": "bookstore-general-catalog",
+      "CentralityScore": 1
+    },
+    {
+      "NodeId": "cell:bookstore-general-orders",
+      "CellId": "bookstore-general-orders",
+      "CentralityScore": 1
+    },
+    {
+      "NodeId": "cell:bookstore-general",
+      "CellId": "bookstore-general",
+      "CentralityScore": 0.5
+    }
+  ],
+  "MaxLineageTreeDepth": 2,
+  "Cells": [
+    {
+      "NodeId": "cell:bookstore-general-catalog",
+      "CellId": "bookstore-general-catalog",
+      "CentralityScore": 1,
+      "IsGodNode": true,
+      "LineageDepth": 2
+    },
+    {
+      "NodeId": "cell:bookstore-general-orders",
+      "CellId": "bookstore-general-orders",
+      "CentralityScore": 1,
+      "IsGodNode": true,
+      "LineageDepth": 2
+    },
+    {
+      "NodeId": "cell:bookstore-general",
+      "CellId": "bookstore-general",
+      "CentralityScore": 0.5,
+      "IsGodNode": true,
+      "LineageDepth": 1
+    }
+  ],
+  "RoutingEdgeProvenanceBreakdown": {}
+}

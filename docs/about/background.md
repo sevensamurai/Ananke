@@ -1,4 +1,4 @@
-<!-- topic: background, tags: about, history, mythology, ananke -->
+﻿<!-- topic: background, tags: about, history, mythology, ananke -->
 ## Why Ananke?
 
 The AI agent ecosystem is predominantly Python.
@@ -147,4 +147,12 @@ memory and offline learning layer — the part that watches, connects, and remem
 so the system does not start from zero every time.
 
 Ananke sets the rules. Aether learns them.
+
+---
+
+## License & Commercial Use
+
+Ananke is **free and open source under the [MIT License](https://opensource.org/licenses/MIT)** — for personal, commercial, and enterprise use alike. There are no tiers, no usage fees, and no open-core split. The full framework is free of charge and always will be.
+
+See the [Roadmap & License](roadmap.md) page for the full statement and version plan.
 

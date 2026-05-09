@@ -4,7 +4,7 @@
 Build production-grade finite state machines with distributed locking, guard
 conditions, composable middleware, lifecycle hooks, and circuit breaking.
 
-**Demo:** [StateMachineDemo](../../src/demos/StateMachineDemo/)
+**Demo:** [StateMachineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/StateMachineDemo)
 
 ---
 
@@ -225,4 +225,4 @@ jobs. See [Guide 09 — Distributed Systems](09-distributed.md) for details.
 
 ---
 
-← [Back to Learning Path](../learning.md)
+← [Back to Learning Path](learning-path.md)

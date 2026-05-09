@@ -1,3 +1,5 @@
+﻿using System.Text.Json.Serialization;
+
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
@@ -177,5 +179,93 @@ public class JsonSchemaGeneratorTests
     {
         var schema = JsonSchemaGenerator.GenerateForType(typeof(Primitives));
         ((bool)schema["additionalProperties"]).ShouldBeFalse();
+    }
+
+    // ── Dictionary ────────────────────────────────────────────────────────
+
+    private record WithDictionary { public Dictionary<string, int> Counts { get; init; } = []; }
+
+    private record WithReadOnlyDictionary { public IReadOnlyDictionary<string, string> Labels { get; init; } = new Dictionary<string, string>(); }
+
+    [Test]
+    public void Generate_DictionaryProperty_UsesAdditionalProperties()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(WithDictionary));
+        var props = (Dictionary<string, object>)schema["properties"];
+        var countsSchema = (Dictionary<string, object>)props["Counts"];
+
+        ((string)countsSchema["type"]).ShouldBe("object");
+        var additionalProps = (Dictionary<string, object>)countsSchema["additionalProperties"];
+        ((string)additionalProps["type"]).ShouldBe("integer");
+    }
+
+    [Test]
+    public void Generate_ReadOnlyDictionaryProperty_UsesAdditionalProperties()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(WithReadOnlyDictionary));
+        var props = (Dictionary<string, object>)schema["properties"];
+        var labelsSchema = (Dictionary<string, object>)props["Labels"];
+
+        ((string)labelsSchema["type"]).ShouldBe("object");
+        var additionalProps = (Dictionary<string, object>)labelsSchema["additionalProperties"];
+        ((string)additionalProps["type"]).ShouldBe("string");
+    }
+
+    // ── JsonIgnore ────────────────────────────────────────────────────────
+
+    private record WithIgnored
+    {
+        public string Visible { get; init; } = string.Empty;
+        [JsonIgnore] public string Hidden { get; init; } = string.Empty;
+    }
+
+    [Test]
+    public void Generate_JsonIgnoreProperty_ExcludedFromSchema()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(WithIgnored));
+        var props = (Dictionary<string, object>)schema["properties"];
+
+        props.ShouldContainKey("Visible");
+        props.ShouldNotContainKey("Hidden");
+
+        var required = (List<string>)schema["required"];
+        required.ShouldNotContain("Hidden");
+    }
+
+    // ── Recursive type depth guard ────────────────────────────────────────
+
+    private class SelfReferencing
+    {
+        public string Name { get; init; } = string.Empty;
+        public SelfReferencing? Child { get; init; }
+    }
+
+    [Test]
+    public void Generate_RecursiveType_DoesNotThrow()
+    {
+        Should.NotThrow(() => JsonSchemaGenerator.GenerateForType(typeof(SelfReferencing)));
+    }
+
+    [Test]
+    public void Generate_RecursiveType_StopsAtMaxDepth()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(SelfReferencing));
+
+        // Walk as deep as the schema goes; must not be infinite
+        static int MaxSchemaDepth(Dictionary<string, object> s, int current = 0)
+        {
+            if (!s.TryGetValue("properties", out var propsObj))
+                return current;
+            var props = (Dictionary<string, object>)propsObj;
+            var deepest = current;
+            foreach (var v in props.Values)
+            {
+                if (v is Dictionary<string, object> nested)
+                    deepest = Math.Max(deepest, MaxSchemaDepth(nested, current + 1));
+            }
+            return deepest;
+        }
+
+        MaxSchemaDepth(schema).ShouldBeLessThanOrEqualTo(12); // generous bound above MaxDepth=10
     }
 }

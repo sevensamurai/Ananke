@@ -1,0 +1,58 @@
+{
+  "platforms": {
+    "azure-ai": {
+      "capabilities": [
+        "code_interpreter",
+        "file_search",
+        "bing_search",
+        "bing_grounding",
+        "bing_custom_search",
+        "azure_ai_search",
+        "azure_function",
+        "sharepoint",
+        "sharepoint_grounding",
+        "microsoft_fabric",
+        "browser_automation",
+        "memory_search",
+        "a2a",
+        "capture_structured_outputs",
+        "deep_research",
+        "image_generation"
+      ]
+    },
+    "vertex-ai": {
+      "capabilities": [
+        "code_execution",
+        "code_interpreter",
+        "vertex_extension:code_interpreter",
+        "google_search",
+        "google_search_retrieval",
+        "bash",
+        "computer_use",
+        "url_context",
+        "deep_research",
+        "memory_bank",
+        "memory_profiles",
+        "image_generation",
+        "bigquery",
+        "spanner",
+        "bigtable",
+        "pubsub",
+        "maps",
+        "artifact_service",
+        "a2a"
+      ]
+    },
+    "claude": {
+      "capabilities": [
+        "web_search",
+        "web_fetch",
+        "code_execution",
+        "computer_use",
+        "text_editor",
+        "bash",
+        "memory"
+      ]
+    }
+  }
+}

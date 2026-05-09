@@ -1,4 +1,5 @@
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Routing;
@@ -67,6 +68,20 @@ public class WorkflowScaffoldTests
         scaffold.JobNames.ShouldContain("classify");
         scaffold.JobNames.ShouldContain("escalate");
         scaffold.JobNames.ShouldContain("auto_resolve");
+    }
+
+    [Test]
+    public void Parse_ToolAndUseDirectives_ExposePortableMetadata()
+    {
+        var scaffold = WorkflowScaffold.Parse<ScaffoldState>("test", """
+            tool(web_search, tags: [search, web], description: "Search the public web")
+            use(plan, web_search, semantic: true)
+            plan -> End
+            """);
+
+        scaffold.ToolDeclarations["web_search"].Tags.ShouldBe(["search", "web"]);
+        scaffold.JobToolDeclarations["plan"].ToolNames.ShouldBe(["web_search"]);
+        scaffold.JobToolDeclarations["plan"].Semantic.ShouldBeTrue();
     }
 
     [Test]

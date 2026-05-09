@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Federation.Azure</PackageId>
+    <Description>Azure AI Agent Service adapter for Ananke Federation — deploy workflows to Azure AI Foundry, monitor platform agents, and translate manifests to Assistants API configuration.</Description>
+    <PackageTags>ai;agents;federation;azure;openai;deployment</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Federation.Azure.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.Projects.Agents" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Federation\Ananke.Federation.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+  </ItemGroup>
+
+</Project>

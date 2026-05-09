@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nnke-platform</AssemblyName>
+    <RootNamespace>Ananke.Tool.Platform</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nnke-platform</ToolCommandName>
+    <PackageId>nnke-platform</PackageId>
+    <Description>CLI tool for Ananke federation — validate deployability, deploy workflows to cloud platforms (Azure AI, Vertex AI, Claude), manage deployment profiles, and inspect platform capabilities.</Description>
+    <PackageTags>ananke;cli;dotnet-tool;federation;deployment;azure;vertex-ai;claude;agents</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="nnke-platform.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Design\Ananke.Design.csproj" />
+    <ProjectReference Include="..\Ananke.Federation\Ananke.Federation.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
+    <ProjectReference Include="..\Ananke.Tool.Shared\Ananke.Tool.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Output\" />
+  </ItemGroup>
+
+</Project>

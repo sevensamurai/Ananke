@@ -1,0 +1,53 @@
+﻿# Default: auto-detect text, normalise to LF in repo
+* text=auto eol=lf
+
+# C# / .NET source
+*.cs        text working-tree-encoding=UTF-8 eol=lf
+*.csx       text working-tree-encoding=UTF-8 eol=lf
+*.fs        text working-tree-encoding=UTF-8 eol=lf
+*.fsx       text working-tree-encoding=UTF-8 eol=lf
+*.vb        text working-tree-encoding=UTF-8 eol=lf
+
+# Project / solution files (VS requires CRLF on checkout)
+*.csproj    text working-tree-encoding=UTF-8 eol=crlf
+*.fsproj    text working-tree-encoding=UTF-8 eol=crlf
+*.props     text working-tree-encoding=UTF-8 eol=crlf
+*.targets   text working-tree-encoding=UTF-8 eol=crlf
+*.sln       text working-tree-encoding=UTF-8 eol=crlf
+*.slnx      text working-tree-encoding=UTF-8 eol=crlf
+
+# Config / data
+*.json      text working-tree-encoding=UTF-8 eol=lf
+*.xml       text working-tree-encoding=UTF-8 eol=lf
+*.config    text working-tree-encoding=UTF-8 eol=lf
+*.nuspec    text working-tree-encoding=UTF-8 eol=lf
+*.resx      text working-tree-encoding=UTF-8 eol=lf
+
+# Docs
+*.md        text working-tree-encoding=UTF-8 eol=lf
+*.txt       text working-tree-encoding=UTF-8 eol=lf
+
+# CI / scripting
+*.yml       text working-tree-encoding=UTF-8 eol=lf
+*.yaml      text working-tree-encoding=UTF-8 eol=lf
+*.sh        text working-tree-encoding=UTF-8 eol=lf
+*.bash      text working-tree-encoding=UTF-8 eol=lf
+*.cmd       text working-tree-encoding=UTF-8 eol=crlf
+*.bat       text working-tree-encoding=UTF-8 eol=crlf
+*.ps1       text working-tree-encoding=UTF-8 eol=crlf
+*.psm1      text working-tree-encoding=UTF-8 eol=crlf
+
+# Binary assets — never mangle
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       binary
+*.pdf       binary
+*.zip       binary
+*.nupkg     binary
+*.snupkg    binary
+*.dll       binary
+*.exe       binary
+*.pdb       binary
