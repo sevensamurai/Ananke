@@ -67,6 +67,8 @@ internal static partial class TemplateEngine
         ["provider"] = provider,
         ["model"] = DefaultModel(provider),
         ["provider_package"] = ProviderPackage(provider),
+        ["ananke_version"] = AnankeVersion,
+        ["ms_extensions_version"] = MsExtensionsVersion,
     };
 
     private static string LoadResource(string resourceName)
