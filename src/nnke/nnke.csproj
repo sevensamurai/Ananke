@@ -40,4 +40,34 @@
        The docs/ directory is located by walking up from CWD to find Ananke.slnx.
        Only guides/ and reference/ are indexed — about/ and learning.md are editorial. -->
 
+  <!--
+    Generates obj/TemplateEngine.Versions.g.cs from the two version properties in
+    Directory.Build.props so TemplateEngine.cs never drifts from the source of truth.
+  -->
+  <Target Name="GenerateTemplateEngineVersions" BeforeTargets="BeforeCompile">
+    <PropertyGroup>
+      <_VersionsFile>$(IntermediateOutputPath)TemplateEngine.Versions.g.cs</_VersionsFile>
+      <_VersionsContent>// &lt;auto-generated/&gt;
+namespace Ananke.Tool.Templates%3B
+
+internal static partial class TemplateEngine
+{
+    /// &lt;summary&gt;
+    /// Ananke package version baked in at build time from Directory.Build.props &lt;c&gt;VersionPrefix&lt;/c&gt;.
+    /// &lt;/summary&gt;
+    public const string AnankeVersion = "$(VersionPrefix)"%3B
+
+    /// &lt;summary&gt;
+    /// Microsoft.Extensions.* package version baked in at build time from Directory.Build.props &lt;c&gt;MsExtensionsVersion&lt;/c&gt;.
+    /// &lt;/summary&gt;
+    public const string MsExtensionsVersion = "$(MsExtensionsVersion)"%3B
+}
+</_VersionsContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_VersionsFile)" Lines="$(_VersionsContent)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Include="$(_VersionsFile)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

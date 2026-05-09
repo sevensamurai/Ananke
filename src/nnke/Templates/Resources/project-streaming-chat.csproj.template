@@ -14,10 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ananke.Orchestration" />
-    <PackageReference Include="{{provider_package}}" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Ananke.Orchestration" Version="{{ananke_version}}" />
+    <PackageReference Include="{{provider_package}}" Version="{{ananke_version}}" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="{{ms_extensions_version}}" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="{{ms_extensions_version}}" />
   </ItemGroup>
 
 </Project>
