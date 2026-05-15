@@ -1,6 +1,7 @@
 using Ananke.Abstractions;
 using Ananke.Abstractions.Distributed;
 using Ananke.StateMachine.Builder;
+using Ananke.StateMachine.Middleware;
 
 namespace Ananke.StateMachine.Tests;
 
@@ -71,3 +72,7 @@ sealed class DoorMachine : AbstractStateMachine<TestContext, DoorState, DoorActi
         TestContext context, DoorNotify notification) =>
         Task.CompletedTask;
 }
+
+// ── ITimestamped payload helper for tests ────────────────────────
+sealed record TimestampedPayload(DateTimeOffset EventTime) : ITimestamped;
+

@@ -59,6 +59,10 @@ public interface IActionStateMachine<C, S, T, N>
     /// Transitions the state machine to a new state, carrying an optional payload.
     /// For interrupt transitions, the payload is stored alongside the interrupt stack
     /// and surfaced in <see cref="TransitionResult{S}.InterruptPayload"/>.
+    /// When the payload implements <see cref="Ananke.Abstractions.ITimestamped"/> its
+    /// <see cref="Ananke.Abstractions.ITimestamped.EventTime"/> is used as the attributed
+    /// event timestamp on <see cref="TransitionResult{S}.EventTimestamp"/>; otherwise
+    /// <see cref="DateTimeOffset.UtcNow"/> is used.
     /// </summary>
     /// <param name="context">The context identifying the state machine instance</param>
     /// <param name="transition">The transition to execute</param>

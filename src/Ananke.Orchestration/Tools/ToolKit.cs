@@ -33,6 +33,7 @@ public sealed class ToolKit
     private IToolMemory? _memory;
     private IToolFaultObserver? _faultObserver;
     private ISmartToolRouter? _router;
+    private IToolExecutorStrategy _executorStrategy = NullToolExecutorStrategy.Instance;
 
     public string Name { get; }
     public IReadOnlyDictionary<string, ToolDefinition> Tools => _tools;
@@ -73,6 +74,21 @@ public sealed class ToolKit
     {
         ArgumentNullException.ThrowIfNull(memory);
         _memory = memory;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers an <see cref="IToolExecutorStrategy"/> that dispatches remote-backed tools
+    /// (those with no local <c>Execute</c> delegate). The strategy is called instead of
+    /// the built-in stub-error for <see cref="ToolExecutionMode.Callback"/>,
+    /// <see cref="ToolExecutionMode.OpenApi"/>, and similar modes.
+    /// Defaults to <see cref="NullToolExecutorStrategy"/>.
+    /// </summary>
+    /// <returns>This <see cref="ToolKit"/> for fluent chaining.</returns>
+    public ToolKit WithExecutorStrategy(IToolExecutorStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        _executorStrategy = strategy;
         return this;
     }
 
@@ -281,7 +297,7 @@ public sealed class ToolKit
     {
         var builder = new ToolBuilder();
         configure(builder);
-        RegisterTool(builder.Build(name, description));
+        RegisterTool(builder.Build(name, description, _executorStrategy));
         return this;
     }
 

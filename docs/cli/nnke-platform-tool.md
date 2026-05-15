@@ -1,7 +1,9 @@
-<!-- topic: nnke-platform, tags: nnke-platform, dotnet-tool, federation, deployment, cloud, azure, google, anthropic, mesh, organics, local-loop, emulators, local-emulated, local-design-loop, foundry, gemini-enterprise, platform-native -->
+﻿<!-- topic: nnke-platform, tags: nnke-platform, dotnet-tool, federation, deployment, cloud, azure, google, anthropic, mesh, organics, local-loop, emulators, local-emulated, local-design-loop, foundry, gemini-enterprise, platform-native -->
 # nnke-platform Tool Companion
 
 `nnke-platform` is the operations CLI for Ananke federation: validate deployability, manage remote deployments, inspect live health, and work with platform-specific runtime concerns.
+
+Once workflows leave the local process, you need a stable operations surface — deployment status, health checks, teardown, and a federated view — that does not bloat the design-time tool. That is why this is a separate CLI rather than a subcommand of `nnke`.
 
 For the shared rationale behind the CLI split and the high-level difference between `nnke` and `nnke-platform`, start with [CLI Overview](overview.md).
 

@@ -1,4 +1,4 @@
-<!-- topic: demos, tags: documentation, demos, examples, runnable-projects, catalog -->
+﻿<!-- topic: demos, tags: documentation, demos, examples, runnable-projects, catalog -->
 # Demos
 
 Runnable Ananke projects mapped to the documentation. Use this page when you want to see a feature implemented end-to-end instead of reading the guide first.
@@ -45,11 +45,27 @@ The tables below map the guide set to the demo projects in the main repository, 
 | 13 | [Design Tooling](guides/13-design-tooling.md) | Text DSL, YAML manifests, `Bind()` at runtime, Mermaid diagram export | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
 | 14 | [Testing](guides/14-testing.md) | In-memory implementations for every contract, zero-config integration tests, test patterns | — |
 | 15 | [Empirical Memory](guides/15-empirical-memory.md) | `IEmpiricalMemory`, `EmpiricalMemoryTools` (`recall_empirical`, `commit_insight`, `reinforce_empirical`), `EmpiricalKind` (Pattern / Skill / Heuristic), confidence tracking, dedup, `InMemoryEmpiricalMemory` and `QdrantEmpiricalMemory` | [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) |
+| 16 | [Agentic Patterns](guides/16-agentic-patterns.md) | `AgenticPattern` builder, Review & Critique, Iterative Refinement — pre-wired validated topologies on top of `Workflow<TState>` primitives | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+
+---
+
+### Emergence & Learning
+
+These demos validate the longer-arc capabilities described in the [Background & Philosophy](about/background.md) — specifically that cell division works end-to-end and that empirical memory accumulates and replays correctly. Run them before building on these layers to confirm the baseline behaviour on your machine.
+
+| Demo | What it validates | Notes |
+|---|---|---|
+| [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) | Cell division end-to-end: a generalist workflow accumulates tools, structural tension is detected, a division is proposed and approved, two specialised peers are spawned, the parent is killed, and the outcome is recorded into empirical memory. | Runs with no API keys. The flagship demonstration of `Ananke.Organics`. |
+| [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) | `commit`, `recall`, `reinforce`, `contradict`, offline learning sweeps with decay and consolidation — the empirical memory loop in isolation. | Runs with no API keys. Start here before building on `IEmpiricalMemory`. |
+| [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) | Empirical memory accumulating game strategy over repeated self-play sessions; confidence scores shifting with wins and losses. | Demonstrates the offline learner running between sessions. |
+
+> **Honest status:** Multi-generation lineage (a specialist dividing again) and closed-loop learning (division outcomes driving the next policy decision end-to-end) are structurally wired but not yet exercised in these demos. See the [Roadmap](about/roadmap.md) for what is complete and what is ahead.
 
 ---
 
 ## Featured Walkthroughs
 
+- [Organic Kernel Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) — the flagship Organics demo: cell division from detection to spawned peers, end-to-end, no API keys.
 - [Multi-Agent Demo](demos/multi-agent.md) — router, worker, reviewer orchestration in one focused walkthrough.
 - [Tools Demo](demos/tools.md) — concrete ToolKit registration patterns, typed parameters, and async tools.
 - [CLI Overview](cli/overview.md) — scaffold, validate, run, and serve workflows from the terminal.

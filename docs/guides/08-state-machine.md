@@ -1,8 +1,10 @@
-<!-- topic: state-machine, tags: state-machine, distributed, locking, guard, middleware, circuit-breaker, transitions -->
+﻿<!-- topic: state-machine, tags: state-machine, distributed, locking, guard, middleware, circuit-breaker, transitions -->
 # 08 — State Machine
 
 Build production-grade finite state machines with distributed locking, guard
 conditions, composable middleware, lifecycle hooks, and circuit breaking.
+
+`AbstractStateMachine` exists because long-lived entities — conversations, orders, device sessions — don't fit a start-to-finish pipeline model. The state machine handles ongoing status, event-driven transitions, and safe coordination across concurrent service instances. The same state machine that uses `InMemoryDistributedLock` in tests uses `RedisDistributedLock` in production; the topology doesn't change.
 
 **Demo:** [StateMachineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/StateMachineDemo)
 

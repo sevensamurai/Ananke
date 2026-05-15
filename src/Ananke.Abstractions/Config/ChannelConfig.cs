@@ -7,7 +7,7 @@ public class ChannelConfig
     public string? Username { get; set; }
     public string? Password { get; set; }
     public string Namespace { get; set; } = "ananke";
-    
+
     /// <summary>
     /// Optional: group name.
     /// Used for load balancing/allocating listeners to a topic by group.

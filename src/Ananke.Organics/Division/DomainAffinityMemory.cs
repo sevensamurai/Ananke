@@ -1,4 +1,3 @@
-using Ananke.Learning;
 using Ananke.Learning.EmpiricalMemory;
 
 namespace Ananke.Organics.Division;
@@ -78,4 +77,11 @@ public sealed class DomainAffinityMemory(
     /// <inheritdoc />
     public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default) =>
         inner.MarkConsolidatedAsync(entryId, knowledgeDocId, ct);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+        EmpiricalEntry reference,
+        PairRecallOptions? options = null,
+        CancellationToken ct = default) =>
+        inner.PairRecallAsync(reference, options, ct);
 }

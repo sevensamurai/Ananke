@@ -258,6 +258,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 
     internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(string id, T transition, object? payload)
     {
+        var eventTime = payload is ITimestamped ts ? ts.EventTime : DateTimeOffset.UtcNow;
         try
         {
             var persistedContext = await GetPersistedContextAsync(id);
@@ -280,11 +281,11 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                     await _store.SetValueAsync(id, persistedContext);
 
                     Log.LogDebug("SELF-TRANSITION: {State} (implicit)", CurrentState);
-                    return TransitionResult<S>.Succeeded(previousState, CurrentState);
+                    return TransitionResult<S>.Succeeded(previousState, CurrentState) with { EventTimestamp = eventTime };
                 }
 
                 Log.LogWarning("Invalid transition: {State} --({Transition})--> ?", CurrentState, transition);
-                return TransitionResult<S>.InvalidTransition(CurrentState, transition?.ToString() ?? "unknown");
+                return TransitionResult<S>.InvalidTransition(CurrentState, transition?.ToString() ?? "unknown") with { EventTimestamp = eventTime };
             }
 
             // Check guard condition
@@ -294,7 +295,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 if (!guardResult)
                 {
                     Log.LogDebug("Guard condition failed for transition: {Transition}", transition);
-                    return TransitionResult<S>.GuardFailed(CurrentState);
+                    return TransitionResult<S>.GuardFailed(CurrentState) with { EventTimestamp = eventTime };
                 }
             }
 
@@ -308,7 +309,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                     Log.LogWarning("Max interrupt depth ({Depth}) exceeded for context {Id}",
                         _options.MaxInterruptDepth, id);
                     return TransitionResult<S>.Failed(CurrentState,
-                        $"Maximum interrupt depth ({_options.MaxInterruptDepth}) exceeded");
+                        $"Maximum interrupt depth ({_options.MaxInterruptDepth}) exceeded") with { EventTimestamp = eventTime };
                 }
 
                 persistedContext.InterruptStack.Add(CurrentState);
@@ -320,7 +321,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     Log.LogWarning("Resume attempted with empty interrupt stack for context {Id}", id);
                     return TransitionResult<S>.Failed(CurrentState,
-                        "Cannot resume: interrupt stack is empty");
+                        "Cannot resume: interrupt stack is empty") with { EventTimestamp = eventTime };
                 }
 
                 resolvedFinalState = persistedContext.InterruptStack[^1];
@@ -375,7 +376,8 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                     WasInterrupt = config.IsInterrupt,
                     WasResume = config.IsResume,
                     ResumedFromState = config.IsResume ? previousState : default,
-                    InterruptPayload = resultPayload
+                    InterruptPayload = resultPayload,
+                    EventTimestamp = eventTime
                 };
             }
 
@@ -387,13 +389,14 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 WasInterrupt = config.IsInterrupt,
                 WasResume = config.IsResume,
                 ResumedFromState = config.IsResume ? previousState : default,
-                InterruptPayload = resultPayload
+                InterruptPayload = resultPayload,
+                EventTimestamp = eventTime
             };
         }
         catch (Exception ex)
         {
             Log.LogError(500, ex, "Transition error: {Message}", ex.Message);
-            return TransitionResult<S>.Failed(CurrentState, ex.Message, ex);
+            return TransitionResult<S>.Failed(CurrentState, ex.Message, ex) with { EventTimestamp = eventTime };
         }
     }
 
@@ -407,16 +410,20 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// <summary>
     /// Executes a transition with distributed locking and middleware pipeline,
     /// carrying an optional payload for interrupt transitions.
+    /// When the payload implements <see cref="ITimestamped"/> its
+    /// <see cref="ITimestamped.EventTime"/> is used as the transition timestamp;
+    /// otherwise <see cref="DateTimeOffset.UtcNow"/> is used.
     /// Blocked when OperationalStatus is Faulted.
     /// </summary>
     protected async Task<TransitionResult<S>> InternalTransitionAsync(C context, T transition, object? payload)
     {
+        var eventTime = payload is ITimestamped ts ? ts.EventTime : DateTimeOffset.UtcNow;
         // Gate: Block transitions if Faulted
         if (OperationalStatus == OperationalStatus.Faulted)
         {
             Log.LogWarning("Transition BLOCKED [{Id}] - Faulted: {Reason}", 
                 context.Id, OperationalStatusReason);
-            return TransitionResult<S>.Failed(CurrentState, $"Faulted: {OperationalStatusReason}");
+            return TransitionResult<S>.Failed(CurrentState, $"Faulted: {OperationalStatusReason}") with { EventTimestamp = eventTime };
         }
 
         Log.LogDebug("Transition request: [{Id}] {Transition}", context.Id, transition);
@@ -491,6 +498,8 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// Performs a state transition with an optional payload.
     /// Override to add custom behavior. Default delegates to
     /// <see cref="InternalTransitionAsync(C, T, object?)"/>.
+    /// When the payload implements <see cref="ITimestamped"/> its event time is used
+    /// as the attributed timestamp on the result; otherwise <see cref="DateTimeOffset.UtcNow"/> is used.
     /// </summary>
     public virtual Task<TransitionResult<S>> TransitionAsync(C context, T transition, object? payload)
         => InternalTransitionAsync(context, transition, payload);

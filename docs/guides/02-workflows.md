@@ -1,8 +1,10 @@
-<!-- topic: workflows, tags: workflow, job, fork, join, routing, parallelism, sub-workflow, streaming, conditional -->
+﻿<!-- topic: workflows, tags: workflow, job, fork, join, routing, parallelism, sub-workflow, streaming, conditional -->
 # 02 — Workflows
 
 Build complex orchestration graphs with conditional routing, fork/join parallelism,
 sub-workflows, and real-time event streaming.
+
+The workflow is the primary unit of composition in Ananke. State is typed as a plain C# record and enforced by the compiler end-to-end — invalid topologies fail at build time, not at runtime under load. This is the layer where business logic lives; everything below it (providers, locks, stores) is pluggable.
 
 **Demo:** [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo)
 

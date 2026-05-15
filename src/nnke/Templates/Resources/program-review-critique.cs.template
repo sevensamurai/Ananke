@@ -2,17 +2,18 @@ using System.Text.Json;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Workflows;
 
 // -------------------------------------------------------------------
-//  {{name}} — Review & Critique Pattern
+//  {{name}} -- Review & Critique Pattern
 //
 //  A generator agent produces output, a critic evaluates it, and the
 //  loop repeats until the critic approves or the iteration cap is hit.
-//  Uses SimulatedModel — runs without API keys. Replace with real
+//  Uses SimulatedModel -- runs without API keys. Replace with real
 //  provider when ready: Ananke.Orchestration.OpenAI, .Anthropic, etc.
 // -------------------------------------------------------------------
 
-Console.WriteLine($"  {{name}} — Review & Critique");
+Console.WriteLine($"  {{name}} -- Review & Critique");
 Console.WriteLine();
 
 var iteration = 0;
@@ -41,7 +42,7 @@ var critic = AgentJobFactory.Create<ReviewState, CriticResponse>("critic",
     {
         // Simulate improving scores across iterations
         var score = Math.Min(1.0, 0.3 * iteration);
-        Console.WriteLine($"    Critic: score={score:F1} — {r.Feedback}");
+        Console.WriteLine($"    Critic: score={score:F1} -- {r.Feedback}");
         return s with { Score = score, Feedback = r.Feedback ?? "" };
     })
     .Build();

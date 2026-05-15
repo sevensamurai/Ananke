@@ -1,8 +1,10 @@
-<!-- topic: agents, tags: agent, llm, openai, anthropic, google, structured-output, model-routing, multimodal -->
+﻿<!-- topic: agents, tags: agent, llm, openai, anthropic, google, structured-output, model-routing, multimodal -->
 # 03 — Agents
 
 Integrate LLMs into workflows with `AgentJob`, structured output, multi-provider
 support, and capability-based model routing.
+
+The provider is a pluggable detail, not a foundation. Because every agent is wrapped behind `IStreamingAgentModel`, the workflow code — prompts, tool definitions, state mappings — stays unchanged when you swap OpenAI for Anthropic, Google Gemini, or a local model. Switching is a one-line configuration change.
 
 **Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 

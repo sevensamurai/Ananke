@@ -14,17 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="{{name}}.ananke.yml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Ananke.Design" Version="{{ananke_version}}" />
     <PackageReference Include="Ananke.Orchestration" Version="{{ananke_version}}" />
     <PackageReference Include="{{provider_package}}" Version="{{ananke_version}}" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="{{ms_extensions_version}}" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="{{ms_extensions_version}}" />
   </ItemGroup>
 
 </Project>

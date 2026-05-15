@@ -1,4 +1,4 @@
-﻿<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, MIT, license, free, commercial -->
+﻿<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
 ### Where We Are — v0.8.0
@@ -43,7 +43,7 @@ and a formal migration guide.
 
 ### License & Commercial Use
 
-Ananke is and will remain **free and open source under the [MIT License](https://opensource.org/licenses/MIT)**.
+Ananke is and will remain **free and open source under the [Apache 2.0 License](https://opensource.org/licenses/Apache-2.0)**.
 
 That means:
 
@@ -51,13 +51,15 @@ That means:
   license places no restrictions on how you use the framework.
 - **No usage fees, no tiers, no open-core.** The full framework — every package — is
   free of charge. There is no paid version with more features.
-- **Fork it, extend it, redistribute it.** The MIT license is intentionally permissive.
+- **Fork it, extend it, redistribute it.** The Apache 2.0 license is intentionally permissive.
   You are not required to open-source your own application.
 
 **What may be offered separately** — at some future point, consulting, custom integration
 work, or tailored extensions *on top of* the framework could be offered as a paid
-professional service. That would never affect the framework itself. The core remains MIT,
+professional service. That would never affect the framework itself. The core remains Apache 2.0,
 maintained in the open, free forever.
 
 If you want the framework to stay healthy: contribute, report issues, and share what you
-build with it.
+build with it. The goal is systems that don't just run — but learn from what they do and
+grow into the complexity they accumulate. Building that in the open, with people who care
+about the same problems, is the point.

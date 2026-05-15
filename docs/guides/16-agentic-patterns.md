@@ -4,6 +4,8 @@
 Build recognized agentic design patterns with `AgenticPattern` — pre-wired
 workflow builders for review-and-critique, iterative refinement, and more.
 
+Patterns sit on top of the same `Workflow<TState>` primitives you'd use directly — they are not a separate abstraction or a new runtime. If a pattern fits your use case, use it and get a named, validated topology for free. If it doesn't, drop to the primitives directly without rewriting anything.
+
 **Demo:** [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) — all 14 patterns, no API keys required
 
 ---

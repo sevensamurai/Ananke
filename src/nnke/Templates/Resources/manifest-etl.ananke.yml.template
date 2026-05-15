@@ -1,13 +1,13 @@
 # {{name}}.ananke.yml
-# ────────────────────────────────────────────────
+# ------------------------------------------------
 # Declarative workflow: topology + agent config.
 # Job implementations are bound in code via Bind().
 # Agent jobs are auto-built from this config.
-# ────────────────────────────────────────────────
+# ------------------------------------------------
 
 name: {{name}}
 
-# Model aliases — resolved to IAgentModel instances at load time.
+# Model aliases -- resolved to IAgentModel instances at load time.
 # API keys come from secrets.json, not this file.
 models:
   planner:
@@ -17,7 +17,7 @@ models:
     provider: {{provider}}
     model: {{model}}
 
-# Job declarations — "type: agent" jobs are auto-constructed from config.
+# Job declarations -- "type: agent" jobs are auto-constructed from config.
 # "type: code" jobs must be bound in code via Bind().
 jobs:
   plan:
@@ -44,7 +44,7 @@ jobs:
   combine:
     type: code
 
-# Topology — DSL syntax.
+# Topology -- DSL syntax.
 connections:
   - plan -> fork(fetch_a, fetch_b)
   - fetch_a -> transform

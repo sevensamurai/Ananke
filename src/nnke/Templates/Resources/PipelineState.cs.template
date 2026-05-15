@@ -1,0 +1,12 @@
+/// <summary>
+/// Immutable state record threaded through the {{name}} workflow.
+/// Add fields as needed for your pipeline data.
+/// </summary>
+public sealed record PipelineState
+{
+    /// <summary>The input prompt or query for the agent.</summary>
+    public string UserInput { get; init; } = "";
+
+    /// <summary>The agent's response output.</summary>
+    public string Output { get; init; } = "";
+}

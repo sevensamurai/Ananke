@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Graph.Abstractions</PackageId>
+    <Description>Shared connection options and helpers for Ananke graph-backend adapter packages.</Description>
+    <PackageTags>graph;knowledge-graph;memgraph;dotnet;ai;agents</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

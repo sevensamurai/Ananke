@@ -53,4 +53,24 @@ public sealed class EntityScopedEmpiricalMemory(
     /// <inheritdoc />
     public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default) =>
         inner.MarkConsolidatedAsync(entryId, knowledgeDocId, ct);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+        EmpiricalEntry reference,
+        PairRecallOptions? options = null,
+        CancellationToken ct = default)
+    {
+        options ??= new PairRecallOptions();
+        var outerFilter = options.CandidateFilter;
+        // Restrict candidates to this entity (or the reference's entity when scoped).
+        return inner.PairRecallAsync(
+            reference,
+            options with
+            {
+                CandidateFilter = e =>
+                    (e.EntityId == _entityId || e.EntityId is null)
+                    && (outerFilter is null || outerFilter(e))
+            },
+            ct);
+    }
 }

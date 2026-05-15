@@ -1,6 +1,6 @@
 /// <summary>
 /// Immutable state record for the {{name}} human-in-the-loop workflow.
-/// Threaded through analyze → [interrupt/review] → execute → End.
+/// Threaded through analyze -> [interrupt/review] -> execute -> End.
 /// </summary>
 public sealed record ApprovalState
 {

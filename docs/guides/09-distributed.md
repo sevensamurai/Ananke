@@ -1,9 +1,11 @@
-<!-- topic: distributed, tags: distributed, redis, mqtt, handoff, bridge, pub-sub -->
+﻿<!-- topic: distributed, tags: distributed, redis, mqtt, handoff, bridge, pub-sub -->
 # 09 — Distributed Systems
 
 Coordinate across processes with Redis distributed locking, MQTT pub/sub,
 agent-to-agent handoff, and the Bridge layer that wires state machines into
 workflows.
+
+The distributed layer is not a rewrite — it is a wiring change. The same `Workflow<T>` that runs in-memory during development and tests runs across processes in production by swapping `InMemoryHandoffChannel` for `MqttHandoffChannel` and `InMemoryDistributedLock` for `RedisDistributedLock`. No topology changes, no business logic changes.
 
 **Demo:** [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo)
 

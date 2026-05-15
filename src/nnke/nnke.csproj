@@ -27,9 +27,15 @@
 
   <ItemGroup>
     <!-- Template files contain {{placeholder}} tokens, not compilable C#.
-         Files use .template or -template extension to avoid SDK auto-compile globs. -->
+         Files use .ext.template extension to avoid SDK auto-compile globs.
+         *.cs.template files need WithCulture="false": MSBuild interprets ".cs" as a
+         culture code, strips it from the manifest resource name, and routes the files
+         into a satellite assembly, breaking GetManifestResourceStream on the main assembly. -->
     <Compile Remove="Templates\Resources\**" />
-    <EmbeddedResource Include="Templates\Resources\*" />
+    <EmbeddedResource Include="Templates\Resources\*.cs.template" WithCulture="false" />
+    <EmbeddedResource Include="Templates\Resources\*.csproj.template" />
+    <EmbeddedResource Include="Templates\Resources\*.yml.template" />
+    <EmbeddedResource Include="Templates\Resources\*.json.template" />
   </ItemGroup>
 
   <ItemGroup>

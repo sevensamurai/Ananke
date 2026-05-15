@@ -17,6 +17,8 @@ public interface ITransitionMiddleware<C, S, T>
     /// <summary>
     /// Invokes the middleware with the transition context.
     /// Call next() to continue the pipeline.
+    /// The attributed event timestamp is available on the returned
+    /// <see cref="TransitionResult{S}.EventTimestamp"/> after the pipeline completes.
     /// </summary>
     /// <param name="context">The state machine context</param>
     /// <param name="transition">The transition being executed</param>

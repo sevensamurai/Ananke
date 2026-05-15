@@ -2,9 +2,7 @@
 
 ## What Makes Ananke Different
 
-Most AI frameworks treat the LLM as the foundation and bolt infrastructure on top.
-Ananke inverts that: **typed state, distributed coordination, and production observability
-come first**. The LLM is a pluggable component — and the system keeps getting smarter the longer it runs.
+Most AI frameworks start with the LLM and build infrastructure around it. Ananke starts from the other end: fix the contracts first, type the state, make the vendor layer genuinely pluggable — then let agents, workflows, and state machines do their work on a foundation that won't shift. The goal isn't a better on-ramp to a hosted runtime. It's infrastructure you own, that stays yours as requirements grow, and that gets smarter the longer it runs.
 
 - **Swap providers without touching business logic** — OpenAI, Anthropic, Google, or local
   models through the same `IStreamingAgentModel` interface
@@ -16,8 +14,10 @@ come first**. The LLM is a pluggable component — and the system keeps getting 
 - **Agentic patterns** — Review & Critique, Iterative Refinement — recognized patterns as first-class workflow builders
 - **External skill catalog** — discover and run Python, Node.js, and Docker tools from registries directly through ToolKit
 - **nnke Tools** — `nnke` scaffolds, validates, runs, and serves workflows locally; `nnke-platform` deploys, observes, and manages the federation mesh in the cloud
-- **Production-ready from day one** — distributed locking, checkpointing, circuit breaking,
-  and OpenTelemetry tracing built in
+- **Production-oriented infrastructure** — distributed locking, checkpointing, circuit breaking,
+  and OpenTelemetry tracing built in; not added later
+
+> **Status:** Ananke is a release candidate (v0.8.x). The foundation is stable and the core surface area is locked. See the [Roadmap](about/roadmap.md) for what is complete, what is in progress, and what the path to 1.0 looks like.
 
 ---
 
