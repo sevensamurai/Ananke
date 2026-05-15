@@ -277,9 +277,22 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
                 if (_affectOptions is not null)
                 {
+                    if (_affectOptions.StrengthHalfLifeDays is { } shl)
+                    {
+                        var elapsedDays = (float)(DateTimeOffset.UtcNow - entry.LastObserved).TotalDays;
+                        compositeScore *= MathF.Pow(2f, -elapsedDays / shl);
+                    }
+
+                    var effectiveValence = MathF.Abs(entry.Valence);
+                    if (_affectOptions.ValenceHalfLifeDays is { } vhl)
+                    {
+                        var elapsedDays = (float)(DateTimeOffset.UtcNow - entry.LastObserved).TotalDays;
+                        effectiveValence *= MathF.Pow(2f, -elapsedDays / vhl);
+                    }
+
                     var priorityBoost = 1f + _affectOptions.MaxPriorityBoost
                                            * entry.Intensity
-                                           * MathF.Abs(entry.Valence);
+                                           * effectiveValence;
                     compositeScore *= priorityBoost;
                 }
 
@@ -592,6 +605,59 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             cancellationToken: ct);
 
         _logger.LogDebug("Empirical consolidated: '{Id}' → '{DocId}'", entryId, knowledgeDocId);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+        EmpiricalEntry reference,
+        PairRecallOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        await EnsureCollectionAsync(ct);
+
+        options ??= new PairRecallOptions();
+        var scorer = options.Scorer ?? EmpiricalPairScorers.TagOverlap;
+
+        // Use the reference entry's embedding as the Qdrant query vector to
+        // pre-filter a set of top-M semantically close candidates, then apply
+        // the pair scorer client-side for precise ranking.
+        var preFilterK = Math.Max(options.MaxResults * 5, 100);
+        var referenceEmbedding = await _embedder.EmbedAsync(
+            reference.Description.ToEmbeddingText(), ct);
+
+        var results = await _client.SearchAsync(
+            collectionName: _collectionName,
+            vector: referenceEmbedding,
+            limit: (ulong)preFilterK,
+            payloadSelector: true,
+            cancellationToken: ct);
+
+        var matches = new List<EmpiricalMatch>();
+
+        foreach (var point in results)
+        {
+            var entry = MapScoredPointToEntry(point);
+
+            if (entry.Id == reference.Id)
+                continue;
+
+            if (entry.ConsolidatedInto is not null)
+                continue;
+
+            if (options.CandidateFilter is not null && !options.CandidateFilter(entry))
+                continue;
+
+            var score = scorer(reference, entry);
+            if (score >= options.MinScore)
+                matches.Add(new EmpiricalMatch { Entry = entry, Score = score });
+        }
+
+        matches.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+        return matches.Count > options.MaxResults
+            ? matches.Take(options.MaxResults).ToList()
+            : matches;
     }
 
     // ── Collection initialization ────────────────────────────────

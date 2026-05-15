@@ -1,6 +1,6 @@
 /// <summary>
 /// Immutable state record for the {{name}} review-critique workflow.
-/// Threaded through generator → critic → loop.
+/// Threaded through generator -> critic -> loop.
 /// </summary>
 public sealed record ReviewState
 {

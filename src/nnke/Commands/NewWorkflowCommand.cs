@@ -94,7 +94,7 @@ internal static class NewWorkflowCommand
         WriteFile(projectDir, $"{name}.csproj", ProjectTemplate.Render(name, provider, pattern), files, skipped);
 
         // Program.cs — pattern-specific template
-        WriteFile(projectDir, "Program.cs", ProgramTemplate.Render(name, pattern), files, skipped);
+        WriteFile(projectDir, "Program.cs", ProgramTemplate.Render(name, pattern, provider), files, skipped);
 
         // Manifest — only for manifest-driven patterns
         if (isManifest)

@@ -1,9 +1,11 @@
-<!-- topic: empirical-memory, tags: empirical-memory, patterns, skills, heuristics, learning, confidence, qdrant -->
+﻿<!-- topic: empirical-memory, tags: empirical-memory, patterns, skills, heuristics, learning, confidence, qdrant -->
 # 15 — Empirical Memory
 
 Give agents a third memory layer that accumulates **patterns, skills, and heuristics
 learned from repeated interactions** — alongside the semantic knowledge store
 (Guide 06) and episodic conversation memory.
+
+This is the layer that makes deployment a starting point, not a ceiling. Most frameworks treat an agent as a static artifact: deploy it, run it, redeploy a new version. Empirical memory treats it as a system with a lifecycle — one that accumulates what has actually worked across sessions, contradicts what hasn't, and compounds intelligence over time rather than starting from zero on every run.
 
 **Demo:** [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo)
 

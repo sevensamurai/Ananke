@@ -219,5 +219,9 @@ public class DomainAffinityMemoryTests
             LastConsolidatedId = entryId;
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+            EmpiricalEntry reference, PairRecallOptions? options = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<EmpiricalMatch>>([]);
     }
 }

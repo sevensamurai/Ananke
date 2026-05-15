@@ -9,8 +9,13 @@
 
 ### What is Ananke?
 
-Ananke is a vendor-agnostic, production-ready .NET framework for building AI agents and
-automated multi-step pipelines. It provides:
+Ananke is a vendor-agnostic .NET framework for building AI agents and automated multi-step
+pipelines. It starts from a different premise than most AI frameworks: infrastructure
+contracts come first, LLM providers slot in last. The result is a typed, testable,
+composable foundation where the workflow graph, state types, and tool definitions are
+all yours — independent of any provider's SDK or roadmap.
+
+Concretely, it provides:
 
 - **Typed workflow orchestration** — directed graphs of jobs with compile-time state safety
 - **LLM agent integration** — tool calling, structured output, token-level streaming
@@ -25,7 +30,11 @@ automated multi-step pipelines. It provides:
 
 ### Who is Ananke for?
 
-Ananke is designed for .NET developers (C# 12+, .NET 10) building production AI systems.
+Ananke is for .NET developers (C# 12+, .NET 10) who want to own their AI infrastructure
+rather than couple production systems to a specific provider's hosted runtime. If strong
+typing, composable primitives, and the ability to test without API keys matter to your
+team, this is the right starting point.
+
 It is suitable for:
 
 - Streaming chat agents and AI assistants
@@ -41,7 +50,10 @@ Ananke targets **.NET 10**.
 
 ### Is Ananke production-ready?
 
-Yes. Ananke is designed with production requirements first:
+The foundation is designed for production from the start — not hardened after the fact.
+Every infrastructure contract has a defined interface before any LLM is involved, which
+means correctness is enforced by the type system and every dependency can be swapped
+without touching business logic. Concretely:
 
 - All state is typed end-to-end — the compiler enforces correctness
 - Every infrastructure contract (`IDistributedLock`, `IKnowledgeStore`, `ICheckpointStore`,
@@ -53,6 +65,10 @@ Yes. Ananke is designed with production requirements first:
 - LLM response caching is built in (`CachingAgentModel`)
 - Polly integration provides circuit breakers and custom resilience pipelines
 - OpenTelemetry tracing is emitted automatically for workflows, state transitions, and tool calls
+
+> Ananke is a release candidate (v0.8.x). The core surface area is stable. See the
+> [Roadmap](../about/roadmap.md) for what is complete, what is in progress, and what
+> is planned before 1.0.
 
 ### Is Ananke open source?
 

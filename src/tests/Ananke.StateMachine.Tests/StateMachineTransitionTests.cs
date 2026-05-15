@@ -204,6 +204,46 @@ public class StateMachineTransitionTests
         machine.InitialState.ShouldBe(Light.Off);
     }
 
+    // ── EventTimestamp overload ───────────────────────────────────────
+
+    [Test]
+    public async Task TransitionAsync_WithEventTime_PreservesSuppliedTimestamp()
+    {
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("et-1");
+        var past = DateTimeOffset.UtcNow.AddDays(-30);
+
+        var result = await machine.TransitionAsync(ctx, LightAction.TurnOn, new TimestampedPayload(past));
+
+        result.Success.ShouldBeTrue();
+        result.EventTimestamp.ShouldBe(past);
+    }
+
+    [Test]
+    public async Task TransitionAsync_WithoutEventTime_EventTimestampIsApproximatelyNow()
+    {
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("et-2");
+        var before = DateTimeOffset.UtcNow;
+
+        var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
+
+        result.EventTimestamp.ShouldBeGreaterThanOrEqualTo(before);
+        result.EventTimestamp.ShouldBeLessThanOrEqualTo(DateTimeOffset.UtcNow.AddSeconds(2));
+    }
+
+    [Test]
+    public async Task TransitionAsync_WithEventTime_ResultCarriesCorrectTimestamp()
+    {
+        var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("et-3");
+        var past = DateTimeOffset.UtcNow.AddHours(-5);
+
+        var result = await machine.TransitionAsync(ctx, LightAction.TurnOn, new TimestampedPayload(past));
+
+        result.EventTimestamp.ShouldBe(past);
+    }
+
     // ── TransitionResult static factories ────────────────────────────
 
     [Test]

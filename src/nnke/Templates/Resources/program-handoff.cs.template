@@ -1,16 +1,16 @@
-using Ananke.Orchestration;
 using Ananke.Orchestration.Jobs;
+using Ananke.Orchestration.Workflows;
 
 // -------------------------------------------------------------------
-//  {{name}} — Handoff Pattern (Agent-to-Agent Delegation)
+//  {{name}} -- Handoff Pattern (Agent-to-Agent Delegation)
 //
 //  A triage job processes a request, then hands off to an external
 //  specialist agent via a channel and awaits a response.
-//  Uses InMemoryHandoffChannel — swap to MqttHandoffChannel for
+//  Uses InMemoryHandoffChannel -- swap to MqttHandoffChannel for
 //  production cross-process handoffs.
 // -------------------------------------------------------------------
 
-Console.WriteLine($"  {{name}} — Handoff");
+Console.WriteLine($"  {{name}} -- Handoff");
 Console.WriteLine();
 
 var channel = new InMemoryHandoffChannel();

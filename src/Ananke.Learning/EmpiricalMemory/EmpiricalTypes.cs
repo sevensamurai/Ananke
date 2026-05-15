@@ -445,9 +445,53 @@ public sealed record BrowseOptions
 }
 
 /// <summary>
-/// Configuration for affect-driven learning mechanics:
-/// prediction-error reinforcement, decay, and priority boosting.
+/// Options controlling <see cref="IEmpiricalMemory.PairRecallAsync"/> behavior.
 /// </summary>
+public sealed record PairRecallOptions
+{
+    /// <summary>
+    /// Maximum number of results to return. Default is 20.
+    /// </summary>
+    public int MaxResults { get; init; } = 20;
+
+    /// <summary>
+    /// Minimum pair score required for a result to be included.
+    /// Results below this threshold are silently dropped.
+    /// Default is 0 (no threshold).
+    /// </summary>
+    public float MinScore { get; init; }
+
+    /// <summary>
+    /// Optional predicate applied before scoring. Only entries that satisfy
+    /// this filter are scored against the reference entry.
+    /// When <see langword="null"/>, all non-consolidated entries are candidates.
+    /// </summary>
+    public Predicate<EmpiricalEntry>? CandidateFilter { get; init; }
+
+    /// <summary>
+    /// Scoring function that computes similarity between a reference entry and
+    /// a candidate entry. Higher values indicate greater similarity.
+    /// When <see langword="null"/>, <see cref="EmpiricalPairScorers.TagOverlap"/>
+    /// is used as the default.
+    /// </summary>
+    public Func<EmpiricalEntry, EmpiricalEntry, float>? Scorer { get; init; }
+}
+
+/// <summary>
+/// Built-in pair-scoring functions for <see cref="PairRecallOptions.Scorer"/>.
+/// </summary>
+public static class EmpiricalPairScorers
+{
+    /// <summary>
+    /// Weighted Jaccard overlap over <see cref="SemanticDescription.SemanticTags"/>.
+    /// For each tag present in both entries the minimum weight is summed and
+    /// divided by the union weight. Returns 0 when either entry has no semantic tags
+    /// (falls back gracefully — callers may chain a fallback scorer if desired).
+    /// </summary>
+    public static float TagOverlap(EmpiricalEntry reference, EmpiricalEntry candidate)
+        => reference.Description.TagOverlap(candidate.Description);
+}
+
 public sealed record AffectOptions
 {
     // ── Reinforcement ────────────────────────────────────────────
@@ -521,6 +565,25 @@ public sealed record AffectOptions
     /// (non-affect) path. Default: 0.3.
     /// </summary>
     public float ContradictionConfidencePenalty { get; init; } = 0.3f;
+
+    // ── Wall-clock half-life ─────────────────────────────────────
+
+    /// <summary>
+    /// Half-life in days for belief strength at recall time.
+    /// The composite score is multiplied by <c>2^(-elapsed / halfLife)</c>
+    /// based on <see cref="EmpiricalEntry.LastObserved"/>.
+    /// <see langword="null"/> disables this adjustment. Default: <see langword="null"/>.
+    /// </summary>
+    public float? StrengthHalfLifeDays { get; init; } = null;
+
+    /// <summary>
+    /// Half-life in days for valence magnitude at recall time.
+    /// The absolute valence used in priority-boost is multiplied by
+    /// <c>2^(-elapsed / halfLife)</c>, fading emotional salience over time.
+    /// Only applied when <see cref="MaxPriorityBoost"/> is active.
+    /// <see langword="null"/> disables this adjustment. Default: <see langword="null"/>.
+    /// </summary>
+    public float? ValenceHalfLifeDays { get; init; } = null;
 
     // ── Recall priority ──────────────────────────────────────────
 

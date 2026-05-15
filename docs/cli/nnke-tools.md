@@ -5,6 +5,8 @@ Ananke ships two focused .NET global tools. They are intentionally separate: `nn
 for inner-loop development; `nnke-platform` carries cloud SDK weight for deployment and
 federation operations.
 
+Both tools exist for the same reason the framework does: the friction in building production AI systems is rarely in the runtime code first. It is in validating topology before deployment, running without credentials during development, and having a stable inspection surface that AI coding tools can rely on.
+
 ---
 
 ## nnke — design, local execution & diagnostics

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Ananke.Abstractions.Graph;
 
 namespace Ananke.Learning.Episodes;
 
@@ -12,6 +13,8 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
     private readonly ConcurrentDictionary<string, Episode> _episodes = new();
     // 5.7: Hard cap prevents unbounded heap growth in long-running scenarios.
     private readonly int _maxEpisodes;
+    private readonly IEpisodeGraphProjector? _graphProjector;
+    private readonly IKnowledgeGraph? _graph;
 
     /// <summary>
     /// Creates a new in-memory episode store.
@@ -21,15 +24,29 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
     /// episode (by <see cref="Episode.CompletedAt"/>) is evicted before the new one is
     /// written. Default is <c>50_000</c>.
     /// </param>
-    public InMemoryEpisodeStore(int maxEpisodes = 50_000)
+    /// <param name="graph">
+    /// Optional knowledge graph. When both <paramref name="graph"/> and
+    /// <paramref name="graphProjector"/> are supplied, every committed episode is
+    /// projected into the graph immediately after the commit completes.
+    /// </param>
+    /// <param name="graphProjector">
+    /// Strategy that translates an <see cref="Episode"/> into graph nodes/edges.
+    /// Ignored when <paramref name="graph"/> is <see langword="null"/>.
+    /// </param>
+    public InMemoryEpisodeStore(
+        int maxEpisodes = 50_000,
+        IKnowledgeGraph? graph = null,
+        IEpisodeGraphProjector? graphProjector = null)
     {
         if (maxEpisodes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxEpisodes), "Must be positive.");
         _maxEpisodes = maxEpisodes;
+        _graph = graph;
+        _graphProjector = graphProjector;
     }
 
     /// <inheritdoc />
-    public Task<Episode> CommitAsync(Episode episode, CancellationToken ct = default)
+    public async Task<Episode> CommitAsync(Episode episode, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(episode);
 
@@ -45,7 +62,11 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
         }
 
         _episodes[episode.Id] = episode;
-        return Task.FromResult(episode);
+
+        if (_graph is not null && _graphProjector is not null)
+            await _graphProjector.ProjectAsync(episode, _graph, ct);
+
+        return episode;
     }
 
     /// <inheritdoc />

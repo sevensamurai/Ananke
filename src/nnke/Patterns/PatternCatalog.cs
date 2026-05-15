@@ -279,6 +279,56 @@ internal static class PatternCatalog
                         (state, reply) => state with { Resolution = reply.Text }));
                     """,
             },
+            new()
+            {
+                Key = "streaming-chat",
+                Title = "Streaming Chat",
+                Style = "code",
+                Topology = "respond → End  (streaming events emitted per token)",
+                DslEquivalent = null,
+                ApiEntryPoint = "Workflow<TState>.StreamAsync(initialState)",
+                UseCases = ["Real-time chat interfaces", "Token-streaming UIs", "Interactive assistant workflows"],
+                ScaffoldCommand = "nnke new workflow <name> --pattern streaming-chat",
+                DocsRef = "nnke docs workflows",
+                Description = """
+                    A workflow that emits incremental streaming events as jobs complete,
+                    suitable for chat-style UIs where the user sees tokens appear in
+                    real time. Uses StreamAsync() instead of RunAsync() and handles
+                    WorkflowEvent<TState> discriminated unions (Completed, Faulted, etc.).
+                    """,
+                ApiExample = """
+                    await foreach (var evt in workflow.StreamAsync(initialState))
+                    {
+                        if (evt is WorkflowEvent<ChatState>.Completed c)
+                            Console.WriteLine(c.State.LastResponse);
+                    }
+                    """,
+            },
+            new()
+            {
+                Key = "organic-host",
+                Title = "Organic Host (Self-Dividing Colony)",
+                Style = "code",
+                Topology = "cell → [divide when overloaded] → child cells → End",
+                DslEquivalent = null,
+                ApiEntryPoint = "OrganicHost(colony, landscape, options)",
+                UseCases = ["Auto-scaling agent colonies", "Self-organizing multi-agent systems", "Adaptive workload distribution"],
+                ScaffoldCommand = "nnke new workflow <name> --pattern organic-host",
+                DocsRef = "nnke docs organics",
+                Description = """
+                    Hosts a self-dividing workflow colony that spawns child cells when
+                    tool load exceeds a threshold. The OrganicHost monitors an
+                    InMemoryCapabilityMap (landscape) and applies a ThresholdDivisionPolicy
+                    to decide when to divide. Swap InProcessWorkflowHost for a distributed
+                    host to scale across processes.
+                    """,
+                ApiExample = """
+                    await using var host = new OrganicHost(
+                        new InProcessWorkflowHost(),
+                        new InMemoryCapabilityMap(TimeSpan.FromMinutes(5)),
+                        new OrganicGrowthOptions { Policy = new ThresholdDivisionPolicy(minTools: 8) });
+                    """,
+            },
         };
 
         return entries.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);

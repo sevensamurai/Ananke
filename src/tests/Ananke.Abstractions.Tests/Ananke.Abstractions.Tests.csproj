@@ -39,4 +39,8 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Channels\" />
+  </ItemGroup>
+
 </Project>

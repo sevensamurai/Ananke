@@ -59,6 +59,14 @@ public record TransitionResult<S> where S : Enum
     public object? InterruptPayload { get; init; }
 
     /// <summary>
+    /// The logical event time associated with this transition.
+    /// When the transition payload implements <see cref="Ananke.Abstractions.ITimestamped"/>
+    /// this reflects <see cref="Ananke.Abstractions.ITimestamped.EventTime"/>;
+    /// otherwise defaults to <see cref="DateTimeOffset.UtcNow"/>.
+    /// </summary>
+    public DateTimeOffset EventTimestamp { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
     /// Creates a successful transition result
     /// </summary>
     public static TransitionResult<S> Succeeded(S previousState, S currentState) => new()

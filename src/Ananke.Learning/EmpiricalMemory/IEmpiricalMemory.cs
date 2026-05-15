@@ -109,4 +109,29 @@ public interface IEmpiricalMemory
     /// <param name="ct">Cancellation token.</param>
     /// <exception cref="KeyNotFoundException">No entry with <paramref name="entryId"/> exists.</exception>
     Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Finds entries most similar to a <paramref name="reference"/> entry using a
+    /// pair-scoring function rather than a free-text query embedding.
+    /// Useful for matching, recommendation, and reviewer-assignment workflows where
+    /// an existing entry is the query rather than a new situation string.
+    /// </summary>
+    /// <param name="reference">
+    /// The entry to score all candidates against. The reference itself is excluded
+    /// from results.
+    /// </param>
+    /// <param name="options">
+    /// Controls candidate filtering, the scoring function, result count, and
+    /// minimum score threshold. When <see langword="null"/>, defaults are used:
+    /// <see cref="EmpiricalPairScorers.TagOverlap"/> scorer, top 20, no threshold.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>
+    /// Matches ordered by descending score. Only non-consolidated entries above
+    /// <see cref="PairRecallOptions.MinScore"/> are returned.
+    /// </returns>
+    Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+        EmpiricalEntry reference,
+        PairRecallOptions? options = null,
+        CancellationToken ct = default);
 }

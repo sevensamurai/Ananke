@@ -3,6 +3,8 @@
 
 Build a router → worker → reviewer pipeline using Ananke's workflow primitives and the `AgenticPattern` library.
 
+This walkthrough validates two things concretely: that provider-swapping works without touching the workflow shape, and that recognized agentic patterns (`ReviewCritique`) produce the same typed topology as hand-wiring the equivalent graph.
+
 → **Further reading:** [11 — Advanced Agents](../guides/11-advanced-agents.md) · [16 — Agentic Patterns](../guides/16-agentic-patterns.md)
 
 ---

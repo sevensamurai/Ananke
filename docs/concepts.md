@@ -3,11 +3,15 @@
 
 A high-level tour of Ananke's core building blocks. Each section links to the in-depth guide for further reading.
 
+The design sequence matters: infrastructure contracts come first, LLM providers slot in last. Every primitive described here has an in-memory implementation — you can build, test, and validate full workflows with no API keys and no external services before wiring in a real provider.
+
 ---
 
 ## Workflows
 
 A **workflow** is a typed, directed graph of jobs. You define a plain C# record as your state type, wire jobs with `.Then()` / `.Fork()` / `.Join()`, and call `.RunAsync()`. The graph engine handles scheduling, parallelism, sub-workflow composition, and real-time event streaming — your job code stays pure and testable.
+
+The state type is generic and compiler-enforced from end to end: if the types don't align, the workflow won't build. This means structural correctness is validated at compile time, not discovered at runtime under load.
 
 Key primitives: sequential chains, conditional routing via `Workflow.Decide<T>`, parallel fan-out/fan-in with `Workflow.Fork` + `.Join()`, and nested `SubFlow`.
 
@@ -19,7 +23,7 @@ Key primitives: sequential chains, conditional routing via `Workflow.Decide<T>`,
 
 An **agent** is an LLM wrapped behind the `IStreamingAgentModel` interface. An `AgentJob` drops that LLM into any workflow step — you supply a system prompt, user prompt template, optional tools, and a mapping from the model's response to your state type.
 
-Because the provider is injected as an interface, you can swap OpenAI for Anthropic, Google Gemini, or a local Ollama endpoint without changing workflow code. Structured output (JSON schema) works the same across all providers.
+Because the provider is injected as an interface, you can swap OpenAI for Anthropic, Google Gemini, or a local Ollama endpoint without changing workflow code. Structured output (JSON schema) works the same across all providers. The provider is a detail, not a foundation.
 
 [Learn more →](guides/03-agents.md)
 
@@ -41,6 +45,8 @@ Ananke provides two complementary memory layers:
 
 **Empirical memory:** Agents accumulate *episodes* (interaction records) and *skills* (validated patterns distilled from episodes). An offline learner scores episodes with Monte Carlo reward propagation and promotes high-value patterns to skills. Skills can be exported as packages and shared across projects.
 
+The empirical layer is why deployment is not a ceiling. Each instance accumulates what has actually worked — patterns, skills, heuristics — and the offline learner reinforces, contradicts, and consolidates those over time. The system does not start from zero every time it runs; it compounds intelligence across sessions.
+
 [Long-term memory →](guides/06-memory.md) · [Empirical memory →](guides/15-empirical-memory.md) · [Memory tuning →](guides/15a-empirical-memory-tuning.md)
 
 ---
@@ -49,7 +55,7 @@ Ananke provides two complementary memory layers:
 
 Every workflow runs inside a **state machine** that supports interrupts, a middleware pipeline, circuit breaking, and distributed locking via RedLock. Workflow state is fully serialisable — you can pause execution, persist the checkpoint (to Redis, SQL, or any adapter), and resume from a different process.
 
-The distributed layer adds Redis-backed persistence and horizontal scaling, enabling multi-replica deployments without coordination ceremony.
+The distributed layer adds Redis-backed persistence and horizontal scaling, enabling multi-replica deployments without coordination ceremony. The same `Workflow<T>` that runs in-memory in tests runs across processes with a different wiring — the topology doesn't change, only the infrastructure adapters.
 
 [State machine →](guides/08-state-machine.md) · [Distributed →](guides/09-distributed.md)
 
@@ -76,6 +82,8 @@ Ananke workflows can be **exposed as MCP (Model Context Protocol) servers**, mak
 `AgenticPattern` is a library of pre-wired workflow builders for recognised orchestration patterns. Patterns are discoverable via IntelliSense, validate at `Build()`, and generate named topologies rather than ad-hoc graphs.
 
 Available patterns: **Review & Critique** (generator → critic loop until approval), **Iterative Refinement** (single-agent refinement loop). More are added each release.
+
+Patterns sit on top of the same `Workflow<TState>` primitives — they are not a different abstraction. If a pattern doesn't fit, you drop down to the primitives directly without rewriting anything.
 
 [Learn more →](guides/16-agentic-patterns.md)
 

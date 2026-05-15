@@ -1,6 +1,6 @@
 /// <summary>
 /// Immutable state record for the {{name}} handoff workflow.
-/// Threaded through triage → [handoff to specialist] → finalize → End.
+/// Threaded through triage -> [handoff to specialist] -> finalize -> End.
 /// </summary>
 public sealed record HandoffState
 {

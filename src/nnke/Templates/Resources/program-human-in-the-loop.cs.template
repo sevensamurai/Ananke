@@ -1,15 +1,15 @@
-using Ananke.Orchestration;
 using Ananke.Orchestration.Checkpointing;
+using Ananke.Orchestration.Workflows;
 
 // -------------------------------------------------------------------
-//  {{name}} — Human-in-the-Loop Pattern
+//  {{name}} -- Human-in-the-Loop Pattern
 //
 //  Workflow runs analysis, then pauses (interrupts) so a human can
 //  review and approve before execution continues. Uses checkpointing
 //  to persist state across the pause.
 // -------------------------------------------------------------------
 
-Console.WriteLine($"  {{name}} — Human-in-the-Loop");
+Console.WriteLine($"  {{name}} -- Human-in-the-Loop");
 Console.WriteLine();
 
 var checkpointStore = new InMemoryCheckpointStore();
@@ -39,7 +39,7 @@ var execution = await workflow.RunAsync(new ApprovalState { Data = "Process batc
 Console.WriteLine($"    Status after analyze: {execution.Status}");
 Console.WriteLine($"    Analysis: {execution.State.Analysis}");
 
-// Simulate human review — approve and resume
+// Simulate human review -- approve and resume
 Console.WriteLine("    [Human approves]");
 var resumed = await workflow.ResumeAsync(
     execution.Id,

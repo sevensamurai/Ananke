@@ -216,20 +216,19 @@ public sealed class ToolBuilder
         return this;
     }
 
-    internal ToolDefinition Build(string name, string description)
+    internal ToolDefinition Build(string name, string description,
+        IToolExecutorStrategy? executorStrategy = null)
     {
         if (_execute is null && _executionMode == ToolExecutionMode.Local)
             throw new InvalidOperationException(
                 $"Tool '{name}' has no execute handler. Call OnExecute(...) in the builder.");
 
-        // For remote-backed tools without a local Execute, provide a stub that
-        // clearly indicates the tool must be invoked via its remote endpoint.
-        var execute = _execute ?? ((_, _) => Task.FromResult(
-            ToolResult.Error($"Tool '{name}' has no local execute handler " +
-                             $"(execution mode: {_executionMode}). " +
-                             "Run this tool via its remote endpoint or platform.")));
+        // For remote-backed tools without a local Execute, delegate to the registered
+        // IToolExecutorStrategy (defaults to NullToolExecutorStrategy which returns a
+        // descriptive error, preserving pre-existing behaviour).
+        var strategy = executorStrategy ?? NullToolExecutorStrategy.Instance;
 
-        return new ToolDefinition
+        var definition = new ToolDefinition
         {
             Name = name,
             Description = description,
@@ -240,7 +239,15 @@ public sealed class ToolBuilder
             ExecutionMode = _executionMode,
             Endpoint = _endpoint,
             PlatformCapability = _platformCapability,
-            Execute = (args, ct) => execute(new ToolArgs(args), ct)
+            Execute = null! // set below
         };
+
+        Func<IReadOnlyDictionary<string, object?>, CancellationToken, Task<ToolResult>> execute =
+            _execute is not null
+                ? (args, ct) => _execute(new ToolArgs(args), ct)
+                : (args, ct) => strategy.DispatchAsync(definition, args, ct);
+
+        definition = definition with { Execute = execute };
+        return definition;
     }
 }

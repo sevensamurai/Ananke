@@ -2,16 +2,17 @@ using System.Text.Json;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Workflows;
 
 // -------------------------------------------------------------------
-//  {{name}} — Iterative Refinement Pattern
+//  {{name}} -- Iterative Refinement Pattern
 //
 //  A single agent refines its output over multiple cycles until a
 //  quality threshold is met or the iteration cap is reached.
-//  Uses SimulatedModel — runs without API keys.
+//  Uses SimulatedModel -- runs without API keys.
 // -------------------------------------------------------------------
 
-Console.WriteLine($"  {{name}} — Iterative Refinement");
+Console.WriteLine($"  {{name}} -- Iterative Refinement");
 Console.WriteLine();
 
 var round = 0;

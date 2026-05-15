@@ -138,6 +138,47 @@ relevant documentation guide and demo (where available).
 | **In-memory handoff channel** | `InMemoryHandoffChannel` — test agent handoff without MQTT | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory checkpoint store** | `InMemoryCheckpointStore` — test checkpointing without a filesystem | [14 — Testing](../guides/14-testing.md) | — |
 
+## Empirical Memory & Agent Learning
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **IEmpiricalMemory** | Three-kind memory store: Pattern, Skill, Heuristic — each with a confidence score | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) |
+| **EmpiricalMemoryTools** | Agent tools: `recall_empirical`, `commit_insight`, `reinforce_empirical`, `contradict_empirical` | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **Confidence tracking** | Scores increase on reinforcement and decrease on contradiction — without deleting entries | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **InMemoryEmpiricalMemory** | Zero-config in-memory implementation for dev/test | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **QdrantEmpiricalMemory** | Persistent, distributed empirical memory via Qdrant | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **IOfflineLearner** | Background learning cycles: decay, curiosity exploration, consolidation | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **IConsolidationSummarizer** | Promote confident entries into `IKnowledgeStore` as permanent knowledge | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **Skill packages** | Export validated skills as portable packages; import across deployments | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+
+## Agentic Patterns
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **AgenticPattern builder** | Pre-wired workflow builders for recognized orchestration patterns; validates at `Build()` | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+| **Review & Critique** | Generator → critic loop until approval or max iterations | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+| **Iterative Refinement** | Single-agent refinement loop until quality threshold | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+
+## Organics
+
+> These features are working and demonstrable. Multi-generation lineage and closed-loop learning (division outcomes driving the next policy decision end-to-end) are structurally wired but not yet exercised end-to-end. See the [Roadmap](../about/roadmap.md).
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **Cell division** | A generalist workflow detects structural tension, proposes a split, spawns two specialised peers, kills the parent, and records the outcome into empirical memory | — | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) |
+| **Complexity monitors** | Detect generalist ceiling via tool count and routing entropy signals | — | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) |
+| **Division proposal & approval** | Human-gated or automatic approval of proposed splits before execution | — | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) |
+| **Organic mesh inspection** | `nnke mesh` — inspect local Organics mesh snapshots from the CLI | [CLI Overview](../cli/overview.md) | — |
+
+## Federation
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **Cross-cloud federation** | Deploy the same manifest to Azure, Google, or Anthropic; unified telemetry across the cluster | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
+| **Human approval gates** | Cross-cloud workflows with interrupt-and-resume approval gates | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
+| **nnke-platform CLI** | Deploy, observe, compare platforms, and manage federation mesh operations | [CLI Overview](../cli/overview.md) | — |
+| **Smart Tool Router** | Route tool calls to the best available provider based on capability, cost, and latency | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
+
 ---
 
 ← [Demos](../demos.md) · [Learning Path](../learning-path.md)

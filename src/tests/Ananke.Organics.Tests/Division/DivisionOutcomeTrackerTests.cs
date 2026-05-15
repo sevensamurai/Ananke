@@ -199,5 +199,9 @@ public class DivisionOutcomeTrackerTests
 
         public Task MarkConsolidatedAsync(string entryId, string knowledgeDocId, CancellationToken ct = default) =>
             Task.CompletedTask;
+
+        public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+            EmpiricalEntry reference, PairRecallOptions? options = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<EmpiricalMatch>>([]);
     }
 }

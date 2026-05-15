@@ -1,4 +1,4 @@
-{
+﻿{
     "title": "Ananke",
     "subtitle": "AI Agent Orchestration for .NET",
     "logo": "ananke-logo.png",
@@ -655,7 +655,7 @@
                         "versioning",
                         "releases",
                         "open source",
-                        "MIT",
+                        "Apache-2.0",
                         "license",
                         "free",
                         "commercial"

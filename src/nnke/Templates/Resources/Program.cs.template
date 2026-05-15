@@ -1,0 +1,59 @@
+using System.Text.Json;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Tools;
+using Ananke.Orchestration.Workflows;
+
+// -------------------------------------------------------------------
+//  {{name}} -- Simple Workflow
+//
+//  A single agent job processes input and returns a response.
+//  Uses SimulatedModel -- runs without API keys. Replace with a real
+//  provider when ready: Ananke.Orchestration.OpenAI, .Anthropic, etc.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} -- Simple Workflow");
+Console.WriteLine();
+
+var tools = new ToolKit("{{name}}-tools");
+// tools.AddTool("get_time", "Returns the current UTC time.",
+//     () => ToolResult.Ok(DateTime.UtcNow.ToString("O")));
+
+var agent = AgentJobFactory.Create<PipelineState, AgentOutput>("agent",
+        new SimulatedModel(_ => JsonSerializer.Serialize(
+            new AgentOutput { Response = "Hello from {{name}}!" })))
+    .WithSystemPrompt("You are a helpful assistant.")
+    .WithPrompt(s => s.UserInput)
+    // .WithTools(tools)  // Uncomment to enable tool calling
+    .MapResult((s, r) => s with { Output = r.Response ?? "" })
+    .Build();
+
+var workflow = new Workflow<PipelineState>("{{name}}")
+    .Job("agent", agent)
+    .Then("agent", Workflow.End);
+
+var result = await workflow.RunAsync(new PipelineState
+{
+    UserInput = "Hello! What can you help me with?"
+});
+
+Console.WriteLine($"  Input:   {result.State.UserInput}");
+Console.WriteLine($"  Output:  {result.State.Output}");
+Console.WriteLine($"  Status:  {result.Status}");
+
+// --- SimulatedModel: replace with a real provider ---
+// OpenAI:    var model = Ananke.Orchestration.OpenAI.OpenAIChatAgentModel.Create(apiKey, "{{model}}");
+// Anthropic: var model = Ananke.Orchestration.Anthropic.AnthropicAgentModel.Create(apiKey, "{{model}}");
+// Google:    var model = Ananke.Orchestration.Google.GeminiAgentModel.Create(apiKey, "{{model}}");
+
+internal sealed class SimulatedModel(Func<AgentRequest, string> responder) : IAgentModel
+{
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse
+        {
+            Text = responder(request),
+            Usage = new TokenUsage { InputTokens = 100, OutputTokens = 50 }
+        });
+}
+
+internal sealed record AgentOutput { public string? Response { get; init; } }

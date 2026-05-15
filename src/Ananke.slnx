@@ -50,6 +50,7 @@
     <Project Path="tests/Ananke.Federation.Conformance.Tests/Ananke.Federation.Conformance.Tests.csproj" />
     <Project Path="tests/Ananke.Federation.Google.Tests/Ananke.Federation.Google.Tests.csproj" />
     <Project Path="tests/Ananke.Federation.Tests/Ananke.Federation.Tests.csproj" />
+    <Project Path="tests/Ananke.Graph.Memgraph.Tests/Ananke.Graph.Memgraph.Tests.csproj" />
     <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
@@ -79,6 +80,8 @@
   <Project Path="Ananke.Federation.Google/Ananke.Federation.Google.csproj" Id="4ae473a1-950a-422e-9fe9-e953f1832cf7" />
   <Project Path="Ananke.Federation.LocalEmulators/Ananke.Federation.LocalEmulators.csproj" />
   <Project Path="Ananke.Federation/Ananke.Federation.csproj" Id="ba69f556-2154-465b-b613-b2dbb59336d7" />
+  <Project Path="Ananke.Graph.Abstractions/Ananke.Graph.Abstractions.csproj" />
+  <Project Path="Ananke.Graph.Memgraph/Ananke.Graph.Memgraph.csproj" />
   <Project Path="Ananke.Learning/Ananke.Learning.csproj" Id="4e1339be-51d1-4550-9474-76b3a4e82cf4" />
   <Project Path="Ananke.MCP/Ananke.MCP.csproj" />
   <Project Path="Ananke.MQTT/Ananke.MQTT.csproj" />

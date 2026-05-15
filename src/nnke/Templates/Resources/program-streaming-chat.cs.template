@@ -7,7 +7,6 @@ using Microsoft.Extensions.Configuration;
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("secrets.json", optional: true)
-    .AddEnvironmentVariables()
     .Build();
 
 // --- 2. Model ---
@@ -32,6 +31,6 @@ var initialState = new ChatState { UserInput = userInput };
 
 await foreach (var evt in workflow.StreamAsync(initialState))
 {
-    if (evt is WorkflowEvent<ChatState>.Completed completed)
-        Console.WriteLine($"  Agent: {completed.State.LastResponse}");
+    if (evt is WorkflowCompleted<ChatState> completed)
+        Console.WriteLine($"  Agent: {completed.Result.FinalState.LastResponse}");
 }

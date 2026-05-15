@@ -1,6 +1,6 @@
 /// <summary>
 /// Immutable state record for the {{name}} router workflow.
-/// Threaded through classify → [route] → branch → End.
+/// Threaded through classify -> [route] -> branch -> End.
 /// </summary>
 public sealed record RouterState
 {

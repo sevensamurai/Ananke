@@ -3,6 +3,8 @@
 
 Register built-in tools and author custom tools that LLMs can call during agent workflows.
 
+This walkthrough validates that typed tool parameters produce accurate JSON Schema for the model, that `ToolResult.Ok`/`Error` signals propagate correctly through the framework, and that async tools behave identically to sync ones.
+
 → **Further reading:** [04 — Tools](../guides/04-tools.md) · [Tools Reference](../reference/tools-reference.md)
 
 ---

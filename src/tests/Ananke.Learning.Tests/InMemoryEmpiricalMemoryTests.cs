@@ -812,6 +812,217 @@ public class InMemoryEmpiricalMemoryTests
         updated.Prediction.ShouldBe(0.6f); // stored from confidence fallback
     }
 
+    [Test]
+    public async Task Recall_StrengthHalfLife_ReducesScoreForOldEntries()
+    {
+        // Two separate memories — one with extreme strength half-life, one without.
+        // Same entry with LastObserved 30 days ago; the half-life memory should
+        // return a materially lower score.
+        var withHalfLife = new InMemoryEmpiricalMemory(
+            _embedder,
+            affectOptions: new AffectOptions { StrengthHalfLifeDays = 1f });   // 1-day half-life
+        var withoutHalfLife = new InMemoryEmpiricalMemory(_embedder);
+
+        var entry = MakePattern("hl1", "strength decay half life test", confidence: 1.0f) with
+        {
+            LastObserved = DateTimeOffset.UtcNow.AddDays(-30)
+        };
+
+        await withHalfLife.CommitAsync(entry);
+        await withoutHalfLife.CommitAsync(entry);
+
+        var decayedResults  = await withHalfLife.RecallAsync("strength decay half life test");
+        var baselineResults = await withoutHalfLife.RecallAsync("strength decay half life test");
+
+        // 30-day old entry with 1-day half-life → multiplier = 2^-30 ≈ 9.3e-10
+        decayedResults[0].Score.ShouldBeLessThan(baselineResults[0].Score);
+        decayedResults[0].Score.ShouldBeLessThan(0.001f);
+    }
+
+    [Test]
+    public async Task Recall_ValenceHalfLife_FadesEmotionalSalienceOverTime()
+    {
+        // Affect with both priority boost and a very short valence half-life.
+        // An old entry with high valence should score lower than if half-life is disabled.
+        var withHalfLife = new AffectOptions
+        {
+            MaxPriorityBoost = 0.5f,
+            ValenceHalfLifeDays = 0.001f   // extreme — decays valence to near zero
+        };
+        var withoutHalfLife = new AffectOptions
+        {
+            MaxPriorityBoost = 0.5f,
+            ValenceHalfLifeDays = null
+        };
+
+        var memWith = new InMemoryEmpiricalMemory(_embedder, affectOptions: withHalfLife);
+        var memWithout = new InMemoryEmpiricalMemory(_embedder, affectOptions: withoutHalfLife);
+
+        var entry = MakePattern("v1", "valence fade test", confidence: 0.8f) with
+        {
+            Intensity = 1.0f,
+            Valence = 1.0f,
+            LastObserved = DateTimeOffset.UtcNow.AddDays(-30)
+        };
+
+        await memWith.CommitAsync(entry);
+        await memWithout.CommitAsync(entry);
+
+        var decayedResults = await memWith.RecallAsync("valence fade test");
+        var boostedResults = await memWithout.RecallAsync("valence fade test");
+
+        // Without valence decay the priority boost is applied at full valence,
+        // so the score should be higher than with extreme valence half-life.
+        boostedResults[0].Score.ShouldBeGreaterThan(decayedResults[0].Score);
+    }
+
+    // ── PairRecallAsync ──────────────────────────────────────────
+
+    [Test]
+    public async Task PairRecall_EmptyStore_ReturnsEmpty()
+    {
+        var reference = MakePatternWithTags("ref", "reference entry", ["cause:gc", "effect:timeout"]);
+        var results = await _memory.PairRecallAsync(reference);
+        results.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task PairRecall_ReturnsTopKOrderedByScore()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc", "effect:timeout", "service:api"]);
+
+        // high overlap: 3 matching tags
+        var high = MakePatternWithTags("h1", "high overlap", ["cause:gc", "effect:timeout", "service:api"]);
+        // medium overlap: 1 matching tag
+        var med  = MakePatternWithTags("m1", "medium overlap", ["cause:gc"]);
+        // no overlap: completely different tags
+        var none = MakePatternWithTags("n1", "no overlap", ["cause:cpu", "effect:oom"]);
+
+        await _memory.CommitAsync(high);
+        await _memory.CommitAsync(med);
+        await _memory.CommitAsync(none);
+
+        var results = await _memory.PairRecallAsync(reference);
+
+        results.Count.ShouldBe(3);
+        results[0].Entry.Id.ShouldBe("h1");
+        results[1].Entry.Id.ShouldBe("m1");
+        results[0].Score.ShouldBeGreaterThan(results[1].Score);
+    }
+
+    [Test]
+    public async Task PairRecall_ExcludesReferenceEntry()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        await _memory.CommitAsync(reference);
+        await _memory.CommitAsync(MakePatternWithTags("other", "other entry", ["cause:gc"]));
+
+        var results = await _memory.PairRecallAsync(reference);
+
+        results.ShouldAllBe(m => m.Entry.Id != "ref");
+    }
+
+    [Test]
+    public async Task PairRecall_ExcludesConsolidatedEntries()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        var candidate = MakePatternWithTags("c1", "candidate", ["cause:gc"]);
+        await _memory.CommitAsync(candidate);
+        await _memory.MarkConsolidatedAsync("c1", "doc-1");
+
+        var results = await _memory.PairRecallAsync(reference);
+
+        results.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task PairRecall_CandidateFilter_ExcludesNonMatchingEntries()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        await _memory.CommitAsync(MakePatternWithTags("k1", "keep", ["cause:gc"]));
+        await _memory.CommitAsync(MakePatternWithTags("x1", "exclude", ["cause:gc"]));
+
+        var options = new PairRecallOptions
+        {
+            CandidateFilter = e => e.Id == "k1"
+        };
+
+        var results = await _memory.PairRecallAsync(reference, options);
+
+        results.Count.ShouldBe(1);
+        results[0].Entry.Id.ShouldBe("k1");
+    }
+
+    [Test]
+    public async Task PairRecall_MinScore_ExcludesBelowThreshold()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        // no-overlap entry will score 0
+        await _memory.CommitAsync(MakePatternWithTags("z1", "zero overlap", ["cause:cpu"]));
+
+        var options = new PairRecallOptions { MinScore = 0.01f };
+        var results = await _memory.PairRecallAsync(reference, options);
+
+        results.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task PairRecall_MaxResults_LimitsOutput()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        // dedupThreshold > 1.0 disables semantic dedup so all 10 entries are stored
+        // independently (InMemoryEmbedder returns identical vectors for any text).
+        var mem = new InMemoryEmpiricalMemory(_embedder, dedupThreshold: 1.1f);
+        for (var i = 0; i < 10; i++)
+            await mem.CommitAsync(MakePatternWithTags($"e{i}", $"entry {i}", ["cause:gc"]));
+
+        var options = new PairRecallOptions { MaxResults = 3 };
+        var results = await mem.PairRecallAsync(reference, options);
+
+        results.Count.ShouldBe(3);
+    }
+
+    [Test]
+    public async Task PairRecall_CustomScorer_IsUsed()
+    {
+        var reference = MakePatternWithTags("ref", "reference", ["cause:gc"]);
+        var a = MakePatternWithTags("a1", "a", ["cause:gc"]);
+        var b = MakePatternWithTags("b1", "b", ["cause:cpu"]);
+
+        await _memory.CommitAsync(a);
+        await _memory.CommitAsync(b);
+
+        // Custom scorer always returns 1.0 for b and 0.0 for everyone else
+        var options = new PairRecallOptions
+        {
+            Scorer = (_, candidate) => candidate.Id == "b1" ? 1.0f : 0.0f
+        };
+
+        var results = await _memory.PairRecallAsync(reference, options);
+
+        results[0].Entry.Id.ShouldBe("b1");
+        results[0].Score.ShouldBe(1.0f);
+    }
+
+    private static EmpiricalEntry MakePatternWithTags(
+        string id, string summary, IReadOnlyList<string> tags) => new()
+    {
+        Id = id,
+        Kind = EmpiricalKind.Pattern,
+        Tags = [],
+        Source = "test",
+        Description = new SemanticDescription
+        {
+            Summary = summary,
+            SemanticTags = tags.ToDictionary(t => t, _ => 1.0f)
+        },
+        Confidence = 0.8f,
+        ObservationCount = 1,
+        Evidence = [],
+        FirstObserved = DateTimeOffset.UtcNow,
+        LastObserved = DateTimeOffset.UtcNow
+    };
+
     // ── Test prediction source helpers ──────────────────────────
 
     private sealed class FixedPredictionSource(float? value) : IPredictionSource

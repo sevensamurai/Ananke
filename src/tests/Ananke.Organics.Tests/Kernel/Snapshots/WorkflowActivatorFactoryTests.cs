@@ -261,6 +261,10 @@ public class WorkflowActivatorFactoryTests
         public Task MarkConsolidatedAsync(string entryId, string documentId, CancellationToken ct = default) =>
             Task.CompletedTask;
 
+        public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+            EmpiricalEntry reference, PairRecallOptions? options = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<EmpiricalMatch>>([]);
+
         public int Count => 0;
     }
 }

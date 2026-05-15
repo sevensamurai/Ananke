@@ -79,4 +79,13 @@ public sealed record ToolEndpoint
     /// credentials providers — never stored in the tool definition.
     /// </summary>
     public string? AuthHeader { get; init; }
+
+    /// <summary>
+    /// Optional query-string parameters appended to the endpoint URI at dispatch time.
+    /// Use for key-based auth idioms that require a query parameter rather than a header
+    /// (e.g. Azure Functions <c>?code=…</c>, API gateway routing keys).
+    /// Values are resolved at deploy/dispatch time — never store secrets here directly;
+    /// populate this dictionary from a credentials provider in the host.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? QueryParams { get; init; }
 }

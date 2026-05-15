@@ -1,13 +1,13 @@
+using Ananke.Abstractions;
+using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Graph;
+using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using Ananke.Abstractions;
-using Ananke.Abstractions.Agents;
-using Ananke.Orchestration.Knowledge;
-using Ananke.Orchestration.Knowledge.Catalog;
-using Ananke.Orchestration.Knowledge.Embeddings;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Learning.EmpiricalMemory;
 
@@ -29,6 +29,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     private readonly IPredictionSource? _predictionSource;
     private readonly ILogger _logger;
     private readonly int _maxEntries;
+    private readonly IEmpiricalGraphProjector? _graphProjector;
+    private readonly IKnowledgeGraph? _graph;
 
     // ── Observability ────────────────────────────────────────────
     private static readonly ActivitySource Activity = new(AnankeSourceNames.EmpiricalMemory);
@@ -73,6 +75,15 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     /// before a new entry is written. Default is <c>10_000</c>.
     /// </param>
     /// <param name="logger">Optional logger for diagnostic output.</param>
+    /// <param name="graph">
+    /// Optional knowledge graph. When both <paramref name="graph"/> and
+    /// <paramref name="graphProjector"/> are supplied, every committed entry is
+    /// projected into the graph immediately after the commit completes.
+    /// </param>
+    /// <param name="graphProjector">
+    /// Strategy that translates an <see cref="EmpiricalEntry"/> into graph nodes/edges.
+    /// Ignored when <paramref name="graph"/> is <see langword="null"/>.
+    /// </param>
     public InMemoryEmpiricalMemory(
         IEmbeddingModel embedder,
         float dedupThreshold = 0.9f,
@@ -80,7 +91,9 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         AffectOptions? affectOptions = null,
         IPredictionSource? predictionSource = null,
         int maxEntries = 10_000,
-        ILogger<InMemoryEmpiricalMemory>? logger = null)
+        ILogger<InMemoryEmpiricalMemory>? logger = null,
+        IKnowledgeGraph? graph = null,
+        IEmpiricalGraphProjector? graphProjector = null)
     {
         ArgumentNullException.ThrowIfNull(embedder);
         if (maxEntries <= 0)
@@ -92,6 +105,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         _predictionSource = predictionSource;
         _maxEntries = maxEntries;
         _logger = logger ?? NullLogger<InMemoryEmpiricalMemory>.Instance;
+        _graph = graph;
+        _graphProjector = graphProjector;
     }
 
     /// <inheritdoc />
@@ -148,6 +163,10 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         CommitCounter.Add(1);
         _logger.LogDebug("Empirical commit: new {Kind} '{Id}' (confidence: {Confidence:F2})",
             entry.Kind, entry.Id, entry.Confidence);
+
+        if (_graph is not null && _graphProjector is not null)
+            await (_graphProjector.ProjectAsync(entry, _graph, ct));
+
         return entry;
     }
 
@@ -180,9 +199,22 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
             if (_affectOptions is not null)
             {
+                if (_affectOptions.StrengthHalfLifeDays is { } shl)
+                {
+                    var elapsedDays = (float)(DateTimeOffset.UtcNow - stored.Entry.LastObserved).TotalDays;
+                    compositeScore *= MathF.Pow(2f, -elapsedDays / shl);
+                }
+
+                var effectiveValence = MathF.Abs(stored.Entry.Valence);
+                if (_affectOptions.ValenceHalfLifeDays is { } vhl)
+                {
+                    var elapsedDays = (float)(DateTimeOffset.UtcNow - stored.Entry.LastObserved).TotalDays;
+                    effectiveValence *= MathF.Pow(2f, -elapsedDays / vhl);
+                }
+
                 var priorityBoost = 1f + _affectOptions.MaxPriorityBoost
                                        * stored.Entry.Intensity
-                                       * MathF.Abs(stored.Entry.Valence);
+                                       * effectiveValence;
                 compositeScore *= priorityBoost;
             }
 
@@ -413,6 +445,47 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
         _logger.LogDebug("Empirical consolidated: '{Id}' → '{DocId}'", entryId, knowledgeDocId);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<EmpiricalMatch>> PairRecallAsync(
+        EmpiricalEntry reference,
+        PairRecallOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        options ??= new PairRecallOptions();
+        var scorer = options.Scorer ?? EmpiricalPairScorers.TagOverlap;
+
+        var results = new List<EmpiricalMatch>();
+
+        foreach (var (_, stored) in _entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var entry = stored.Entry;
+
+            if (entry.Id == reference.Id)
+                continue;
+
+            if (entry.ConsolidatedInto is not null)
+                continue;
+
+            if (options.CandidateFilter is not null && !options.CandidateFilter(entry))
+                continue;
+
+            var score = scorer(reference, entry);
+            if (score >= options.MinScore)
+                results.Add(new EmpiricalMatch { Entry = entry, Score = score });
+        }
+
+        results.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+        IReadOnlyList<EmpiricalMatch> top = results.Count > options.MaxResults
+            ? results.Take(options.MaxResults).ToList()
+            : results;
+
+        return Task.FromResult(top);
     }
 
     /// <summary>Returns the number of entries currently stored.</summary>

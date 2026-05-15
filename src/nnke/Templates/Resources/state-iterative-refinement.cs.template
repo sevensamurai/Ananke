@@ -1,6 +1,6 @@
 /// <summary>
 /// Immutable state record for the {{name}} iterative refinement workflow.
-/// Threaded through refine → quality check → loop.
+/// Threaded through refine -> quality check -> loop.
 /// </summary>
 public sealed record RefinementState
 {
