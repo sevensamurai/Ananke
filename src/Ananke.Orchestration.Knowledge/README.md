@@ -1,9 +1,9 @@
-﻿# Ananke.Orchestration.Knowledge
+# Ananke.Orchestration.Knowledge
 
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Knowledge.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Knowledge)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
 
-Knowledge pipeline for Ananke — vector knowledge stores, document processing, chunking, embedding abstractions, knowledge catalog with LLM-enriched metadata, and cross-document linking.
+Knowledge pipeline for Ananke — vector knowledge stores, document ingestion, chunking, embedding abstractions, knowledge catalogs, and optional cross-document linking.
 
 ## Install
 
@@ -65,7 +65,7 @@ var sources = await catalog.BrowseAsync(new CatalogBrowseOptions { Query = "depl
 // Phase 2: deep-search within matched sources
 var chunks = await catalogStore.SearchAsync("kubernetes deployment", new SearchOptions
 {
-    Filter = new KnowledgeFilter { ["source_id"] = sources[0].Entry.SourceId }
+    Filter = new KnowledgeFilter { ["source"] = sources[0].Source }
 });
 ```
 
@@ -101,6 +101,17 @@ services.AddKnowledgeLinking(options =>
 | `KnowledgeBase` | Class | Combines a store, catalog entry, and description into a named unit |
 | `InMemoryEmbedder` | Class | Deterministic character-hash embedder for testing |
 
+## What this package is responsible for
+
+- semantic search over embedded document chunks via `IKnowledgeStore`
+- document ingestion via `DocumentProcessor`
+- document-level discovery via `IKnowledgeCatalog`
+- optional reranking and enrichment through `CatalogAwareKnowledgeStore`
+- optional graph-expanded retrieval through `LinkedKnowledgeStore`
+- grouping multiple stores plus one catalog through `KnowledgeBase`
+
+This package does **not** depend on the workflow engine. It can be used independently in ingestion services, background jobs, and standalone search applications.
+
 ## The pipeline
 
 ```
@@ -119,6 +130,14 @@ IKnowledgeStore
       └─ LinkedKnowledgeStore    (graph-expanded search)
 ```
 
+## Package boundaries
+
+- `Ananke.Orchestration.Knowledge` owns the knowledge, catalog, document, embedding, and linking contracts/implementations.
+- `Ananke.Documents` supplies concrete extractors such as `PdfExtractor` and `MarkdownExtractor`.
+- `Ananke.Orchestration` depends on this package and contains the bridge types that expose knowledge stores and catalogs as `ToolKit` tools.
+
+This split allows vector-store and ingestion integrations to depend on the knowledge pipeline without pulling in workflow execution.
+
 ## Implementations
 
 | Interface | In-memory (this package) | Distributed |
@@ -131,7 +150,9 @@ IKnowledgeStore
 
 ## Dependencies
 
-- `Ananke.Abstractions` — for `IAgentModel`, `IEmbeddingModel`, `AgentMessage`
+- `Ananke.Abstractions` — for `IAgentModel`, `IEmbeddingModel`, and shared agent/message contracts
+- `Microsoft.Extensions.DependencyInjection.Abstractions` — DI extension support
+- `Microsoft.Extensions.Logging.Abstractions` — logging abstractions for processing components
 
 This package has **no dependency on `Ananke.Orchestration`** — it is independent of the workflow engine.
 
@@ -144,6 +165,10 @@ This package has **no dependency on `Ananke.Orchestration`** — it is independe
 | `Ananke.Qdrant` | Distributed vector store implementations via Qdrant |
 | `Ananke.Orchestration.OpenAI` | `OpenAIEmbeddingModel` for production embeddings |
 | `Ananke.Orchestration.Google` | `GeminiEmbeddingModel` for production embeddings |
+
+## Documentation
+
+Full docs, demos, and architecture: **[github.com/sevensamurai/Ananke](https://github.com/sevensamurai/Ananke)**
 
 ## License
 

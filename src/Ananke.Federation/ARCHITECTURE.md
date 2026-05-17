@@ -44,9 +44,14 @@ Ananke.Federation/
 | Namespace | Key Types |
 |---|---|
 | `Ananke.Federation.Credentials` | `IFederationCredentialProvider` |
-| `Ananke.Federation.Deployment` | `IFederationDeployer`, `IDeploymentRegistry`, `InMemoryDeploymentRegistry`, `DeploymentRecord`, `DeploymentProfile`, `DeploymentStatus`, `DeployOptions` |
+| `Ananke.Federation.Adapters` | `AdapterManifest`, `AdapterDiagnostics` — sidecar JSON manifest written by adapter installers; read by `PlatformHost` to validate compatibility before loading the assembly |
+| `Ananke.Federation.Agents` | `IManagedAgentClient` — CRUD abstraction over platform managed-agent resources; implemented by each provider package |
+| `Ananke.Federation.Execution` | `IPlatformNativeExecutor`, `PlatformNativeExecutorRegistry` — executes workflow steps using the platform's native execution API |
+| `Ananke.Federation.Paths` | `AnankePaths` — well-known file/directory path constants for federation artefacts |
+| `Ananke.Federation.Recommendation` | `IPlatformRecommender`, `PlatformRecommender`, `PlatformFitScore`, `PlatformFitReport`, `FitReason`, `FitReasonKind`, `PlatformProfiles`, `RecommendationWeights` — scores and ranks deployment platforms for a given manifest |
+| `Ananke.Federation.Deployment` | `IFederationDeployer`, `IDeploymentRegistry`, `InMemoryDeploymentRegistry`, `JsonFileDeploymentRegistry`, `DeploymentRecord`, `DeploymentProfile`, `DeploymentStatus`, `DeployOptions`, `LocalFederationDeployer`, `FederationDeployerRegistry` |
 | `Ananke.Federation.Division` | `FederatedDivisionPolicy`, `PlatformDivisionApprovalGate` |
-| `Ananke.Federation.Hosting` | `FederatedWorkflowHost`, `HybridRouter`, `FederatedComplexityMonitor` |
+| `Ananke.Federation.Hosting` | `FederatedWorkflowHost`, `HybridRouter`, `FederatedComplexityMonitor`, `PlatformWorkflowHostBase` |
 | `Ananke.Federation.Monitoring` | `IRemoteCellMonitor`, `RemoteCellHealth`, `RemoteCellMetrics`, `RemoteCellTrend`, `RemoteMetricsTracker`, `MetricsSample` |
 | `Ananke.Federation.Prompts` | `ISystemPromptCompiler`, `ManifestSystemPromptCompiler` |
 | `Ananke.Federation.Validation` | `IDeployabilityValidator`, `DeployabilityValidator`, `IPlatformValidator`, `DeployabilityReport`, `DeployDiagnostic`, `DeployDiagnosticSeverity`, `IModelMapper` |

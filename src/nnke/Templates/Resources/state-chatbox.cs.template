@@ -1,0 +1,9 @@
+/// <summary>
+/// Minimal state record used by the {{name}} chatbox workflow.
+/// The conversation history is managed internally by <see cref="Ananke.Orchestration.Agents.StreamingChatWorkflow"/>.
+/// </summary>
+public sealed record ChatboxState
+{
+    /// <summary>The current user message being processed.</summary>
+    public string UserMessage { get; init; } = "";
+}

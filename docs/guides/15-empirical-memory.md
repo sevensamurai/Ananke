@@ -189,6 +189,66 @@ No ML, no LLM — pure empirical learning from structured game analysis.
 
 ---
 
+## Knowledge Graph Projections
+
+Empirical data can be projected into an `IKnowledgeGraph` for richer, graph-based
+analytics beyond flat vector recall.
+
+### Graph Builders
+
+| Builder | What it produces |
+|---|---|
+| `DocumentStructureBuilder` | Nodes = documents/chunks; edges = heading hierarchy and cross-references |
+| `EpisodeTrajectoryBuilder` | Nodes = episodes; directed edges = causal or temporal succession |
+| `TagCoOccurrenceBuilder` | Nodes = tags; edges weighted by how often they appear together |
+
+```csharp
+using Ananke.Learning.Knowledge.Builders;
+
+var graph = await new TagCoOccurrenceBuilder()
+    .BuildAsync(await episodeStore.GetAllAsync());
+```
+
+### Graph-Expanded Prediction
+
+`GraphExpandedPredictionSource` wraps a base `IPredictionSource` and expands each
+result set by traversing the graph neighbourhood — surfacing entries that are
+tag-adjacent but not directly recalled by vector similarity alone:
+
+```csharp
+using Ananke.Learning.Knowledge.Retrieval;
+
+var source = new GraphExpandedPredictionSource(basePredictionSource, graph, hops: 2);
+var predictions = await source.PredictAsync(context);
+```
+
+### Community Consolidation
+
+`CommunityConsolidator` detects concept clusters in the graph and merges related
+empirical entries, reducing fragmentation without losing evidence trails:
+
+```csharp
+using Ananke.Learning.Knowledge.Analytics;
+
+var consolidator = new CommunityConsolidator(memory, graph);
+await consolidator.ConsolidateAsync();
+```
+
+### Report Export
+
+`KnowledgeReportExporter` serialises analytics results (community summaries, tag
+importance maps, graph statistics) into portable report formats suitable for
+dashboards or offline review:
+
+```csharp
+using Ananke.Learning.Knowledge.Reporting;
+
+var exporter = new KnowledgeReportExporter();
+await exporter.ExportAsync(graph, outputPath: "knowledge-report.json");
+```
+
+---
+
 ## RecallOptions
 
 ```csharp

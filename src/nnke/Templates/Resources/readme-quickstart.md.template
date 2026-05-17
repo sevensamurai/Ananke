@@ -1,0 +1,48 @@
+# {{name}}
+
+An Ananke quickstart project scaffolded with `nnke new quickstart`.
+
+## Run it
+
+```bash
+dotnet run
+```
+
+No API key required — this project uses `SimulatedModel`, which returns a hardcoded
+response so you can see the workflow machinery working without credentials.
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `{{name}}.csproj` | .NET project — references `Ananke.Orchestration` only |
+| `Program.cs` | Workflow + agent job + SimulatedModel (swap for real provider when ready) |
+| `QuickstartState.cs` | Typed state record threaded through the workflow |
+
+No `.ananke.yml` — this project is pure C#. Manifest-driven topology comes next.
+
+## Switch to a real LLM provider
+
+See the commented-out provider blocks at the bottom of `Program.cs`. The steps:
+
+1. Add the provider package, e.g.:
+   ```bash
+   dotnet add package Ananke.Orchestration.OpenAI
+   ```
+2. Add your API key to a `secrets.json`:
+   ```json
+   { "OpenAI": { "ApiKey": "sk-..." } }
+   ```
+3. Replace `SimulatedModel` with the provider model (see `Program.cs` comments).
+
+Full walkthrough: `nnke docs 01-getting-started`
+
+## What to explore next
+
+| Topic | Command |
+|---|---|
+| Full Guide 01 | `nnke docs 01-getting-started` |
+| Workflows — fork/join, routing | `nnke docs 02-workflows` |
+| Add LLM topology in YAML | `nnke new workflow {{name}}-v2 --pattern sequential` |
+| Streaming conversational agent | `nnke new chatbox {{name}}-chat` |
+| Browse all patterns | `nnke patterns` |

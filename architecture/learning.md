@@ -1,4 +1,4 @@
-# Architecture: Empirical Learning
+﻿# Architecture: Empirical Learning
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers empirical memory, episodes, offline learning, skill packaging, and exploration strategies.
 
@@ -128,6 +128,33 @@ Implementations: `EntityScopedConversationMemory`, `EntityScopedEmpiricalMemory`
 
 ## External Knowledge Ingestion
 
-`IExternalKnowledgeSource` + `ExternalKnowledgeSyncer`:
-- Pull knowledge from external sources on a schedule
-- Feed into the knowledge pipeline
+`IExternalKnowledgeSource` + `ExternalKnowledgeSyncer<TEvent>` (in `Ananke.Learning.Ingestion`):
+- Domain-specific external data sources implement `IExternalKnowledgeSource` to resolve batches of `KnowledgeDocument` from external events (GitHub, supplier APIs, device registries, etc.)
+- `ExternalKnowledgeSyncer<TEvent>` orchestrates the write pattern: subscribe to events → call `ResolveAsync` → upsert into `IKnowledgeStore`
+- Recommended integration point for products that need to pre-materialise domain context without live API calls at inference time
+
+## Knowledge Graph Analytics
+
+`Ananke.Learning` includes a set of graph-projection and analytics types (in `Ananke.Learning.Knowledge.*`) that populate and analyse an `IKnowledgeGraph` from learning data:
+
+### Graph Builders
+
+| Type | Namespace | Purpose |
+|---|---|---|
+| `DocumentStructureBuilder` | `Knowledge.Builders` | Projects document section relationships into the knowledge graph |
+| `EpisodeTrajectoryBuilder` | `Knowledge.Builders` | Projects episode step sequences as directed graph paths |
+| `TagCoOccurrenceBuilder` | `Knowledge.Builders` | Projects empirical tag co-occurrence frequencies as weighted edges |
+
+### Analytics
+
+| Type | Namespace | Purpose |
+|---|---|---|
+| `CommunityConsolidator` | `Knowledge.Analytics` | Detects tag/concept communities in the graph and merges empirical entries within each community |
+| `GraphTagImportanceTracker` | `Knowledge.Analytics` | Centrality-weighted variant of `ITagImportanceTracker` — ranks tags by their structural influence in the knowledge graph |
+
+### Reporting & Retrieval
+
+| Type | Namespace | Purpose |
+|---|---|---|
+| `KnowledgeReportExporter` | `Knowledge.Reporting` | Serialises knowledge graph analytics (community summaries, tag importance maps, trajectory stats) to portable report formats |
+| `GraphExpandedPredictionSource` | `Knowledge.Retrieval` | `IPredictionSource` implementation that expands recall by traversing graph neighbourhood — returns semantically adjacent patterns beyond direct tag matches |

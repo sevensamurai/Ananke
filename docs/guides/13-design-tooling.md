@@ -1,4 +1,4 @@
-<!-- topic: design-tooling, tags: dsl, manifest, yaml, topology, mermaid, scaffold, design, nnke -->
+﻿<!-- topic: design-tooling, tags: dsl, manifest, yaml, topology, mermaid, scaffold, design, nnke -->
 # 13 — Design Tooling
 
 Define workflow topologies in a text DSL or YAML manifest, bind code at runtime,
@@ -207,6 +207,65 @@ scaffold
     .BindMerge("combine", MergeResults);
 
 var workflow = scaffold.Build();
+```
+
+---
+
+## Tool Binding from Manifests
+
+When a manifest declares `tools:` sections, `WorkflowToolResolver` reads those
+declarations and builds per-job `ToolKit` instances automatically, so you don't
+have to wire tools by hand:
+
+```csharp
+using Ananke.Design.Tools;
+
+// Resolve all manifest-declared tools into a per-job map
+var resolver = new WorkflowToolResolver(bindings);
+IReadOnlyDictionary<string, ToolKit> toolKits = resolver.Resolve(manifest);
+
+// Bind agent jobs using the resolved kits
+foreach (var (jobName, jobDef) in manifest.Jobs.Where(j => j.Value.Type == "agent"))
+{
+    var kit = toolKits.GetValueOrDefault(jobName) ?? new ToolKit(jobName);
+    var builder = AgentJobFactory.Create<PipelineState, AgentTextResponse>(jobName, model)
+        .WithSystemPrompt(jobDef.SystemPrompt!)
+        .WithTools(kit);
+
+    scaffold.Bind(jobName, builder.Build());
+}
+```
+
+### Smart-Router Stage Declarations
+
+YAML manifests can describe smart-router pipeline stages. Each stage is described by a
+`RouterStageDescriptor` and assembled by `RouterStageFactory` at bind time:
+
+```yaml
+# my-workflow.ananke.yml (excerpt)
+router_stages:
+  - stage: semantic_recall
+    options:
+      top_k: 5
+  - stage: inflammation
+    options:
+      threshold: 0.4
+```
+
+```csharp
+var stages = RouterStageFactory.Build(manifest.RouterStages);
+scaffold.BindRouter("route", Workflow.DecideWithSmartRouter(stages));
+```
+
+### Testing Tool Resolution
+
+For tests, replace the registry with `InMemoryToolBindingResolver` to avoid
+external registries:
+
+```csharp
+var resolver = new WorkflowToolResolver(new InMemoryToolBindingResolver());
+var toolKits = resolver.Resolve(testManifest);
+// toolKits returns empty kits for any declared binding — safe for unit tests
 ```
 
 ---

@@ -8,15 +8,8 @@
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
-  <ItemGroup Condition="Exists('secrets.json')">
-    <None Update="secrets.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Ananke.Orchestration" Version="{{ananke_version}}" />
-    <PackageReference Include="{{provider_package}}" Version="{{ananke_version}}" />
   </ItemGroup>
 
 </Project>

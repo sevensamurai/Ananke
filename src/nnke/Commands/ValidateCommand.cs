@@ -6,17 +6,22 @@ using System.CommandLine;
 namespace Ananke.Tool.Commands;
 
 /// <summary>
-/// Handles <c>nnke validate &lt;file&gt;</c> — parses an <c>.ananke.yml</c>
-/// manifest and validates its topology via <see cref="WorkflowManifest"/> and
-/// <see cref="WorkflowScaffold"/>. Supports <c>--json</c> for machine-readable output.
+/// Handles <c>nnke validate &lt;file&gt;</c> and <c>nnke manifest validate &lt;file&gt;</c> —
+/// parses an <c>.ananke.yml</c> manifest and validates its topology via
+/// <see cref="WorkflowManifest"/> and <see cref="WorkflowScaffold"/>.
+/// Supports <c>--json</c> for machine-readable output.
 /// </summary>
 internal static class ValidateCommand
 {
-    public static Command Create()
+    /// <inheritdoc cref="Create(string)"/>
+    public static Command Create() => Create("validate");
+
+    /// <summary>Creates the command registered under <paramref name="commandName"/>.</summary>
+    public static Command Create(string commandName)
     {
         var fileArg = new Argument<FileInfo>("file") { Description = "Path to the .ananke.yml manifest file." };
 
-        var command = new Command("validate", "Parse and validate an .ananke.yml manifest.")
+        var command = new Command(commandName, "Parse and validate an .ananke.yml manifest.")
         {
             fileArg
         };

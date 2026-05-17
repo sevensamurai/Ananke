@@ -1,4 +1,4 @@
-<!-- topic: mcp-and-interop, tags: mcp, interop, a2a, protocol, server, client -->
+﻿<!-- topic: mcp-and-interop, tags: mcp, interop, a2a, protocol, server, client -->
 # 12 — MCP & Interop
 
 Expose tools and workflows as an [MCP](https://modelcontextprotocol.io/) server,
@@ -97,6 +97,15 @@ await StreamingChatWorkflow.Create("chat", model)
     .OnTextDelta(async delta => Console.Write(delta))
     .Build()
     .RunAsync(state);
+```
+
+`AddMcpServerToolsAsync` is built on `McpToolInvoker`, which handles request
+serialisation, response mapping, and error propagation for each external call.
+You can also instantiate `McpToolInvoker` directly for custom transport scenarios:
+
+```csharp
+var invoker = new McpToolInvoker(mcpClient);
+ToolResult result = await invoker.InvokeAsync("tool_name", arguments);
 ```
 
 ---

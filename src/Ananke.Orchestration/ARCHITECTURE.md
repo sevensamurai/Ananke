@@ -12,6 +12,7 @@ types to the tool system.
 
 Agent model interfaces (`IAgentModel`, `AgentRequest`, etc.) live in `Ananke.Abstractions.Agents`.
 Knowledge types (`IKnowledgeStore`, `IKnowledgeCatalog`, etc.) live in `Ananke.Orchestration.Knowledge`.
+Compatibility is maintained with type-forwarding for several agent and knowledge types that used to live in this assembly.
 
 ## Dependencies
 
@@ -24,14 +25,15 @@ Knowledge types (`IKnowledgeStore`, `IKnowledgeCatalog`, etc.) live in `Ananke.O
 
 | Namespace | Contents |
 |-----------|----------|
-| `Ananke.Orchestration` | `Workflow<TState>`, `WorkflowDefinition`, `WorkflowExecution`, `WorkflowResult`, `AgenticPattern`, `BudgetConfig`, `JobRef`, `ExecutionStatus` |
-| `Ananke.Orchestration.Agents` | `AgentJob<TState,TResponse>`, `AgentJobFactory`, `TextAgentJob`, `StreamingChatWorkflow`, `ChatSessionEvent`, `JsonSchemaGenerator` |
+| `Ananke.Orchestration` | `AgenticPattern`, `JobRef`, type-forwards for selected agent/knowledge types |
+| `Ananke.Orchestration.Workflows` | `Workflow`, `Workflow<TState>`, `WorkflowDefinition`, `WorkflowExecution`, `WorkflowResult`, `ExecutionStatus` |
+| `Ananke.Orchestration.Agents` | `AgentJob<TState,TResponse>`, `TextAgentJob<TState>`, `StreamingChatWorkflow`, `ChatSessionEvent`, `JsonSchemaGenerator`, token-usage capture helpers |
 | `Ananke.Orchestration.Agents.Context` | `IContextStrategy`, `SlidingWindowContextStrategy`, `SummarizingContextStrategy`, `ITokenCounter`, `ApproximateTokenCounter`, `AgentMessageExtensions` |
 | `Ananke.Orchestration.Agents.Middleware` | `IAgentModelMiddleware`, `MiddlewareAgentModel`, `GuardrailAgentModelMiddleware`, `LoggingAgentModelMiddleware`, `CachingAgentModel`, `ResilientAgentModel`, `SmartToolRouterMiddleware` |
 | `Ananke.Orchestration.Agents.Routing` | `IModelRouter`, `ModelRouter`, `CapabilityModelRouter`, `ModelCatalog`, `ModelProfile`, `ModelCapability`, `ModelCostRates`, `TaskRequirements` |
-| `Ananke.Orchestration.Jobs` | `IJob`, `DelegateJob`, `HandoffJob`, `SubFlowJob`, `JobDescriptor`, `JobExecution`, `Handoff`, `InterruptMode` |
-| `Ananke.Orchestration.Routing` | `IRouter`, `DelegateRouter`, `AgentRouter`, `Connections`, `ForkMode`, `ForkTarget`, `JoinDescriptor` |
-| `Ananke.Orchestration.Tools` | `ToolKit`, `ToolBuilder`, `ToolDefinition`, `ToolArgs` |
+| `Ananke.Orchestration.Jobs` | `IJob`, `DelegateJob`, `HandoffJob`, `HandoffProxy`, `SubFlowJob`, `SubFlowContext`, `SubFlowInterruptedException`, `InMemoryHandoffChannel`, `JobDescriptor`, `JobExecution`, `Handoff`, `InterruptMode` |
+| `Ananke.Orchestration.Routing` | `IRouter`, `DelegateRouter`, `AgentRouter`, `AgentRoutingException`, `Connections`, `ForkMode`, `ForkTarget`, `JoinDescriptor`, `LoopExitReason` |
+| `Ananke.Orchestration.Tools` | `ToolKit`, `ToolBuilder`, `ToolDefinition`, `ToolArgs`, `ToolExecutionMode`, `ToolMetrics`, `IToolExecutorStrategy` |
 | `Ananke.Orchestration.Tools.Gating` | `IToolFaultObserver`, `ToolAffinityTracker`, `InMemoryToolMemory` |
 | `Ananke.Orchestration.Tools.Routing` | `ISmartToolRouter`, `CompositeSmartToolRouter`, `HeuristicTagStage`, `SemanticRecallStage`, `AffinityRerankStage`, `HealthFilterStage`, `LlmRouterStage`, `PinnedToolStage`, `PassThroughRouter`, `IRoutingPromptTemplate`, `DefaultRoutingPromptTemplate` |
 | `Ananke.Orchestration.Tools.Faults` | `InMemoryToolFaultObserver`, `ToolHealthRecovery`, `ToolPruner` |
@@ -45,16 +47,22 @@ Knowledge types (`IKnowledgeStore`, `IKnowledgeCatalog`, etc.) live in `Ananke.O
 | `Ananke.Orchestration.Execution` | `IWorkflowRunner`, `WorkflowRunner` |
 | `Ananke.Orchestration.Tracing` | `WorkflowTraceContext`, `NullTracer` |
 | `Ananke.Orchestration.Extensions` | `ServiceCollectionExtensions` |
+| `Ananke.Orchestration.Budget` | `BudgetConfig`, token usage helpers |
+| `Ananke.Orchestration.Credentials` | `ICredentialProvider` — provider-agnostic runtime credential resolution; implementations live in each `Ananke.Orchestration.{Provider}` package |
+| `Ananke.Orchestration.Translators` | `IJsonSchemaTranslator`, `IModelMapper`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-specific schema and prompt translation contracts |
 
 ## Key Types
 
 | Type | Kind | Purpose |
 |------|------|---------|
-| `Workflow<TState>` | Class | Fluent DAG builder — `Job()`, `Then()`, `Decide()`, `Chain()`, `Fork()`, `SubFlow()`. Immutable after first `RunAsync`. |
-| `AgentJobFactory` | Static class | Fluent builder factory for `AgentJob<TState,TResponse>` and `TextAgentJob<TState>` — `AgentJobFactory.Create<TState,TResponse>(name, model)` |
+| `Workflow<TState>` | Class | Fluent typed workflow builder with direct, routed, looped, fork/join, and sub-workflow transitions. Frozen after `Build()`. |
+| `IWorkflowRunner` | Interface | Executes, resumes, and streams `WorkflowDefinition<TState>` instances |
+| `WorkflowRunner` | Class | Default execution engine implementing checkpoints, interrupts, fork/join orchestration, middleware, and event streaming |
+| `AgentJobFactory` | Static class | Fluent builder factory for `AgentJob<TState,TResponse>` and `TextAgentJob<TState>` |
 | `AgentJob<TState,TResponse>` | Class | `IJob` that wraps an `IAgentModel` call with system prompt, tools, and response mapping |
-| `StreamingChatWorkflow` | Static class | Pre-built agent-tools loop with `OnTextDelta`/`OnToolResult` callbacks. Builder pattern via `Create().WithSystemPrompt().WithTools().RunAsync()` |
-| `ToolKit` | Class | Named collection of `ToolDefinition` — quick-add (0/1 param) or builder (2+ params) |
+| `TextAgentJob<TState>` | Class | `IJob` wrapper for plain-text agent output, optional memory, context compaction, and tool loops |
+| `StreamingChatWorkflow` | Static class | Pre-built streaming agent-tools loop with delta callbacks, optional memory, and context strategies |
+| `ToolKit` | Class | Named collection of `ToolDefinition` with tool-memory integration, routing hooks, fault observation, and execution-strategy support |
 | `AgenticPattern` | Static class | Factory for `ReviewCritique<TState>` and `IterativeRefinement<TState>` pattern builders |
 | `ModelCatalog` | Class | Registry of `ModelProfile` entries for capability-based routing |
 | `CompositeSmartToolRouter` | Class | Pipeline-style smart tool router; compose stages (heuristic, semantic, affinity, health, LLM) via `ISmartToolRouter` |
@@ -81,23 +89,25 @@ Workflow<TState>.RunAsync(initialState)
 - `IContextStrategy` — conversation history management (sliding window, summarizing)
 - `IModelRouter` — capability-based model selection for multi-model workflows
 - `ICheckpointStore` — custom checkpoint persistence
+- `IToolExecutorStrategy` — execution for remote-backed or externally hosted tools
+- `IToolFaultObserver` — health/fault observation for tool execution
 - `IKnowledgeStore`, `IDocumentExtractor`, `IDocumentChunker` — knowledge pipeline (defined in `Ananke.Orchestration.Knowledge`)
 
 ## Agents Sub-Structure
 
-The `Agents` folder organizes 26 files into sub-namespaces by concern:
+The `Agents` area is split into sub-namespaces by concern:
 
 ```
 Agents/
-  ├── Root (5)       AgentJobFactory, AgentJob, TextAgentJob, StreamingChatWorkflow,
+  ├── Root           AgentJobFactory, AgentJob, TextAgentJob, StreamingChatWorkflow,
   │                  ChatSessionEvent, JsonSchemaGenerator
   ├── Context/ (6)   IContextStrategy, SlidingWindowContextStrategy,
   │                  SummarizingContextStrategy, ITokenCounter,
   │                  ApproximateTokenCounter, AgentMessageExtensions
-  ├── Middleware/ (6) IAgentModelMiddleware, MiddlewareAgentModel,
+  ├── Middleware/    IAgentModelMiddleware, MiddlewareAgentModel,
   │                  GuardrailAgentModelMiddleware, LoggingAgentModelMiddleware,
-  │                  CachingAgentModel, ResilientAgentModel
-  └── Routing/ (8)   IModelRouter, ModelRouter, CapabilityModelRouter,
+  │                  CachingAgentModel, ResilientAgentModel, SmartToolRouterMiddleware
+  └── Routing/       IModelRouter, ModelRouter, CapabilityModelRouter,
                      ModelCatalog, ModelProfile, ModelCapability,
                      ModelCostRates, TaskRequirements
 ```
@@ -117,7 +127,7 @@ This project targets **ASP.NET Core / hosted services / console** hosts — none
 
 | Surface | Stability |
 |---|---|
-| `Workflow<TState>` fluent builder (`Job`, `Then`, `Decide`, `Fork`, `Join`, `SubFlow`, `Chain`) | Stable |
+| `Workflow<TState>` fluent builder (`Job`, `Then`, `Decide`, `Loop`, `Fork`, `Join`, `SubFlow`, `Chain`) | Stable |
 | `AgentJobFactory` / `AgentJob<TState,TResponse>` / `TextAgentJob<TState>` | Stable |
 | `StreamingChatWorkflow` | Stable |
 | `ToolKit` / `ToolDefinition` / `ToolBuilder` / `ToolArgs` | Stable |

@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.svg)](https://www.nuget.org/packages/Ananke.Orchestration)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
 
-Workflow orchestration engine for .NET — fluent graph-as-code builder, AI agent jobs with tool calling, fork/join parallelism, human-in-the-loop interrupts, checkpointing, and tracing.
+Workflow orchestration engine for .NET — typed workflows, agent jobs, streaming chat loops, tool execution, checkpointing, and orchestration-level tracing.
 
 ## Install
 
@@ -32,6 +32,14 @@ var workflow = new Workflow<ResearchState>("research-pipeline")
 var result = await workflow.RunAsync(new ResearchState { Query = "distributed systems" });
 ```
 
+The same workflow surface supports:
+
+- delegate jobs and custom `IJob<TState>` implementations
+- direct, routed, looped, fork/join, and sub-workflow transitions
+- checkpoint/resume for human-in-the-loop scenarios
+- event streaming through `IWorkflowRunner.StreamAsync(...)`
+- agent jobs backed by `IAgentModel` and `IStreamingAgentModel`
+
 ### DI registration
 
 ```csharp
@@ -45,22 +53,43 @@ services.AddWorkflowOrchestration(o => o
 
 ## Features
 
-- **Fluent graph builder** — `.Then()`, `.Fork()`, `.Join()`, `.SubFlow()`, `.Chain()`
-- **AI agent jobs** — `AgentJobFactory` with tool calling, structured output, token streaming
-- **Conditional routing** — `Workflow.Decide()` for lambda-based, `DecideWithAgent()` for LLM-driven
-- **Fork / Join** — fan-out to parallel branches, fan-in with merge function
-- **Human-in-the-loop** — `.InterruptBefore()` / `.InterruptAfter()` with `ResumeAsync()`
-- **Checkpointing** — persist and resume workflow state (`InMemoryCheckpointStore` or custom `ICheckpointStore` — see interface remarks for Redis/SQL guidance)
-- **Resilience** — Polly-based retry built into the runner
-- **Smart Tool Router** — `CompositeSmartToolRouter` pipeline with heuristic-tag, semantic-recall, affinity re-rank, health-filter, and LLM routing stages; controlled via `SmartToolRouterMiddleware`
-- **Model decorators** — `ResilientAgentModel` (429 retry + OTel) and `CachingAgentModel` (LLM response caching)
-- **Tracing** — `IWorkflowTracer` for OpenTelemetry integration
+- **Typed workflow builder** — `Workflow<TState>` with `Job`, `Then`, `Chain`, `Loop`, `Fork`, `Join`, and `SubFlow`
+- **Routing primitives** — `Workflow.Decide(...)`, `Workflow.DecideAsync(...)`, and `Workflow.DecideWithAgent(...)`
+- **Agent jobs** — `AgentJob<TState,TResponse>` for structured output and `TextAgentJob<TState>` for plain-text generations
+- **Streaming chat workflow** — `StreamingChatWorkflow` builder for agent → tools → agent loops with delta callbacks
+- **Checkpointing and resume** — `ICheckpointStore`, interrupts, and `IWorkflowRunner.ResumeAsync(...)`
+- **Workflow event streaming** — `IWorkflowRunner.StreamAsync(...)` for progress, fork/join, and terminal events
+- **Tool execution** — `ToolKit`, `ToolDefinition`, `ToolBuilder`, memory-backed tool gating, and execution strategies
+- **Smart tool routing** — `CompositeSmartToolRouter` and routing stages surfaced through `SmartToolRouterMiddleware`
+- **Model middleware** — logging, guardrails, caching, resilience, and tool-window narrowing at the `IAgentModel` layer
+- **Pattern builders** — `AgenticPattern.ReviewCritique<TState>()` and `AgenticPattern.IterativeRefinement<TState>()`
+- **Tracing and budgets** — `IWorkflowTracer`, workflow trace context, and token-usage capture for model calls
+
+## Key surfaces
+
+| Type | Purpose |
+|---|---|
+| `Workflow<TState>` | Fluent workflow definition and convenience execution entry point |
+| `IWorkflowRunner` / `WorkflowRunner` | Execution, resume, and event streaming engine |
+| `IJob<TState>` | Job abstraction for custom workflow work units |
+| `IWorkflowJobMiddleware<TState>` | Cross-cutting wrapper around workflow job execution |
+| `AgentJob<TState,TResponse>` | Structured-output agent job with optional tool loop |
+| `TextAgentJob<TState>` | Plain-text agent job with optional tool loop |
+| `StreamingChatWorkflow` | Pre-built streaming conversation loop with optional memory and tools |
+| `ToolKit` | Named collection of tools, tool-memory integration, and routing hooks |
+| `AgenticPattern` | Factory for common multi-step agent patterns |
+
+## Package boundaries
+
+`Ananke.Orchestration` depends on `Ananke.Orchestration.Knowledge`, but the knowledge package remains independently consumable. This package also includes bridge types that expose knowledge stores and catalogs as agent-callable tools.
+
+For compatibility, several agent and knowledge types are type-forwarded so existing consumers that referenced them through `Ananke.Orchestration` continue to resolve after package extraction.
 
 ## Related packages
 
 | Package | What it adds |
 |---|---|
-| `Ananke.Orchestration.Knowledge` | Knowledge pipeline — vector stores, document processing, catalog, linking (included as transitive dep) |
+| `Ananke.Orchestration.Knowledge` | Vector stores, document processing, knowledge catalog, and document-linking pipeline (included transitively) |
 | `Ananke.Orchestration.OpenAI` | OpenAI `IStreamingAgentModel` + `IEmbeddingModel` provider |
 | `Ananke.Orchestration.Anthropic` | Anthropic / Claude `IStreamingAgentModel` provider |
 | `Ananke.Orchestration.Google` | Google Gemini `IStreamingAgentModel` + `IEmbeddingModel` provider |

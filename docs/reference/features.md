@@ -106,8 +106,10 @@ relevant documentation guide and demo (where available).
 | **Agent handoff** | `HandoffJob` — request/response handoff between agents across processes | [09 — Distributed](../guides/09-distributed.md) | — |
 | **MCP server** | Expose `ToolKit` and `Workflow` as MCP server capabilities (stdio + HTTP) | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
 | **MCP client** | Import tools from external MCP servers into `ToolKit` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
+| **McpToolInvoker** | Invoke tools on external MCP servers and return typed results — the underlying transport used by `AddMcpServerToolsAsync` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 | **A2A client** | Call remote A2A agents as `IAgentModel` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 | **A2A server** | Expose Ananke workflows as A2A-compliant endpoints | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
+| **SkillCatalogMemorySync** | Sync discovered skill catalog entries into `IToolMemory` so the smart router can score and recall them across sessions | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 
 ## Observability
 
@@ -128,6 +130,9 @@ relevant documentation guide and demo (where available).
 | **ModelResolver** | Resolve model instances from YAML manifest + configuration | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
 | **Runtime binding** | `Bind()` job implementations to a scaffold at runtime | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
 | **Mermaid export** | `workflow.ToMermaid()` — generate diagrams from any validated workflow | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
+| **WorkflowToolResolver** | Resolve manifest-declared tools into per-job `ToolKit` instances — wires tools from YAML to the scaffolded workflow | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
+| **InMemoryToolBindingResolver** | In-memory `IToolBindingResolver` for tests and local scaffolding without external registries | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
+| **RouterStageDescriptor / RouterStageFactory** | Declare smart-router stages in YAML manifests; `RouterStageFactory` constructs the pipeline at bind time | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
 
 ## Testing
 
@@ -137,6 +142,7 @@ relevant documentation guide and demo (where available).
 | **In-memory knowledge store** | `InMemoryKnowledgeStore` — vector store that runs without external services | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory handoff channel** | `InMemoryHandoffChannel` — test agent handoff without MQTT | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory checkpoint store** | `InMemoryCheckpointStore` — test checkpointing without a filesystem | [14 — Testing](../guides/14-testing.md) | — |
+| **In-memory embedder** | `InMemoryEmbedder` — deterministic character-hash embedder; run full RAG and empirical memory pipelines without a real embedding model | [14 — Testing](../guides/14-testing.md) | — |
 
 ## Empirical Memory & Agent Learning
 
@@ -150,6 +156,11 @@ relevant documentation guide and demo (where available).
 | **IOfflineLearner** | Background learning cycles: decay, curiosity exploration, consolidation | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
 | **IConsolidationSummarizer** | Promote confident entries into `IKnowledgeStore` as permanent knowledge | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
 | **Skill packages** | Export validated skills as portable packages; import across deployments | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **External knowledge ingestion** | `IExternalKnowledgeSource` + `ExternalKnowledgeSyncer<TEvent>` — pre-materialise domain context from external APIs into `IKnowledgeStore` on an event-driven schedule | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **Knowledge graph projections** | `DocumentStructureBuilder`, `EpisodeTrajectoryBuilder`, `TagCoOccurrenceBuilder` — project learning data into an `IKnowledgeGraph` for graph-based analytics | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **Graph-expanded prediction** | `GraphExpandedPredictionSource` — `IPredictionSource` that expands recall by traversing graph neighbourhood beyond direct tag matches | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **Community consolidation** | `CommunityConsolidator` — detects concept communities in the knowledge graph and merges related empirical entries | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
+| **Knowledge report export** | `KnowledgeReportExporter` — serialise graph analytics (community summaries, tag importance maps) to portable report formats | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
 
 ## Agentic Patterns
 
@@ -178,6 +189,10 @@ relevant documentation guide and demo (where available).
 | **Human approval gates** | Cross-cloud workflows with interrupt-and-resume approval gates | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
 | **nnke-platform CLI** | Deploy, observe, compare platforms, and manage federation mesh operations | [CLI Overview](../cli/overview.md) | — |
 | **Smart Tool Router** | Route tool calls to the best available provider based on capability, cost, and latency | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
+| **LocalFederationDeployer** | `IFederationDeployer` that runs cells in the local process — enables testing federation flows without cloud credentials | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
+| **Adapter manifest system** | `AdapterManifest` sidecar JSON validated before loading a provider adapter DLL; `AdapterDiagnostics` for compatibility reporting | — | — |
+| **IManagedAgentClient** | CRUD abstraction over platform managed-agent resources; implemented by each provider package for conformance testing | — | — |
+| **IPlatformNativeExecutor** | Execute workflow steps via a platform's native execution API; `PlatformNativeExecutorRegistry` resolves by platform ID at runtime | — | — |
 
 ---
 

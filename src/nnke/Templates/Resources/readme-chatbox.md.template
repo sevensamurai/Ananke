@@ -1,0 +1,68 @@
+# {{name}}
+
+An Ananke streaming conversational agent scaffolded with `nnke new chatbox`.  
+Exposes a Minimal API with SSE streaming via `StreamingChatWorkflow`.
+
+## Run it
+
+```bash
+dotnet run
+```
+
+Then in another terminal:
+
+```bash
+# Single JSON response
+curl -s -X POST http://localhost:5000/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message":"What can Ananke do?"}'
+
+# Streaming (Server-Sent Events)
+curl -N -X POST http://localhost:5000/chat/stream \
+     -H "Content-Type: application/json" \
+     -d '{"message":"Tell me about agentic workflows."}'
+```
+
+No API key required yet — `SimulatedStreamingModel` streams word-by-word so you
+can see the SSE transport in action immediately.
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `{{name}}.csproj` | ASP.NET Minimal API — references `Ananke.Orchestration` + `Microsoft.AspNetCore.OpenApi` |
+| `Program.cs` | API endpoints + `SimulatedStreamingModel` (swap for real provider when ready) |
+| `secrets.json` | API key placeholder — never commit this |
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/chat` | Full JSON response `{"reply":"..."}` |
+| `POST` | `/chat/stream` | SSE stream of text deltas, ends with `data: [DONE]` |
+
+## Switch to a real LLM provider
+
+See the commented-out provider blocks at the top of `Program.cs`:
+
+```bash
+# OpenAI
+dotnet add package Ananke.Orchestration.OpenAI
+
+# Anthropic
+dotnet add package Ananke.Orchestration.Anthropic
+```
+
+Then update `secrets.json`:
+```json
+{ "OpenAI": { "ApiKey": "sk-..." } }
+```
+
+## What to explore next
+
+| Topic | Command |
+|---|---|
+| Full streaming guide | `nnke docs 05-streaming` |
+| Add tool calling to the agent | `nnke docs 07-tool-calling` |
+| Add conversation memory | `nnke docs 08-memory` |
+| Workflow patterns | `nnke new workflow {{name}}-v2 --pattern router` |
