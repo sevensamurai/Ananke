@@ -56,6 +56,9 @@ Ananke.Organics/
 | `Ananke.Organics.Division.Approval` | `IDivisionApprovalGate`, `AutoApprovalGate`, `LlmApprovalGate`, `CallbackApprovalGate`, `MetabolicDivisionApprovalGate`, `DivisionApproval` |
 | `Ananke.Organics.Healing` | `IHealingPolicy`, `ThresholdHealingPolicy`, `IHealthMonitor`, `CompositeHealingPolicy`, `HealingPlan`, `HealthSnapshot`, `FailureOrigin`, `AgedCellPrunePolicy`, `IdleCellPrunePolicy` |
 | `Ananke.Organics.Sensing` | `ICapabilityMap`, `InMemoryCapabilityMap`, `IMeshAggregator`, `InMemoryMeshAggregator`, `IRequestRouter`, `KeywordRequestRouter`, `IDomainRouter`, `RoutingAffinityTracker`, `QuorumApprovalGate`, `MeshSignal`, `WorkflowSignal`, `SensedCapability` |
+| `Ananke.Organics.Topology` | `ColonyGraphBuilder` — builds a `IKnowledgeGraph` colony graph from the live mesh state (capability map, lineage, routing affinity) |
+| `Ananke.Organics.Topology.Centrality` | `GodNodeDetector` — identifies over-centralised cells in the colony graph using degree/PageRank centrality |
+| `Ananke.Organics.Topology.Reporting` | `ColonyReportExporter` — serialises colony graph snapshots to portable report formats |
 
 ---
 

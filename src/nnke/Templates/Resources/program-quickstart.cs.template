@@ -1,0 +1,71 @@
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Workflows;
+
+// -------------------------------------------------------------------
+//  {{name}} — Quickstart (Guide 01: Getting Started)
+//
+//  A single agent job wired into a workflow. SimulatedModel is used
+//  so this runs without an API key. When you are ready to use a real
+//  LLM, swap SimulatedModel for a provider model — see the comments
+//  at the bottom of this file.
+//
+//  dotnet run
+//  Next: nnke docs 02-workflows   (fork/join, routing, parallelism)
+//        nnke new workflow {{name}}-v2 --pattern sequential
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} — Quickstart");
+Console.WriteLine();
+
+// --- Agent job (plain-text) ---
+// Receives state, calls the model, maps the text response back into state.
+var agent = AgentJobFactory.Create<QuickstartState>("respond", new SimulatedModel())
+    .WithSystemPrompt("You are a helpful assistant. Answer concisely.")
+    .WithPrompt(s => s.UserInput)
+    .MapResult((s, text) => s with { Response = text })
+    .Build();
+
+// --- Workflow ---
+// A directed graph of jobs. Each job receives typed state and returns new state.
+var workflow = new Workflow<QuickstartState>("{{name}}")
+    .Job("respond", agent)
+    .Then("respond", Workflow.End);
+
+// --- Run ---
+var execution = await workflow.RunAsync(new QuickstartState
+{
+    UserInput = "What can Ananke help me build?"
+});
+
+var finalState = execution.Result!.FinalState;
+Console.WriteLine($"  Input  : {finalState.UserInput}");
+Console.WriteLine($"  Output : {finalState.Response}");
+Console.WriteLine($"  Success: {execution.Result.Success}");
+Console.WriteLine();
+Console.WriteLine("  Next steps:");
+Console.WriteLine("    nnke docs 01-getting-started   (full guide with real LLM providers)");
+Console.WriteLine("    nnke docs 02-workflows          (fork/join, routing, parallelism)");
+Console.WriteLine("    nnke new workflow {{name}}-v2 --pattern sequential");
+
+// --- SimulatedModel: replace with a real provider when ready ---
+// OpenAI:
+//   dotnet add package Ananke.Orchestration.OpenAI
+//   var model = new OpenAIChatAgentModel(new ChatClient("gpt-4.1-mini", new ApiKeyCredential(apiKey)));
+//
+// Anthropic:
+//   dotnet add package Ananke.Orchestration.Anthropic
+//   var model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-4-20250514");
+//
+// Google:
+//   dotnet add package Ananke.Orchestration.Google
+//   var model = GoogleAgentModel.Create(apiKey, "gemini-2.5-flash");
+
+internal sealed class SimulatedModel : IAgentModel
+{
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse
+        {
+            Text = "Hello! I am an Ananke agent. Ask me anything."
+        });
+}

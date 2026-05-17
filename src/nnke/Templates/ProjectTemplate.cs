@@ -15,6 +15,8 @@ internal static class ProjectTemplate
     {
         var resourceName = pattern switch
         {
+            "quickstart" => "project-quickstart.csproj.template",
+            "chatbox" => "project-chatbox.csproj.template",
             "organic-host" => "project-organic-host.csproj.template",
             "streaming-chat" => "project-streaming-chat.csproj.template",
             _ when CodePatterns.Contains(pattern) => "project-code.csproj.template",

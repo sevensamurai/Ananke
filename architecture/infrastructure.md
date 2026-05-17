@@ -1,4 +1,4 @@
-# Architecture: Infrastructure
+﻿# Architecture: Infrastructure
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers Redis, MQTT, Qdrant, OpenTelemetry, StateMachine, and ASP.NET Core integration.
 
@@ -42,9 +42,10 @@ stateDiagram-v2
 
 | Interface | Implementation | Backend |
 |---|---|---|
-| `IDistributedLock` | RedLock-based | Redis via RedLock.net |
-| `IKeyValueDataAdapter` | StackExchange.Redis | Redis key-value |
-| `ICheckpointStore` | Redis-backed | Workflow checkpoint persistence |
+| `IDistributedLock` | `RedisDistributedLock` (RedLock-based) | Redis via RedLock.net |
+| `IKeyValueDataAdapter` | `RedisDataAdapter` | Redis key-value via StackExchange.Redis |
+| `ICheckpointStore` | `RedisCheckpointStore` | Workflow checkpoint persistence; TTL via `EXPIREAT` |
+| `IConversationMemory` | `RedisConversationMemory` | Multi-turn conversation history per session; optional TTL |
 
 Registration: `services.AddAnankeRedis(options)`
 

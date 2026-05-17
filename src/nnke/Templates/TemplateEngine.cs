@@ -59,6 +59,27 @@ internal static partial class TemplateEngine
     };
 
     /// <summary>
+    /// Returns the C# class name of the streaming agent model for a given provider.
+    /// </summary>
+    public static string ProviderClass(string provider) => provider switch
+    {
+        "anthropic" => "AnthropicAgentModel",
+        "google" => "GeminiAgentModel",
+        _ => "OpenAIChatAgentModel",
+    };
+
+    /// <summary>
+    /// Returns the PascalCase configuration section name for a given provider,
+    /// matching the key used in <c>secrets.json</c> (e.g. <c>"OpenAI"</c>, <c>"Anthropic"</c>).
+    /// </summary>
+    public static string ProviderSection(string provider) => provider switch
+    {
+        "anthropic" => "Anthropic",
+        "google" => "Google",
+        _ => "OpenAI",
+    };
+
+    /// <summary>
     /// Builds the standard variable dictionary used by most scaffold templates.
     /// </summary>
     public static Dictionary<string, string> StandardVariables(string name, string provider) => new()
@@ -67,6 +88,8 @@ internal static partial class TemplateEngine
         ["provider"] = provider,
         ["model"] = DefaultModel(provider),
         ["provider_package"] = ProviderPackage(provider),
+        ["provider_class"] = ProviderClass(provider),
+        ["provider_section"] = ProviderSection(provider),
         ["ananke_version"] = AnankeVersion,
         ["ms_extensions_version"] = MsExtensionsVersion,
     };

@@ -96,9 +96,12 @@ internal static class NewWorkflowCommand
         // Program.cs — pattern-specific template
         WriteFile(projectDir, "Program.cs", ProgramTemplate.Render(name, pattern, provider), files, skipped);
 
-        // Manifest — only for manifest-driven patterns
+        // Manifest and README — only for manifest-driven patterns
         if (isManifest)
+        {
             WriteFile(projectDir, $"{name}.ananke.yml", ManifestTemplate.Render(name, provider, pattern), files, skipped);
+            WriteFile(projectDir, "README.md", ReadmeTemplate.Render(name, provider), files, skipped);
+        }
 
         // State record — pattern-specific type
         var (stateFileName, stateContent) = StateTemplate.RenderForPattern(name, pattern);
@@ -161,5 +164,15 @@ internal static class NewWorkflowCommand
         DirectoryInfo output, List<string> files, List<string> skipped)
     {
         Execute(name, provider, pattern, output, json: false, filesOverride: files, skippedOverride: skipped);
+    }
+
+    /// <summary>
+    /// Entry point for commands that delegate pattern scaffold to this command
+    /// (e.g. <c>nnke new pattern</c>). Passes through to <see cref="Execute"/>.
+    /// </summary>
+    internal static void ExecuteForCli(
+        string name, string provider, string pattern, DirectoryInfo? output, bool json)
+    {
+        Execute(name, provider, pattern, output, json);
     }
 }

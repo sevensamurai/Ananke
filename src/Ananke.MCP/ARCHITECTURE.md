@@ -26,3 +26,4 @@ Supports stdio and HTTP transports via the official C# MCP SDK.
 | `AnankeToolAdapter` | Class | Wraps a `ToolDefinition` as an MCP server tool handler |
 | `WorkflowToolAdapter` | Class | Wraps a `Workflow<TState>` as an MCP server tool |
 | `McpServerBuilderExtensions` | Static class | `builder.AddAnankeTools(toolkit)` — registers tools with MCP server builder |
+| `McpToolInvoker` | Class | Invokes tools registered on an external MCP server and returns typed results; used when importing external MCP tools into a `ToolKit` |

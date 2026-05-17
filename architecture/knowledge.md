@@ -1,4 +1,4 @@
-# Architecture: Knowledge Pipeline
+﻿# Architecture: Knowledge Pipeline
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers vector stores, document processing, catalog, and document linking.
 
@@ -63,6 +63,9 @@ flowchart TD
 | `InMemoryDocumentLinkGraph` | In-memory graph |
 | `DocumentLinkExtractor` | Discover links between documents |
 | `LinkedKnowledgeStore` | Decorator that follows links during search |
+| `KnowledgeLinkingExtensions` | DI helpers: `services.AddKnowledgeLinking()` — registers `LinkedKnowledgeStore` and `DocumentLinkExtractor` |
+| `KnowledgeLinkingOptions` | Configuration: traversal depth, score-blend weight, min link strength |
+| `LinkedSearchOptions` | Per-query controls for graph traversal depth and score blending, passed to `LinkedKnowledgeStore.SearchAsync` |
 
 ### External Providers
 

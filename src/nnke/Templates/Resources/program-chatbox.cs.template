@@ -1,0 +1,150 @@
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
+using {{provider_package}};
+using Microsoft.Extensions.Configuration;
+using System.Runtime.CompilerServices;
+
+// -------------------------------------------------------------------
+//  {{name}} — Streaming Conversational Agent (Minimal API)
+//
+//  Endpoints:
+//    POST /chat          — full JSON response  {"reply":"..."}
+//    POST /chat/stream   — SSE stream of text deltas, ends with [DONE]
+//
+//  No API key?  SimulatedStreamingModel is used automatically.
+//  Have a key?  Add it to secrets.json — the real model is picked up
+//               on the next dotnet run (no code change needed).
+//
+//  dotnet run
+//  curl -N -X POST http://localhost:5000/chat/stream \
+//       -H "Content-Type: application/json" \
+//       -d '{"message":"Hello!"}'
+//
+//  Next: nnke docs 05-streaming   (streaming patterns and transports)
+// -------------------------------------------------------------------
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("secrets.json", optional: true);
+
+// ── Model selection ────────────────────────────────────────────────
+// If secrets.json contains "{{provider_section}}": { "ApiKey": "..." }
+// the real {{provider_class}} is used automatically.
+// Otherwise SimulatedStreamingModel is used — no credentials required.
+//
+// To switch to a different provider, update the PackageReference in
+// {{name}}.csproj and adjust secrets.json accordingly:
+//
+//   OpenAI    → Ananke.Orchestration.OpenAI    / "OpenAI":    { "ApiKey": "sk-..."     }
+//   Anthropic → Ananke.Orchestration.Anthropic / "Anthropic": { "ApiKey": "sk-ant-..." }
+//   Google    → Ananke.Orchestration.Google    / "Google":    { "ApiKey": "AIza..."    }
+var apiKey = builder.Configuration["{{provider_section}}:ApiKey"];
+
+IStreamingAgentModel model = !string.IsNullOrWhiteSpace(apiKey)
+    ? {{provider_class}}.Create(apiKey, builder.Configuration["{{provider_section}}:Model"] ?? "{{model}}")
+    : new SimulatedStreamingModel();
+
+if (model is SimulatedStreamingModel)
+    Console.WriteLine("  [{{name}}] No API key found — using SimulatedStreamingModel. " +
+        "Add \"{{provider_section}}\": { \"ApiKey\": \"...\" } to secrets.json to use a real model.");
+
+// ── ChatService ────────────────────────────────────────────────────
+// Singleton that owns the model. A new StreamingChatWorkflow is built
+// per request so that SSE/buffer callbacks are scoped to each call.
+builder.Services.AddSingleton(model);
+builder.Services.AddSingleton<ChatService>();
+
+var app = builder.Build();
+
+// ── POST /chat ─────────────────────────────────────────────────────
+app.MapPost("/chat", async (ChatRequest req, ChatService chat, CancellationToken ct) =>
+{
+    var reply = await chat.CompleteAsync(req.Message, ct);
+    return Results.Ok(new ChatResponse(reply));
+});
+
+// ── POST /chat/stream ──────────────────────────────────────────────
+// Streams text deltas as Server-Sent Events.
+// Each SSE event:  data: <delta>\n\n
+// Final event:     data: [DONE]\n\n
+app.MapPost("/chat/stream", async (ChatRequest req, ChatService chat,
+    HttpContext http, CancellationToken ct) =>
+{
+    http.Response.ContentType = "text/event-stream";
+    http.Response.Headers.CacheControl = "no-cache";
+    http.Response.Headers.Connection = "keep-alive";
+
+    await chat.StreamAsync(
+        req.Message,
+        async delta =>
+        {
+            await http.Response.WriteAsync($"data: {delta}\n\n", ct);
+            await http.Response.Body.FlushAsync(ct);
+        },
+        ct);
+
+    await http.Response.WriteAsync("data: [DONE]\n\n", ct);
+    await http.Response.Body.FlushAsync(ct);
+});
+
+app.Run();
+
+// ── DTOs ──────────────────────────────────────────────────────────
+internal sealed record ChatRequest(string Message);
+internal sealed record ChatResponse(string Reply);
+
+// ── ChatService ────────────────────────────────────────────────────
+// Owns the model reference; builds a StreamingChatWorkflow per call
+// so that per-request callbacks (SSE writers, buffers) are correctly
+// scoped and do not bleed across concurrent requests.
+internal sealed class ChatService(IStreamingAgentModel model)
+{
+    private const string SystemPrompt = "You are a helpful assistant. Answer concisely.";
+
+    public async Task<string> CompleteAsync(string userMessage, CancellationToken ct)
+    {
+        var buffer = new System.Text.StringBuilder();
+        await StreamingChatWorkflow.Create("{{name}}", model)
+            .WithSystemPrompt(SystemPrompt)
+            .OnTextDelta(delta => { buffer.Append(delta); return Task.CompletedTask; })
+            .RunAsync([AgentMessage.User(userMessage)], ct);
+        return buffer.ToString();
+    }
+
+    public async Task StreamAsync(string userMessage, Func<string, Task> onDelta, CancellationToken ct)
+    {
+        await StreamingChatWorkflow.Create("{{name}}", model)
+            .WithSystemPrompt(SystemPrompt)
+            .OnTextDelta(onDelta)
+            .RunAsync([AgentMessage.User(userMessage)], ct);
+    }
+}
+
+// ── SimulatedStreamingModel ───────────────────────────────────────
+// Emits the response word-by-word so the SSE transport is visible
+// without credentials. Replaced automatically when a real API key is
+// present in secrets.json (no code change needed).
+internal sealed class SimulatedStreamingModel : IStreamingAgentModel
+{
+    private const string ReplyText =
+        "Hello! I am a simulated Ananke streaming agent. " +
+        "Add a real API key to secrets.json and I will be replaced automatically.";
+
+    public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
+        AgentRequest request,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        foreach (var word in ReplyText.Split(' '))
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(60, ct);
+            yield return new AgentStreamChunk { TextDelta = word + " " };
+        }
+        yield return new AgentStreamChunk { CompletedResponse = new AgentResponse { Text = ReplyText } };
+    }
+
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse { Text = ReplyText });
+}

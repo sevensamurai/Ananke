@@ -35,6 +35,7 @@
     <EmbeddedResource Include="Templates\Resources\*.cs.template" WithCulture="false" />
     <EmbeddedResource Include="Templates\Resources\*.csproj.template" />
     <EmbeddedResource Include="Templates\Resources\*.yml.template" />
+    <EmbeddedResource Include="Templates\Resources\*.md.template" />
     <EmbeddedResource Include="Templates\Resources\*.json.template" />
   </ItemGroup>
 

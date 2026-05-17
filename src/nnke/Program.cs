@@ -4,14 +4,14 @@ using System.CommandLine;
 
 var jsonOption = CliOptions.CreateJsonOption();
 
-var rootCommand = new RootCommand("Ananke CLI — scaffold workflows, validate manifests, and export diagrams. For federation ops, install nnke-platform.")
+var rootCommand = new RootCommand("Ananke CLI — scaffold working AI agent projects from zero. Run 'nnke new quickstart <name>' to start.")
 {
     jsonOption,
     NewCommand.Create(),
+    ManifestCommand.Create(),
     ValidateCommand.Create(),
-    RunCommand.Create(),
-    ServeCommand.Create(),
     DiagramCommand.Create(),
+    ServeCommand.Create(),
     InspectCommand.Create(),
     ExplainCommand.Create(),
     PatternsCommand.Create(),

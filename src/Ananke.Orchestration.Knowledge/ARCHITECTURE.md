@@ -12,6 +12,7 @@ documents through chunking, embedding, and semantic search.
 Separated from `Ananke.Orchestration` so that vector storage backends
 (`Ananke.Qdrant`) and document extractors (`Ananke.Documents`) can
 depend on knowledge types without pulling in the workflow engine.
+`Ananke.Orchestration` then layers bridge/tool types on top of this package.
 
 ## Dependencies
 
@@ -78,11 +79,21 @@ depend on knowledge types without pulling in the workflow engine.
 | `DocumentLink` | Linking | Weighted edge between two documents |
 | `LinkedSearchOptions` | Linking | Controls graph traversal depth and score blending |
 
+## Package boundary with `Ananke.Orchestration`
+
+This assembly owns the knowledge pipeline itself. `Ananke.Orchestration` adds bridge types that expose these capabilities through the tool system:
+
+- `KnowledgeSearchTool`
+- `KnowledgeTools`
+- `KnowledgeCatalogTools`
+
+That split keeps ingestion/search reusable outside workflow execution while still enabling agent-callable knowledge tools in the orchestration package.
+
 ## Bridge Types (in `Ananke.Orchestration`)
 
-Three files remain in `Ananke.Orchestration` as bridge code connecting Knowledge types
-to the `ToolKit` system. These exist because `ToolKit` has implementation logic that
-belongs in the workflow engine, not in the knowledge layer.
+Three files remain in `Ananke.Orchestration` as bridge code connecting knowledge types
+to the `ToolKit` system. These exist because `ToolKit` implementation logic belongs in
+the workflow engine, not in the reusable knowledge layer.
 
 | File | Namespace | Purpose |
 |------|-----------|---------|
@@ -94,10 +105,11 @@ belongs in the workflow engine, not in the knowledge layer.
 
 ```
 1. IDocumentExtractor.ExtractAsync(stream)  → ExtractedDocument (sections, links, images)
-2. IDocumentChunker.Chunk(text, options)    → DocumentChunk[] (sized for embedding)
-3. IEmbeddingModel.EmbedBatchAsync(chunks)  → ReadOnlyMemory<float>[] (vectors)
-4. IKnowledgeStore.UpsertAsync(documents)   → indexed in vector store
-5. IKnowledgeStore.SearchAsync(query)       → ranked KnowledgeChunk[]
+2. IDocumentChunker.Chunk(extracted)        → DocumentChunk[] (sized for embedding)
+3. IKnowledgeStore.UpsertAsync(documents)   → indexed in vector store
+4. IKnowledgeStore.SearchAsync(query)       → ranked KnowledgeChunk[]
+
+Embedding happens inside the concrete `IKnowledgeStore` implementation via the configured `IEmbeddingModel`.
 ```
 
 ## Decorator Stack

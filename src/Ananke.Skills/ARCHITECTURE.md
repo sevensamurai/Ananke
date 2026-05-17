@@ -13,6 +13,13 @@ and install them as CLI processes that are callable via `ToolKit`.
 
 - `Ananke.Orchestration` (project)
 
+## Namespace → Folder Map
+
+| Namespace | Contents |
+|-----------|----------|
+| `Ananke.Skills` | `ISkillCatalog`, `ISkillScoreStore`, `JsonFileScoreStore`, `SkillDescriptor`, `SkillInstallMethod`, `SkillScore`, `CliProcessRunner`, `ToolKitSkillExtensions`, `SkillCatalogMemorySync` |
+| `Ananke.Skills.OpenClaw` | `OpenClawCatalog` — `ISkillCatalog` implementation backed by the OpenClaw/ClawHub registry |
+
 ## Key Types
 
 | Type | Kind | Purpose |
@@ -26,3 +33,4 @@ and install them as CLI processes that are callable via `ToolKit`.
 | `CliProcessRunner` | Class | Executes CLI-based skills as child processes |
 | `ToolKitSkillExtensions` | Static class | `toolkit.AddSkill(descriptor)` — installs a skill as a `ToolDefinition` |
 | `SkillInstallMethod` | Enum | How to install a skill: `Npm`, `Pip`, `DotnetTool`, `Binary` |
+| `SkillCatalogMemorySync` | Class | Synchronises discovered skill catalog entries into an `IToolMemory` so the smart router can recall and score them |

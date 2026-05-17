@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Learning.svg)](https://www.nuget.org/packages/Ananke.Learning)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
 
-Empirical memory and skill learning for .NET AI agents — commit observations, recall by semantic similarity, reinforce with prediction-error feedback, and run offline learning sweeps that decay weak beliefs, explore curiosity-driven hypotheses, and consolidate mature patterns into long-term knowledge.
+Empirical memory and experience-based learning for .NET AI agents — commit observations, recall patterns and heuristics, reinforce or contradict beliefs, run offline learning cycles, track episodes, and package learned behavior for transfer.
 
 Part of the [Ananke](https://github.com/sevensamurai/Ananke) framework.
 
@@ -13,7 +13,7 @@ Part of the [Ananke](https://github.com/sevensamurai/Ananke) framework.
 dotnet add package Ananke.Learning
 ```
 
-This package depends on `Ananke.Orchestration` (which transitively includes `Ananke.Abstractions`).
+This package depends on `Ananke.Orchestration` and `Ananke.Abstractions`.
 
 ## Key concepts
 
@@ -27,7 +27,7 @@ Outcome ---------> ReinforceAsync -------|  prediction-error -> confidence/stren
 Background ------> LearnAsync -----------+  decay, curiosity, simulation, consolidation
 ```
 
-An **empirical entry** represents a single learned observation — a pattern, skill, or heuristic — with semantic tags, an embedding vector, confidence, strength, and affective signals (valence/intensity). Entries are committed during agent execution, recalled by similarity, reinforced when outcomes arrive, and periodically swept by the offline learner.
+An **empirical entry** represents a learned pattern, skill, or heuristic. Entries carry structured semantic descriptions, tags, confidence, observation history, affective signals, optional episode linkage, and optional entity scope. They are committed during agent execution, recalled by similarity, reinforced or contradicted by outcomes, and periodically swept by the offline learner.
 
 ## What is included
 
@@ -35,48 +35,58 @@ An **empirical entry** represents a single learned observation — a pattern, sk
 
 | Type | Description |
 |---|---|
-| `IEmpiricalMemory` | Mutable store for empirical entries — commit, recall, reinforce, contradict, browse, decay |
-| `IOfflineLearner` | Background learning sweep — decays weak entries, explores curious hypotheses via simulation, consolidates mature patterns into knowledge |
+| `IEmpiricalMemory` | Mutable store for empirical entries — commit, recall, reinforce, contradict, browse, count, mark consolidated, and pair-recall |
+| `IEpisodeStore` | Persistence contract for completed action trajectories and outcomes |
+| `IOfflineLearner` | Background learning sweep — decay, curiosity-driven exploration, and consolidation of mature entries |
 | `ISimulationSource` | Domain-specific simulator that tests hypotheses and returns reward outcomes |
 | `IPredictionSource` | Predicts expected confidence for an entry, enabling prediction-error reinforcement |
 | `IConsolidationSummarizer` | Generates a summary when an entry is promoted from empirical memory to long-term knowledge |
+| `IEntityMemoryProvider` | Creates entity-scoped memory facades over shared underlying stores |
+| `IExplorationStrategy` | Exploration/exploitation strategy for choosing among predicted actions |
+| `ITagImportanceTracker` | Tracks predictive importance of tags/features across outcomes |
+| `ISkillPackager` | Exports/imports skill packages built from empirical entries and episodes |
 
-### In-memory implementations
+### Built-in implementations
 
 | Type | Description |
 |---|---|
 | `InMemoryEmpiricalMemory` | Thread-safe in-memory `IEmpiricalMemory` with cosine-similarity recall and tag-overlap scoring |
-| `InMemoryOfflineLearner` | Full offline learning pipeline — decay, exploration, simulation, consolidation |
+| `OfflineLearner` | Default offline learning pipeline — decay, exploration, simulation, and consolidation |
+| `InMemoryEpisodeStore` | In-memory persistence for completed episodes |
 | `TagOverlapPredictionSource` | Predicts confidence from the average confidence of entries sharing the most tags |
-| `TemplateConsolidationSummarizer` | Formats a consolidation summary from a string template |
+| `MonteCarloRewardPropagator` | Propagates terminal rewards backward through episode steps |
+| `TagImportanceTracker` | Default feature/tag importance tracker |
+| `EntityMemoryProvider` | Lazily creates entity-scoped memory facades |
+| `SkillPackager` | Default skill export/import implementation |
+| `JsonSkillPackageFormat` | JSON-based skill package format |
 
 ### Data types
 
 | Type | Description |
 |---|---|
-| `EmpiricalEntry` | A learned observation with identity, semantic description, embedding, confidence, strength, variance, valence, intensity, and evidence trail |
-| `EmpiricalKind` | Taxonomy — `Pattern` (what is observed), `Skill` (how to act), `Heuristic` (rules of thumb) |
-| `SemanticDescription` | Structured description with weighted tags, text summary, and embedding source text |
-| `EmpiricalMatch` | A recall result with the matched entry and composite similarity score |
-| `Reinforcement` | Signal applied to an entry — reward, evidence source, and optional affect |
-| `RecallOptions` | Controls recall — top-K, tag filter, kind filter, minimum confidence, and affect boost |
-| `AffectOptions` | Configures how valence and intensity influence recall priority |
-| `SimulationOutcome` | Result of a simulated hypothesis test — reward and summary |
-| `OfflineLearnerOptions` | Configures the offline sweep — decay rate, exploration batch size, consolidation thresholds |
-| `OfflineLearningResult` | Statistics from a completed learning sweep |
+| `EmpiricalEntry` | Learned pattern/skill/heuristic with semantic description, tags, confidence, evidence, affective signals, and optional episode/entity linkage |
+| `EmpiricalKind` | Taxonomy — `Pattern`, `Skill`, `Heuristic` |
+| `SemanticDescription` | Structured semantic summary and weighted tags used for embedding and tag overlap |
+| `EmpiricalMatch` | Recall result with the matched entry and composite score |
+| `Reinforcement` | Signal applied to an entry — evidence, reward, source, and adjustments |
+| `RecallOptions`, `BrowseOptions`, `PairRecallOptions` | Recall and browse configuration |
+| `AffectOptions` | Configures prediction-error and affect-driven learning behavior |
+| `Episode`, `EpisodeStep`, `EpisodeOutcome` | Episode trajectory model used for credit assignment and skill packaging |
+| `OfflineLearnerOptions`, `OfflineLearningResult` | Offline sweep configuration and outcome summary |
+| `SkillExportOptions`, `SkillImportOptions`, `SkillExportResult`, `SkillImportResult` | Skill package transfer configuration and results |
 
 ### Agent tool integration
 
 | Type | Description |
 |---|---|
-| `EmpiricalMemoryTools` | `ToolKit` factory — registers `recall`, `commit`, and `reinforce` as agent-callable tools so LLMs can interact with empirical memory directly |
+| `EmpiricalMemoryTools` | `ToolKit` factory — registers `recall_empirical`, `commit_insight`, and `reinforce_empirical` as agent-callable tools |
 
 ## Quick start
 
 ### Commit and recall
 
 ```csharp
-using Ananke.Learning;
+using Ananke.Learning.EmpiricalMemory;
 using Ananke.Orchestration.Knowledge.Embeddings;
 
 var embedder = new InMemoryEmbedder();
@@ -85,12 +95,24 @@ var memory = new InMemoryEmpiricalMemory(embedder);
 // Commit an observation
 var entry = await memory.CommitAsync(new EmpiricalEntry
 {
+    Id = Guid.NewGuid().ToString("N"),
     Kind = EmpiricalKind.Pattern,
-    Description = "Center control leads to more wins",
-    Semantic = new SemanticDescription(
-        Tags: [new("strategy", "center-control", 1.0f)],
-        Summary: "Placing pieces in the center column creates more threats",
-        EmbeddingSourceText: "center column control strategy"),
+    Tags = ["strategy", "center-control"],
+    Source = "manual-observation",
+    Description = new SemanticDescription
+    {
+        Summary = "Placing pieces in the center column creates more threats",
+        SemanticTags = new Dictionary<string, float>
+        {
+            ["strategy:center-control"] = 1.0f,
+            ["domain:connect4"] = 0.8f
+        }
+    },
+    Confidence = 0.5f,
+    ObservationCount = 1,
+    Evidence = [],
+    FirstObserved = DateTimeOffset.UtcNow,
+    LastObserved = DateTimeOffset.UtcNow
 });
 
 // Recall by similarity
@@ -105,30 +127,63 @@ var matches = await memory.RecallAsync(
 await memory.ReinforceAsync(entry.Id, new Reinforcement
 {
     Reward = 1.0f,
-    Evidence = "won the game after using this strategy",
+    NewEvidence = ["won the game after using this strategy"],
+    Source = "game-outcome"
 });
 ```
 
 ### Run offline learning
 
 ```csharp
+using Ananke.Abstractions.Agents;
+using Ananke.Learning.Offline;
 using Ananke.Orchestration.Knowledge;
 
 var knowledgeStore = new InMemoryKnowledgeStore(embedder);
-var learner = new InMemoryOfflineLearner();
-
-var result = await learner.LearnAsync(
+var learner = new OfflineLearner(
     memory,
-    knowledgeStore,
-    new OfflineLearnerOptions
+    embedder,
+    knowledgeStore: knowledgeStore,
+    options: new OfflineLearnerOptions
     {
-        DecayRate = 0.02f,
         ExplorationBatchSize = 5,
         ConsolidationMinObservations = 10,
-        ConsolidationMinStrength = 0.7f,
+        ConsolidationMinStrength = 0.8f,
     });
 
+var result = await learner.LearnAsync();
+
 // result.Decayed, result.Explored, result.Consolidated
+```
+
+### Entity-scoped memory
+
+```csharp
+using Ananke.Learning.EntityMemory;
+
+var provider = new EntityMemoryProvider(
+    conversationMemory,
+    memory,
+    episodeStore,
+    knowledgeStore);
+
+var customerMemory = provider.GetOrCreate("customer-123");
+var customerPatterns = await customerMemory.Empirical.RecallAsync("billing dispute");
+```
+
+### Skill export/import
+
+```csharp
+using Ananke.Learning.Skills;
+
+var packager = new SkillPackager();
+await using var writer = new JsonSkillPackageFormat().CreateWriter(stream);
+
+var export = await packager.ExportAsync(
+    new SkillExportOptions { Name = "support-playbook", Domain = "customer-support" },
+    memory,
+    writer,
+    episodes: episodeStore);
 ```
 
 ### Expose as agent tools
@@ -147,22 +202,30 @@ var toolkit = EmpiricalMemoryTools.Create(memory);
 2. **Recall** — On future decisions, the agent recalls similar entries by vector cosine similarity and tag overlap.
 3. **Reinforce** — When outcomes arrive, entries are reinforced (positive or negative). Prediction-error mechanics update confidence, strength, variance, and affective signals.
 4. **Contradict** — Entries disproven by evidence have their confidence reduced.
-5. **Offline sweep** — A background process runs periodically:
+5. **Episode tracking** — Completed action sequences can be persisted and replayed for reward propagation and packaging.
+6. **Offline sweep** — A background process runs periodically:
    - **Decay** removes entries whose strength has fallen below threshold.
    - **Exploration** selects curious (high-variance, low-observation) entries and tests them via `ISimulationSource`.
    - **Consolidation** promotes mature, high-confidence entries into `IKnowledgeStore` for long-term retention.
+7. **Packaging** — Stable skills and supporting episodes can be exported and imported between agents or environments.
+
+## Package boundaries
+
+- `Ananke.Learning` owns empirical memory, episodes, offline learning, feature tracking, entity-scoped facades, and skill packaging.
+- `Ananke.Orchestration.Knowledge` supplies the long-term knowledge store used during consolidation.
+- `Ananke.Orchestration` supplies `ToolKit` integration for exposing learning capabilities to agents.
 
 ## Related packages
 
 | Package | What it adds |
 |---|---|
-| `Ananke.Orchestration` | Workflow engine, knowledge store, embedding model |
+| `Ananke.Orchestration` | Workflow engine, tool integration, and access to the knowledge package |
 | `Ananke.Orchestration.OpenAI` | OpenAI embedding model for production vector search |
 | `Ananke.Qdrant` | Qdrant-backed `IEmpiricalMemory` and `IKnowledgeStore` for persistent storage |
 
 ## Worked example
 
-See the **[Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/Connect4Demo)** — an agent that learns Connect Four strategy through self-play, empirical memory, and offline consolidation.
+See the Connect4 learning demo in the repository for an agent that learns strategy through self-play, empirical memory, and offline consolidation.
 
 ## Documentation
 

@@ -1,4 +1,4 @@
-# Architecture: Agents & LLM Providers
+﻿# Architecture: Agents & LLM Providers
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers the agent model abstraction, provider adapters, middleware pipeline, and model routing.
 
@@ -9,10 +9,10 @@
 ```mermaid
 classDiagram
     class IAgentModel {
-        +SendAsync(AgentRequest) AgentResponse
+        +GenerateAsync(AgentRequest, ct) Task~AgentResponse~
     }
     class IStreamingAgentModel {
-        +StreamAsync(AgentRequest) IAsyncEnumerable~AgentStreamChunk~
+        +GenerateStreamAsync(AgentRequest, ct) IAsyncEnumerable~AgentStreamChunk~
     }
     class IEmbeddingModel {
         +EmbedAsync(text) float[]
@@ -65,20 +65,40 @@ Middleware is composed via `MiddlewareAgentModel` which wraps an inner `IAgentMo
 
 ## Model Routing
 
-`IModelRouter` selects the best model for a task based on declared capabilities:
+Two routing mechanisms are provided:
+
+### `ModelRouter`
+
+`ModelRouter` is a simple predicate-based router. Register one or more `When(predicate, model)` rules and a mandatory `Otherwise(fallback)`. Converts to `IAgentModel` via `.ToAgentModel()` (returns a `RoutedAgentModel` that also implements `IStreamingAgentModel`).
+
+```csharp
+var router = new ModelRouter()
+    .When(req => req.Messages.Any(m => m.HasImage()), visionModel)
+    .Otherwise(defaultModel);
+```
+
+### `CapabilityModelRouter`
+
+`CapabilityModelRouter` selects the best model for a task based on declared capabilities and cost/speed/intelligence tiers:
 
 ```mermaid
 flowchart TD
     REQ[TaskRequirements<br/>e.g. vision + reasoning] --> ROUTER[CapabilityModelRouter]
     ROUTER --> CAT[ModelCatalog<br/>registered ModelProfiles]
-    CAT --> MATCH[Best match by<br/>capability score + cost]
+    CAT --> MATCH[Best match by<br/>RoutingStrategy]
     MATCH --> MODEL[Selected IAgentModel]
 ```
 
-- `ModelProfile` — declares model name, capabilities, cost rates
-- `ModelCapability` — enum: `TextGeneration`, `Vision`, `Reasoning`, `ToolCalling`, `StructuredOutput`, etc.
-- `TaskRequirements` — what the job needs
+- `ModelProfile` — declares model name, capabilities (`ModelCapability` flags), cost rates, speed tier, intelligence tier
+- `ModelCapability` — flags enum with tiers:
+  - *Tier 1 (basic)*: `TextGeneration`, `LargeContext`
+  - *Tier 2 (intermediate)*: `StructuredOutput`, `ToolCalling`
+  - *Tier 3 (advanced)*: `CodeGeneration`, `Vision`
+  - *Tier 4 (frontier)*: `Reasoning`
+  - *Tier 5 (multimodal)*: `AudioInput`, `ImageGeneration`, `AudioOutput`, `RealtimeStreaming`, `VideoInput`
+- `TaskRequirements` — what the job needs (required `ModelCapability` flags)
 - `ModelCostRates` — input/output token pricing for budget-aware routing
+- `RoutingStrategy` — `CheapestFit`, `FastestFit`, `BestFit`, `Weighted`, `Custom`; configurable per-router
 
 ## Context Management
 

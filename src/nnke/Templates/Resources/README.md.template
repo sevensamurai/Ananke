@@ -1,0 +1,58 @@
+# {{name}}
+
+An Ananke workflow project scaffolded with `nnke new workflow`.
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `{{name}}.csproj` | .NET project file — references Ananke packages |
+| `Program.cs` | Entry point — loads the manifest, binds code jobs, and runs the workflow |
+| `{{name}}.ananke.yml` | **Declarative manifest** — defines the workflow topology and agent configuration (see below) |
+| `WorkflowState.cs` | Typed state record passed between jobs |
+| `secrets.json` | API keys — never commit this file |
+
+## The `.ananke.yml` manifest
+
+The manifest is a YAML file that describes your workflow in two sections:
+
+### `models`
+
+Named aliases for the LLM models your agents will use:
+
+```yaml
+models:
+  planner:
+    provider: {{provider}}   # openai | anthropic | google
+    model: {{model}}         # model name for the chosen provider
+```
+
+The `provider` and `model` fields are resolved at load time to `IAgentModel` instances.
+API keys come from `secrets.json`, not this file.
+
+### `jobs`
+
+Declares every step in the workflow. Each job is either:
+
+- **`type: agent`** — automatically constructed from the manifest config. Requires a `model` alias and a `system_prompt`.
+- **`type: code`** — a custom C# delegate. Must be bound in `Program.cs` via `Bind("job-name", ...)` before the workflow runs.
+
+### `connections`
+
+Describes the execution graph using a simple DSL:
+
+| Syntax | Meaning |
+|---|---|
+| `a -> b` | Run `b` after `a` |
+| `a -> fork(b, c)` | Fan out — run `b` and `c` in parallel after `a` |
+| `join(b, c) -> d` | Fan in — run `d` only after both `b` and `c` complete |
+| `x -> End` | Terminal edge — workflow finishes when `x` completes |
+
+## Running the workflow
+
+```bash
+# Add your API key to secrets.json first
+dotnet run
+```
+
+To switch provider, pass `--provider` when re-scaffolding, or update `secrets.json` and the `models` section of the manifest manually.

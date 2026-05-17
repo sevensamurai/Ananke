@@ -5,13 +5,17 @@ using System.CommandLine;
 namespace Ananke.Tool.Commands;
 
 /// <summary>
-/// Handles <c>nnke diagram &lt;file&gt;</c> — loads an <c>.ananke.yml</c>
-/// manifest and exports its topology as a Mermaid flowchart.
+/// Handles <c>nnke diagram &lt;file&gt;</c> and <c>nnke manifest diagram &lt;file&gt;</c> —
+/// loads an <c>.ananke.yml</c> manifest and exports its topology as a Mermaid flowchart.
 /// Supports <c>--json</c> for structured output.
 /// </summary>
 internal static class DiagramCommand
 {
-    public static Command Create()
+    /// <inheritdoc cref="Create(string)"/>
+    public static Command Create() => Create("diagram");
+
+    /// <summary>Creates the command registered under <paramref name="commandName"/>.</summary>
+    public static Command Create(string commandName)
     {
         var fileArg = new Argument<FileInfo>("file") { Description = "Path to the .ananke.yml manifest file." };
 
@@ -20,7 +24,7 @@ internal static class DiagramCommand
             Description = "Output file for the Mermaid diagram. Defaults to stdout."
         };
 
-        var command = new Command("diagram", "Export a Mermaid flowchart from an .ananke.yml manifest.")
+        var command = new Command(commandName, "Export a Mermaid flowchart from an .ananke.yml manifest.")
         {
             fileArg,
             outputOption

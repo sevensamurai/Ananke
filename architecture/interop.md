@@ -1,4 +1,4 @@
-# Architecture: Interop — MCP, A2A, Skills, Platforms
+﻿# Architecture: Interop — MCP, A2A, Skills, Platforms
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers protocol bridges, external skill catalog, and messaging platform adapters.
 
@@ -28,6 +28,7 @@ flowchart LR
 | `AnankeToolAdapter` | Wraps `ToolKit` tools as MCP tool capabilities |
 | `WorkflowToolAdapter` | Wraps a `Workflow<T>` as an MCP tool |
 | `McpServerBuilderExtensions` | DI integration for MCP server setup |
+| `McpToolInvoker` | Invokes tools on external MCP servers and returns typed results — used when importing tools from a remote MCP server into a `ToolKit` |
 | `ToolKitMcpExtensions` | Import tools from external MCP servers into `ToolKit` |
 
 ---
@@ -83,6 +84,7 @@ flowchart LR
 | `ISkillScoreStore` / `JsonFileScoreStore` | Local voting and reliability scoring |
 | `SkillScore` | Success rate, vote count, last used |
 | `ToolKitSkillExtensions` | `toolkit.AddFromCatalogAsync()` convenience methods |
+| `SkillCatalogMemorySync` | Synchronises discovered skill catalog entries into `IToolMemory` so the smart router can recall and score them across sessions |
 
 ---
 

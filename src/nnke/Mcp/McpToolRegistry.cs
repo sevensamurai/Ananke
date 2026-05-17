@@ -36,6 +36,8 @@ internal static class McpToolRegistry
         CreatePatternsDescribe(),
         CreateInspect(),
         CreateValidate(),
+        CreateScaffoldQuickstart(),
+        CreateScaffoldChatbox(),
         CreateScaffold(),
         CreateMeshStatus(),
         CreateCellTrace(),
@@ -314,8 +316,86 @@ internal static class McpToolRegistry
         new()
         {
             Name = "ananke_scaffold",
-            Description = "Scaffold a new Ananke project from a template. Templates: workflow, streaming-chat, organic-host, review-critique, iterative-refinement, router, human-in-the-loop, handoff.",
-            Title = "Scaffold Ananke project"
+            Description = "Scaffold a new Ananke workflow project from a pattern template. Patterns: etl, sequential, fan-out, sub-workflow (manifest-driven); review-critique, iterative-refinement, router, human-in-the-loop, handoff, organic-host, streaming-chat (code-only). For a beginner project use ananke_scaffold_quickstart; for a streaming chat API use ananke_scaffold_chatbox.",
+            Title = "Scaffold Ananke workflow project"
+        });
+
+    // ── ananke_scaffold_quickstart ────────────────────────────────────
+
+    private static McpServerTool CreateScaffoldQuickstart() => McpServerTool.Create(
+        (string outputDirectory, string? projectName, string? provider) =>
+        {
+            var name = projectName ?? "my-quickstart";
+            var prov = provider ?? "openai";
+            var outDir = new DirectoryInfo(string.IsNullOrWhiteSpace(outputDirectory)
+                ? Path.Combine(Directory.GetCurrentDirectory(), name)
+                : outputDirectory);
+
+            var captured = new List<string>();
+            var skipped = new List<string>();
+
+            try
+            {
+                Commands.NewQuickstartCommand.ExecuteForMcp(name, prov, outDir, captured, skipped);
+            }
+            catch (Exception ex)
+            {
+                return Serialize(new { status = "error", message = ex.Message });
+            }
+
+            return Serialize(new
+            {
+                status = "created",
+                template = "quickstart",
+                projectDir = outDir.FullName,
+                files = captured,
+                skipped = skipped.Count > 0 ? skipped : null
+            });
+        },
+        new()
+        {
+            Name = "ananke_scaffold_quickstart",
+            Description = "Scaffold a beginner Ananke console project aligned with Guide 01 (Getting Started). Uses SimulatedModel — runs without an API key. Pass provider to pre-configure provider comments.",
+            Title = "Scaffold Ananke quickstart"
+        });
+
+    // ── ananke_scaffold_chatbox ───────────────────────────────────────
+
+    private static McpServerTool CreateScaffoldChatbox() => McpServerTool.Create(
+        (string outputDirectory, string? projectName, string? provider) =>
+        {
+            var name = projectName ?? "my-chatbox";
+            var prov = provider ?? "openai";
+            var outDir = new DirectoryInfo(string.IsNullOrWhiteSpace(outputDirectory)
+                ? Path.Combine(Directory.GetCurrentDirectory(), name)
+                : outputDirectory);
+
+            var captured = new List<string>();
+            var skipped = new List<string>();
+
+            try
+            {
+                Commands.NewChatboxCommand.ExecuteForMcp(name, prov, outDir, captured, skipped);
+            }
+            catch (Exception ex)
+            {
+                return Serialize(new { status = "error", message = ex.Message });
+            }
+
+            return Serialize(new
+            {
+                status = "created",
+                template = "chatbox",
+                projectDir = outDir.FullName,
+                files = captured,
+                skipped = skipped.Count > 0 ? skipped : null
+            });
+        },
+        new()
+        {
+            Name = "ananke_scaffold_chatbox",
+            Description = "Scaffold a streaming conversational agent as an ASP.NET Minimal API with SSE (POST /chat and POST /chat/stream). Uses SimulatedStreamingModel — runs without an API key.",
+            Title = "Scaffold Ananke chatbox"
         });
 
     // ── ananke_mesh_status ─────────────────────────────────────────

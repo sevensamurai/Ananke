@@ -1,0 +1,11 @@
+/// <summary>
+/// Immutable state threaded through the {{name}} quickstart workflow.
+/// </summary>
+public sealed record QuickstartState
+{
+    /// <summary>The user's input prompt.</summary>
+    public string UserInput { get; init; } = "";
+
+    /// <summary>The agent's response.</summary>
+    public string Response { get; init; } = "";
+}
