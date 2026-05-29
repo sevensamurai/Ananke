@@ -15,7 +15,7 @@ dotnet add package Ananke.Platforms.Slack
 
 1. Create a Slack App at [api.slack.com/apps](https://api.slack.com/apps)
 2. Enable **Socket Mode** and generate an App-Level Token (`xapp-…`)
-3. Add Bot Token Scopes: `chat:write`, `reactions:write`, `channels:history`, `groups:history`, `im:history`, `mpim:history`
+3. Add Bot Token Scopes (see [Required Scopes](#required-scopes) below)
 4. Subscribe to bot events: `message.channels`, `message.groups`, `message.im`, `message.mpim`
 5. Install the app to your workspace and copy the Bot User OAuth Token (`xoxb-…`)
 
@@ -49,6 +49,111 @@ services.AddSingleton<IPlatformMessageHandler, MyAgentHandler>();
 |---|---|---|---|
 | **Socket Mode** | `UseSocketMode = true` + `AppToken` | No | Development, internal bots |
 | **Events API** | `UseSocketMode = false` + `SigningSecret` | Yes | Production, high-traffic |
+
+## Inbound events
+
+### Slash commands
+
+Enable with `SlackAdapterOptions.EnableSlashCommands = true` (requires `SigningSecret`).
+Incoming payloads are normalised to `PlatformSlashCommand` and dispatched via
+`IPlatformMessageHandler.OnSlashCommandAsync(...)`.
+
+```csharp
+services.AddAnankeSlack(options =>
+{
+    options.EnableSlashCommands = true;
+    options.SigningSecret = config["Slack:SigningSecret"]!;
+});
+```
+
+Map the endpoint (Events API mode only):
+
+```csharp
+app.MapAnankeSlackEvents(); // registers /slack/events, /slack/commands, /slack/interactivity
+```
+
+### Block-action / view-submission interactivity
+
+Enable with `SlackAdapterOptions.EnableInteractivity = true`.
+Payloads are normalised to `PlatformInteractionEvent` (`ActionId`, `Value`, `TriggerId`,
+`UserId`, `ChannelId`, `ThreadId`) and dispatched via
+`IPlatformMessageHandler.OnInteractionAsync(...)`.
+
+Use [`SlackApprovalBlocks`](#approval-blocks) to render Approve / Revise / Reject buttons, and
+`SlackApprovalCallback` (from `Ananke.Roles.Slack`) to bridge the interaction to a
+`CallbackWorkReviewGate`.
+
+### Assistant pane (Agents & AI Apps)
+
+Enable with `SlackAdapterOptions.EnableAssistant = true`.
+`assistant_thread_started` and `assistant_thread_context_changed` events are normalised
+to `PlatformAssistantThreadEvent` and dispatched via
+`IPlatformMessageHandler.OnAssistantThreadAsync(...)`.
+
+```csharp
+options.EnableAssistant = true;
+options.AssistantStatusLabel = "thinking…"; // default
+```
+
+The response sink exposes two Assistant-specific helpers:
+
+```csharp
+await sink.SetAssistantStatusAsync(channelId, threadTs, "loading context…", ct);
+await sink.SetSuggestedPromptsAsync(channelId, threadTs,
+    new[] { "Summarise the backlog", "What needs review?" }, ct);
+```
+
+## Outbound operations
+
+### Modals
+
+```csharp
+var slackSink = (ISlackResponseSink)responseSink;
+await slackSink.OpenViewAsync(triggerId, modalView, ct);
+await slackSink.UpdateViewAsync(viewId, modalView, ct);
+```
+
+### Message metadata
+
+Attach traceability metadata on `chat.postMessage`:
+
+```csharp
+await slackSink.SendBlocksWithMetadataAsync(channelId, blocks,
+    metadata: new SlackMessageMetadata { EventType = "ananke_review", Payload = ... }, ct);
+```
+
+### Approval blocks
+
+`SlackApprovalBlocks.Build(workItem)` returns a Block Kit layout with Approve / Revise /
+Reject buttons wired to the canonical action ids (`ananke_approve`, `ananke_revise`,
+`ananke_reject`). Post the blocks, then use `SlackApprovalCallback` on the
+`OnInteractionAsync` path to resolve the pending `IWorkReviewGate` decision.
+
+### File upload mode
+
+Control how large files are uploaded via `SlackAdapterOptions.UploadMode`:
+
+| Value | Behaviour |
+|---|---|
+| `ExternalUrlV2` (default) | Uses `files.getUploadURLExternal` + `files.completeUploadExternal`. Retries automatically on `expired_url`. |
+| `LegacyFilesUpload` | Falls back to the deprecated `files.upload` API for compatibility. |
+
+## Required scopes
+
+| Scope | Required for |
+|---|---|
+| `app_mentions:read` | Receiving `app_mention` events |
+| `assistant:write` | Setting Assistant pane status and suggested prompts |
+| `chat:write` | Posting messages |
+| `chat:write.public` | Posting in channels the bot hasn't joined |
+| `commands` | Receiving slash commands |
+| `files:write` | Uploading files |
+| `reactions:write` | Adding emoji reactions |
+| `reactions:read` | Receiving `reaction_added` events |
+| `channels:history` | Reading channel message history |
+| `groups:history` | Reading private channel history |
+| `im:history` | Reading DM history |
+| `metadata.message:read` | Reading message metadata payloads |
 
 ## Streaming behavior
 

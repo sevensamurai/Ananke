@@ -73,6 +73,10 @@ relevant documentation guide and demo (where available).
 | **Interrupt before / after** | Pause workflow execution at any job for human review | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **Resume with state** | Resume a paused workflow with optionally modified state | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **Checkpointing** | `ICheckpointStore` — persist full workflow state for resume across restarts | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
+| **Work-review gates** | `IWorkReviewGate` with built-in `AutoWorkReviewGate`, `CallbackWorkReviewGate`, `LlmWorkReviewGate`, and `QuorumWorkReviewGate` — policy-driven review without hard-coding approval logic | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **Async review parking** | `ParkingCallbackWorkReviewGate` — park a review request, return `Pending` immediately, and resume when a decision arrives hours later via `ResumeAsync` | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **Budget gates** | `IBudgetMeter` + `BudgetApprovalGate` — rolling-window token/cost cap enforcement; in-memory default, OTel-backed option | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
+| **Review notification helper** | `WorkItemReviewNotifier` — transport-neutral helper that posts a "please review" prompt to any `IPlatformResponseSink` channel | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
 
 ## State Machine
 
@@ -84,6 +88,32 @@ relevant documentation guide and demo (where available).
 | **Guard conditions** | Block transitions based on runtime state | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Circuit breaking** | `OperationalStatus.Faulted` blocks all transitions until `ResetAsync` | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Lifecycle hooks** | `OnEnter` / `OnExit` per state | [08 — State Machine](../guides/08-state-machine.md) | — |
+
+## Messaging Platforms
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **Normalized platform messages** | `PlatformMessage`, `PlatformReactionEvent`, `PlatformSlashCommand`, `PlatformInteractionEvent`, `PlatformAssistantThreadEvent` — unified inbound model across Slack, Discord, and others | — | — |
+| **IPlatformMessageHandler** | Handler interface with default no-op hooks for messages, reactions, slash commands, interactions, and assistant threads | — | — |
+| **IPlatformResponseSink** | Transport-neutral outbound abstraction: `SendMessageAsync`, `UpdateMessageAsync`, `SendTypingAsync`, `AddReactionAsync` | — | — |
+| **Slack adapter** | `AddAnankeSlack(...)` — full Slack integration via SlackNet; Events API endpoints (`/slack/events`, `/slack/commands`, `/slack/interactivity`) with signing-secret validation | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **Slack slash commands & interactivity** | Normalized `PlatformSlashCommand` and block-action / view-submission events; opt-in via `SlackAdapterOptions` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **Slack Assistant pane** | First-class support for Slack Agents & AI Apps pane: thread-started / context-changed events, `SetAssistantStatusAsync`, `SetSuggestedPromptsAsync` | — | — |
+| **Slack outbound extras** | Block Kit messages, ephemeral messages, external file uploads, scheduled messages, modal `OpenViewAsync`/`UpdateViewAsync`, optional message metadata footer, `SlackUploadMode` toggle | — | — |
+| **SlackApprovalBlocks** | `SlackApprovalBlocks.Build(workItem)` — Block Kit Approve / Revise / Reject layout with canonical action ids for review flows | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **StreamingMessageBridge** | Progressively edit a posted message as tokens stream in — works with any `IPlatformResponseSink` | — | — |
+
+## Agent Roles
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **AgentRole / ReviewPolicy / EscalationPolicy** | Declarative role definitions; compose persona, review behaviour, and escalation rules in one place | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **IAgentRoleCatalog** | Lookup and registration of named roles; default `AgentRoleCatalog` | — | — |
+| **RoleManifestFactory** | Projects `AgentRole` definitions into `WorkflowManifest` instances for the design-tooling layer | — | — |
+| **StudioRouter / StudioHostBuilder** | Route incoming requests to the right role's workflow; host-friendly composition via `StudioHostBuilder` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **SlackChannelMap** | Typed wrapper that resolves a Slack channel id to an `AgentRole` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **RoleAwareMessageHandler** | Routes each `PlatformMessage` to the workflow named after the resolved role, with configurable fallback | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **SlackApprovalCallback** | Translates Slack block-action interactions into `WorkReviewDecision` values for `CallbackWorkReviewGate` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
 
 ## Production Resilience
 
@@ -120,6 +150,7 @@ relevant documentation guide and demo (where available).
 | **State machine spans** | Built-in `ActivitySource` for transition spans | [10 — Observability](../guides/10-observability.md) | — |
 | **Retry event reporting** | `llm.rate_limit_retry` events with attempt count and delay on the active span | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
 | **Tool span attributes** | `output_length` and `tool.error` on tool execution spans | [04 — Tools](../guides/04-tools.md) | — |
+| **OpenTelemetry budget meter** | `OpenTelemetryBudgetMeter` — federation-style counters (`ananke.federation.tokens.in/out`, `ananke.federation.usd`) with configurable rolling windows and per-role caps; registered via `TracingExtensions.AddBudgetMeter(...)` | [10 — Observability](../guides/10-observability.md) | — |
 
 ## Design Tooling
 
@@ -143,6 +174,8 @@ relevant documentation guide and demo (where available).
 | **In-memory handoff channel** | `InMemoryHandoffChannel` — test agent handoff without MQTT | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory checkpoint store** | `InMemoryCheckpointStore` — test checkpointing without a filesystem | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory embedder** | `InMemoryEmbedder` — deterministic character-hash embedder; run full RAG and empirical memory pipelines without a real embedding model | [14 — Testing](../guides/14-testing.md) | — |
+| **In-memory review parking store** | `InMemoryWorkReviewParkingStore` — test async review parking without external state | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
+| **In-memory budget meter** | `InMemoryBudgetMeter` — test rolling-window budget enforcement without OpenTelemetry | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
 
 ## Empirical Memory & Agent Learning
 

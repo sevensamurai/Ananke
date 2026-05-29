@@ -1,13 +1,14 @@
 ﻿<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
-### Where We Are — v0.8.0
+### Where We Are — v0.8.4
 
-**0.8.0 is the release candidate.**
+**0.8.4 is the current release.**
 
 The core framework is feature-complete. Workflows, agents, state machines, empirical
-memory, distributed infrastructure, MCP/A2A interop, observability, and the design
-tooling layer are all in place and covered by tests.
+memory, distributed infrastructure, MCP/A2A interop, observability, design tooling,
+Slack integration, work-review gates, async review parking, role scaffolding, and the
+federation layer are all in place and covered by tests.
 
 No new functionality is planned before 1.0. The remaining work is:
 
@@ -33,6 +34,7 @@ The surface area that matters — `IStreamingAgentModel`, `IJob<T>`, `Workflow<T
 | **0.6.0** | The public docs site, messaging platform adapters, and external knowledge ingestion became first-class parts of the stack. |
 | **0.7.0** | `nnke` expanded into an agent-friendly CLI and MCP companion for design-time inspection, docs, and patterns. |
 | **0.8.0** | Release candidate: pluggable organics, federation, `nnke-platform` CLI and the Smart Tool Router completed the feature surface for 1.0. |
+| **0.8.4** | Platform review loops and studio scaffolding: richer Slack integrations (slash commands, interactivity, assistant pane, modals, approval blocks), work-review and budget gates in Organics, async review parking, `Ananke.Roles` package, OTel budget meter, `WorkItemReviewNotifier`, and `MiniAgencyDemo`. |
 | **0.8.x** | Bug fixes and minor improvements only. |
 | **1.0.0** | API lock — semantic versioning honoured from this point forward. |
 

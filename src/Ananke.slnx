@@ -27,6 +27,7 @@
 
   <Folder Name="/demos/05-applications/">
     <Project Path="demos/05-applications/AgenticWebDemo/AgenticWebDemo.csproj" />
+    <Project Path="demos/05-applications/MiniAgencyDemo/MiniAgencyDemo.csproj" />
     <Project Path="demos/05-applications/PetAdoptionDemo/PetAdoptionDemo.csproj" />
   </Folder>
 
@@ -53,10 +54,13 @@
     <Project Path="tests/Ananke.Graph.Memgraph.Tests/Ananke.Graph.Memgraph.Tests.csproj" />
     <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
+    <Project Path="tests/Ananke.OpenTelemetry.Tests/Ananke.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Tests/Ananke.Orchestration.Tests.csproj" />
     <Project Path="tests/Ananke.Organics.Tests/Ananke.Organics.Tests.csproj" />
+    <Project Path="tests/Ananke.Platforms.Slack.Tests/Ananke.Platforms.Slack.Tests.csproj" />
     <Project Path="tests/Ananke.Platforms.Tests/Ananke.Platforms.Tests.csproj" />
+    <Project Path="tests/Ananke.Roles.Tests/Ananke.Roles.Tests.csproj" />
     <Project Path="tests/Ananke.Skills.Tests/Ananke.Skills.Tests.csproj" />
     <Project Path="tests/Ananke.StateMachine.Tests/Ananke.StateMachine.Tests.csproj" />
     <Project Path="tests/Ananke.TestHelpers/Ananke.TestHelpers.csproj" />
@@ -97,6 +101,7 @@
   <Project Path="Ananke.Platforms/Ananke.Platforms.csproj" />
   <Project Path="Ananke.Qdrant/Ananke.Qdrant.csproj" />
   <Project Path="Ananke.Redis/Ananke.Redis.csproj" />
+  <Project Path="Ananke.Roles/Ananke.Roles.csproj" />
   <Project Path="Ananke.Skills/Ananke.Skills.csproj" />
   <Project Path="Ananke.StateMachine/Ananke.StateMachine.csproj" />
   <Project Path="Ananke.Tool.Shared/Ananke.Tool.Shared.csproj" />

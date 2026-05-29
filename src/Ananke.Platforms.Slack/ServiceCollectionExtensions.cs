@@ -1,8 +1,10 @@
-using Ananke.Platforms;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SlackNet.Events;
 using SlackNet.Extensions.DependencyInjection;
+using AssistantThreadContextChanged = SlackNet.Events.AssistantThreadContextChanged;
+using AssistantThreadStarted = SlackNet.Events.AssistantThreadStarted;
 
 namespace Ananke.Platforms.Slack;
 
@@ -46,6 +48,33 @@ public static class ServiceCollectionExtensions
         {
             c.UseApiToken(options.BotToken);
 
+            c.RegisterEventHandler<MessageEvent, SlackMessageEventHandler>();
+
+            if (options.EnableAppMentions)
+                c.RegisterEventHandler<AppMention, SlackAppMentionEventHandler>();
+
+            if (options.EnableReactions)
+                c.RegisterEventHandler<ReactionAdded, SlackReactionEventHandler>();
+
+            if (options.EnableSlashCommands)
+#pragma warning disable CS0618 // ReplaceSlashCommandHandling is Experimental in SlackNet
+                c.ReplaceSlashCommandHandling<SlackSlashCommandHandler>();
+#pragma warning restore CS0618
+
+            if (options.EnableInteractivity)
+            {
+#pragma warning disable CS0618 // ReplaceBlockActionHandling / ReplaceViewSubmissionHandling are Experimental in SlackNet
+                c.ReplaceBlockActionHandling<SlackInteractivityHandler>();
+                c.ReplaceViewSubmissionHandling<SlackInteractivityHandler>();
+#pragma warning restore CS0618
+            }
+
+            if (options.EnableAssistant)
+            {
+                c.RegisterEventHandler<AssistantThreadStarted, Assistant.SlackAssistantEventHandler>();
+                c.RegisterEventHandler<AssistantThreadContextChanged, Assistant.SlackAssistantEventHandler>();
+            }
+
             if (!string.IsNullOrWhiteSpace(options.AppToken))
                 c.UseAppLevelToken(options.AppToken);
         });
@@ -54,9 +83,11 @@ public static class ServiceCollectionExtensions
         {
             var slackServices = sp.SlackServices();
             var handler = sp.GetRequiredService<IPlatformMessageHandler>();
+            var httpClient = sp.GetService<IHttpClientFactory>()
+                ?.CreateClient(typeof(SlackResponseSink).FullName ?? nameof(SlackResponseSink));
             var logger = sp.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()
                 ?.CreateLogger<SlackAdapter>();
-            return new SlackAdapter(options, handler, slackServices, logger);
+            return new SlackAdapter(options, handler, slackServices, httpClient, logger);
         });
 
         services.AddSingleton<IMessagePlatformAdapter>(sp => sp.GetRequiredService<SlackAdapter>());

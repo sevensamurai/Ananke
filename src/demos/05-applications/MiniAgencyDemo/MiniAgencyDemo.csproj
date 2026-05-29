@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MiniAgencyDemo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <ProjectReference Include="..\..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Platforms\Ananke.Platforms.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Platforms.Slack\Ananke.Platforms.Slack.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Organics\Ananke.Organics.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.Roles\Ananke.Roles.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="roles.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="build-and-review.ananke.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="prompts\*.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="secrets.json" Condition="Exists('secrets.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

@@ -15,6 +15,5 @@
 		<None Include="..\..\docs\**" LinkBase="docs" />
 		<None Include="..\..\internals\**" LinkBase="internals" />
 		<None Include="..\..\releases\**" LinkBase="releases" />
-    <None Include="..\..\proprietary\**" LinkBase="proprietary" />
 	</ItemGroup>
 </Project>

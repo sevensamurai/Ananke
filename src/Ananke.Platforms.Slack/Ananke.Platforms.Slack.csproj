@@ -6,13 +6,21 @@
 	<Description>Slack adapter for Ananke — bridges Slack Bot events (Socket Mode and Events API) to Ananke agent workflows via IMessagePlatformAdapter. Provides services.AddAnankeSlack() for DI registration.</Description>
   </PropertyGroup>
 
-  <ItemGroup>
+	<ItemGroup>
+	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+		<_Parameter1>Ananke.Platforms.Slack.Tests</_Parameter1>
+	</AssemblyAttribute>
+	</ItemGroup>
+
+	<ItemGroup>
+	<PackageReference Include="Microsoft.Extensions.Http" />
 	<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
 	<PackageReference Include="SlackNet.Extensions.DependencyInjection" />
   </ItemGroup>
 
-  <ItemGroup>
+	<ItemGroup>
 	<ProjectReference Include="..\Ananke.Platforms\Ananke.Platforms.csproj" />
-  </ItemGroup>
+	<ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
+	</ItemGroup>
 
 </Project>

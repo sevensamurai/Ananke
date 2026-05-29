@@ -1,0 +1,34 @@
+# build-and-review.ananke.yml
+# The runtime demo path is implemented in MiniAgencyMessageHandler.
+# This manifest is still registered through StudioHostBuilder so the
+# role/workflow artifacts stay aligned with the demo configuration.
+
+name: build-and-review
+
+description: Minimal two-step draft and review workflow artifact for the mini agency demo.
+
+models:
+  local:
+    provider: openai
+    model: local
+
+jobs:
+  draft:
+    type: agent
+    modelAlias: local
+    maxToolRounds: 2
+    tools:
+      - current_time
+    systemPrompt: |
+      Draft a concise, useful Slack response for the user's request.
+
+  review:
+    type: agent
+    modelAlias: local
+    maxToolRounds: 1
+    systemPrompt: |
+      Review the draft and decide whether it should be approved, revised, or rejected.
+
+connections:
+  - draft -> review
+  - review -> End
