@@ -1,4 +1,4 @@
-<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl -->
+﻿<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl -->
 # 07 — Human-in-the-Loop
 
 Pause workflow execution at any step for human review, checkpoint the full state,
@@ -152,6 +152,98 @@ app.MapPost("/api/workflow/{id}/approve", async (string id, ApprovalRequest req)
     return Results.Ok(resumed.State);
 });
 ```
+
+---
+
+---
+
+## Work-Review Gates
+
+Beyond the generic interrupt/resume pattern, `Ananke.Organics` provides a typed review layer for **work products** — structured items (diffs, documents, plans) that need an explicit approve/revise/reject decision before a workflow continues.
+
+### Core abstractions
+
+```csharp
+// The item under review
+var item = new WorkItem
+{
+    Id      = "wi-1",
+    Title   = "Add login endpoint",
+    Kind    = WorkItemKind.Patch,
+    Payload = "<diff content>",
+};
+
+// A gate decides what to do with it
+WorkReviewOutcome outcome = await gate.ReviewAsync(item, ct);
+// outcome.Decision  == WorkReviewDecision.Approved | Revised | Rejected
+// outcome.Comment   == optional reviewer note
+```
+
+### Built-in gate implementations
+
+| Gate | Behaviour |
+|---|---|
+| `AutoWorkReviewGate` | Always approves — useful for automated pipelines |
+| `CallbackWorkReviewGate` | Delegates to an `async Func` — wire any custom logic |
+| `LlmWorkReviewGate` | Uses a configured `IAgentModel` to review the payload |
+| `QuorumWorkReviewGate` | Wraps multiple gates; requires a configurable quorum to approve |
+
+### Budget gates
+
+`BudgetApprovalGate` wraps an `IBudgetMeter` and blocks work when a rolling-window token or cost cap is exceeded:
+
+```csharp
+var meter   = new InMemoryBudgetMeter(windowMinutes: 60, tokenLimit: 100_000);
+var gate    = new BudgetApprovalGate(meter);
+var outcome = await gate.ReviewAsync(item, ct);
+// WorkReviewDecision.Rejected when the budget window is exhausted
+```
+
+---
+
+## Async Review Parking
+
+Some review decisions don't arrive immediately — a Slack reaction, an email reply, or a webhook might come back hours later. The **parking pattern** handles this cleanly:
+
+1. `ReviewAsync` parks the request and returns `WorkReviewOutcome.Pending` immediately
+2. The caller records the parking id (returned in `outcome.Comment`)
+3. When the decision arrives (e.g. via a Slack block-action webhook), call `ResumeAsync`
+
+```csharp
+// Register the parking store (e.g. in DI)
+IWorkReviewParkingStore store = new InMemoryWorkReviewParkingStore();
+var gate = new ParkingCallbackWorkReviewGate(store);
+
+// In the workflow job
+var outcome = await gate.ReviewAsync(item, ct);
+if (outcome.Decision == WorkReviewDecision.Pending)
+{
+    var parkingId = outcome.Comment;   // store this with your job execution id
+    // workflow suspends here — caller is responsible for checkpointing
+}
+
+// Later — when the human decision arrives (e.g. from a Slack interaction handler)
+await gate.ResumeAsync(parkingId, WorkReviewDecision.Approved);
+```
+
+### Surfacing the review request
+
+Use `WorkItemReviewNotifier` (in `Ananke.Platforms`) to post the notification to any channel before parking:
+
+```csharp
+var notifier = new WorkItemReviewNotifier(responseSink);
+await notifier.NotifyAsync(
+    workItemId: item.Id,
+    title:      item.Title,
+    kind:       item.Kind.ToString(),
+    payload:    item.Payload,
+    channelId:  "C_REVIEWERS",
+    threadId:   null);
+// Then park:
+var outcome = await gate.ReviewAsync(item, ct);
+```
+
+The notifier is transport-neutral — it calls `IPlatformResponseSink.SendMessageAsync` and works with any platform. Slack-specific rendering (Block Kit approval buttons via `SlackApprovalBlocks`) is handled by the Slack response sink or a decorator.
 
 ---
 

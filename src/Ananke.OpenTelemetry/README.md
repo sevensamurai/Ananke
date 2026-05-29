@@ -5,6 +5,8 @@
 
 OpenTelemetry tracing infrastructure for Ananke — one-liner OTLP export to BetterStack, Jaeger, Grafana Tempo, or any OTLP-compatible backend.
 
+It also provides a listener-backed `IBudgetMeter` implementation for rolling token and spend tracking from OpenTelemetry counters.
+
 ## Install
 
 ```bash
@@ -21,6 +23,11 @@ services.AddTracingPipeline(o =>
     o.ServiceName    = "my-service";
     o.ServiceVersion = "1.0.0";
     o.UseBetterStack(sourceToken);
+});
+
+services.AddBudgetMeter(o =>
+{
+    o.DefaultTokenCap = 100_000;
 });
 ```
 
@@ -53,11 +60,13 @@ services.AddTracingPipeline(o =>
 | Service | Implementation |
 |---|---|
 | `IWorkflowTracer` | `ActivitySourceTracer` — creates OpenTelemetry spans for workflow execution |
+| `IBudgetMeter` | `OpenTelemetryBudgetMeter` — rolling window spend meter backed by federation counters |
 | OpenTelemetry pipeline | OTLP exporter with configurable endpoint, headers, and activity sources |
 
 ## Features
 
 - **One-liner setup** — `AddTracingPipeline()` wires resource, sources, exporter, and `IWorkflowTracer`
+- **Budget listener** — `AddBudgetMeter()` listens to `ananke.federation.tokens.in`, `ananke.federation.tokens.out`, and `ananke.federation.usd`
 - **BetterStack** — built-in `UseBetterStack(token)` convenience method
 - **Any OTLP backend** — `UseOtlp(endpoint, headers)` for Jaeger, Grafana Tempo, etc.
 - **Multiple activity sources** — orchestration tracing by default, add state machine tracing with `AddSource()`

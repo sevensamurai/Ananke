@@ -5,7 +5,8 @@ namespace Ananke.Platforms.Slack;
 
 /// <summary>
 /// SlackNet <see cref="IEventHandler{T}"/> that bridges incoming
-/// <see cref="MessageEvent"/>s to the <see cref="SlackAdapter.DispatchAsync"/> pipeline.
+/// <see cref="MessageEvent"/>s to the
+/// <see cref="SlackAdapter.DispatchAsync(MessageEvent, CancellationToken)"/> pipeline.
 /// Registered during <see cref="ServiceCollectionExtensions.AddAnankeSlack"/> configuration.
 /// </summary>
 internal sealed class SlackMessageEventHandler(SlackAdapter adapter) : IEventHandler<MessageEvent>

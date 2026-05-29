@@ -1,4 +1,6 @@
 using Ananke.Abstractions.Tracing;
+using Ananke.OpenTelemetry.Budget;
+using Ananke.Organics.Division.Approval;
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
@@ -83,6 +85,26 @@ public static class TracingExtensions
     public static IServiceCollection AddWorkflowTracer(this IServiceCollection services)
     {
         services.AddSingleton<IWorkflowTracer, ActivitySourceTracer>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="OpenTelemetryBudgetMeter"/> as the singleton
+    /// <see cref="IBudgetMeter"/> implementation and configures its rolling window options.
+    /// </summary>
+    public static IServiceCollection AddBudgetMeter(
+        this IServiceCollection services,
+        Action<BudgetMeterOptions>? configure = null)
+    {
+        var options = new BudgetMeterOptions();
+        configure?.Invoke(options);
+
+        services.AddSingleton(options);
+        services.AddSingleton<OpenTelemetryBudgetMeter>(sp => new OpenTelemetryBudgetMeter(
+            sp.GetRequiredService<BudgetMeterOptions>(),
+            sp.GetService<TimeProvider>()));
+        services.AddSingleton<IBudgetMeter>(sp => sp.GetRequiredService<OpenTelemetryBudgetMeter>());
+
         return services;
     }
 }

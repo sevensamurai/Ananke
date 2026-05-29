@@ -26,7 +26,7 @@ The tables below map the guide set to the demo projects in the main repository, 
 |---|---|---|---|
 | 05 | [Streaming Chat](guides/05-streaming-chat.md) | `StreamingChatWorkflow`, `ChatSessionEvent` / `BuildStream()`, `ChatSession<S,T>`, `InMemorySessionStore`, SSE endpoints, web UI integration | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) · [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
 | 06 | [Long-Term Memory](guides/06-memory.md) | Knowledge pipeline (extract → chunk → embed → store), `KnowledgeBase` multi-section grouping, catalog, time-decay reranking, agent-driven ingestion | [LongTermMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LongTermMemoryDemo) |
-| 07 | [Human-in-the-Loop](guides/07-human-in-the-loop.md) | Interrupt before/after, checkpointing, resume with modified state | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
+| 07 | [Human-in-the-Loop](guides/07-human-in-the-loop.md) | Interrupt before/after, checkpointing, resume with modified state, work-review gates, async review parking, budget gates | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) · [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
 
 ### Production Infrastructure
 
@@ -66,6 +66,7 @@ These demos validate the longer-arc capabilities described in the [Background & 
 ## Featured Walkthroughs
 
 - [Organic Kernel Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) — the flagship Organics demo: cell division from detection to spawned peers, end-to-end, no API keys.
+- [Mini Agency Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) — a Slack-backed draft-and-review application wiring `Ananke.Roles`, work-review gates, async parking, and optional OTel metrics in a realistic end-to-end flow.
 - [Multi-Agent Demo](demos/multi-agent.md) — router, worker, reviewer orchestration in one focused walkthrough.
 - [Tools Demo](demos/tools.md) — concrete ToolKit registration patterns, typed parameters, and async tools.
 - [CLI Overview](cli/overview.md) — scaffold, validate, run, and serve workflows from the terminal.

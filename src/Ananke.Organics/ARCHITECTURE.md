@@ -39,6 +39,7 @@ Ananke.Organics/
     Snapshots/          Point-in-time mesh capture and restoration
   Division/             Surface-tension evaluation, plan proposal, and execution
     Approval/           Governance gate between proposal and execution
+    Review/             Work-product review gates and quorum rules
   Healing/              Error-rate evaluation and recovery planning
   Sensing/              Capability heartbeat aggregation and request routing
 ```
@@ -53,7 +54,8 @@ Ananke.Organics/
 | `Ananke.Organics.Kernel.Lineage` | `ILineageStore`, `InMemoryLineageStore`, `CellLineage` |
 | `Ananke.Organics.Kernel.Snapshots` | `HostSnapshot`, `WorkflowSnapshotBuilder`, `HostSnapshotExporter`, `IWorkflowActivatorFactory`, `TypedWorkflowActivatorFactory`, `WorkflowActivator`, `PromptWorkflowDesigner` |
 | `Ananke.Organics.Division` | `IDivisionPolicy`, `ThresholdDivisionPolicy`, `ExperienceDrivenDivisionPolicy`, `IDivisionTransition`, `StopTheWorldDivisionTransition`, `IWorkflowDivider`, `WorkflowDivider`, `IDivisionOutcomeTracker`, `DivisionOutcomeTracker`, `WorkflowExecutionMonitor`, `ComplexitySnapshot`, `DivisionPlan`, `DivisionResult`, `DivisionSignal`, `DivisionExperience`, `MetabolicSignal`, `MetabolicThresholds`, `StructuralProfile`, `StructuralProfileFactory`, `MemoryProfile`, `FailurePattern`, `FailureClassifier`, `FailureClassifierBuilder`, `FailureClassifierProfiles`, `ToolKitClusterStrategy`, `DomainAffinityMemory`, `IRemoteCellSource`, `DivisionOptions` |
-| `Ananke.Organics.Division.Approval` | `IDivisionApprovalGate`, `AutoApprovalGate`, `LlmApprovalGate`, `CallbackApprovalGate`, `MetabolicDivisionApprovalGate`, `DivisionApproval` |
+| `Ananke.Organics.Division.Approval` | `IDivisionApprovalGate`, `AutoApprovalGate`, `LlmApprovalGate`, `CallbackApprovalGate`, `MetabolicDivisionApprovalGate`, `BudgetApprovalGate`, `IBudgetMeter`, `InMemoryBudgetMeter`, `BudgetSpend`, `DivisionApproval` |
+| `Ananke.Organics.Division.Review` | `IWorkReviewGate`, `AutoWorkReviewGate`, `LlmWorkReviewGate`, `CallbackWorkReviewGate`, `QuorumWorkReviewGate`, `WorkReviewQuorum`, `WorkItem`, `WorkItemKind`, `WorkReviewDecision`, `WorkReviewOutcome`, `IWorkReviewParkingStore`, `InMemoryWorkReviewParkingStore`, `ParkingCallbackWorkReviewGate` |
 | `Ananke.Organics.Healing` | `IHealingPolicy`, `ThresholdHealingPolicy`, `IHealthMonitor`, `CompositeHealingPolicy`, `HealingPlan`, `HealthSnapshot`, `FailureOrigin`, `AgedCellPrunePolicy`, `IdleCellPrunePolicy` |
 | `Ananke.Organics.Sensing` | `ICapabilityMap`, `InMemoryCapabilityMap`, `IMeshAggregator`, `InMemoryMeshAggregator`, `IRequestRouter`, `KeywordRequestRouter`, `IDomainRouter`, `RoutingAffinityTracker`, `QuorumApprovalGate`, `MeshSignal`, `WorkflowSignal`, `SensedCapability` |
 | `Ananke.Organics.Topology` | `ColonyGraphBuilder` — builds a `IKnowledgeGraph` colony graph from the live mesh state (capability map, lineage, routing affinity) |
@@ -72,6 +74,9 @@ Ananke.Organics/
 | `OrganicWorkflowExtensions.JoinHost` | Static extension | Entry point — `workflow.JoinHost(host, toolKit)` returns the observed wrapper. |
 | `IDivisionPolicy` | `interface` | Proposes a `DivisionPlan` when surface tension (structural complexity) exceeds thresholds. Returns `null` when healthy. |
 | `IDivisionApprovalGate` | `interface` | Governance gate between proposal and execution. Default: `AutoApprovalGate`. |
+| `IBudgetMeter` | `interface` | Reads rolling-window token and cost spend for a workflow key. Default: `InMemoryBudgetMeter`. |
+| `IWorkReviewGate` | `interface` | Reviews work products such as PRs or design docs and returns approved, rejected, revised, or pending decisions. |
+| `IWorkReviewParkingStore` | `interface` | Persists pending review state across threads (and optionally process restarts). Default: `InMemoryWorkReviewParkingStore`. |
 | `IWorkflowDivider` | `interface` | Executes the approved plan: derive → seed → activate → spawn → confirm → kill. Atomic — no partial divisions. |
 | `IHealingPolicy` | `interface` | Evaluates `HealthSnapshot` + `ComplexitySnapshot` to produce a `HealingPlan`. Returns `null` when healthy. |
 | `ICapabilityMap` | `interface` | Live registry of which domains each cell can handle (populated by heartbeat / sensing signals). |
@@ -200,6 +205,46 @@ Default: `InMemoryLineageStore` (survives restarts only if the host process does
 
 ---
 
+## Async Review Parking
+
+`CallbackWorkReviewGate` can stall a workflow thread for hours while a reviewer sleeps.
+`ParkingCallbackWorkReviewGate` solves this with a park-and-resume pattern:
+
+```
+Workflow calls ReviewAsync(item)
+  → item is persisted via IWorkReviewParkingStore (returns opaque parkingId)
+  → WorkReviewDecision { Outcome = Pending, Comment = parkingId } is returned immediately
+  → workflow runner checkpoints and yields the thread
+
+Reviewer clicks Approve / Revise / Reject (e.g. via SlackApprovalCallback)
+  → ParkingCallbackWorkReviewGate.ResumeAsync(parkingId, decision) is called
+  → store entry is removed (CompleteAsync)
+  → any in-process waiter on the original ReviewAsync call is resolved
+  → workflow runner re-enters the gate with the real decision
+```
+
+The `Comment` field of the `Pending` decision carries the opaque parking id so the
+calling code can forward it into a Slack message (or any other channel) without needing a
+separate out-parameter.
+
+### Implementations
+
+| Type | Description |
+|---|---|
+| `IWorkReviewParkingStore` | Store interface — `ParkAsync`, `TryGetAsync`, `CompleteAsync`. |
+| `InMemoryWorkReviewParkingStore` | Default in-process implementation. Thread-safe; state is lost on restart. |
+| `ParkingCallbackWorkReviewGate` | Gate implementation. Exposes `ReviewAsync` (parks) and `ResumeAsync` (resolves). |
+
+### Typical wiring with Slack
+
+1. Workflow calls `ReviewAsync` — receives `Pending` + `parkingId`.
+2. Application posts `SlackApprovalBlocks.Build(workItem)` to the review channel, embedding the `parkingId` in the message metadata or block value.
+3. Reviewer clicks a button → `SlackApprovalCallback.HandleInteractionAsync` resolves the decision.
+4. Application calls `gate.ResumeAsync(parkingId, decision)`.
+5. Workflow continues with the resolved `WorkReviewDecision`.
+
+---
+
 ## Extension Points
 
 | Interface | Default | Purpose |
@@ -215,6 +260,7 @@ Default: `InMemoryLineageStore` (survives restarts only if the host process does
 | `IMeshAggregator` | `InMemoryMeshAggregator` | Mesh-wide stress aggregation |
 | `IRequestRouter` | `KeywordRequestRouter` | Request → cell dispatch |
 | `ILineageStore` | `InMemoryLineageStore` | Birth/death persistence |
+| `IWorkReviewParkingStore` | `InMemoryWorkReviewParkingStore` | Pending-review state storage — swap for Redis, Postgres, etc. for durability |
 | `IWorkflowActivatorFactory` | `TypedWorkflowActivatorFactory` | Constructs new child workflows from snapshots |
 | `IDivisionOutcomeTracker` | `DivisionOutcomeTracker` | Records division results back to empirical memory |
 
@@ -227,6 +273,9 @@ A process restart loses:
 - capability map registrations
 - mesh aggregator state
 - lineage records
+- division outcome history
+- routing affinity scores
+- parked review state (use a durable `IWorkReviewParkingStore` to survive restarts)
 - division outcome history
 - routing affinity scores
 
@@ -250,9 +299,14 @@ Production deployments must supply persistent implementations of `ILineageStore`
 | `ILineageStore` / `InMemoryLineageStore` / `CellLineage` | Stable |
 | `HostSnapshot` / `WorkflowSnapshotBuilder` / `HostSnapshotExporter` | Stable |
 | `OrganicGrowthOptions` / `OrganicGrowthOptionsBuilder` | Stable |
+| `IWorkReviewGate` / `WorkItem` / `WorkReviewDecision` / `WorkReviewOutcome` | Stable |
+| `IWorkReviewParkingStore` / `InMemoryWorkReviewParkingStore` / `ParkingCallbackWorkReviewGate` | Stable |
 | `LlmApprovalGate` / `MetabolicDivisionApprovalGate` | **Preview** — LLM gate prompt format may change |
 | `PromptWorkflowDesigner` | **Preview** — autonomous topology evolution is experimental |
 | `QuorumApprovalGate` | **Preview** |
+| `IRemoteCellSource` / federated division path | **Preview** — federated host integration is not yet complete |
+
+Breaking changes to **Stable** surfaces require a documented design review.
 | `IRemoteCellSource` / federated division path | **Preview** — federated host integration is not yet complete |
 
 Breaking changes to **Stable** surfaces require a documented design review.

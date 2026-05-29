@@ -1,0 +1,29 @@
+[
+  {
+    "name": "drafter",
+    "domainTags": ["slack", "drafting", "review"],
+    "modelAlias": "local",
+    "systemPromptPath": "prompts/drafter.system.md",
+    "toolNames": ["current_time"],
+    "temperature": 0.2,
+    "maxToolRounds": 2,
+    "review": {
+      "llmFirstPass": true,
+      "finalApprovalRequired": false
+    }
+  },
+  {
+    "name": "reviewer",
+    "domainTags": ["slack", "review", "quality"],
+    "modelAlias": "local",
+    "systemPromptPath": "prompts/reviewer.system.md",
+    "toolNames": [],
+    "temperature": 0.0,
+    "maxToolRounds": 1,
+    "review": {
+      "llmFirstPass": true,
+      "finalApprovalRequired": true,
+      "additionalReviewerUserIds": ["any-channel-user"]
+    }
+  }
+]
