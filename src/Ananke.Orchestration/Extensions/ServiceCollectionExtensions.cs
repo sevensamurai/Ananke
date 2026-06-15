@@ -1,9 +1,14 @@
+using System.Threading.Channels;
 using Ananke.Abstractions.Memory;
+using Ananke.Abstractions.Trajectory;
 using Ananke.Abstractions.Tracing;
+using Ananke.Orchestration.Agents.Trajectory;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Execution;
 using Ananke.Orchestration.Memory;
+using Ananke.Orchestration.Tools.Gating;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -70,6 +75,66 @@ public static class ServiceCollectionExtensions
                 return new ConversationMemoryCleanupTimer(memory, interval, loggerFactory, timeProvider);
             });
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="CompositeAdaptiveHarnessPolicy"/> as both
+    /// <see cref="IAdaptiveHarnessPolicy"/> and <see cref="ITrajectoryObserver"/>.
+    /// Also registers a <see cref="ToolAffinityTracker"/> singleton if one is not already present.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// services.AddAdaptiveHarness(o =>
+    /// {
+    ///     o.KitName                = "ops";
+    ///     o.HallucinationThreshold = 2;
+    ///     o.AbandonedFaultPenalty  = -0.8f;
+    ///     o.SuccessReward          = 1.0f;
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddAdaptiveHarness(
+        this IServiceCollection services,
+        Action<AdaptiveHarnessOptions>? configure = null)
+    {
+        var options = new AdaptiveHarnessOptions();
+        configure?.Invoke(options);
+
+        services.TryAddSingleton<ToolAffinityTracker>();
+        services.AddSingleton(options);
+
+        services.AddSingleton<CompositeAdaptiveHarnessPolicy>(sp =>
+            new CompositeAdaptiveHarnessPolicy(
+                sp.GetRequiredService<ToolAffinityTracker>(),
+                options,
+                sp.GetService<ILearningCycleTrigger>(),
+                sp.GetService<ILogger<CompositeAdaptiveHarnessPolicy>>()));
+
+        services.AddSingleton<IAdaptiveHarnessPolicy>(sp =>
+            sp.GetRequiredService<CompositeAdaptiveHarnessPolicy>());
+
+        // Background channel: bounded so heavy hallucination runs don't OOM.
+        // ChannelTrajectoryObserver writes non-blocking; AdaptationQueueWorker drains off the hot path.
+        var channel = Channel.CreateBounded<TrajectorySnapshot>(
+            new BoundedChannelOptions(options.AdaptationChannelCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true
+            });
+        services.AddSingleton(channel);
+
+        services.AddSingleton<ITrajectoryObserver>(sp =>
+            new ChannelTrajectoryObserver(
+                sp.GetRequiredService<Channel<TrajectorySnapshot>>(),
+                sp.GetService<ILogger<ChannelTrajectoryObserver>>()));
+
+        services.AddHostedService(sp =>
+            new AdaptationQueueWorker(
+                sp.GetRequiredService<Channel<TrajectorySnapshot>>(),
+                sp.GetRequiredService<IAdaptiveHarnessPolicy>(),
+                sp.GetService<ILogger<AdaptationQueueWorker>>()));
 
         return services;
     }

@@ -1,4 +1,5 @@
 using Ananke.Organics.Division;
+using Ananke.Organics.Division.Approval;
 using Ananke.Organics.Kernel;
 using Ananke.Roles.Roles;
 using Ananke.Roles.Studio;
@@ -22,6 +23,7 @@ public sealed class StudioHostBuilderTests
                 ModelAlias = "local",
                 SystemPromptPath = "prompt.txt"
             })
+            .UseApprovalGate<AutoApprovalGate>()
             .DisableDivision();
 
         builder.Build(services);

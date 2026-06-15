@@ -1,5 +1,5 @@
 using System.Diagnostics.Metrics;
-using Ananke.Organics.Division.Approval;
+using Ananke.Abstractions.Budget;
 
 namespace Ananke.OpenTelemetry.Budget;
 

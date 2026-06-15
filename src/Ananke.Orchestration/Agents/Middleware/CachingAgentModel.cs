@@ -131,7 +131,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         if (entry is null || DateTimeOffset.UtcNow >= entry.ExpiresAt)
         {
             try { await _cache.RemoveAsync(cacheKey); }
-            catch { /* best-effort cleanup — errors logged by the adapter */ }
+            catch (Exception) { /* best-effort cleanup — errors logged by the adapter */ }
             return null;
         }
 

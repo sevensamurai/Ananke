@@ -20,6 +20,7 @@ public sealed class RedisCheckpointStore : ICheckpointStore
     private readonly ConnectionMultiplexer _redis;
     private readonly ILogger<RedisCheckpointStore> _logger;
     private readonly string _prefix;
+    private readonly TimeProvider _clock;
 
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = false };
     private static readonly JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
@@ -30,16 +31,19 @@ public sealed class RedisCheckpointStore : ICheckpointStore
     /// <param name="redis">An existing Redis connection multiplexer.</param>
     /// <param name="prefix">Key prefix for checkpoint keys. Defaults to <c>"ananke:checkpoint"</c>.</param>
     /// <param name="logger">Optional logger.</param>
+    /// <param name="clock">Optional time provider for TTL computation. Defaults to <see cref="TimeProvider.System"/>.</param>
     public RedisCheckpointStore(
         ConnectionMultiplexer redis,
         string prefix = "ananke:checkpoint",
-        ILogger<RedisCheckpointStore>? logger = null)
+        ILogger<RedisCheckpointStore>? logger = null,
+        TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(redis);
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
         _redis = redis;
         _prefix = prefix;
         _logger = logger ?? NullLogger<RedisCheckpointStore>.Instance;
+        _clock = clock ?? TimeProvider.System;
     }
 
     private string Key(string executionId) => $"{_prefix}:{executionId}";
@@ -54,7 +58,7 @@ public sealed class RedisCheckpointStore : ICheckpointStore
         var key = Key(checkpoint.ExecutionId);
 
         TimeSpan? ttl = checkpoint.ExpiresAt != DateTimeOffset.MaxValue
-            ? checkpoint.ExpiresAt.UtcDateTime - DateTime.UtcNow
+            ? checkpoint.ExpiresAt - _clock.GetUtcNow()
             : null;
 
         // Use atomic SET with optional expiry — avoids a TTL-less key if the process

@@ -1,6 +1,5 @@
 using System.Text.Json;
-using Ananke.Orchestration.Tools;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 using Shouldly;
 
 namespace Ananke.Orchestration.Conformance.Tests;
@@ -21,15 +20,11 @@ public abstract class ToolSchemaTranslatorConformanceTests
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    private static ToolDefinition MakeRemoteTool(string name = "test_tool") => new()
-    {
-        Name = name,
-        Description = "A test tool",
-        Parameters = [],
-        ExecutionMode = ToolExecutionMode.Callback,
-        Endpoint = new ToolEndpoint { Uri = new Uri("https://example.com/tool") },
-        Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
-    };
+    private static ProviderTool MakeRemoteTool(string name = "test_tool") =>
+        new(name, "A test tool", "{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false}")
+        {
+            ExecutionMode = ToolExecutionMode.Callback
+        };
 
     // ── 1. Basic translation ─────────────────────────────────────────────
 
@@ -96,13 +91,9 @@ public abstract class ToolSchemaTranslatorConformanceTests
         // Providers that disallow Local-mode tools (e.g. OpenAI) must throw.
         // Providers that silently skip or accept them must at least return non-null.
         var translator = CreateTranslator();
-        var localTool = new ToolDefinition
+        var localTool = new ProviderTool("local_tool", "runs in-process", "{}")
         {
-            Name  = "local_tool",
-            Description = "runs in-process",
-            Parameters = [],
-            ExecutionMode = ToolExecutionMode.Local,
-            Execute = (_, _) => Task.FromResult(ToolResult.Ok("done"))
+            ExecutionMode = ToolExecutionMode.Local
         };
 
         object? result = null;
@@ -121,7 +112,7 @@ public abstract class ToolSchemaTranslatorConformanceTests
 /// </summary>
 internal sealed class PassThroughToolSchemaTranslator : IToolSchemaTranslator
 {
-    public object Translate(IEnumerable<ToolDefinition> tools)
+    public object Translate(IEnumerable<ProviderTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
         return tools.Select(t => new { t.Name, t.Description }).ToList();

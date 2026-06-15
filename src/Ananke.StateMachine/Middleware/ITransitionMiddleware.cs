@@ -112,10 +112,14 @@ public class MetricsMiddleware<C, S, T> : ITransitionMiddleware<C, S, T>
     where T : Enum
 {
     private readonly Action<T, TimeSpan, bool>? _recordMetric;
+    private readonly TimeProvider _clock;
 
-    public MetricsMiddleware(Action<T, TimeSpan, bool>? recordMetric = null)
+    public MetricsMiddleware(
+        Action<T, TimeSpan, bool>? recordMetric = null,
+        TimeProvider? clock = null)
     {
         _recordMetric = recordMetric;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<TransitionResult<S>> InvokeAsync(
@@ -124,12 +128,12 @@ public class MetricsMiddleware<C, S, T> : ITransitionMiddleware<C, S, T>
         S currentState,
         Func<Task<TransitionResult<S>>> next)
     {
-        var startTime = DateTime.UtcNow;
+        var startTime = _clock.GetUtcNow();
         var result = await next();
-        var elapsed = DateTime.UtcNow - startTime;
-        
+        var elapsed = _clock.GetUtcNow() - startTime;
+
         _recordMetric?.Invoke(transition, elapsed, result.Success);
-        
+
         return result;
     }
 }

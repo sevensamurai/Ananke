@@ -38,4 +38,16 @@ public interface ISpan : IAsyncDisposable
     void SetAttribute(string key, string value);
 
     void RecordError(Exception exception);
+
+    /// <summary>
+    /// Records a retry attempt on this span.
+    /// Default implementation is a no-op; override in tracing backends to emit a span event.
+    /// </summary>
+    void RecordRetry(int attemptNumber, string reason) { }
+
+    /// <summary>
+    /// Records whether a prior fault on the named tool was ultimately recovered or abandoned.
+    /// Default implementation is a no-op; override in tracing backends to emit a span event.
+    /// </summary>
+    void RecordFaultResolved(string toolName, bool recovered) { }
 }

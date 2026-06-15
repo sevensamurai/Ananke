@@ -1,10 +1,11 @@
 using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Budget;
 using Ananke.Abstractions.Memory;
+using Ananke.Organics.Division.Approval;
 using Ananke.Design;
 using Ananke.Orchestration.Memory;
 using Ananke.Orchestration.OpenAI;
 using Ananke.Orchestration.Tools;
-using Ananke.Organics.Division.Approval;
 using Ananke.Platforms;
 using Ananke.Platforms.Slack;
 using Ananke.Roles.Roles;
@@ -67,6 +68,7 @@ var studio = new StudioHostBuilder()
             [options.WorkflowName] = options.BudgetCap
         }
     })
+    .UseApprovalGate<AutoApprovalGate>()
     .DisableDivision();
 
 foreach (var role in roles)

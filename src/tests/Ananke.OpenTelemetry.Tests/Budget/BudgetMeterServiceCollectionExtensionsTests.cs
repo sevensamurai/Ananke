@@ -1,5 +1,5 @@
+using Ananke.Abstractions.Budget;
 using Ananke.OpenTelemetry.Budget;
-using Ananke.Organics.Division.Approval;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 

@@ -9,15 +9,12 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <!-- ANANKE_ASYNC_001: existing codebase pre-dates the rule; suppressed globally until
-         a dedicated ConfigureAwait migration pass is complete. New code must comply. -->
-    <NoWarn>$(NoWarn);ANANKE_ASYNC_001</NoWarn>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <!-- Coordinated version across all packages -->
   <PropertyGroup>
-    <VersionPrefix>0.8.4</VersionPrefix>
+    <VersionPrefix>0.8.5</VersionPrefix>
     <MsExtensionsVersion>10.0.7</MsExtensionsVersion>
   </PropertyGroup>
 

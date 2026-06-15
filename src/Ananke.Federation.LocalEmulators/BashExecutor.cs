@@ -11,10 +11,18 @@ namespace Ananke.Federation.LocalEmulators;
 /// <c>bash</c> on Linux/macOS or <c>cmd</c> on Windows.
 /// </summary>
 /// <remarks>
-/// The sandbox root is created on first use and shared within a single executor
-/// instance (one executor per local design-loop session). The directory is
-/// <em>not</em> cleaned up automatically — callers managing their own session
-/// lifecycle should call <see cref="Dispose"/> or delete the directory.
+/// <para>
+/// <strong>Privilege caveat:</strong> commands execute with the same OS privileges
+/// as the host process. There is no process-level isolation — a command can read,
+/// write, or delete any file the host process can access. Only enable
+/// <see cref="AllowUnsafeBash"/> when you control the command source and have
+/// accepted the associated risk (e.g. a supervised local design-loop, never in
+/// production or multi-tenant environments).
+/// </para>
+/// <para>
+/// The sandbox directory is created on construction and deleted automatically
+/// when <see cref="Dispose"/> is called.
+/// </para>
 /// </remarks>
 internal sealed class BashExecutor : IPlatformNativeExecutor, IDisposable
 {
@@ -22,18 +30,43 @@ internal sealed class BashExecutor : IPlatformNativeExecutor, IDisposable
     private readonly int _timeoutSeconds;
     private bool _disposed;
 
-    public BashExecutor(string? sandboxRoot = null, int timeoutSeconds = 30)
+    /// <summary>
+    /// Initialises a new <see cref="BashExecutor"/>.
+    /// </summary>
+    /// <param name="sandboxRoot">
+    /// Working directory for all commands. A temporary directory is created
+    /// automatically when <see langword="null"/>.
+    /// </param>
+    /// <param name="timeoutSeconds">Per-command timeout in seconds (default 30).</param>
+    /// <param name="allowUnsafeBash">
+    /// Must be <see langword="true"/> to permit command execution.
+    /// Defaults to <see langword="false"/>; see the class-level privilege caveat before enabling.
+    /// </param>
+    public BashExecutor(string? sandboxRoot = null, int timeoutSeconds = 30, bool allowUnsafeBash = false)
     {
         _sandboxRoot = sandboxRoot ?? Path.Combine(Path.GetTempPath(), $"ananke-bash-{Guid.NewGuid():N}");
         _timeoutSeconds = timeoutSeconds;
+        AllowUnsafeBash = allowUnsafeBash;
         Directory.CreateDirectory(_sandboxRoot);
     }
+
+    /// <summary>
+    /// When <see langword="false"/> (the default), <see cref="ExecuteAsync"/> returns a fatal
+    /// error without spawning a process. Set to <see langword="true"/> only after reviewing
+    /// the privilege caveat in the class-level remarks.
+    /// </summary>
+    public bool AllowUnsafeBash { get; }
 
     public string Capability => "bash";
     public bool IsStub => false;
 
     public async Task<ToolResult> ExecuteAsync(IReadOnlyDictionary<string, object?> args, CancellationToken ct = default)
     {
+        if (!AllowUnsafeBash)
+            return ToolResult.Fatal(
+                "BashExecutor requires AllowUnsafeBash = true. " +
+                "Commands run with host-process privileges — review the class-level privilege caveat before enabling.");
+
         if (!args.TryGetValue("command", out var cmdVal) || cmdVal is null)
             return ToolResult.Fatal("Missing required argument: command");
 
@@ -68,7 +101,7 @@ internal sealed class BashExecutor : IPlatformNativeExecutor, IDisposable
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+            try { process.Kill(entireProcessTree: true); } catch (Exception) { /* best-effort kill on timeout */ }
             return ToolResult.Error($"bash: command timed out after {_timeoutSeconds}s");
         }
 
@@ -91,7 +124,7 @@ internal sealed class BashExecutor : IPlatformNativeExecutor, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        try { Directory.Delete(_sandboxRoot, recursive: true); } catch { /* best-effort */ }
+        try { Directory.Delete(_sandboxRoot, recursive: true); } catch (IOException) { /* best-effort sandbox cleanup */ }
     }
 
     private static (string Shell, string Flag) RuntimeShell() =>

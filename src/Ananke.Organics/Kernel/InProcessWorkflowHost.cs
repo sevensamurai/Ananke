@@ -67,7 +67,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         await entry.Cts.CancelAsync().ConfigureAwait(false);
         try { await entry.Loop.ConfigureAwait(false); }
         catch (OperationCanceledException) { /* expected */ }
-        catch { /* swallow crash during pause */ }
+        catch (Exception) { /* swallow crash during pause */ }
         entry.Cts.Dispose();
 
         // Signal that the pause has fully taken effect
@@ -147,7 +147,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         {
             // Expected — cell was killed or paused.
         }
-        catch
+        catch (Exception)
         {
             // Cell crashed — remove from alive list so it's not sensed.
         }

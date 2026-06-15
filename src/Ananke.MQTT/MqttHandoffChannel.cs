@@ -317,7 +317,7 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         if (_client is not null)
         {
             try { await _client.DisconnectAsync(); }
-            catch { /* best effort */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "MQTT disconnect failed during dispose — ignoring"); }
             _client.Dispose();
         }
 

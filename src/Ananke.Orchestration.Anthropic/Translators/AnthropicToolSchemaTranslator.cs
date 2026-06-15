@@ -1,11 +1,10 @@
 using System.Text.Json.Nodes;
-using Ananke.Orchestration.Tools;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 
 namespace Ananke.Orchestration.Anthropic.Translators;
 
 /// <summary>
-/// Translates Ananke <see cref="ToolDefinition"/> instances into JSON tool definitions
+/// Translates <see cref="ProviderTool"/> instances into JSON tool definitions
 /// for the Anthropic Messages API. Returns a <see cref="JsonArray"/> suitable for the
 /// <c>"tools"</c> property of a create-message request body.
 /// </summary>
@@ -24,7 +23,7 @@ public sealed class AnthropicToolSchemaTranslator : IToolSchemaTranslator
 
     /// <inheritdoc />
     /// <returns>A <see cref="JsonArray"/> of Anthropic tool objects.</returns>
-    public object Translate(IEnumerable<ToolDefinition> tools)
+    public object Translate(IEnumerable<ProviderTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
 
@@ -52,22 +51,19 @@ public sealed class AnthropicToolSchemaTranslator : IToolSchemaTranslator
         return result;
     }
 
-    private static JsonObject ToCustomToolJson(ToolDefinition tool)
+    private static JsonObject ToCustomToolJson(ProviderTool tool)
     {
         var obj = new JsonObject
         {
             ["name"] = tool.Name,
-            ["description"] = tool.Description
+            ["description"] = tool.Description,
+            ["input_schema"] = JsonNode.Parse(tool.ParametersJsonSchema)
         };
-
-        obj["input_schema"] = tool.Parameters.Count > 0
-            ? JsonNode.Parse(tool.ParametersJsonSchema)
-            : new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() };
 
         return obj;
     }
 
-    private static JsonObject ToPlatformNativeJson(ToolDefinition tool)
+    private static JsonObject ToPlatformNativeJson(ProviderTool tool)
     {
         var capability = tool.PlatformCapability
             ?? throw new InvalidOperationException(

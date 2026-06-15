@@ -1,17 +1,17 @@
 using System.Text.Json;
+using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Memory;
+using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tracing;
+using Ananke.Abstractions.Trajectory;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Routing;
+using Ananke.Orchestration.Agents.Trajectory;
 using Ananke.Orchestration.Jobs;
-using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Polly;
-using Polly.Retry;
-
-using Ananke.Abstractions.Agents;
 
 namespace Ananke.Orchestration.Agents;
 
@@ -25,19 +25,23 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
     private readonly IReadOnlyDictionary<string, ToolDefinition>? _toolExecutors;
     private readonly Action<TState, TResponse>? _onResponse;
     private readonly int _maxToolRounds;
-    private readonly ResiliencePipeline<AgentResponse> _retryPipeline;
+    private readonly int _maxRetryAttempts;
+    private readonly TimeSpan _retryBaseDelay;
     private readonly int? _maxContextTokens;
     private readonly IConversationMemory? _memory;
     private readonly Func<TState, string>? _sessionIdBuilder;
     private readonly IContextStrategy? _contextStrategy;
     private readonly ILogger _logger;
+    private readonly IHallucinationObserver? _hallucinationObserver;
+    private readonly ITrajectoryObserver? _trajectoryObserver;
+    private readonly string? _kitName;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    // 4.6: Cache the generated JSON schema once per (TResponse, TState) pair to avoid
+    // Cache the generated JSON schema once per (TResponse, TState) pair to avoid
     // redundant reflection work on every structured agent call.
     private static readonly string CachedResponseSchema = JsonSchemaGenerator.Generate<TResponse>();
 
@@ -57,7 +61,10 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         IConversationMemory? memory,
         Func<TState, string>? sessionIdBuilder,
         IContextStrategy? contextStrategy,
-        ILogger logger)
+        ILogger logger,
+        IHallucinationObserver? hallucinationObserver,
+        ITrajectoryObserver? trajectoryObserver,
+        string? kitName)
     {
         Name = name;
         _model = model;
@@ -68,29 +75,16 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         _toolExecutors = toolExecutors;
         _onResponse = onResponse;
         _maxToolRounds = maxToolRounds;
-        _retryPipeline = new ResiliencePipelineBuilder<AgentResponse>()
-            .AddRetry(new RetryStrategyOptions<AgentResponse>
-            {
-                MaxRetryAttempts = maxRetryAttempts - 1,
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = retryBaseDelay,
-                UseJitter = false,
-                ShouldHandle = new PredicateBuilder<AgentResponse>()
-                    .Handle<Exception>(ex => ex is not OperationCanceledException),
-                OnRetry = args =>
-                {
-                    logger.LogWarning(args.Outcome.Exception,
-                        "[{AgentName}] LLM call failed (attempt {Attempt}/{MaxAttempts}), retrying in {DelayMs}ms",
-                        name, args.AttemptNumber + 1, maxRetryAttempts, (int)args.RetryDelay.TotalMilliseconds);
-                    return ValueTask.CompletedTask;
-                }
-            })
-            .Build();
+        _maxRetryAttempts = maxRetryAttempts;
+        _retryBaseDelay = retryBaseDelay;
         _maxContextTokens = maxContextTokens;
         _memory = memory;
         _sessionIdBuilder = sessionIdBuilder;
         _contextStrategy = contextStrategy;
         _logger = logger;
+        _hallucinationObserver = hallucinationObserver;
+        _trajectoryObserver = trajectoryObserver;
+        _kitName = kitName;
     }
 
     public string Name { get; }
@@ -118,7 +112,6 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         var userPrompt = _promptBuilder(state);
         var messages = new List<AgentMessage>();
 
-        // Load prior conversation history from memory
         string? sessionId = null;
         var historyCount = 0;
         if (_memory is not null && _sessionIdBuilder is not null)
@@ -134,22 +127,35 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
         messages.Add(AgentMessage.User(userPrompt));
 
-        // Apply context strategy to compact messages before the first LLM call
         if (_contextStrategy is not null)
         {
             var compacted = await _contextStrategy.ApplyAsync(messages, _systemPrompt, ct);
             if (!ReferenceEquals(compacted, messages))
             {
-                historyCount = 0; // compacted list may have dropped history messages
+                historyCount = 0;
                 messages = [.. compacted];
             }
         }
 
-        TResponse response = _tools is not null
-            ? await ExecuteWithToolsAsync(messages, ct)
-            : await ExecuteStructuredAsync(messages, ct);
+        var snapshotBuilder = _trajectoryObserver is not null
+            ? new TrajectorySnapshotBuilder(Name, _trajectoryObserver)
+            : null;
 
-        // Persist only new messages (skip the loaded history)
+        TResponse response = default!;
+        var succeeded = false;
+        try
+        {
+            response = _tools is not null
+                ? await ExecuteWithToolsAsync(messages, snapshotBuilder, ct)
+                : await ExecuteStructuredAsync(messages, snapshotBuilder, ct);
+            succeeded = true;
+        }
+        finally
+        {
+            if (snapshotBuilder is not null)
+                await snapshotBuilder.CompleteAsync(succeeded, ct: ct).ConfigureAwait(false);
+        }
+
         if (_memory is not null && sessionId is not null && historyCount < messages.Count)
         {
             var newMessages = messages.GetRange(historyCount, messages.Count - historyCount);
@@ -162,6 +168,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
     private async Task<TResponse> ExecuteStructuredAsync(
         List<AgentMessage> messages,
+        TrajectorySnapshotBuilder? snapshotBuilder,
         CancellationToken ct)
     {
         var parentSpan = WorkflowTraceContext.Value?.CurrentSpan;
@@ -178,7 +185,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
         };
 
-        var result = await GenerateWithRetryAsync(request, ct);
+        var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
         var text = result.Text
             ?? throw new InvalidOperationException($"[{Name}] LLM returned empty response.");
 
@@ -191,6 +198,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
     private async Task<TResponse> ExecuteWithToolsAsync(
         List<AgentMessage> messages,
+        TrajectorySnapshotBuilder? snapshotBuilder,
         CancellationToken ct)
     {
         var parentSpan = WorkflowTraceContext.Value?.CurrentSpan;
@@ -206,7 +214,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
         };
 
-        var result = await GenerateWithRetryAsync(request, ct);
+        var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
 
         while (result.RequiresAction)
         {
@@ -227,9 +235,39 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                 toolSpan?.SetAttribute("tool_round", toolRound.ToString());
 
                 var args = ParseToolArgs(call.Arguments);
-                var toolResult = _toolExecutors!.TryGetValue(call.FunctionName, out var executor)
-                    ? await executor.ExecuteAsync(args, ct)
-                    : ToolResult.Error($"Unknown tool: {call.FunctionName}");
+                ToolResult toolResult;
+
+                if (_toolExecutors!.TryGetValue(call.FunctionName, out var executor))
+                {
+                    toolResult = await executor.ExecuteAsync(args, ct);
+                    snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: toolResult.IsError);
+                }
+                else
+                {
+                    var evt = new HallucinatedToolCallEvent
+                    {
+                        RequestedToolName = call.FunctionName,
+                        RequestedKitName = _kitName,
+                        AgentId = Name,
+                        EpisodeId = snapshotBuilder?.EpisodeId ?? string.Empty,
+                        OccurredAt = DateTimeOffset.UtcNow,
+                    };
+
+                    if (_hallucinationObserver is not null)
+                        await _hallucinationObserver.ReportAsync(evt, ct).ConfigureAwait(false);
+
+                    ToolMetrics.HallucinationReported.Add(1,
+                        new KeyValuePair<string, object?>("agent_id", Name),
+                        new KeyValuePair<string, object?>("kit", _kitName ?? string.Empty),
+                        new KeyValuePair<string, object?>("requested_name", call.FunctionName));
+
+                    toolSpan?.SetAttribute("tool.hallucination", "true");
+                    toolSpan?.SetAttribute("tool.hallucination.requested_name", call.FunctionName);
+
+                    toolResult = ToolResult.Error(
+                        $"Unknown tool '{call.FunctionName}': this tool is not registered. Do not call it again.");
+                    snapshotBuilder?.RecordToolCall(hallucinated: true, faulted: false);
+                }
 
                 if (toolResult.IsError)
                 {
@@ -256,8 +294,6 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                     "Do not call those tools again. Proceed with your best answer using any information you already have."));
             }
 
-            // 4.6: Check context-token budget before assembling the next request so we
-            // surface the limit before an avoidably large call is dispatched.
             if (_maxContextTokens.HasValue)
             {
                 var preFlight = new AgentRequest
@@ -279,15 +315,12 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                         Name, estimated, _maxContextTokens.Value, toolRound + 1);
             }
 
-            // Apply context strategy before re-requesting in the tool loop
             IReadOnlyList<AgentMessage> requestMessages = messages;
             if (_contextStrategy is not null)
-            {
                 requestMessages = await _contextStrategy.ApplyAsync(messages, _systemPrompt, ct);
-            }
 
             request = request with { Messages = requestMessages };
-            result = await GenerateWithRetryAsync(request, ct);
+            result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
         }
 
         llmSpan?.SetAttribute("tool_rounds", toolRound.ToString());
@@ -296,7 +329,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         messages.Add(AgentMessage.User(
             $"Based on everything above, provide your final response as JSON matching the {typeof(TResponse).Name} schema."));
 
-        return await ExecuteStructuredAsync(messages, ct);
+        return await ExecuteStructuredAsync(messages, snapshotBuilder, ct);
     }
 
     private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
@@ -304,23 +337,58 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         var dict = new Dictionary<string, object?>();
         using var doc = JsonDocument.Parse(arguments);
         foreach (var prop in doc.RootElement.EnumerateObject())
-        {
             dict[prop.Name] = prop.Value.Clone();
-        }
         return dict;
     }
 
     private static int EstimateTokens(AgentRequest request) =>
         ((request.SystemPrompt?.Length ?? 0) +
-         request.Messages.Sum(m => (m.Content?.Length ?? 0) + (m.ToolCalls?.Sum(tc => tc.Arguments.Length + tc.FunctionName.Length) ?? 0)) +
+         request.Messages.Sum(m => (m.Content?.Length ?? 0) +
+            (m.ToolCalls?.Sum(tc => tc.Arguments.Length + tc.FunctionName.Length) ?? 0)) +
          (request.Tools?.Sum(t => t.Name.Length + t.Description.Length + t.ParametersJsonSchema.Length) ?? 0)) / 4;
 
-    private async Task<AgentResponse> GenerateWithRetryAsync(AgentRequest request, CancellationToken ct)
+    private async Task<AgentResponse> GenerateWithRetryAsync(
+        AgentRequest request,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        ISpan? span,
+        CancellationToken ct)
     {
-        var response = await _retryPipeline.ExecuteAsync(
-            async token => await _model.GenerateAsync(request, token), ct);
-        TokenUsageCapture.Accumulate(response);
-        return response;
+        Exception? lastException = null;
+        var retries = 0;
+
+        for (var attempt = 0; attempt < _maxRetryAttempts; attempt++)
+        {
+            try
+            {
+                var response = await _model.GenerateAsync(request, ct).ConfigureAwait(false);
+                TokenUsageCapture.Accumulate(response);
+                if (retries > 0)
+                    span?.SetAttribute("gen_ai.retry_count", retries.ToString());
+                return response;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                if (attempt == _maxRetryAttempts - 1)
+                    break;
+
+                retries++;
+                var delayMs = (int)(_retryBaseDelay.TotalMilliseconds * Math.Pow(2, retries - 1));
+                _logger.LogWarning(ex,
+                    "[{AgentName}] LLM call failed (attempt {Attempt}/{Max}), retrying in {Delay}ms",
+                    Name, retries, _maxRetryAttempts, delayMs);
+                snapshotBuilder?.RecordRetry();
+                span?.RecordRetry(retries, ex.Message);
+                ToolMetrics.ModelRetry.Add(1,
+                    new KeyValuePair<string, object?>("agent_id", Name));
+                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        span?.SetAttribute("gen_ai.retry_count", retries.ToString());
+        throw new InvalidOperationException(
+            $"[{Name}] LLM call failed after {_maxRetryAttempts} attempts.", lastException!);
     }
 
     /// <summary>Fluent builder for <see cref="AgentJob{TState, TResponse}"/>.</summary>
@@ -345,6 +413,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private Func<TState, string>? _sessionIdBuilder;
         private IContextStrategy? _contextStrategy;
         private ILoggerFactory? _loggerFactory;
+        private ITrajectoryObserver? _trajectoryObserver;
 
         public Builder(string name, IAgentModel model)
         {
@@ -403,11 +472,6 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         /// Prior conversation history is loaded before each call and new messages
         /// are persisted after execution.
         /// </summary>
-        /// <param name="memory">The conversation memory store.</param>
-        /// <param name="sessionId">
-        /// Extracts the session identifier from the workflow state. Each unique session ID
-        /// gets isolated conversation history.
-        /// </param>
         public Builder WithMemory(IConversationMemory memory, Func<TState, string> sessionId)
         {
             ArgumentNullException.ThrowIfNull(memory);
@@ -426,16 +490,19 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
         /// <summary>
         /// Sets the context strategy applied before each LLM call.
-        /// When set, the message history is passed through the strategy before
-        /// building the <see cref="AgentRequest"/>. Use with
-        /// <see cref="WithContextLimit"/> to set the token budget, or configure
-        /// the budget directly on the strategy.
         /// </summary>
-        /// <param name="strategy">The context compaction strategy.</param>
         public Builder WithContextStrategy(IContextStrategy strategy)
         {
             ArgumentNullException.ThrowIfNull(strategy);
             _contextStrategy = strategy;
+            return this;
+        }
+
+        /// <summary>Registers an <see cref="ITrajectoryObserver"/> to receive a snapshot after each run.</summary>
+        public Builder WithTrajectoryObserver(ITrajectoryObserver observer)
+        {
+            ArgumentNullException.ThrowIfNull(observer);
+            _trajectoryObserver = observer;
             return this;
         }
 
@@ -458,12 +525,16 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
             IReadOnlyList<AgentTool>? tools = null;
             IReadOnlyDictionary<string, ToolDefinition>? toolExecutors = null;
+            IHallucinationObserver? hallucinationObserver = null;
+            string? kitName = null;
 
             if (_toolKit is not null)
             {
                 tools = _toolKit.Tools.Values.Select(t =>
                     new AgentTool(t.Name, t.Description, t.ParametersJsonSchema)).ToList();
                 toolExecutors = _toolKit.Tools;
+                hallucinationObserver = _toolKit.HallucinationObserver;
+                kitName = _toolKit.Name;
             }
 
             ILogger logger = _loggerFactory?.CreateLogger($"Ananke.Orchestration.AgentJob.{_name}")
@@ -472,7 +543,8 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return new AgentJob<TState, TResponse>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
                 tools, toolExecutors, _onResponse, _maxToolRounds, _maxRetryAttempts, _retryBaseDelay,
-                _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger);
+                _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger,
+                hallucinationObserver, _trajectoryObserver, kitName);
         }
     }
 }

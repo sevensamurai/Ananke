@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Ananke.Abstractions;
+using Ananke.Abstractions.Providers;
 
 namespace Ananke.Orchestration.Tools;
 
@@ -80,7 +81,7 @@ public sealed record ToolPrerequisite(string Name, Func<CancellationToken, Task<
                 await process.WaitForExitAsync(ct).ConfigureAwait(false);
                 return process.ExitCode == 0;
             }
-            catch
+            catch (Exception)
             {
                 return false;
             }
@@ -111,7 +112,7 @@ public sealed record ToolPrerequisite(string Name, Func<CancellationToken, Task<
                 // We're checking connectivity, not correctness.
                 return true;
             }
-            catch
+            catch (Exception)
             {
                 return false;
             }
@@ -189,6 +190,17 @@ public record ToolDefinition
 
     public Task<ToolResult> ExecuteAsync(IReadOnlyDictionary<string, object?> args, CancellationToken ct = default) =>
         Execute(args, ct);
+
+    /// <summary>
+    /// Projects this definition into a schema-only <see cref="ProviderTool"/> for use with
+    /// <see cref="IToolSchemaTranslator"/>. Execution delegate and prerequisites are dropped.
+    /// </summary>
+    public ProviderTool ToProviderTool() =>
+        new(Name, Description, ParametersJsonSchema)
+        {
+            ExecutionMode = ExecutionMode,
+            PlatformCapability = PlatformCapability
+        };
 
     public string ParametersJsonSchema
     {

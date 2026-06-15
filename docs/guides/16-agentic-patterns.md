@@ -172,7 +172,7 @@ var pipeline = new Workflow<PipelineState>("content-pipeline")
         mapIn: s => s.Article,
         mapOut: (s, article) => s with { Article = article })
     .Job("publish", publishJob)
-    .Chain("gather", "review", "publish", Workflow.End);
+    .Chain("gather", "review", "publish");
 ```
 
 ### Stream events

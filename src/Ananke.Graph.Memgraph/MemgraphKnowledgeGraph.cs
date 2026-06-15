@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Ananke.Abstractions.Graph;
 using Neo4j.Driver;
 
@@ -51,10 +52,12 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         await using var session = factory.OpenSession();
         var props = BuildNodeProps(node);
 
-        await session.ExecuteWriteAsync(tx =>
-            tx.RunAsync(
+        await session.ExecuteWriteAsync(async tx =>
+        {
+            await tx.RunAsync(
                 "MERGE (n:Node {id: $id}) SET n += $props",
-                new { id = node.Id, props })).ConfigureAwait(false);
+                new { id = node.Id, props }).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -62,14 +65,14 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
     {
         await using var session = factory.OpenSession();
 
-        // Relation label must be a valid Cypher identifier — upper-case, replace spaces.
-        var relation = edge.Relation.ToUpperInvariant().Replace(' ', '_');
+        var relation = ValidateRelationLabel(edge.Relation);
 
         // Provenance ordinal: Inferred=0, Extracted=1.  We only allow promotion.
         var provOrdinal = (int)edge.Provenance;
 
-        await session.ExecuteWriteAsync(tx =>
-            tx.RunAsync(
+        await session.ExecuteWriteAsync(async tx =>
+        {
+            await tx.RunAsync(
                 $$"""
                 MATCH (a:Node {id: $fromId}), (b:Node {id: $toId})
                 MERGE (a)-[r:{{relation}}]->(b)
@@ -91,7 +94,8 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
                     prov = provOrdinal,
                     observedAt = edge.ObservedAt.ToUnixTimeMilliseconds(),
                     props = BuildEdgeProps(edge),
-                })).ConfigureAwait(false);
+                }).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -105,10 +109,8 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
                 "MATCH (n:Node {id: $id}) RETURN n",
                 new { id }).ConfigureAwait(false);
 
-            if (!await cursor.FetchAsync().ConfigureAwait(false))
-                return null;
-
-            return RecordToNode(cursor.Current["n"].As<INode>());
+            var records = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return records.Count == 0 ? null : RecordToNode(records[0]["n"].As<INode>());
         }).ConfigureAwait(false);
     }
 
@@ -132,20 +134,14 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
             }
             else
             {
-                var label = relation.ToUpperInvariant().Replace(' ', '_');
+                var label = ValidateRelationLabel(relation);
                 cursor = await tx.RunAsync(
                     $"MATCH (n:Node {{id: $id}})-[r:{label}]-(m:Node) RETURN r, n, m",
                     new { id = nodeId }).ConfigureAwait(false);
             }
 
-            var results = new List<GraphEdge>();
-            while (await cursor.FetchAsync().ConfigureAwait(false))
-            {
-                var rel = cursor.Current["r"].As<IRelationship>();
-                results.Add(RecordToEdge(rel));
-            }
-
-            return (IReadOnlyList<GraphEdge>)results;
+            var records = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return records.Select(r => RecordToEdge(r["r"].As<IRelationship>())).ToList();
         }).ConfigureAwait(false);
     }
 
@@ -165,6 +161,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         if (seedNodeIds.Count == 0)
             return [];
 
+        hops = Math.Clamp(hops, 1, 10);
         await using var session = factory.OpenSession();
 
         return await session.ExecuteReadAsync(async tx =>
@@ -178,11 +175,8 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
                 """,
                 new { seeds = (IList<string>)seedNodeIds, maxNodes }).ConfigureAwait(false);
 
-            var results = new List<GraphNode>();
-            while (await cursor.FetchAsync().ConfigureAwait(false))
-                results.Add(RecordToNode(cursor.Current["m"].As<INode>()));
-
-            return (IReadOnlyList<GraphNode>)results;
+            var records = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return records.Select(r => RecordToNode(r["m"].As<INode>())).ToList();
         }).ConfigureAwait(false);
     }
 
@@ -193,8 +187,8 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         return await session.ExecuteReadAsync(async tx =>
         {
             var cursor = await tx.RunAsync("MATCH (n:Node) RETURN count(n) AS c").ConfigureAwait(false);
-            await cursor.FetchAsync().ConfigureAwait(false);
-            return cursor.Current["c"].As<int>();
+            var records = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return records[0]["c"].As<int>();
         }).ConfigureAwait(false);
     }
 
@@ -205,12 +199,31 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         return await session.ExecuteReadAsync(async tx =>
         {
             var cursor = await tx.RunAsync("MATCH ()-[r]->() RETURN count(r) AS c").ConfigureAwait(false);
-            await cursor.FetchAsync().ConfigureAwait(false);
-            return cursor.Current["c"].As<int>();
+            var records = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return records[0]["c"].As<int>();
         }).ConfigureAwait(false);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static readonly Regex RelationLabelPattern =
+        new(@"^[A-Z][A-Z0-9_]*$", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+
+    /// <summary>
+    /// Normalises <paramref name="relation"/> to upper-case, replaces spaces with underscores,
+    /// then validates the result is a safe Cypher relationship-type identifier.
+    /// Throws <see cref="ArgumentException"/> if the result would allow injection.
+    /// </summary>
+    private static string ValidateRelationLabel(string relation)
+    {
+        var label = relation.ToUpperInvariant().Replace(' ', '_');
+        if (!RelationLabelPattern.IsMatch(label))
+            throw new ArgumentException(
+                $"Relation '{relation}' produces an unsafe Cypher identifier '{label}'. " +
+                "Only letters, digits, and underscores are permitted.",
+                nameof(relation));
+        return label;
+    }
 
     private static Dictionary<string, object?> BuildNodeProps(GraphNode node)
     {

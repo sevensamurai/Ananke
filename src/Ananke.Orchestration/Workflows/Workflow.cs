@@ -14,11 +14,19 @@ public static class Workflow
 {
     internal const string EndMarker = "__end__";
 
+    /// <summary>
+    /// Sentinel that explicitly terminates a workflow from inside a router or decision lambda.
+    /// A job with no outgoing edge is already implicitly terminal — static edges to
+    /// <c>Workflow.End</c> are redundant and can be omitted.
+    /// </summary>
     public static string End => EndMarker;
 
     /// <summary>
     /// Type-safe sentinel for workflow termination. Equivalent to <see cref="End"/>
-    /// but returns a <see cref="JobRef"/> for use with the type-safe overloads.
+    /// but returns a <see cref="JobRef"/> for use with router overloads such as
+    /// <see cref="Workflow{TState}.Then(JobRef, IRouter{TState})"/>.
+    /// A job with no outgoing edge is already implicitly terminal — static edges to
+    /// <c>Workflow.EndRef</c> are redundant and can be omitted.
     /// </summary>
     public static JobRef EndRef => new(EndMarker);
 
@@ -369,7 +377,7 @@ public sealed class Workflow<TState>
 
     /// <summary>
     /// Chains one or more jobs together in a linear sequence using type-safe <see cref="JobRef"/> references.
-    /// The last element may be <see cref="Workflow.EndRef"/> to terminate the workflow.
+    /// The last job in the chain is implicitly terminal — no explicit <see cref="Workflow.EndRef"/> needed.
     /// </summary>
     public Workflow<TState> Chain(params JobRef[] jobRefs) =>
         Chain(jobRefs.Select(r => r.Name).ToArray());

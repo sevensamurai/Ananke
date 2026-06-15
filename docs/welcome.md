@@ -23,18 +23,46 @@ Most AI frameworks start with the LLM and build infrastructure around it. Ananke
 
 ## Quick Start
 
+Install the core package and one provider:
+
 ```bash
-dotnet add package Ananke
+dotnet add package Ananke.Orchestration
+dotnet add package Ananke.Orchestration.OpenAI
 ```
+
+Two LLM-backed agents, one typed state record, one `.Chain()` call to wire them together.
 
 ```csharp
-var workflow = new Workflow<MyState>("hello")
-    .Job("greet", async (state, ct) => state with { Message = "Hello from Ananke!" })
-    .Then("greet", Workflow.End);
+using Ananke.Orchestration;
+using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.OpenAI;
 
-var result = await workflow.RunAsync(new MyState());
-Console.WriteLine(result.State.Message);
+record PipelineState(string Topic = "", string Facts = "", string Summary = "");
+
+// Swap for AnthropicAgentModel or GoogleAgentModel — the workflow is unchanged.
+var model = OpenAIChatAgentModel.Create(
+    Environment.GetEnvironmentVariable("OPENAI_API_KEY")!, "gpt-4.1-mini");
+
+var researchJob = AgentJob.Create<PipelineState>("research", model)
+    .WithSystemPrompt("You are a research assistant. List three key facts concisely.")
+    .WithUserPrompt(s => $"Topic: {s.Topic}")
+    .MapResponse((s, text) => s with { Facts = text });
+
+var reviewJob = AgentJob.Create<PipelineState>("review", model)
+    .WithSystemPrompt("You are an editor. Distill the facts into one sentence.")
+    .WithUserPrompt(s => s.Facts)
+    .MapResponse((s, text) => s with { Summary = text });
+
+var workflow = new Workflow<PipelineState>("research-pipeline")
+    .Job("research", researchJob)
+    .Job("review", reviewJob)
+    .Chain("research", "review");
+
+var result = await workflow.RunAsync(new PipelineState { Topic = "CRISPR" });
+Console.WriteLine(result.State.Summary);
+Console.WriteLine(result.Status); // Completed
 ```
+
 
 -> [Full getting started guide](guides/01-getting-started.md) | [nnke Tools overview](cli/nnke-tools.md)
 

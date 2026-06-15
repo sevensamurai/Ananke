@@ -47,7 +47,7 @@ public sealed class ColonyGraphBuilder(
 
         await AddCapabilityNodesAsync(graph, ct);
         await AddLineageEdgesAsync(graph, ct);
-        AddRoutingEdges(graph);
+        await AddRoutingEdgesAsync(graph, ct);
     }
 
     // ── Private helpers ──────────────────────────────────────────────
@@ -170,7 +170,7 @@ public sealed class ColonyGraphBuilder(
         }
     }
 
-    private void AddRoutingEdges(IKnowledgeGraph graph)
+    private async Task AddRoutingEdgesAsync(IKnowledgeGraph graph, CancellationToken ct)
     {
         if (affinityTracker is null) return;
 
@@ -186,15 +186,14 @@ public sealed class ColonyGraphBuilder(
             // emit a cell-level routing edge from a synthetic routing node.
             var routingNodeId = "routing:observed";
 
-            // Upsert routing node (once)
-            graph.UpsertNodeAsync(new GraphNode
+            await graph.UpsertNodeAsync(new GraphNode
             {
                 Id = routingNodeId,
                 Kind = "routing",
                 Properties = new Dictionary<string, string> { ["note"] = "observed routing outcomes" }
-            }).GetAwaiter().GetResult();
+            }, ct);
 
-            graph.UpsertEdgeAsync(new GraphEdge
+            await graph.UpsertEdgeAsync(new GraphEdge
             {
                 FromId = routingNodeId,
                 ToId = CellId(cellName),
@@ -207,7 +206,7 @@ public sealed class ColonyGraphBuilder(
                     ["selections"] = selections.ToString(),
                     ["meanReward"] = meanReward.ToString("F4")
                 }
-            }).GetAwaiter().GetResult();
+            }, ct);
         }
     }
 

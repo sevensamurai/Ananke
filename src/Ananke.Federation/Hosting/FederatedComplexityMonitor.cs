@@ -129,9 +129,9 @@ public sealed class FederatedComplexityMonitor : IHealthMonitor, IRemoteCellSour
 
                 _metricsTracker.Record(metrics);
             }
-            catch
+            catch (Exception)
             {
-                // Best-effort.
+                // Best-effort — remote platform may be unavailable.
             }
         }
 

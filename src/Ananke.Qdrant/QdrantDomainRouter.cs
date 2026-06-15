@@ -1,6 +1,4 @@
 using Ananke.Abstractions.Agents;
-using Ananke.Organics.Division;
-using Ananke.Organics.Sensing;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 
@@ -20,7 +18,7 @@ namespace Ananke.Qdrant;
 /// hash-based vectors — no API key required.
 /// </para>
 /// <para>
-/// Wrap with <see cref="RoutingAffinityTracker"/> for Phase 2 adaptive refinement.
+/// Wrap with a <c>RoutingAffinityTracker</c> for Phase 2 adaptive refinement.
 /// </para>
 /// </remarks>
 public sealed class QdrantDomainRouter : IDomainRouter
@@ -105,9 +103,9 @@ public sealed class QdrantDomainRouter : IDomainRouter
                 new Filter { Must = { Conditions.MatchKeyword(CellNamePayloadKey, children[0].Name) } },
                 cancellationToken: ct);
         }
-        catch
+        catch (Exception)
         {
-            // Collection may be empty — ignore
+            // Collection may be empty or not yet created — delete is best-effort
         }
 
         // Build one point per child: embed the concatenated tool descriptions

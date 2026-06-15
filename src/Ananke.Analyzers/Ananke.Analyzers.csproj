@@ -15,6 +15,12 @@
     <DevelopmentDependency>true</DevelopmentDependency>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress artifacts the .NET host loader needs but Roslyn analyzers never use.
+         Both files are held open by parallel build agents / the shared compiler, causing
+         CS2012 (DLL lock) and MSB4018/IOException (deps.json lock) on incremental and
+         CI builds. Suppressing them removes the write targets entirely. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <UseSharedCompilation>false</UseSharedCompilation>
   </PropertyGroup>
 
   <ItemGroup>

@@ -11,15 +11,14 @@
 
 A workflow is a directed graph of **jobs** connected by edges. Each job receives a typed
 state object, performs work (optionally calling an LLM, tools, or external services), and
-returns a new state. The graph is validated at build time — invalid topologies (disconnected
-nodes, missing edges) fail before the workflow ever runs.
+returns a new state. The graph is validated at build time. A job with no outgoing edge is
+implicitly terminal — no explicit `.Then(…, Workflow.End)` is needed.
 
 ```csharp
 var workflow = new Workflow<MyState>("my-workflow")
     .Job("step-a", async (state, ct) => state with { A = "done" })
     .Job("step-b", async (state, ct) => state with { B = "done" })
-    .Chain("step-a", "step-b")
-    .Then("step-b", Workflow.End);
+    .Chain("step-a", "step-b");
 
 var result = await workflow.RunAsync(new MyState());
 ```

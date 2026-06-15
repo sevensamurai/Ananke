@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 using Google.GenAI.Types;
 
 namespace Ananke.Orchestration.Google.Translators;

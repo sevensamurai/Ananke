@@ -15,7 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
-    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
   </ItemGroup>
 
 </Project>

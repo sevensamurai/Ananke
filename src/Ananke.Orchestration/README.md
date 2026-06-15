@@ -26,8 +26,7 @@ var workflow = new Workflow<ResearchState>("research-pipeline")
     .Job("search_db",  searchDbJob)
     .Job("synthesize", synthesizeJob)
     .Then("plan", Workflow.Fork("search_web", "search_db"))
-    .Join(["search_web", "search_db"], "synthesize", Merge)
-    .Then("synthesize", Workflow.End);
+    .Join(["search_web", "search_db"], "synthesize", Merge);
 
 var result = await workflow.RunAsync(new ResearchState { Query = "distributed systems" });
 ```

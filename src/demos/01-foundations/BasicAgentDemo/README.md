@@ -96,8 +96,7 @@ var analyzeJob = new AgentJob<ResearchState, AnalysisResult>
 var workflow = new Workflow<ResearchState>("country-research")
     .Job("gather", gatherJob)
     .Job("analyze", analyzeJob)
-    .Then("gather", "analyze")
-    .Then("analyze", Workflow.End);
+    .Chain("gather", "analyze");
 ```
 
 ---

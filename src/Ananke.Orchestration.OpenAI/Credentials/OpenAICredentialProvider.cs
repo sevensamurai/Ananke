@@ -1,4 +1,4 @@
-using Ananke.Orchestration.Credentials;
+using Ananke.Abstractions.Providers;
 
 namespace Ananke.Orchestration.OpenAI.Credentials;
 

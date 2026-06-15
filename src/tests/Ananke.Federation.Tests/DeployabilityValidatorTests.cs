@@ -1,4 +1,5 @@
 using Ananke.Design;
+using ToolExecutionMode = Ananke.Abstractions.Providers.ToolExecutionMode;
 using Ananke.Federation.Validation;
 using Ananke.Orchestration.Tools;
 using Shouldly;

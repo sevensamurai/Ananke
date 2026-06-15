@@ -39,8 +39,7 @@ var agentJob = AgentJob.Create<AssistantState>("assistant", model)
 
 // 3. Run inside a workflow
 var workflow = new Workflow<AssistantState>("assistant-workflow")
-    .Job("assistant", agentJob)
-    .Then("assistant", Workflow.End);
+    .Job("assistant", agentJob);
 
 var result = await workflow.RunAsync(new AssistantState
 {

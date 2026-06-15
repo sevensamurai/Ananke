@@ -1,7 +1,6 @@
-using Ananke.Orchestration.Credentials;
+using Ananke.Abstractions.Providers;
 using Ananke.Orchestration.Google.Credentials;
 using Ananke.Orchestration.Google.Translators;
-using Ananke.Orchestration.Translators;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ananke.Orchestration.Google.Extensions;
