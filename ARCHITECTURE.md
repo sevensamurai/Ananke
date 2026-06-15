@@ -23,7 +23,7 @@
 
 ## System Overview
 
-Ananke is a **.NET 10 framework** for building AI agent systems. It is organized as **~20 focused NuGet packages** around a layered dependency graph. The design principles are:
+Ananke is a **.NET 10 framework** for building AI agent systems. It is organized as **~30 focused NuGet packages** around a layered dependency graph. The design principles are:
 
 1. **Zero-dependency core** — `Ananke.Abstractions` has no external dependencies
 2. **Layered acyclic graph** — dependencies flow strictly downward
@@ -68,14 +68,17 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 | **Learning** | `Ananke.Learning` | Empirical memory, episodes, offline learning, skill packaging, exploration strategies. Depends on Orchestration. |
 | **Design** | `Ananke.Design` | YAML manifest import, Mermaid export. Depends on Orchestration. |
 | **Documents** | `Ananke.Documents` | PDF/Markdown extractors (`IDocumentExtractor`). Depends on Knowledge. |
-| **Providers** | `Ananke.Orchestration.OpenAI`, `.Anthropic`, `.Google` | LLM provider implementations of `IAgentModel`/`IStreamingAgentModel`. Depend on Abstractions only. |
+| **Providers** | `Ananke.Orchestration.OpenAI`, `.Anthropic`, `.Google` | LLM provider implementations of `IAgentModel`/`IStreamingAgentModel`. Depend on Abstractions + Orchestration. |
 | **Interop** | `Ananke.MCP`, `Ananke.A2A` | Protocol bridges (MCP server, A2A agent-to-agent). Depend on Orchestration. |
 | **Skills** | `Ananke.Skills` | External skill catalog (OpenClaw). Depends on Orchestration. |
-| **Platforms** | `Ananke.Platforms`, `.Platforms.Slack`, `.Platforms.Discord` | Messaging platform adapters. Depend on Orchestration. |
+| **Platforms** | `Ananke.Platforms`, `.Platforms.Slack`, `.Platforms.Discord` | Messaging platform adapters. Platforms depends on Orchestration; Slack depends on Organics + Platforms; Discord depends on Orchestration + Platforms. |
 | **Organics** | `Ananke.Organics` | Self-organizing colony architecture (cell division, sensing, routing). Depends on Learning + Design. |
-| **Federation** | `Ananke.Federation`, `.Federation.Anthropic`, `.Federation.Google`, `.Federation.Azure` | Cross-cloud deployment, monitoring, hybrid routing. Depends on Organics + Design. |
-| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant` | External service adapters implementing Abstractions interfaces. |
-| **Web** | `Ananke.AspNetCore` | SSE streaming, session management. Depends on Orchestration + StateMachine. |
+| **Roles** | `Ananke.Roles` | Studio host builder, role catalog, workflow registry. Depends on Design + Organics + Platforms + Platforms.Slack. |
+| **Tool.Shared** | `Ananke.Tool.Shared` | Shared tool primitives reused by organic hosts and CLI tools. Depends on Organics. |
+| **Federation** | `Ananke.Federation`, `.Federation.Anthropic`, `.Federation.Google`, `.Federation.Azure`, `.Federation.LocalEmulators` | Cross-cloud deployment, monitoring, hybrid routing. Depends on Abstractions + Organics + Design. Sub-packages bind to their respective provider. |
+| **Graph** | `Ananke.Graph.Abstractions`, `Ananke.Graph.Memgraph` | Knowledge graph abstraction layer and Memgraph DB adapter. Depend on Abstractions. |
+| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant` | External service adapters implementing Abstractions interfaces. Redis + Qdrant also depend on Orchestration / Knowledge / Learning. |
+| **Web** | `Ananke.AspNetCore` | SSE streaming, session management, organic host registration. Depends on Orchestration + Organics + StateMachine. |
 | **Tooling** | `nnke` (design CLI), `nnke-platform` (federation CLI), `nnke-platform-azure`, `nnke-platform-google`, `nnke-platform-anthropic`, `nnke-platform-all` (adapter companions), `Ananke.Analyzers` | Design-time and federation CLIs; independently published adapter companion tools; Roslyn analyzers. |
 | **Meta** | `Ananke` | Meta-package that bundles everything. |
 
@@ -102,9 +105,21 @@ graph TD
     A2A["Ananke.A2A"]
     SKILLS["Ananke.Skills"]
     PLAT["Ananke.Platforms"]
+    PLAT_SLACK["Ananke.Platforms.Slack"]
+    PLAT_DISCORD["Ananke.Platforms.Discord"]
 
     ORG["Ananke.Organics"]
+    ROLES["Ananke.Roles"]
+    TOOL_SHARED["Ananke.Tool.Shared"]
+
     FED["Ananke.Federation"]
+    FED_ANTHRO["Ananke.Federation.Anthropic"]
+    FED_GOOGLE["Ananke.Federation.Google"]
+    FED_AZURE["Ananke.Federation.Azure"]
+    FED_LOCAL["Ananke.Federation.LocalEmulators"]
+
+    GRAPH_ABS["Ananke.Graph.Abstractions"]
+    GRAPH_MG["Ananke.Graph.Memgraph"]
 
     REDIS["Ananke.Redis"]
     MQTT["Ananke.MQTT"]
@@ -120,37 +135,65 @@ graph TD
     SM --> ABS
 
     %% Core engine
+    LEARN --> ABS
     LEARN --> ORCH
     DESIGN --> ORCH
     DOCS --> KNOW
 
-    %% Providers (thin adapters)
+    %% Providers
     OPENAI --> ABS
+    OPENAI --> ORCH
     ANTHRO --> ABS
+    ANTHRO --> ORCH
     GOOGLE --> ABS
+    GOOGLE --> ORCH
 
     %% Interop & extensions
     MCP --> ORCH
     A2A --> ORCH
     SKILLS --> ORCH
     PLAT --> ORCH
+    PLAT_SLACK --> PLAT
+    PLAT_SLACK --> ORG
+    PLAT_DISCORD --> PLAT
+    PLAT_DISCORD --> ORCH
 
     %% Higher-order
     ORG --> LEARN
     ORG --> DESIGN
+    TOOL_SHARED --> ORG
+    ROLES --> DESIGN
+    ROLES --> ORG
+    ROLES --> PLAT
+    ROLES --> PLAT_SLACK
+    FED --> ABS
     FED --> ORG
     FED --> DESIGN
+    FED_ANTHRO --> FED
+    FED_ANTHRO --> ANTHRO
+    FED_GOOGLE --> FED
+    FED_GOOGLE --> GOOGLE
+    FED_AZURE --> FED
+    FED_AZURE --> OPENAI
+    FED_LOCAL --> FED
+
+    %% Graph extensions
+    GRAPH_ABS --> ABS
+    GRAPH_MG --> ABS
+    GRAPH_MG --> GRAPH_ABS
 
     %% Infrastructure
     REDIS --> ABS
     REDIS --> ORCH
     MQTT --> ABS
     OTEL --> ABS
+    QDRANT --> ABS
     QDRANT --> KNOW
     QDRANT --> LEARN
 
     %% Web
     ASP --> ORCH
+    ASP --> ORG
     ASP --> SM
 
     %% Styling
@@ -164,7 +207,7 @@ graph TD
     class KNOW,ORCH,SM,LEARN,DESIGN,DOCS core
     class OPENAI,ANTHRO,GOOGLE provider
     class REDIS,MQTT,OTEL,QDRANT infra
-    class ORG,FED,MCP,A2A,SKILLS,PLAT,ASP high
+    class ORG,FED,FED_ANTHRO,FED_GOOGLE,FED_AZURE,FED_LOCAL,ROLES,TOOL_SHARED,MCP,A2A,SKILLS,PLAT,PLAT_SLACK,PLAT_DISCORD,GRAPH_ABS,GRAPH_MG,ASP high
 ```
 
 ### Critical Dependency Rule
@@ -181,7 +224,8 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 
 | Folder | Namespace | Purpose |
 |---|---|---|
-| `Agents/` | `Ananke.Abstractions.Agents` | `IAgentModel`, `IEmbeddingModel`, `AgentRequest/Response`, `ContentPart`, `TokenUsage` |
+| `Agents/` | `Ananke.Abstractions.Agents` | `IAgentModel`, `IEmbeddingModel`, `AgentRequest/Response`, `ContentPart`, `TokenUsage`, `ChildSpec`, `IDomainRouter` |
+| `Budget/` | `Ananke.Abstractions.Budget` | `IBudgetMeter`, `BudgetSpend`, `InMemoryBudgetMeter` |
 | `Channels/` | `Ananke.Abstractions.Channels` | `IChannelReader/Writer`, `IHandoffChannel`, `BackgroundProcessor` |
 | `Distributed/` | `Ananke.Abstractions.Distributed` | `IDistributedLock`, `IKeyValueDataAdapter` |
 | `Memory/` | `Ananke.Abstractions.Memory` | `IConversationMemory` |
@@ -423,4 +467,4 @@ For deeper architectural detail on each vertical, see:
 
 ---
 
-*Last updated: auto-generated from project structure. Keep in sync with csproj changes.*
+*Last updated: 2026-06-13 (v0.8.5 — items 1–4 of architecture review). The dependency graph is verified by `tools/check-architecture-graph.ps1` — run it (or let CI run it) after any `.csproj` change.*

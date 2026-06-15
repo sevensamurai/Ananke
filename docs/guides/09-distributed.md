@@ -166,7 +166,7 @@ var workflow = new Workflow<TicketState>("support-triage")
     .Then("fsm_triage", Workflow.Decide<TicketState>(s =>
         s.Category == "escalate" ? "escalate" : "auto_resolve"))
     // ... routing continues ...
-    .Then("fsm_close", Workflow.End);
+    // fsm_close is implicitly terminal
 ```
 
 Jobs prefixed with `fsm_` fire state machine transitions. Business logic

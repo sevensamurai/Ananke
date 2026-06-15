@@ -1,6 +1,6 @@
+using Ananke.Abstractions.Budget;
 using Ananke.Abstractions.Tracing;
 using Ananke.OpenTelemetry.Budget;
-using Ananke.Organics.Division.Approval;
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;

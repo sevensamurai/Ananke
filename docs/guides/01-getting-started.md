@@ -45,8 +45,7 @@ record GreetingState
 // 2. Build the workflow
 var workflow = new Workflow<GreetingState>("hello")
     .Job("greet", (state, ct) =>
-        Task.FromResult(state with { Greeting = $"Hello, {state.Name}!" }))
-    .Then("greet", Workflow.End);
+        Task.FromResult(state with { Greeting = $"Hello, {state.Name}!" }));
 
 // 3. Run it
 var result = await workflow.RunAsync(new GreetingState { Name = "World" });
@@ -58,7 +57,7 @@ Console.WriteLine(result.Status);            // Completed
 **What's happening:**
 - `Workflow<T>` is generic over your state type — the compiler enforces type safety end-to-end.
 - `.Job("greet", ...)` registers a named job with a delegate.
-- `.Then("greet", Workflow.End)` connects the job to the terminal node.
+- A job with no outgoing edge is automatically the terminal node — no explicit `.Then(…, Workflow.End)` needed.
 - `.RunAsync()` executes the graph and returns a `WorkflowExecution<T>`.
 
 ---
@@ -72,8 +71,7 @@ var workflow = new Workflow<PipelineState>("pipeline")
     .Job("fetch",     async (state, ct) => state with { Raw = "raw data" })
     .Job("transform", async (state, ct) => state with { Clean = state.Raw.ToUpperInvariant() })
     .Job("publish",   async (state, ct) => state with { Done = true })
-    .Chain("fetch", "transform", "publish")
-    .Then("publish", Workflow.End);
+    .Chain("fetch", "transform", "publish");
 
 var result = await workflow.RunAsync(new PipelineState());
 // result.State.Done == true

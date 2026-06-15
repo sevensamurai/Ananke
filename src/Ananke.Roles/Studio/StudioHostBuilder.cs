@@ -7,6 +7,8 @@ using Ananke.Organics.Kernel.Lineage;
 using Ananke.Organics.Sensing;
 using Ananke.Roles.Roles;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Ananke.Roles.Studio;
 
@@ -19,6 +21,7 @@ public sealed class StudioHostBuilder(StudioOptions? options = null)
     private readonly Dictionary<string, string> _workflowPaths = new(StringComparer.OrdinalIgnoreCase);
     private StudioOptions _options = options ?? new StudioOptions();
     private bool _divisionDisabled;
+    private Type? _approvalGateType;
 
     /// <summary>
     /// Adds a role definition to the studio catalog.
@@ -56,6 +59,21 @@ public sealed class StudioHostBuilder(StudioOptions? options = null)
     }
 
     /// <summary>
+    /// Sets the <see cref="IDivisionApprovalGate"/> implementation that will be registered
+    /// in the service collection. Must be called before <see cref="Build"/>.
+    /// </summary>
+    /// <typeparam name="TGate">
+    /// Concrete <see cref="IDivisionApprovalGate"/> type. Use
+    /// <see cref="AutoApprovalGate"/> only in supervised local workflows where
+    /// automatic approval is intentional.
+    /// </typeparam>
+    public StudioHostBuilder UseApprovalGate<TGate>() where TGate : class, IDivisionApprovalGate
+    {
+        _approvalGateType = typeof(TGate);
+        return this;
+    }
+
+    /// <summary>
     /// Disables division-specific policy registration for the built service collection.
     /// </summary>
     public StudioHostBuilder DisableDivision()
@@ -74,6 +92,12 @@ public sealed class StudioHostBuilder(StudioOptions? options = null)
         if (_roles.Count == 0 && _workflowPaths.Count == 0)
             throw new InvalidOperationException("At least one role or workflow must be registered before building the studio host.");
 
+        if (_approvalGateType is null)
+            throw new InvalidOperationException(
+                "An IDivisionApprovalGate must be configured. " +
+                "Call UseApprovalGate<TGate>() before Build(). " +
+                "Use AutoApprovalGate only in supervised local workflows where automatic approval is intentional.");
+
         var roleCatalog = new AgentRoleCatalog();
         foreach (var role in _roles.Values)
             roleCatalog.Add(role);
@@ -88,11 +112,38 @@ public sealed class StudioHostBuilder(StudioOptions? options = null)
         services.AddSingleton<RoleManifestFactory>(_ => new RoleManifestFactory(_options.ModelAliasMap));
         services.AddSingleton(workflowRegistry);
 
-        services.AddSingleton<ICapabilityMap, InMemoryCapabilityMap>();
-        services.AddSingleton<IMeshAggregator, InMemoryMeshAggregator>();
-        services.AddSingleton<ILineageStore, InMemoryLineageStore>();
+        services.TryAddSingleton<ICapabilityMap>(sp =>
+        {
+            sp.GetService<ILoggerFactory>()
+              ?.CreateLogger("Ananke.StudioHost")
+              .LogWarning(
+                  "[Ananke] ICapabilityMap is backed by InMemoryCapabilityMap — " +
+                  "colony mesh state will be lost on restart. " +
+                  "Register a persistent ICapabilityMap before StudioHostBuilder.Build to suppress this warning.");
+            return new InMemoryCapabilityMap();
+        });
+        services.TryAddSingleton<IMeshAggregator>(sp =>
+        {
+            sp.GetService<ILoggerFactory>()
+              ?.CreateLogger("Ananke.StudioHost")
+              .LogWarning(
+                  "[Ananke] IMeshAggregator is backed by InMemoryMeshAggregator — " +
+                  "metabolic signals will be lost on restart. " +
+                  "Register a persistent IMeshAggregator before StudioHostBuilder.Build to suppress this warning.");
+            return new InMemoryMeshAggregator();
+        });
+        services.TryAddSingleton<ILineageStore>(sp =>
+        {
+            sp.GetService<ILoggerFactory>()
+              ?.CreateLogger("Ananke.StudioHost")
+              .LogWarning(
+                  "[Ananke] ILineageStore is backed by InMemoryLineageStore — " +
+                  "cell lineage records will be lost on restart. " +
+                  "Register a persistent ILineageStore before StudioHostBuilder.Build to suppress this warning.");
+            return new InMemoryLineageStore();
+        });
         services.AddSingleton<IHealthMonitor, WorkflowExecutionMonitor>();
-        services.AddSingleton<IDivisionApprovalGate, AutoApprovalGate>();
+        services.AddSingleton(typeof(IDivisionApprovalGate), _approvalGateType!);
         services.AddSingleton<IWorkflowHost, InProcessWorkflowHost>();
         services.AddSingleton<KeywordRequestRouter>();
         services.AddSingleton<StudioRouter>(sp => new StudioRouter(

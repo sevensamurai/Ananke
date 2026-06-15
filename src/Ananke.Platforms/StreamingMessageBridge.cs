@@ -47,17 +47,19 @@ public sealed class StreamingMessageBridge(
     string channelId,
     string? threadId,
     StreamingBridgeOptions? options = null,
-    ILogger? logger = null)
+    ILogger? logger = null,
+    TimeProvider? clock = null)
 {
     private readonly IPlatformResponseSink _sink = sink ?? throw new ArgumentNullException(nameof(sink));
     private readonly string _channelId = channelId ?? throw new ArgumentNullException(nameof(channelId));
     private readonly StreamingBridgeOptions _options = options ?? new StreamingBridgeOptions();
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly StringBuilder _buffer = new();
     private readonly object _lock = new();
 
     private string? _messageId;
-    private DateTime _lastFlush = DateTime.MinValue;
+    private DateTimeOffset _lastFlush = DateTimeOffset.MinValue;
     private bool _finalized;
 
     /// <summary>The accumulated text so far.</summary>
@@ -93,7 +95,7 @@ public sealed class StreamingMessageBridge(
             var initialText = _options.ThinkingPlaceholder ?? currentText;
             _messageId = await _sink.SendMessageAsync(_channelId, threadId, initialText, ct)
                 .ConfigureAwait(false);
-            _lastFlush = DateTime.UtcNow;
+            _lastFlush = _clock.GetUtcNow();
             _logger.LogDebug("StreamingBridge: posted initial message {MessageId}", _messageId);
 
             if (_options.ThinkingPlaceholder is not null && currentText != _options.ThinkingPlaceholder)
@@ -104,7 +106,7 @@ public sealed class StreamingMessageBridge(
             return;
         }
 
-        var elapsed = DateTime.UtcNow - _lastFlush;
+        var elapsed = _clock.GetUtcNow() - _lastFlush;
         if (elapsed >= _options.DebounceInterval)
         {
             await FlushEditAsync(currentText, ct).ConfigureAwait(false);
@@ -150,6 +152,6 @@ public sealed class StreamingMessageBridge(
     {
         await _sink.UpdateMessageAsync(_channelId, _messageId!, text, ct)
             .ConfigureAwait(false);
-        _lastFlush = DateTime.UtcNow;
+        _lastFlush = _clock.GetUtcNow();
     }
 }

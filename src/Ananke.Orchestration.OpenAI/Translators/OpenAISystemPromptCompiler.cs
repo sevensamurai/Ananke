@@ -1,5 +1,5 @@
 using Ananke.Abstractions.Agents;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 
 namespace Ananke.Orchestration.OpenAI.Translators;
 

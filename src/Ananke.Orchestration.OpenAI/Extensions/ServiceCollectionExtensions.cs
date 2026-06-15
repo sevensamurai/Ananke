@@ -1,7 +1,6 @@
-using Ananke.Orchestration.Credentials;
+using Ananke.Abstractions.Providers;
 using Ananke.Orchestration.OpenAI.Credentials;
 using Ananke.Orchestration.OpenAI.Translators;
-using Ananke.Orchestration.Translators;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ananke.Orchestration.OpenAI.Extensions;

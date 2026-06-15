@@ -99,7 +99,7 @@ public sealed class ClaudeDeployer(
                 ?? throw new InvalidOperationException("Failed to obtain Anthropic API key.");
 
             using var client = _clientFactory(apiKey);
-            var toolsJson = (System.Text.Json.Nodes.JsonArray)_toolSchemaTranslator.Translate(toolKit.Tools.Values);
+            var toolsJson = (System.Text.Json.Nodes.JsonArray)_toolSchemaTranslator.Translate(toolKit.Tools.Values.Select(t => t.ToProviderTool()));
 
             // One environment per workflow
             var environmentId = await client.CreateEnvironmentAsync(manifest.Name, ct);
@@ -227,7 +227,7 @@ public sealed class ClaudeDeployer(
                           ?? [];
             return (envId, agentIds);
         }
-        catch
+        catch (JsonException)
         {
             return (null, []);
         }

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Budget;
 using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Tools;

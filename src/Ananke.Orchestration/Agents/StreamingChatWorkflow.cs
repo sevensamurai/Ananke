@@ -418,7 +418,7 @@ public static class StreamingChatWorkflow
                 }
                 catch (Exception ex)
                 {
-                    try { await writer.WriteAsync(new ErrorEvent(ex.Message), CancellationToken.None); } catch { }
+                    try { await writer.WriteAsync(new ErrorEvent(ex.Message), CancellationToken.None); } catch (Exception) { }
                 }
                 finally
                 {

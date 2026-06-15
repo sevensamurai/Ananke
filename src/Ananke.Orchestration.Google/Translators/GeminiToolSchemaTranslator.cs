@@ -1,11 +1,10 @@
-using Ananke.Orchestration.Tools;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 using Google.GenAI.Types;
 
 namespace Ananke.Orchestration.Google.Translators;
 
 /// <summary>
-/// Translates Ananke <see cref="ToolDefinition"/> instances into Google GenAI
+/// Translates <see cref="ProviderTool"/> instances into Google GenAI
 /// <see cref="Tool"/> configurations (function declarations, code execution, Google Search).
 /// </summary>
 /// <remarks>
@@ -21,7 +20,7 @@ public sealed class GeminiToolSchemaTranslator : IToolSchemaTranslator
 {
     /// <inheritdoc />
     /// <returns>An <see cref="IReadOnlyList{T}"/> of <see cref="Tool"/> objects.</returns>
-    public object Translate(IEnumerable<ToolDefinition> tools)
+    public object Translate(IEnumerable<ProviderTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
 
@@ -55,7 +54,7 @@ public sealed class GeminiToolSchemaTranslator : IToolSchemaTranslator
         return result.AsReadOnly();
     }
 
-    private static FunctionDeclaration ToFunctionDeclaration(ToolDefinition tool)
+    private static FunctionDeclaration ToFunctionDeclaration(ProviderTool tool)
     {
         var declaration = new FunctionDeclaration
         {
@@ -63,13 +62,14 @@ public sealed class GeminiToolSchemaTranslator : IToolSchemaTranslator
             Description = tool.Description
         };
 
-        if (tool.Parameters.Count > 0)
-            declaration.Parameters = JsonSchemaConverter.Convert(tool.ParametersJsonSchema);
+        var schema = tool.ParametersJsonSchema;
+        if (!string.IsNullOrWhiteSpace(schema) && schema.Trim() != "{}")
+            declaration.Parameters = JsonSchemaConverter.Convert(schema);
 
         return declaration;
     }
 
-    private static Tool ToPlatformNativeTool(ToolDefinition tool)
+    private static Tool ToPlatformNativeTool(ProviderTool tool)
     {
         var capability = tool.PlatformCapability?.ToLowerInvariant()
             ?? throw new InvalidOperationException(

@@ -21,8 +21,7 @@ using Ananke.Orchestration;
 var workflow = new Workflow<MyState>("example")
     .Job("step_a", async (state, ct) => state with { A = "done" })
     .Job("step_b", async (state, ct) => state with { B = "done" })
-    .Then("step_a", "step_b")
-    .Then("step_b", Workflow.End);
+    .Chain("step_a", "step_b");
 
 var result = await workflow.RunAsync(new MyState());
 ```
@@ -32,8 +31,7 @@ var result = await workflow.RunAsync(new MyState());
 | Primitive | What it does |
 |---|---|
 | `.Then("a", "b")` | Direct edge — `a` routes to `b` |
-| `.Then("a", Workflow.End)` | Terminal — `a` ends the workflow |
-| `.Chain("a", "b", "c")` | Shorthand for `Then("a","b")` + `Then("b","c")` |
+| `.Chain("a", "b", "c")` | Shorthand for `Then("a","b")` + `Then("b","c")`; last job is implicitly terminal |
 | `.Then("a", Workflow.Decide<S>(...))` | Conditional routing via lambda |
 | `.Then("a", Workflow.DecideWithAgent<S>(...))` | LLM-driven routing |
 | `.Then("a", Workflow.Fork("b", "c"))` | Fan-out to parallel branches |
@@ -53,9 +51,7 @@ var workflow = new Workflow<OrderState>("order-flow")
     .Job("fast_track", async (state, ct) => state with { Lane = "express" })
     .Job("standard",   async (state, ct) => state with { Lane = "normal" })
     .Then("classify", Workflow.Decide<OrderState>(state =>
-        state.Priority == "high" ? "fast_track" : "standard"))
-    .Then("fast_track", Workflow.End)
-    .Then("standard", Workflow.End);
+        state.Priority == "high" ? "fast_track" : "standard"));
 ```
 
 The `Decide` lambda receives the current state and returns the name of the next job
@@ -88,8 +84,7 @@ var workflow = new Workflow<ResearchState>("parallel-research")
             WebResults = web?.WebResults ?? [],
             DbResults  = db?.DbResults ?? []
         };
-    })
-    .Then("synthesize", Workflow.End);
+    });
 ```
 
 **Fork modes:**
@@ -108,16 +103,14 @@ Nest a workflow inside another with state mapping:
 
 ```csharp
 var inner = new Workflow<InnerState>("validation")
-    .Job("check", async (state, ct) => state with { Valid = true })
-    .Then("check", Workflow.End);
+    .Job("check", async (state, ct) => state with { Valid = true });
 
 var outer = new Workflow<OuterState>("pipeline")
     .Job("prepare", async (state, ct) => state with { Data = "ready" })
     .SubFlow("validate", inner,
         mapIn:  outer => new InnerState { Input = outer.Data },
         mapOut: (outer, inner) => outer with { IsValid = inner.Valid })
-    .Then("prepare", "validate")
-    .Then("validate", Workflow.End);
+    .Chain("prepare", "validate");
 ```
 
 ---
@@ -166,8 +159,7 @@ var workflow = new Workflow<MyState>("resilient")
         return state with { Data = data };
     },
     retry: 3,                                    // retry up to 3 times
-    timeout: TimeSpan.FromSeconds(10))           // 10s per attempt
-    .Then("flaky_api", Workflow.End);
+    timeout: TimeSpan.FromSeconds(10));          // 10s per attempt
 ```
 
 ---
@@ -177,9 +169,10 @@ var workflow = new Workflow<MyState>("resilient")
 Invalid topologies fail at **build time**, not at runtime. The workflow builder
 validates:
 - All jobs referenced in edges are registered
-- Terminal connections exist (no dangling jobs)
 - Fork targets are reachable
 - Join sources match fork branches
+
+A job with no outgoing edge is implicitly terminal — no explicit `Workflow.End` edge is needed.
 
 ---
 

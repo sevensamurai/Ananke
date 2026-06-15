@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Graph;
 using Ananke.Abstractions.Graph.Algorithms;
 using Ananke.Organics.Division;

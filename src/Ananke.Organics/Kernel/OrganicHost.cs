@@ -242,7 +242,7 @@ public sealed class OrganicHost : IAsyncDisposable
                         {
                             return;
                         }
-                        catch
+                        catch (Exception)
                         {
                             // Swallow per-cell failures to keep polling alive.
                         }
@@ -252,7 +252,7 @@ public sealed class OrganicHost : IAsyncDisposable
                 {
                     return;
                 }
-                catch
+                catch (Exception)
                 {
                     // Swallow source failures to keep polling alive.
                 }
@@ -286,10 +286,9 @@ public sealed class OrganicHost : IAsyncDisposable
                 {
                     return;
                 }
-                catch
+                catch (Exception)
                 {
                     // Swallow per-entry failures to keep the loop alive.
-                    // Future: structured logging.
                 }
                 finally
                 {
@@ -566,7 +565,7 @@ public sealed class OrganicHost : IAsyncDisposable
             {
                 // Timeout elapsed — abandon remaining tasks and proceed.
             }
-            catch
+            catch (Exception)
             {
                 // Individual task faults are already handled inside each task.
             }

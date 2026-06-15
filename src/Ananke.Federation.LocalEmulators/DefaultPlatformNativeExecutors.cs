@@ -47,27 +47,36 @@ public static class DefaultPlatformNativeExecutors
     /// <param name="fileSearchRoot">
     /// Optional root directory for file search. Defaults to the current working directory.
     /// </param>
+    /// <param name="allowUnsafeBash">
+    /// Must be <see langword="true"/> to permit shell command execution via
+    /// <c>bash</c>, <c>code_execution</c>, and <c>code_interpreter</c>.
+    /// Defaults to <see langword="false"/>; see <see cref="BashExecutor"/> class
+    /// remarks for the privilege caveat before enabling.
+    /// </param>
     /// <returns><paramref name="registry"/> for fluent chaining.</returns>
     public static PlatformNativeExecutorRegistry Register(
         PlatformNativeExecutorRegistry registry,
         string? sandboxRoot = null,
-        string? fileSearchRoot = null)
+        string? fileSearchRoot = null,
+        bool allowUnsafeBash = false)
     {
         ArgumentNullException.ThrowIfNull(registry);
 
         // ── Real emulators ───────────────────────────────────────────
 
         // HTTP-based
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Ananke-LocalEmulator/1.0");
-        var webSearch = new WebSearchExecutor(http);
-        var webFetch = new WebFetchExecutor(http);
+        var searchHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        searchHttp.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Ananke-LocalEmulator/1.0");
+        var webSearch = new WebSearchExecutor(searchHttp);
+
+        // WebFetchExecutor creates its own handler so redirect/SSRF limits are enforced.
+        var webFetch = new WebFetchExecutor();
 
         registry.Register(webSearch);
         registry.Register(webFetch);
 
         // Shell / sandbox
-        var bash = new BashExecutor(sandboxRoot);
+        var bash = new BashExecutor(sandboxRoot, allowUnsafeBash: allowUnsafeBash);
         registry.Register(bash);
 
         var textEditor = new TextEditorExecutor(bash.SandboxRoot);

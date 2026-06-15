@@ -36,7 +36,6 @@ var workflow = new Workflow<ApprovalState>("trade-approval")
     .Job("execute", async (state, ct) =>
         state with { Executed = true })
     .Chain("analyze", "review", "execute")
-    .Then("execute", Workflow.End)
     .InterruptBefore("execute")          // ← pause here
     .UseCheckpointing(checkpointStore);
 
@@ -73,7 +72,6 @@ Pause after a job completes (useful for reviewing results before proceeding):
 ```csharp
 var workflow = new Workflow<ContentState>("content-pipeline")
     .Chain("draft", "review", "publish")
-    .Then("publish", Workflow.End)
     .InterruptAfter("review")    // pause after review completes
     .UseCheckpointing(checkpointStore);
 ```
@@ -104,7 +102,6 @@ var workflow = new Workflow<State>("content-approval")
         return state with { Published = true };
     })
     .Chain("draft", "review", "publish")
-    .Then("publish", Workflow.End)
     .InterruptBefore("publish")
     .UseCheckpointing(checkpointStore);
 

@@ -1,7 +1,8 @@
-using Ananke.Orchestration.Workflows;
+using Ananke.Abstractions.Providers;
 using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tools.Routing;
 using Ananke.Orchestration.Tools.Gating;
+using Ananke.Orchestration.Workflows;
 
 namespace Ananke.Orchestration.Tools;
 
@@ -32,6 +33,7 @@ public sealed class ToolKit
     private readonly HashSet<string> _pinnedToolNames = [];
     private IToolMemory? _memory;
     private IToolFaultObserver? _faultObserver;
+    private IHallucinationObserver? _hallucinationObserver;
     private ISmartToolRouter? _router;
     private IToolExecutorStrategy _executorStrategy = NullToolExecutorStrategy.Instance;
 
@@ -40,6 +42,9 @@ public sealed class ToolKit
 
     /// <summary>The <see cref="IToolMemory"/> registered on this kit, or <see langword="null"/> if none.</summary>
     public IToolMemory? Memory => _memory;
+
+    /// <summary>The <see cref="IHallucinationObserver"/> registered on this kit, or <see langword="null"/> if none.</summary>
+    public IHallucinationObserver? HallucinationObserver => _hallucinationObserver;
 
     /// <summary>
     /// The <see cref="ISmartToolRouter"/> registered on this kit, or <see langword="null"/> if none.
@@ -119,6 +124,19 @@ public sealed class ToolKit
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
         _pinnedToolNames.Add(toolName);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers an <see cref="IHallucinationObserver"/> with this kit.
+    /// When registered, the orchestration layer will invoke it whenever the model
+    /// calls a tool name that is not present in this kit.
+    /// </summary>
+    /// <returns>This <see cref="ToolKit"/> for fluent chaining.</returns>
+    public ToolKit WithHallucinationObserver(IHallucinationObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        _hallucinationObserver = observer;
         return this;
     }
 

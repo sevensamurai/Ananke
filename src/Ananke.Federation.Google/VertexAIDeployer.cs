@@ -127,7 +127,7 @@ public sealed class VertexAIDeployer : IFederationDeployer
                     continue;
 
                 var modelName = ResolveModel(manifest, job);
-                var tools = (IReadOnlyList<Tool>)_toolSchemaTranslator.Translate(toolKit.Tools.Values);
+                var tools = (IReadOnlyList<Tool>)_toolSchemaTranslator.Translate(toolKit.Tools.Values.Select(t => t.ToProviderTool()));
                 var instructions = _systemPromptCompiler.Compile(manifest, jobName);
 
                 var definition = new AgentDefinition

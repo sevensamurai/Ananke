@@ -1,11 +1,10 @@
-using Ananke.Orchestration.Tools;
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 using OpenAI.Chat;
 
 namespace Ananke.Orchestration.OpenAI.Translators;
 
 /// <summary>
-/// Translates Ananke <see cref="ToolDefinition"/> instances into OpenAI
+/// Translates <see cref="ProviderTool"/> instances into OpenAI
 /// <see cref="ChatTool"/> objects suitable for the Chat Completions API.
 /// </summary>
 /// <remarks>
@@ -18,7 +17,7 @@ public sealed class OpenAIToolSchemaTranslator : IToolSchemaTranslator
 {
     /// <inheritdoc />
     /// <returns>An <see cref="IReadOnlyList{T}"/> of <see cref="ChatTool"/>.</returns>
-    public object Translate(IEnumerable<ToolDefinition> tools)
+    public object Translate(IEnumerable<ProviderTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
 

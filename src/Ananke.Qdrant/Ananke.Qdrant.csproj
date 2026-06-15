@@ -14,7 +14,6 @@
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
     <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
     <ProjectReference Include="..\Ananke.Learning\Ananke.Learning.csproj" />
-    <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />
   </ItemGroup>
 
 </Project>

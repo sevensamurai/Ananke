@@ -39,8 +39,7 @@ public async Task Pipeline_produces_expected_output()
     var workflow = new Workflow<PipelineState>("test-pipeline")
         .Job("fetch",     async (s, ct) => s with { Raw = "data" })
         .Job("transform", async (s, ct) => s with { Clean = s.Raw.ToUpperInvariant() })
-        .Chain("fetch", "transform")
-        .Then("transform", Workflow.End);
+        .Chain("fetch", "transform");
 
     var result = await workflow.RunAsync(new PipelineState());
 
@@ -90,8 +89,7 @@ public async Task Agent_workflow_processes_fake_response()
         .Build();
 
     var workflow = new Workflow<ResearchState>("test")
-        .Job("gather", job)
-        .Then("gather", Workflow.End);
+        .Job("gather", job);
 
     var result = await workflow.RunAsync(new ResearchState { Query = "test" });
 
@@ -150,7 +148,6 @@ public async Task Interrupt_and_resume_works()
         .Job("analyze", async (s, ct) => s with { Analysis = "done" })
         .Job("execute", async (s, ct) => s with { Executed = true })
         .Chain("analyze", "execute")
-        .Then("execute", Workflow.End)
         .InterruptBefore("execute")
         .UseCheckpointing(store);
 

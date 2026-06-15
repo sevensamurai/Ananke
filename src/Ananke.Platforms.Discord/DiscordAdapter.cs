@@ -212,7 +212,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
                 await command.RespondAsync($"Unknown command: `/{command.Data.Name}`", ephemeral: true)
                     .ConfigureAwait(false);
             }
-            catch { /* interaction may have expired */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "Discord interaction expired before unknown-command reply could be sent"); }
             return;
         }
 
@@ -242,7 +242,7 @@ public sealed class DiscordAdapter : IMessagePlatformAdapter
             {
                 await command.FollowupAsync($"❌ {ex.Message}").ConfigureAwait(false);
             }
-            catch { /* interaction may have expired */ }
+            catch (Exception inner) { _logger.LogDebug(inner, "Discord interaction expired before error follow-up could be sent for /{Command}", command.Data.Name); }
         }
     }
 }

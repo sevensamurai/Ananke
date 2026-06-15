@@ -148,7 +148,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
             var response = await _http.GetAsync("/v1/models", ct);
             return response.StatusCode == HttpStatusCode.OK;
         }
-        catch
+        catch (Exception)
         {
             return false;
         }
@@ -193,7 +193,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
                     err.TryGetProperty("message", out var msg))
                     apiMessage = msg.GetString();
             }
-            catch { /* ignore parse failures — use raw body */ }
+            catch (JsonException) { /* ignore parse failures — use raw body */ }
 
             throw new HttpRequestException(
                 $"Anthropic API error {code}: {apiMessage ?? body}",

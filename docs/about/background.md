@@ -1,35 +1,33 @@
 ﻿<!-- topic: background, tags: about, history, mythology, ananke, aether, physis, organics -->
 ## Why Ananke?
 
-I built Ananke because I wanted a different starting point for agentic systems.
-Most frameworks begin with the model and build infrastructure around it. That's a
-reasonable way to explore a new space, but it tends to leave the underlying system
-fragile at exactly the points where long-term software needs to be strong: contracts,
-composition, state, portability, and growth.
+Ananke is a free, open-source .NET framework for building agentic systems: a typed,
+composable foundation for workflows, agents, memory, distributed execution, and the
+longer arc of systems that learn and grow.
 
-That immediate infrastructure gap is only part of the reason this exists. The longer
-arc matters more. I don't think the next generation of useful systems will just
-*call* models. I think they will accumulate experience, learn from what they do,
-develop reusable heuristics, and reorganize as their own complexity grows. To get
-there, the foundation cannot be an afterthought. It has to come first.
+The AI agent ecosystem is evolving rapidly, and it is useful to think of that
+evolution in layers. The first wave of frameworks — fast, prototype-friendly, mostly
+Python-first — maps to what cognitive science calls System 1: immediate and reactive,
+capable of impressive outputs, but stateless. The second wave addresses what surfaces
+when those prototypes cross into production: typed state, structured workflows,
+distributed coordination, circuit breaking, observability. System 2 territory —
+deliberate, auditable, reliable under load.
 
-**How:** start with production-system thinking. Fix the contracts first. Make the
-vendor layer genuinely pluggable from the beginning. Build typed primitives that
-compose cleanly, so the framework stays out of your way as requirements grow.
+Neither wave addresses what is coming next. The systems that will matter most will
+not just *call* models — they will accumulate experience across sessions, develop
+reusable heuristics from what has actually worked, and reorganize their own structure
+as complexity demands it. There is no widely used name for this layer yet; System 3
+fits — an application that learns from what it has done and compounds that knowledge
+over time. Building for System 3 requires a foundation designed for it from the
+start, not retrofitted later.
 
-**What:** Ananke is infrastructure for building agentic systems in that order — a
-typed, composable foundation for workflows, agents, memory, distributed execution,
-and the longer arc of systems that learn and grow.
-
-Imagine you want to build a pet adoption platform. At the start it's small: some
-documents, a few forms, a simple website, a growing queue of requests someone has
-to read and route by hand. Even that can feel daunting, because the first useful
-version already means choosing frameworks, vendors, hosting, persistence, messaging,
-and a set of skills most teams don't have on day one. So the usual move is to keep
-it simple now and bolt intelligence on later — add a chat box, automate the intake
-flow, maybe introduce agents once the need becomes obvious. But by then the
-complexity is higher, the friction is real, and adding those capabilities is harder
-than it needed to be.
+The difference plays out even at small scale. Imagine you want to build a pet
+adoption platform. At the start it's small: some documents, a few forms, a simple
+website, a growing queue of requests someone has to read and route by hand. The
+usual move is to keep it simple now and bolt intelligence on later — add a chat box,
+automate the intake flow, maybe introduce agents once the need becomes obvious. But
+by then the complexity is higher, the friction is real, and adding those capabilities
+is harder than it needed to be.
 
 With Ananke, the infrastructure for that path is already there from the start. You
 begin with a small typed workflow, add a conversational interface in a few lines when
@@ -83,6 +81,24 @@ The principle is the same:
 > **Fix the rules first. Then let everything else move.**
 
 This isn't a metaphor bolted on after the fact. It's the actual design sequence.
+
+### The cognitive science lens
+
+Kahneman's dual-process theory describes two modes of thinking: System 1 is fast,
+instinctive, and reactive; System 2 is slow, deliberate, and logical. Extending that
+framing to software engineering reveals an emergent third layer — and it maps directly
+onto this architecture.
+
+| Layer | Cognitive Analogy | Software Characteristic | Ananke Implementation |
+|---|---|---|---|
+| **System 1** | Fast, instinctive execution | Raw LLM token inference — immediate, reactive, stateless | The basic model connection and prompt execution layer |
+| **System 2** | Slow, deliberate reasoning | Agentic workflows, explicit state machines, validation gates, error handling | The core workflow graph, deterministic distributed locking (RedLock), and telemetry tracing |
+| **System 3** | Continuous evolution and meta-learning | Self-organizing application topologies that dynamically adapt based on empirical outcomes | Self-modifying agent networks (`Ananke.Organics`) driven by empirical memory feedback loops |
+
+True System 3 software cannot exist without a flawless System 2 foundation. You
+cannot build a self-evolving application if your distributed states drop transactions
+or your workflows lack deep observability. The mythology maps to the same sequence —
+Ananke, Aether, Physis — and so does the framework.
 
 ### Ananke — the foundation
 
@@ -166,7 +182,7 @@ the starting point; every deployment gets smarter.
 
 ## The Short Version
 
-I built Ananke because I wanted infrastructure that holds when systems stop being
+Ananke was built for infrastructure that holds when systems stop being
 demos and start becoming real software. The first question was not which model to
 call. It was what the foundation needed to look like so the architecture stayed
 coherent as requirements, providers, and complexity changed.

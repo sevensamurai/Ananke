@@ -1,15 +1,16 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Memory;
+using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tracing;
+using Ananke.Abstractions.Trajectory;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Routing;
+using Ananke.Orchestration.Agents.Trajectory;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Polly;
-using Polly.Retry;
 
 namespace Ananke.Orchestration.Agents;
 
@@ -35,12 +36,16 @@ public sealed class TextAgentJob<TState> : IJob<TState>
     private readonly IReadOnlyDictionary<string, ToolDefinition>? _toolExecutors;
     private readonly Action<TState, string>? _onResponse;
     private readonly int _maxToolRounds;
-    private readonly ResiliencePipeline<AgentResponse> _retryPipeline;
+    private readonly int _maxRetryAttempts;
+    private readonly TimeSpan _retryBaseDelay;
     private readonly int? _maxContextTokens;
     private readonly IConversationMemory? _memory;
     private readonly Func<TState, string>? _sessionIdBuilder;
     private readonly IContextStrategy? _contextStrategy;
     private readonly ILogger _logger;
+    private readonly IHallucinationObserver? _hallucinationObserver;
+    private readonly string? _kitName;
+    private readonly ITrajectoryObserver? _trajectoryObserver;
 
     private TextAgentJob(
         string name,
@@ -58,7 +63,10 @@ public sealed class TextAgentJob<TState> : IJob<TState>
         IConversationMemory? memory,
         Func<TState, string>? sessionIdBuilder,
         IContextStrategy? contextStrategy,
-        ILogger logger)
+        ILogger logger,
+        IHallucinationObserver? hallucinationObserver,
+        string? kitName,
+        ITrajectoryObserver? trajectoryObserver)
     {
         Name = name;
         _model = model;
@@ -69,24 +77,11 @@ public sealed class TextAgentJob<TState> : IJob<TState>
         _toolExecutors = toolExecutors;
         _onResponse = onResponse;
         _maxToolRounds = maxToolRounds;
-        _retryPipeline = new ResiliencePipelineBuilder<AgentResponse>()
-            .AddRetry(new RetryStrategyOptions<AgentResponse>
-            {
-                MaxRetryAttempts = maxRetryAttempts - 1,
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = retryBaseDelay,
-                UseJitter = false,
-                ShouldHandle = new PredicateBuilder<AgentResponse>()
-                    .Handle<Exception>(ex => ex is not OperationCanceledException),
-                OnRetry = args =>
-                {
-                    logger.LogWarning(args.Outcome.Exception,
-                        "[{AgentName}] LLM call failed (attempt {Attempt}/{MaxAttempts}), retrying in {DelayMs}ms",
-                        name, args.AttemptNumber + 1, maxRetryAttempts, (int)args.RetryDelay.TotalMilliseconds);
-                    return ValueTask.CompletedTask;
-                }
-            })
-            .Build();
+        _maxRetryAttempts = maxRetryAttempts;
+        _retryBaseDelay = retryBaseDelay;
+        _hallucinationObserver = hallucinationObserver;
+        _kitName = kitName;
+        _trajectoryObserver = trajectoryObserver;
         _maxContextTokens = maxContextTokens;
         _memory = memory;
         _sessionIdBuilder = sessionIdBuilder;
@@ -128,9 +123,24 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             }
         }
 
-        string text = _tools is not null
-            ? await ExecuteWithToolsAsync(messages, ct)
-            : await ExecutePlainAsync(messages, ct);
+        var snapshotBuilder = _trajectoryObserver is not null
+            ? new TrajectorySnapshotBuilder(Name, _trajectoryObserver)
+            : null;
+
+        string text = string.Empty;
+        var succeeded = false;
+        try
+        {
+            text = _tools is not null
+                ? await ExecuteWithToolsAsync(messages, snapshotBuilder, ct)
+                : await ExecutePlainAsync(messages, snapshotBuilder, ct);
+            succeeded = true;
+        }
+        finally
+        {
+            if (snapshotBuilder is not null)
+                await snapshotBuilder.CompleteAsync(succeeded, ct: ct).ConfigureAwait(false);
+        }
 
         if (_memory is not null && sessionId is not null && historyCount < messages.Count)
         {
@@ -142,7 +152,10 @@ public sealed class TextAgentJob<TState> : IJob<TState>
         return _mapResult(state, text);
     }
 
-    private async Task<string> ExecutePlainAsync(List<AgentMessage> messages, CancellationToken ct)
+    private async Task<string> ExecutePlainAsync(
+        List<AgentMessage> messages,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        CancellationToken ct)
     {
         var parentSpan = WorkflowTraceContext.Value?.CurrentSpan;
         await using var llmSpan = parentSpan?.StartSpan($"{Name}/plain", SpanKind.LlmCall);
@@ -155,7 +168,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
         };
 
-        var result = await GenerateWithRetryAsync(request, ct);
+        var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
         var text = result.Text
             ?? throw new InvalidOperationException($"[{Name}] LLM returned empty response.");
 
@@ -164,7 +177,10 @@ public sealed class TextAgentJob<TState> : IJob<TState>
         return text;
     }
 
-    private async Task<string> ExecuteWithToolsAsync(List<AgentMessage> messages, CancellationToken ct)
+    private async Task<string> ExecuteWithToolsAsync(
+        List<AgentMessage> messages,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        CancellationToken ct)
     {
         var parentSpan = WorkflowTraceContext.Value?.CurrentSpan;
         await using var llmSpan = parentSpan?.StartSpan($"{Name}/tool-loop", SpanKind.LlmCall);
@@ -179,7 +195,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
         };
 
-        var result = await GenerateWithRetryAsync(request, ct);
+        var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
 
         while (result.RequiresAction)
         {
@@ -199,9 +215,39 @@ public sealed class TextAgentJob<TState> : IJob<TState>
                 toolSpan?.SetAttribute("tool_round", toolRound.ToString());
 
                 var args = ParseToolArgs(call.Arguments);
-                var toolResult = _toolExecutors!.TryGetValue(call.FunctionName, out var executor)
-                    ? await executor.ExecuteAsync(args, ct)
-                    : ToolResult.Error($"Unknown tool: {call.FunctionName}");
+                ToolResult toolResult;
+
+                if (_toolExecutors!.TryGetValue(call.FunctionName, out var executor))
+                {
+                    toolResult = await executor.ExecuteAsync(args, ct);
+                    snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: toolResult.IsError);
+                }
+                else
+                {
+                    var evt = new HallucinatedToolCallEvent
+                    {
+                        RequestedToolName = call.FunctionName,
+                        RequestedKitName = _kitName,
+                        AgentId = Name,
+                        EpisodeId = snapshotBuilder?.EpisodeId ?? string.Empty,
+                        OccurredAt = DateTimeOffset.UtcNow,
+                    };
+
+                    if (_hallucinationObserver is not null)
+                        await _hallucinationObserver.ReportAsync(evt, ct).ConfigureAwait(false);
+
+                    ToolMetrics.HallucinationReported.Add(1,
+                        new KeyValuePair<string, object?>("agent_id", Name),
+                        new KeyValuePair<string, object?>("kit", _kitName ?? string.Empty),
+                        new KeyValuePair<string, object?>("requested_name", call.FunctionName));
+
+                    toolSpan?.SetAttribute("tool.hallucination", "true");
+                    toolSpan?.SetAttribute("tool.hallucination.requested_name", call.FunctionName);
+
+                    toolResult = ToolResult.Error(
+                        $"Unknown tool '{call.FunctionName}': this tool is not registered. Do not call it again.");
+                    snapshotBuilder?.RecordToolCall(hallucinated: true, faulted: false);
+                }
 
                 if (toolResult.IsError)
                 {
@@ -246,7 +292,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
                 requestMessages = await _contextStrategy.ApplyAsync(messages, _systemPrompt, ct);
 
             request = request with { Messages = requestMessages };
-            result = await GenerateWithRetryAsync(request, ct);
+            result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
         }
 
         llmSpan?.SetAttribute("tool_rounds", toolRound.ToString());
@@ -288,12 +334,48 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             (m.ToolCalls?.Sum(tc => tc.Arguments.Length + tc.FunctionName.Length) ?? 0)) +
          (request.Tools?.Sum(t => t.Name.Length + t.Description.Length + t.ParametersJsonSchema.Length) ?? 0)) / 4;
 
-    private async Task<AgentResponse> GenerateWithRetryAsync(AgentRequest request, CancellationToken ct)
+    private async Task<AgentResponse> GenerateWithRetryAsync(
+        AgentRequest request,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        ISpan? span,
+        CancellationToken ct)
     {
-        var response = await _retryPipeline.ExecuteAsync(
-            async token => await _model.GenerateAsync(request, token), ct);
-        TokenUsageCapture.Accumulate(response);
-        return response;
+        Exception? lastException = null;
+        var retries = 0;
+
+        for (var attempt = 0; attempt < _maxRetryAttempts; attempt++)
+        {
+            try
+            {
+                var response = await _model.GenerateAsync(request, ct).ConfigureAwait(false);
+                TokenUsageCapture.Accumulate(response);
+                if (retries > 0)
+                    span?.SetAttribute("gen_ai.retry_count", retries.ToString());
+                return response;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                if (attempt == _maxRetryAttempts - 1)
+                    break;
+
+                retries++;
+                var delayMs = (int)(_retryBaseDelay.TotalMilliseconds * Math.Pow(2, retries - 1));
+                _logger.LogWarning(ex,
+                    "[{AgentName}] LLM call failed (attempt {Attempt}/{Max}), retrying in {Delay}ms",
+                    Name, retries, _maxRetryAttempts, delayMs);
+                snapshotBuilder?.RecordRetry();
+                span?.RecordRetry(retries, ex.Message);
+                ToolMetrics.ModelRetry.Add(1,
+                    new KeyValuePair<string, object?>("agent_id", Name));
+                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        span?.SetAttribute("gen_ai.retry_count", retries.ToString());
+        throw new InvalidOperationException(
+            $"[{Name}] LLM call failed after {_maxRetryAttempts} attempts.", lastException!);
     }
 
     /// <summary>Fluent builder for <see cref="TextAgentJob{TState}"/>.</summary>
@@ -314,6 +396,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
         private Func<TState, string>? _sessionIdBuilder;
         private IContextStrategy? _contextStrategy;
         private ILoggerFactory? _loggerFactory;
+        private ITrajectoryObserver? _trajectoryObserver;
 
         internal Builder(string name, IAgentModel model)
         {
@@ -383,6 +466,14 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             return this;
         }
 
+        /// <summary>Registers a <see cref="ITrajectoryObserver"/> to receive a snapshot after each run.</summary>
+        public Builder WithTrajectoryObserver(ITrajectoryObserver observer)
+        {
+            ArgumentNullException.ThrowIfNull(observer);
+            _trajectoryObserver = observer;
+            return this;
+        }
+
         /// <summary>Sets a logger factory for structured logging.</summary>
         public Builder WithLogger(ILoggerFactory loggerFactory)
         {
@@ -429,12 +520,16 @@ public sealed class TextAgentJob<TState> : IJob<TState>
 
             IReadOnlyList<AgentTool>? tools = null;
             IReadOnlyDictionary<string, ToolDefinition>? toolExecutors = null;
+            IHallucinationObserver? hallucinationObserver = null;
+            string? kitName = null;
 
             if (_toolKit is not null)
             {
                 tools = _toolKit.Tools.Values.Select(t =>
                     new AgentTool(t.Name, t.Description, t.ParametersJsonSchema)).ToList();
                 toolExecutors = _toolKit.Tools;
+                hallucinationObserver = _toolKit.HallucinationObserver;
+                kitName = _toolKit.Name;
             }
 
             ILogger logger = _loggerFactory?.CreateLogger($"Ananke.Orchestration.TextAgentJob.{_name}")
@@ -443,7 +538,8 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             return new TextAgentJob<TState>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
                 tools, toolExecutors, _onResponse, _maxToolRounds, _maxRetryAttempts, _retryBaseDelay,
-                _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger);
+                _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger,
+                hallucinationObserver, kitName, _trajectoryObserver);
         }
     }
 }

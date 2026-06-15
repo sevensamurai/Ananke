@@ -1,4 +1,4 @@
-using Ananke.Orchestration.Translators;
+using Ananke.Abstractions.Providers;
 using Shouldly;
 
 namespace Ananke.Orchestration.Conformance.Tests;

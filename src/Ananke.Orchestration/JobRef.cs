@@ -15,8 +15,7 @@ namespace Ananke.Orchestration;
 /// var workflow = new Workflow&lt;MyState&gt;("pipeline")
 ///     .Job("research", researchFunc, out var research)
 ///     .Job("draft", draftFunc, out var draft)
-///     .Then(research, draft)
-///     .Then(draft, Workflow.EndRef);
+///     .Chain(research, draft);   // draft is implicitly terminal
 /// </code>
 /// </example>
 public readonly record struct JobRef

@@ -47,4 +47,40 @@ internal static class ToolMetrics
         Meter.CreateCounter<long>(
             "tool.pruned",
             description: "Number of tools removed from IToolMemory by ToolPruner.");
+
+    /// <summary>
+    /// Incremented on each retry attempt inside <c>GenerateWithRetryAsync</c>.
+    /// Tags: <c>agent_id</c>.
+    /// </summary>
+    internal static readonly Counter<long> ModelRetry =
+        Meter.CreateCounter<long>(
+            "ananke.model.retry",
+            description: "Incremented on each retry attempt before a successful generation.");
+
+    /// <summary>
+    /// Incremented when the model calls a tool name not registered in the ToolKit.
+    /// Tags: <c>agent_id</c>, <c>kit</c>, <c>requested_name</c>.
+    /// </summary>
+    internal static readonly Counter<long> HallucinationReported =
+        Meter.CreateCounter<long>(
+            "ananke.tools.hallucination",
+            description: "Incremented when the model calls a tool name not in the ToolKit.");
+
+    /// <summary>
+    /// Incremented when a trajectory reaches positive reward after a prior fault.
+    /// Tags: <c>agent_id</c>, <c>kit</c>, <c>tool</c>.
+    /// </summary>
+    internal static readonly Counter<long> FaultRecovered =
+        Meter.CreateCounter<long>(
+            "ananke.tools.fault_recovered",
+            description: "Incremented when a trajectory reaches positive reward after a prior fault.");
+
+    /// <summary>
+    /// Incremented when a trajectory ends non-positively after a prior fault.
+    /// Tags: <c>agent_id</c>, <c>kit</c>, <c>tool</c>.
+    /// </summary>
+    internal static readonly Counter<long> FaultAbandoned =
+        Meter.CreateCounter<long>(
+            "ananke.tools.fault_abandoned",
+            description: "Incremented when a trajectory ends non-positively after a prior fault.");
 }

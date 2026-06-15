@@ -3,13 +3,15 @@ using Ananke.Design;
 using Ananke.Federation.Deployment;
 using Ananke.Orchestration.Tools;
 using Ananke.Organics.Kernel;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Federation.Hosting;
 
 /// <summary>
 /// Shared lifecycle base for platform-specific <see cref="IWorkflowHost"/> implementations.
 /// Handles the deploy → keep-alive → teardown loop; subclasses provide only the
-/// platform-specific teardown call via <see cref="TeardownCoreAsync"/>.
+/// platform-specific deploy/teardown calls.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,15 +24,21 @@ namespace Ananke.Federation.Hosting;
 /// <para>
 /// Subclass pattern:
 /// <code>
-/// public sealed class AcmeWorkflowHost(AcmeDeployer deployer, WorkflowManifest manifest, ToolKit toolKit)
-///     : PlatformWorkflowHostBase(manifest, toolKit)
+/// public sealed class AcmeWorkflowHost(AcmeDeployer deployer, WorkflowManifest manifest, ToolKit toolKit,
+///     ILogger&lt;AcmeWorkflowHost&gt;? logger = null)
+///     : PlatformWorkflowHostBase(manifest, toolKit, logger)
 /// {
+///     protected override string Platform => deployer.Platform;
+///
 ///     protected override Task&lt;DeploymentRecord&gt; DeployCoreAsync(
 ///         WorkflowManifest manifest, ToolKit toolKit, DeployOptions options, CancellationToken ct)
 ///         => deployer.DeployAsync(manifest, toolKit, options, ct);
 ///
 ///     protected override Task TeardownCoreAsync(string deploymentId, CancellationToken ct)
 ///         => deployer.TeardownAsync(deploymentId, ct);
+///
+///     protected override Task MarkDeploymentFailedAsync(string deploymentId, CancellationToken ct)
+///         => deployer.MarkFailedAsync(deploymentId, ct);
 /// }
 /// </code>
 /// </para>
@@ -39,18 +47,19 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
 {
     private readonly WorkflowManifest _manifest;
     private readonly ToolKit _toolKit;
+    private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, CellEntry> _cells = new();
 
     /// <summary>
-    /// Initialises the base with the manifest and toolkit that will be deployed
-    /// when cells are started.
+    /// Initialises the base with the manifest, toolkit, and optional logger.
     /// </summary>
-    protected PlatformWorkflowHostBase(WorkflowManifest manifest, ToolKit toolKit)
+    protected PlatformWorkflowHostBase(WorkflowManifest manifest, ToolKit toolKit, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(toolKit);
         _manifest = manifest;
         _toolKit = toolKit;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>Platform identifier (e.g. <c>"azure-ai"</c>). Used to build <see cref="DeployOptions"/>.</summary>
@@ -70,6 +79,13 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
     /// Should be a best-effort no-op when the deployment does not exist.
     /// </summary>
     protected abstract Task TeardownCoreAsync(string deploymentId, CancellationToken ct);
+
+    /// <summary>
+    /// Marks a deployment as failed in the registry. Called when deploy throws.
+    /// Default is a no-op; override to call <c>deployer.MarkFailedAsync</c>.
+    /// </summary>
+    protected virtual Task MarkDeploymentFailedAsync(string deploymentId, CancellationToken ct)
+        => Task.CompletedTask;
 
     /// <inheritdoc />
     public Task StartAsync(string name, Func<CancellationToken, Task> workflowLoop, CancellationToken ct = default)
@@ -102,7 +118,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         if (entry.DeploymentId is not null)
         {
             try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None); }
-            catch { /* Best-effort teardown */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "Best-effort teardown failed for deployment '{Id}'", entry.DeploymentId); }
         }
 
         await CancelAndDispose(entry);
@@ -122,7 +138,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
             if (entry.DeploymentId is not null)
             {
                 try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None); }
-                catch { /* Best-effort */ }
+                catch (Exception ex) { _logger.LogDebug(ex, "Best-effort teardown failed for deployment '{Id}' during dispose", entry.DeploymentId); }
             }
 
             await CancelAndDispose(entry);
@@ -146,9 +162,18 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         {
             // Expected — cell was stopped.
         }
-        catch
+        catch (Exception ex)
         {
-            // Deploy failed; cell remains registered until StopAsync or DisposeAsync.
+            _logger.LogError(ex, "Cell '{Name}' deployment failed on platform '{Platform}'", name, Platform);
+
+            if (_cells.TryGetValue(name, out var failing) && failing.DeploymentId is not null)
+            {
+                try { await MarkDeploymentFailedAsync(failing.DeploymentId, CancellationToken.None); }
+                catch (Exception inner)
+                {
+                    _logger.LogWarning(inner, "Could not mark deployment '{Id}' as failed", failing.DeploymentId);
+                }
+            }
         }
     }
 
@@ -160,7 +185,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
             await entry.Loop;
         }
         catch (OperationCanceledException) { }
-        catch { }
+        catch (Exception) { }
         finally { entry.Cts.Dispose(); }
     }
 

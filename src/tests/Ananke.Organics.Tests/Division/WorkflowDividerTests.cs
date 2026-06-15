@@ -3,6 +3,7 @@ using Ananke.Learning;
 using Ananke.Learning.EmpiricalMemory;
 using Ananke.Organics.Kernel;
 using Ananke.Organics.Kernel.Snapshots;
+using Ananke.Abstractions.Agents;
 using Ananke.Organics.Division;
 using Ananke.Organics.Sensing;
 using Ananke.TestHelpers;

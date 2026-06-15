@@ -1,4 +1,5 @@
 using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Trajectory;
 using Ananke.Learning.EmpiricalMemory;
 using Ananke.Orchestration.Knowledge;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,12 @@ namespace Ananke.Learning.Offline;
 /// Handles decay (forgetting), curiosity-driven exploration (wandering),
 /// and intrinsic reward computation via vector-space predictions.
 /// </summary>
-public sealed class OfflineLearner : IOfflineLearner
+/// <remarks>
+/// Implements <see cref="ILearningCycleTrigger"/> so it can be registered as such in DI
+/// and injected into <c>CompositeAdaptiveHarnessPolicy</c> without creating a circular
+/// project reference between <c>Ananke.Orchestration</c> and <c>Ananke.Learning</c>.
+/// </remarks>
+public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
 {
     private readonly IEmpiricalMemory _memory;
     private readonly IEmbeddingModel _embedder;
@@ -57,6 +63,10 @@ public sealed class OfflineLearner : IOfflineLearner
         _logger = logger ?? NullLogger<OfflineLearner>.Instance;
         _rng = new Random();
     }
+
+    /// <inheritdoc cref="ILearningCycleTrigger.TriggerAsync"/>
+    async Task ILearningCycleTrigger.TriggerAsync(CancellationToken ct) =>
+        await LearnAsync(ct).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task<OfflineLearningResult> LearnAsync(CancellationToken ct = default)

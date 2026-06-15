@@ -60,8 +60,7 @@ var pipeline = new Workflow<PipelineState>("data-pipeline")
         { WordCount = state.Input?.Split(' ').Length ?? 0 }))
     .Job("format", (state, _) => Task.FromResult(state with
         { Output = state.Input!.ToUpperInvariant() }))
-    .Chain("validate", "enrich", "format")
-    .Then("format", Workflow.End);
+    .Chain("validate", "enrich", "format");
 
 builder.Services
     .AddMcpServer(options => { /* ... */ })

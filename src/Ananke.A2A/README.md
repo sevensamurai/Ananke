@@ -117,8 +117,7 @@ var workflow = new Workflow<MyState>("pipeline")
         .CreateMessage(s => new Request { Query = s.Input })
         .MapResult((s, r) => s with { Output = r.Answer })
         .Build())
-    .Chain("local-step", "remote-step")
-    .Then("remote-step", Workflow.End);
+    .Chain("local-step", "remote-step");
 ```
 
 ## Features

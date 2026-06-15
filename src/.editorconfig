@@ -32,3 +32,176 @@ end_of_line = lf
 
 [*.ps1]
 end_of_line = crlf
+
+# ── ANANKE_ASYNC_001 legacy suppression ──────────────────────────────────────
+# Files below pre-date the ConfigureAwait(false) rule.  New files in any project
+# are expected to comply.  Remove entries here as each file is migrated.
+[Ananke.StateMachine/StateMachine.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.StateMachine/AbstractStateMachine.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Redis/RedisDataAdapter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Redis/RedisConversationMemory.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Qdrant/QdrantKnowledgeCatalog.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Qdrant/QdrantKnowledgeStore.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Qdrant/QdrantEmpiricalMemory.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Qdrant/QdrantEpisodeStore.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Qdrant/QdrantDomainRouter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Topology/ColonyGraphBuilder.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Kernel/Snapshots/PromptWorkflowDesigner.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Division/ExperienceDrivenDivisionPolicy.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Execution/WorkflowRunner.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/TextAgentJob.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/Routing/ModelRouter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/Middleware/ResilientAgentModel.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/Middleware/MiddlewareAgentModel.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/Middleware/CachingAgentModel.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration/Agents/AgentJob.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Orchestration.Knowledge/Linking/DocumentLinkExtractor.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.MQTT/MqttChannelWriter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.MQTT/MqttChannelReader.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Learning/Offline/OfflineLearner.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Learning/Knowledge/Reporting/KnowledgeReportExporter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation/Hosting/PlatformWorkflowHostBase.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation/Hosting/FederatedComplexityMonitor.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Google/VertexAIWorkflowHost.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Azure/AzureWorkflowHost.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Azure/AzureAgentDeployer.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Anthropic/ClaudeWorkflowHost.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Anthropic/ClaudeManagedAgentsClient.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Federation.Google/AgentRuntime/AgentRuntimeClient.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Abstractions/Channels/BackgroundProcessor.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Kernel/OrganicHost.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Division/WorkflowDivider.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Organics/Topology/Reporting/ColonyReportExporter.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Learning/Knowledge/Builders/EpisodeTrajectoryBuilder.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[Ananke.Learning/Knowledge/Builders/TagCoOccurrenceBuilder.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+# Demo and CLI tool projects — application entrypoints, suppress globally.
+[demos/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke-platform/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke-platform-google/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke-platform-azure/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke-platform-anthropic/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[nnke-platform-all/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+# Test helpers that use private async setup methods.
+[tests/Ananke.Abstractions.Tests/Graph/BreadthFirstExpansionTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Analyzers.Tests/ConfigureAwaitAnalyzerTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Analyzers.Tests/UndefinedJobNameAnalyzerTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Orchestration.Tests/NociceptionTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Orchestration.Tests/Phase4Tests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Integration.Tests/ChatWithInterruptionTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Integration.Tests/MessageFlowTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Learning.Tests/MonteCarloRewardPropagatorTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Learning.Tests/SkillPackagingTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Learning.Tests/TagImportanceTrackerTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+[tests/Ananke.Organics.Tests/**/*.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none

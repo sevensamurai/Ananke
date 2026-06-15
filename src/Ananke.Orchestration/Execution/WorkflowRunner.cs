@@ -172,7 +172,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         {
             await linkedCts.CancelAsync();
             try { await task; }
-            catch { /* Errors communicated via WorkflowFaulted events */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "Workflow task faulted after cancellation — error already surfaced as WorkflowFaulted event"); }
         }
     }
 
