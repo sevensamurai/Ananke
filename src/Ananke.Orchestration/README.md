@@ -61,8 +61,9 @@ services.AddWorkflowOrchestration(o => o
 - **Tool execution** — `ToolKit`, `ToolDefinition`, `ToolBuilder`, memory-backed tool gating, and execution strategies
 - **Smart tool routing** — `CompositeSmartToolRouter` and routing stages surfaced through `SmartToolRouterMiddleware`
 - **Model middleware** — logging, guardrails, caching, resilience, and tool-window narrowing at the `IAgentModel` layer
-- **Pattern builders** — `AgenticPattern.ReviewCritique<TState>()` and `AgenticPattern.IterativeRefinement<TState>()`
-- **Tracing and budgets** — `IWorkflowTracer`, workflow trace context, and token-usage capture for model calls
+- **Pattern builders** — `AgenticPattern.ReviewCritique<TState>()`, `AgenticPattern.IterativeRefinement<TState>()`, and `AgenticPattern.Interview<TState>()` (conversational turns via `Workflow<TState>.AwaitInput`, resumed by platform adapters via `WorkflowInputExtensions.ResumeWithInputAsync`)
+- **Tracing and budgets** — `IWorkflowTracer`, workflow trace context, token-usage capture for model calls, and a `BudgetExceeded<TState>` workflow event backed by `IBudgetMeter`
+- **Adaptive harness** — `CompositeAdaptiveHarnessPolicy` reacts to per-episode `TrajectorySnapshot`s (from `Ananke.Abstractions.Trajectory`): triggers a learning cycle on hallucination spikes and rewards/penalizes tool affinities on clean successes or abandoned faults
 
 ## Key surfaces
 
@@ -77,6 +78,7 @@ services.AddWorkflowOrchestration(o => o
 | `StreamingChatWorkflow` | Pre-built streaming conversation loop with optional memory and tools |
 | `ToolKit` | Named collection of tools, tool-memory integration, and routing hooks |
 | `AgenticPattern` | Factory for common multi-step agent patterns |
+| `CompositeAdaptiveHarnessPolicy` | Default `IAdaptiveHarnessPolicy`/`ITrajectoryObserver` — adapts tool affinities and triggers learning cycles from completed-episode trajectory snapshots |
 
 ## Package boundaries
 

@@ -37,9 +37,8 @@ public sealed class MemgraphPageRankScorer(MemgraphSessionFactory factory) : ICe
                 var node  = cursor.Current["node"].As<INode>();
                 var rank  = (float)cursor.Current["rank"].As<double>();
                 var id    = node["id"].As<string>();
-                var kind  = node["kind"].As<string>();
 
-                if (nodeKindFilter is null || kind == nodeKindFilter)
+                if (nodeKindFilter is null || node.Labels.Contains(nodeKindFilter))
                     results[id] = rank;
             }
 

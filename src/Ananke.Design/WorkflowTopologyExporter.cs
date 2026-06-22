@@ -43,6 +43,11 @@ namespace Ananke.Design;
 ///     <term>Interrupt</term>
 ///     <description>Lossless — exported as <c>interrupt(name)</c>.</description>
 ///   </item>
+///   <item>
+///     <term>Ask (input turn)</term>
+///     <description>Lossless — exported as <c>ask(name)</c>, distinguished from a plain
+///     <c>interrupt(name)</c> via <see cref="WorkflowDefinition{TState}.InputJobs"/>.</description>
+///   </item>
 /// </list>
 /// <para>
 /// The manifest export does not include system prompts, model definitions, or tool
@@ -214,11 +219,15 @@ public static class WorkflowTopologyExporter
             lines.Add($"join({sources}) -> {join.Target}");
         }
 
-        // Interrupt annotations
+        // Interrupt / ask annotations — ask(name) is an input-collecting turn, a subset of
+        // InterruptMode.Before jobs (see WorkflowDefinition.InputJobs); plain interrupts get
+        // interrupt(name).
         foreach (var (name, descriptor) in definition.Jobs)
         {
-            if (descriptor.Interrupt == Ananke.Orchestration.Jobs.InterruptMode.Before)
-                lines.Add($"interrupt({name})");
+            if (descriptor.Interrupt != Ananke.Orchestration.Jobs.InterruptMode.Before)
+                continue;
+
+            lines.Add(definition.InputJobs.Contains(name) ? $"ask({name})" : $"interrupt({name})");
         }
 
         return lines;

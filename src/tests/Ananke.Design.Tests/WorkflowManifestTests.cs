@@ -280,6 +280,28 @@ public class WorkflowManifestTests
         manifest.Connections[1].ShouldBe("escalate -> End");
     }
 
+    [Test]
+    public void Parse_ConnectionsWithLoop_PassesThroughToScaffold()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "jobs:",
+            "connections:",
+            "  - start -> code_cycle",
+            "  - code_cycle -> await_ci",
+            "  - await_ci -> loop(code_cycle, exit: report)",
+            "  - report -> End",
+        ]);
+
+        manifest.Connections.ShouldContain("await_ci -> loop(code_cycle, exit: report)");
+
+        var scaffold = WorkflowScaffold.Parse<object>(manifest.Name, manifest.Connections);
+
+        scaffold.UnboundLoops.ShouldContain("await_ci");
+        scaffold.GetTopologyDsl().ShouldContain("await_ci -> loop(code_cycle, exit: report)");
+    }
+
     // ── Comments and blank lines ─────────────────────────────────────
 
     [Test]

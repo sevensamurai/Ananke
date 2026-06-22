@@ -23,6 +23,9 @@ public class ModelCatalogTests
     [TestCase("claude-sonnet-4-20250514")]
     [TestCase("claude-opus-4-20250514")]
     [TestCase("claude-3-5-haiku-20241022")]
+    [TestCase("claude-opus-4-8")]
+    [TestCase("claude-sonnet-4-6")]
+    [TestCase("claude-haiku-4-5")]
     [TestCase("gemini-2.5-pro")]
     [TestCase("gemini-2.5-flash")]
     [TestCase("gemini-2.0-flash")]
@@ -56,6 +59,14 @@ public class ModelCatalogTests
     public void TryGet_NullName_Throws()
     {
         Should.Throw<ArgumentException>(() => ModelCatalog.TryGet(null!));
+    }
+
+    [Test]
+    public void TryGet_ClaudeOpus4_8_CarriesReasoning()
+    {
+        var template = ModelCatalog.TryGet("claude-opus-4-8");
+        template.ShouldNotBeNull();
+        (template.Capabilities & ModelCapability.Reasoning).ShouldNotBe(ModelCapability.None);
     }
 
     // ── ToProfile binding ───────────────────────────────────────
@@ -157,6 +168,36 @@ public class ModelCatalogTests
         // CheapestFit should select the mini model
         var selected = router.Select(request);
         selected.ShouldBeSameAs(cheapModel);
+    }
+
+    [Test]
+    public void CurrentGenAnthropicProfiles_RouteByCapabilityAndTier()
+    {
+        var opusModel = new FakeModel();
+        var sonnetModel = new FakeModel();
+        var haikuModel = new FakeModel();
+
+        var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
+            .AddModel(ModelCatalog.Anthropic.ClaudeHaiku4_5
+                .ToProfile(haikuModel, new ModelCostRates(0.001m, 0.005m)))
+            .AddModel(ModelCatalog.Anthropic.ClaudeSonnet4_6
+                .ToProfile(sonnetModel, new ModelCostRates(0.003m, 0.015m)))
+            .AddModel(ModelCatalog.Anthropic.ClaudeOpus4_8
+                .ToProfile(opusModel, new ModelCostRates(0.005m, 0.025m)));
+
+        var planRequest = new AgentRequest { Messages = [AgentMessage.User("plan")] }
+            .WithRequiredCapabilities(ModelCapability.Reasoning)
+            .WithMinIntelligence(5);
+        router.Select(planRequest).ShouldBeSameAs(opusModel);
+
+        var codeRequest = new AgentRequest { Messages = [AgentMessage.User("code")] }
+            .WithRequiredCapabilities(ModelCapability.CodeGeneration)
+            .WithMinIntelligence(4);
+        router.Select(codeRequest).ShouldBeSameAs(sonnetModel);
+
+        var toolRequest = new AgentRequest { Messages = [AgentMessage.User("call a tool")] }
+            .WithRequiredCapabilities(ModelCapability.ToolCalling);
+        router.Select(toolRequest).ShouldBeSameAs(haikuModel);
     }
 
     // ── All catalog entries ─────────────────────────────────────

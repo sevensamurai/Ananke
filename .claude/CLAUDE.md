@@ -1,6 +1,8 @@
-# Build & verify
+﻿# Build & verify
 - Build: `dotnet build --no-restore`
 - Test: `dotnet test --no-build --logger "console;verbosity=normal"`
+
+# Only before create a pull request
 - Lint: `dotnet format --verify-no-changes`
 
 # Architecture
@@ -20,9 +22,11 @@
 
 # Workflow
 - Always `dotnet build` + `dotnet test` after a change set
-- Open ADR in docs/adr/ before proposing architectural changes
+- When docs (`docs/`, any `README.md` / `ARCHITECTURE.md`) are touched, run `powershell -File scripts/check-docs.ps1` before opening a PR — it flags stale type/API names. See `scripts/README.md`.
+- Open ADR in internals/design/ before proposing architectural changes
 - Do not modify .csproj files without confirmation
 
 # Code navigation
+- Read `MAP.md` first to find which architecture doc / guide / source dir covers a concept
 - Use codegraph_explore and codegraph_search before reading files
 - Only fall back to grep/glob if codegraph returns no results

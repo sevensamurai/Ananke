@@ -1,4 +1,7 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Workflows;
+using Ananke.Orchestration.Checkpointing;
+using Ananke.Orchestration.Memory;
 using Ananke.Orchestration.Patterns;
 using Ananke.Orchestration.Routing;
 using Shouldly;
@@ -11,6 +14,14 @@ public record ReviewState
     public double Score { get; init; }
     public int Revisions { get; init; }
     public List<string> Trail { get; init; } = [];
+}
+
+public record InterviewState
+{
+    public string ConversationId { get; init; } = "conversation-1";
+    public List<string> Agenda { get; init; } = [];
+    public List<string> Transcript { get; init; } = [];
+    public bool Complete { get; init; }
 }
 
 [TestFixture]
@@ -272,6 +283,345 @@ public class AgenticPatternTests
         exitReason.ShouldBe(LoopExitReason.ConditionMet);
     }
 
+    // ── Interview: validation ─────────────────────────────────────
+
+    [Test]
+    public void Interview_MissingQuestion_Throws()
+    {
+        var builder = AgenticPattern.Interview<InterviewState>("test")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete);
+
+        var ex = Should.Throw<InvalidOperationException>(() => builder.Build());
+        ex.Message.ShouldContain("WithQuestion");
+    }
+
+    [Test]
+    public void Interview_MissingNavigation_Throws()
+    {
+        var builder = AgenticPattern.Interview<InterviewState>("test")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .Until(s => s.Complete);
+
+        var ex = Should.Throw<InvalidOperationException>(() => builder.Build());
+        ex.Message.ShouldContain("WithNavigation");
+    }
+
+    [Test]
+    public void Interview_MissingUntil_Throws()
+    {
+        var builder = AgenticPattern.Interview<InterviewState>("test")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s);
+
+        var ex = Should.Throw<InvalidOperationException>(() => builder.Build());
+        ex.Message.ShouldContain("Until");
+    }
+
+    [Test]
+    public void Interview_MissingWelcomeAndIcebreaker_Throws()
+    {
+        var builder = AgenticPattern.Interview<InterviewState>("test")
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete);
+
+        var ex = Should.Throw<InvalidOperationException>(() => builder.Build());
+        ex.Message.ShouldContain("WithWelcome");
+        ex.Message.ShouldContain("WithIcebreaker");
+    }
+
+    [Test]
+    public void Interview_MaxTurnsLessThan1_Throws()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            AgenticPattern.Interview<InterviewState>("test").MaxTurns(0));
+    }
+
+    [Test]
+    public void Interview_WithTurnTimeoutNonPositive_Throws()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            AgenticPattern.Interview<InterviewState>("test").WithTurnTimeout(TimeSpan.Zero));
+    }
+
+    // ── Interview: topology ───────────────────────────────────────
+
+    [Test]
+    public void Interview_ProducesValidWorkflow_WithInputJobMarked()
+    {
+        var interview = AgenticPattern.Interview<InterviewState>("topology")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete)
+            .Build();
+
+        var def = interview.Workflow.Build();
+
+        def.Name.ShouldBe("topology");
+        def.EntryJob.ShouldBe("welcome");
+        def.Jobs.ShouldContainKey("ask_question");
+        def.InputJobs.ShouldContain("ask_question");
+    }
+
+    [Test]
+    public async Task Interview_WelcomeAndIcebreaker_RunOnceBeforeFirstTurn()
+    {
+        var order = new List<string>();
+
+        var interview = AgenticPattern.Interview<InterviewState>("greeting")
+            .WithWelcome((s, _) => { order.Add("welcome"); return Task.FromResult(s); })
+            .WithIcebreaker((s, _) => { order.Add("icebreaker"); return Task.FromResult(s); })
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(new InMemoryCheckpointStore());
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["q1"] });
+
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        order.ShouldBe(["welcome", "icebreaker"]);
+    }
+
+    // ── Interview: execution ───────────────────────────────────────
+
+    private static InterviewState Navigate(string answer, InterviewState s)
+    {
+        var head = s.Agenda[0];
+        var rest = s.Agenda.Skip(1).ToList();
+
+        if (answer.StartsWith("expand:", StringComparison.Ordinal))
+        {
+            return s with
+            {
+                Agenda = [answer["expand:".Length..], .. rest],
+                Transcript = [.. s.Transcript, $"{head}={answer}"]
+            };
+        }
+
+        if (answer == "skip")
+            return s with { Agenda = rest, Complete = rest.Count == 0 };
+
+        if (answer.StartsWith("update:", StringComparison.Ordinal))
+        {
+            return s with
+            {
+                Agenda = [answer["update:".Length..], .. rest],
+                Transcript = [.. s.Transcript, $"{head}={answer}"]
+            };
+        }
+
+        return s with
+        {
+            Agenda = rest,
+            Transcript = [.. s.Transcript, $"{head}={answer}"],
+            Complete = rest.Count == 0
+        };
+    }
+
+    [Test]
+    public async Task Interview_ExpandSkipAndUpdate_AllAlterAgenda_AndTerminatesOnUntil()
+    {
+        var store = new InMemoryCheckpointStore();
+
+        var interview = AgenticPattern.Interview<InterviewState>("profile")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation(Navigate)
+            .Until(s => s.Complete)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(store);
+
+        var initial = new InterviewState
+        {
+            Agenda = ["fav-food", "fav-season", "fav-hobby"],
+            Transcript = ["fav-color=blue"]
+        };
+
+        var execution = await workflow.RunAsync(initial);
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-food");
+
+        async Task<WorkflowExecution<InterviewState>> Reply(string executionId, InterviewState state, string answer)
+        {
+            var next = await interview.FoldAnswer(state, answer, default);
+            return await workflow.ResumeAsync(executionId, _ => next);
+        }
+
+        execution = await Reply(execution.Id, execution.State, "expand:cuisine");
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("cuisine"); // expand: follow-up jumps the queue
+
+        execution = await Reply(execution.Id, execution.State, "italian");
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-season");
+
+        execution = await Reply(execution.Id, execution.State, "skip");
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-hobby"); // fav-season dropped, no transcript entry
+
+        execution = await Reply(execution.Id, execution.State, "update:fav-color");
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-color"); // re-enqueued for revisit
+
+        execution = await Reply(execution.Id, execution.State, "red");
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+        execution.Result!.FinalState.Complete.ShouldBeTrue();
+        execution.Result.FinalState.Transcript.ShouldBe([
+            "fav-color=blue",
+            "fav-food=expand:cuisine",
+            "cuisine=italian",
+            "fav-hobby=update:fav-color",
+            "fav-color=red"
+        ]);
+    }
+
+    [Test]
+    public async Task Interview_MaxTurnsCap_ExitsWhenUntilNeverTrue()
+    {
+        var store = new InMemoryCheckpointStore();
+
+        var interview = AgenticPattern.Interview<InterviewState>("stuck")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(_ => "same question")
+            .WithNavigation((answer, s) => s with { Transcript = [.. s.Transcript, answer] })
+            .Until(_ => false)
+            .MaxTurns(3)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(store);
+
+        var execution = await workflow.RunAsync(new InterviewState());
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var next = await interview.FoldAnswer(execution.State, "ok", default);
+            execution = await workflow.ResumeAsync(execution.Id, _ => next);
+        }
+
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+        execution.Result!.FinalState.Transcript.ShouldBe(["ok", "ok", "ok"]);
+    }
+
+    // ── Interview: memory write-through + turn timeout ────────────
+
+    [Test]
+    public async Task Interview_WithMemory_WritesQuestionAndAnswerToConversationMemory()
+    {
+        var memory = new InMemoryConversationMemory();
+        var store = new InMemoryCheckpointStore();
+
+        var interview = AgenticPattern.Interview<InterviewState>("memory-backed")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((answer, s) => s with
+            {
+                Agenda = [.. s.Agenda.Skip(1)],
+                Complete = s.Agenda.Count <= 1
+            })
+            .Until(s => s.Complete)
+            .WithMemory(memory, s => s.ConversationId)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(store);
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["fav-color"] });
+
+        var question = await interview.GetQuestion(execution.State, default);
+        question.ShouldBe("fav-color");
+
+        var next = await interview.FoldAnswer(execution.State, "blue", default);
+        execution = await workflow.ResumeAsync(execution.Id, _ => next);
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+
+        var history = await memory.GetHistoryAsync("conversation-1");
+        history.Count.ShouldBe(2);
+        history[0].Role.ShouldBe(AgentRole.Assistant);
+        history[0].Content.ShouldBe("fav-color");
+        history[1].Role.ShouldBe(AgentRole.User);
+        history[1].Content.ShouldBe("blue");
+    }
+
+    [Test]
+    public async Task Interview_TurnTimeout_ExposesPauseMessage_AndStaysResumable()
+    {
+        var store = new InMemoryCheckpointStore();
+
+        var interview = AgenticPattern.Interview<InterviewState>("pausable")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((answer, s) => s with
+            {
+                Agenda = [.. s.Agenda.Skip(1)],
+                Transcript = [.. s.Transcript, answer],
+                Complete = s.Agenda.Count <= 1
+            })
+            .Until(s => s.Complete)
+            .WithTurnTimeout(TimeSpan.FromMinutes(30))
+            .Build();
+
+        interview.TurnTimeout.ShouldBe(TimeSpan.FromMinutes(30));
+
+        var workflow = interview.Workflow.UseCheckpointing(store);
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["fav-color"] });
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+
+        // Host's own pending-input wait exceeds TurnTimeout: it shows the pause message but
+        // does not abort or otherwise touch the execution — it stays checkpointed as-is.
+        var shownToUser = interview.PauseMessage;
+        shownToUser.ShouldBe(Interview<InterviewState>.DefaultPauseMessage);
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+
+        // The user eventually replies; the paused turn resumes exactly like an on-time one.
+        var next = await interview.FoldAnswer(execution.State, "blue", default);
+        execution = await workflow.ResumeAsync(execution.Id, _ => next);
+
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+        execution.Result!.FinalState.Transcript.ShouldBe(["blue"]);
+    }
+
+    [Test]
+    public async Task Interview_FakeAdapter_ResumesViaResumeWithInputAsync_AgendaAdvances()
+    {
+        // A fake platform adapter: it owns nothing but a paused execution id and the next
+        // inbound message — exactly the shape a Slack/Discord adapter would have (ADR §4, B4).
+        var store = new InMemoryCheckpointStore();
+
+        var interview = AgenticPattern.Interview<InterviewState>("adapter-driven")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation(Navigate)
+            .Until(s => s.Complete)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(store);
+
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["fav-food", "fav-hobby"] });
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-food");
+
+        // "Inbound message" — the adapter correlates it to execution.Id by conversation/thread id
+        // (out of scope here) and resumes via the channel-agnostic helper, no manual fold+resume.
+        execution = await workflow.ResumeWithInputAsync(
+            execution.Id, execution.State, "pizza", interview.FoldAnswer);
+
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        execution.State.Transcript.ShouldBe(["fav-food=pizza"]);
+        (await interview.GetQuestion(execution.State, default)).ShouldBe("fav-hobby");
+
+        execution = await workflow.ResumeWithInputAsync(
+            execution.Id, execution.State, "chess", interview.FoldAnswer);
+
+        execution.Status.ShouldBe(ExecutionStatus.Completed);
+        execution.Result!.FinalState.Transcript.ShouldBe(["fav-food=pizza", "fav-hobby=chess"]);
+    }
+
     // ── Entry point validation ──────────────────────────────────
 
     [Test]
@@ -288,5 +638,11 @@ public class AgenticPatternTests
 
         Should.Throw<ArgumentException>(() =>
             AgenticPattern.IterativeRefinement<ReviewState>(""));
+
+        Should.Throw<ArgumentException>(() =>
+            AgenticPattern.Interview<InterviewState>(null!));
+
+        Should.Throw<ArgumentException>(() =>
+            AgenticPattern.Interview<InterviewState>(""));
     }
 }

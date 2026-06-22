@@ -8,6 +8,18 @@ Bridges the OpenAI ChatClient (and any OpenAI-compatible API) to Ananke's
 `IAgentModel`/`IStreamingAgentModel` interface. Supports tool calling,
 streaming, structured output (JSON schema), and custom endpoints.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `OpenAIChatAgentModel` — the `IStreamingAgentModel` implementation that wraps
+   `ChatClient`; the package's sole entry point — `src/Ananke.Orchestration.OpenAI/OpenAIChatAgentModel.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Orchestration` (project)

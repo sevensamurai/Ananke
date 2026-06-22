@@ -34,17 +34,11 @@ C# .NET 10.0 library for AI agent orchestration. Solution: `src/Ananke.slnx`. Bu
 ## Architecture Reference
 When working on anything non-trivial — new features, refactors, cross-project changes, interface design — read the relevant architecture document(s) first. They are the authoritative reference for type names, interfaces, and design decisions.
 
-| Document | When to read it |
-|---|---|
-| [`ARCHITECTURE.md`](../ARCHITECTURE.md) | Entry point — layer map, dependency graph, project list, testing strategy |
-| [`architecture/orchestration.md`](../architecture/orchestration.md) | `Workflow<T>`, jobs, routing, streaming events, checkpointing, budget, middleware |
-| [`architecture/agents.md`](../architecture/agents.md) | `IAgentModel`, `IStreamingAgentModel`, provider adapters, model routing, context strategies |
-| [`architecture/knowledge.md`](../architecture/knowledge.md) | RAG pipeline, `IKnowledgeStore`, `IKnowledgeCatalog`, document processing, `KnowledgeBase` |
-| [`architecture/learning.md`](../architecture/learning.md) | `IEmpiricalMemory`, episodes, offline learning, skill packaging, entity memory |
-| [`architecture/organics-federation.md`](../architecture/organics-federation.md) | `OrganicHost`, cell division, `IHealthMonitor`, federation, cross-cloud deployment |
-| [`architecture/infrastructure.md`](../architecture/infrastructure.md) | Redis, MQTT, Qdrant, OpenTelemetry, ASP.NET Core integration |
-| [`architecture/interop.md`](../architecture/interop.md) | MCP server, A2A protocol, `Ananke.Skills`, platform adapters (Slack, Discord) |
-| [`architecture/federation-credentials.md`](../architecture/federation-credentials.md) | Credential types, rotation, `IFederationCredentialProvider` per platform |
+Start at [`MAP.md`](../MAP.md) — it routes by concept to the right `architecture/*.md` section,
+`docs/` guide, and source directory, and disambiguates [`ARCHITECTURE.md`](../ARCHITECTURE.md)
+(layer map, dependency graph, testing strategy) from `src/ARCHITECTURE.md` (package inventory,
+CLI tooling layer, per-type source paths). Do not maintain a second copy of that routing table
+here — extend `MAP.md` instead so Claude and Copilot stay pointed at the same map.
 
 ## Tooling — Creating or Rewriting Files
 

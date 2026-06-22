@@ -36,6 +36,7 @@ same `Workflow<TState>` primitives you'd use directly.
 |---|---|---|
 | **Review & Critique** | `AgenticPattern.ReviewCritique<TState>(...)` | Generator → Critic → loop until approved or max iterations |
 | **Iterative Refinement** | `AgenticPattern.IterativeRefinement<TState>(...)` | Single agent refine loop until quality threshold or max iterations |
+| **Interview** | `AgenticPattern.Interview<TState>(...)` | Welcome → icebreaker → multi-turn conversation over a question agenda, with expand/skip/update navigation |
 
 More patterns will be added in future releases (Map-Reduce, Swarm, etc.).
 
@@ -56,6 +57,7 @@ generator → critic → [approved?] → end
 
 ```csharp
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 
 var workflow = AgenticPattern.ReviewCritique<ArticleState>("draft-review")
     .WithGenerator(generatorAgent)    // produces or revises output
@@ -138,6 +140,67 @@ var result = await workflow.RunAsync(new DraftState { Draft = initialDraft });
 | Same agent produces and assesses output | **Iterative Refinement** |
 | Need typed feedback flowing from critic to generator | **Review & Critique** |
 | Simple "keep improving until good enough" | **Iterative Refinement** |
+| Multi-turn, human-driven exchange over a question agenda | **Interview** |
+
+---
+
+## Interview (Conversational)
+
+The **Interview** pattern handles a different shape: not an agent looping on its own output, but
+a human-driven, multi-turn exchange — welcome, icebreaker, then a turn loop that walks a question
+agenda held in state. Each reply can **expand** (push follow-up questions), **skip** (drop
+now-irrelevant ones), or **update** (revisit an earlier answer).
+
+```
+welcome → icebreaker → ask_question ⇄ loop(ask_question, exit: end)
+                              ↑ AwaitInput — pauses before each turn
+```
+
+A turn's question and the user's reply only exist outside the workflow run — the question is
+read from state *after* the pause, and the reply is folded into state *before* resuming — so
+`Build()` returns an `Interview<TState>` (the workflow **plus** two host-side hooks), not a bare
+`Workflow<TState>`:
+
+### Basic Usage
+
+```csharp
+using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
+
+var interview = AgenticPattern.Interview<InterviewState>("recruit-onboarding")
+    .WithWelcome((s, ct) => Post(s, "Hi! This'll take about five minutes.", ct))
+    .WithIcebreaker((s, ct) => Post(s, "To start easy: what are you most proud of shipping?", ct))
+    .WithQuestion(s => s.Agenda[0].Text)        // selects the next prompt from the agenda
+    .WithNavigation((answer, s) => Navigate(answer, s))   // expand / skip / update
+    .Until(s => s.Complete)                      // loop exits once the agenda is empty
+    .MaxTurns(40)                                 // safety cap (default: 20)
+    .Build();
+
+var workflow = interview.Workflow.UseCheckpointing(checkpointStore);
+var execution = await workflow.RunAsync(initialState);
+
+// execution.Status == Interrupted — read the question, then resume with the reply:
+var question = await interview.GetQuestion(execution.State, ct);
+var resumed = await workflow.ResumeWithInputAsync(execution.Id, execution.State, reply, interview.FoldAnswer);
+```
+
+`ResumeWithInputAsync` (from [Guide 07 — Human-in-the-Loop](07-human-in-the-loop.md#input-collecting-turns-awaitinput))
+is the channel-agnostic fold-then-resume helper; an adapter just correlates the inbound message to
+`execution.Id` and calls it.
+
+### Memory and turn timeouts
+
+```csharp
+var interview = AgenticPattern.Interview<InterviewState>("screening")
+    .WithQuestion(...).WithNavigation(...).Until(...)
+    .WithMemory(conversationMemory, s => s.ConversationId)   // writes each turn to IConversationMemory
+    .WithTurnTimeout(TimeSpan.FromHours(24))                  // exposed as interview.PauseMessage
+    .Build();
+```
+
+`WithTurnTimeout` doesn't run a timer in the framework — it's a value the host reads
+(`interview.PauseMessage`, `interview.TurnTimeout`) to decide when to show a "no rush, reply
+whenever" note. A timed-out turn stays checkpointed and resumable; the framework never aborts it.
 
 ---
 
@@ -172,7 +235,8 @@ var pipeline = new Workflow<PipelineState>("content-pipeline")
         mapIn: s => s.Article,
         mapOut: (s, article) => s with { Article = article })
     .Job("publish", publishJob)
-    .Chain("gather", "review", "publish");
+    .Chain("gather", "review", "publish")
+    .Then("publish", Workflow.End);
 ```
 
 ### Stream events

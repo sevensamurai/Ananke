@@ -16,7 +16,7 @@
 
 ### Does Ananke support Ollama (local models)?
 
-Yes. Use `OpenAIChatAgentModel` with a custom `baseUri` pointing to your Ollama server.
+Yes. Use `OpenAIChatAgentModel.Create` with a custom `endpoint` pointing to your Ollama server.
 See [Advanced Agent Features](../guides/11-advanced-agents.md) for the exact configuration.
 
 ### Does Ananke support Azure OpenAI?
@@ -40,7 +40,7 @@ one-line configuration change.
 ### What is `IStreamingAgentModel`?
 
 `IStreamingAgentModel` is Ananke's provider-agnostic interface for LLM interaction. All
-provider implementations (`OpenAIChatAgentModel`, `AnthropicAgentModel`, `GoogleAgentModel`,
+provider implementations (`OpenAIChatAgentModel`, `AnthropicAgentModel`, `GeminiAgentModel`,
 `A2AAgentModel`) implement this interface. You can also implement it yourself to wrap any
 model or API.
 

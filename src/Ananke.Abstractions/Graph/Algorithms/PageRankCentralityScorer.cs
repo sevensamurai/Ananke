@@ -31,7 +31,7 @@ public sealed class PageRankCentralityScorer : ICentralityScorer
             else
             {
                 var node = await graph.GetNodeAsync(id, ct).ConfigureAwait(false);
-                if (node?.Kind == nodeKindFilter)
+                if (node is not null && node.EffectiveLabels.Contains(nodeKindFilter))
                     nodeIds.Add(id);
             }
         }

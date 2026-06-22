@@ -9,6 +9,20 @@ Provides production-grade implementations of Ananke's infrastructure
 abstractions using Redis-compatible stores. Required for distributed
 `AbstractStateMachine` deployments and persistent conversation memory.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `RedisDistributedLock` — `IDistributedLock` via the RedLock algorithm, multi-instance safe — `src/Ananke.Redis/RedisDistributedLock.cs`
+2. `RedisDataAdapter` — `IKeyValueDataAdapter` for key-value persistence with JSON serialization — `src/Ananke.Redis/RedisDataAdapter.cs`
+3. `RedisConversationMemory` — `IConversationMemory` for session-scoped conversation history — `src/Ananke.Redis/RedisConversationMemory.cs`
+4. `ServiceCollectionExtensions` — `services.AddRedis(options => ...)` DI registration, the usual starting point for wiring this package in — `src/Ananke.Redis/ServiceCollectionExtensions.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Abstractions` (project)
@@ -18,13 +32,13 @@ abstractions using Redis-compatible stores. Required for distributed
 
 ## Key Types
 
-| Type | Kind | Purpose |
-|------|------|---------|
-| `RedisDistributedLock` | Class | `IDistributedLock` via RedLock algorithm (multi-instance safe) |
-| `RedisDataAdapter` | Class | `IKeyValueDataAdapter` — key-value persistence with JSON serialization |
-| `RedisCheckpointStore` | Class | `ICheckpointStore` — workflow checkpoint persistence |
-| `RedisConversationMemory` | Class | `IConversationMemory` — session-scoped conversation history |
-| `ServiceCollectionExtensions` | Static class | `services.AddRedis(options => ...)` DI registration |
+| Type | Kind | Purpose | Source |
+|------|------|---------|--------|
+| `RedisDistributedLock` | Class | `IDistributedLock` via RedLock algorithm (multi-instance safe) | `src/Ananke.Redis/RedisDistributedLock.cs` |
+| `RedisDataAdapter` | Class | `IKeyValueDataAdapter` — key-value persistence with JSON serialization | `src/Ananke.Redis/RedisDataAdapter.cs` |
+| `RedisCheckpointStore` | Class | `ICheckpointStore` — workflow checkpoint persistence. Not auto-registered by `AddRedis(...)`; takes a `ConnectionMultiplexer` directly — see README for manual wiring | `src/Ananke.Redis/RedisCheckpointStore.cs` |
+| `RedisConversationMemory` | Class | `IConversationMemory` — session-scoped conversation history | `src/Ananke.Redis/RedisConversationMemory.cs` |
+| `ServiceCollectionExtensions` | Static class | `services.AddRedis(options => ...)` DI registration | `src/Ananke.Redis/ServiceCollectionExtensions.cs` |
 
 ## Redis API Surface Used
 

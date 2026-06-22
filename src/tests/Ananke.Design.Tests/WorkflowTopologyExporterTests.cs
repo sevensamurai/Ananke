@@ -118,6 +118,24 @@ public class WorkflowTopologyExporterTests
         lines.ShouldContain("interrupt(review)");
     }
 
+    // ── ToDsl: ask ─────────────────────────────────────────────────────
+
+    [Test]
+    public void ToDsl_Ask_EmitsAskDirective_NotInterrupt()
+    {
+        var workflow = new Workflow<ScaffoldState>("test")
+            .Job("process", (s, _) => Task.FromResult(s))
+            .Job("ask_question", (s, _) => Task.FromResult(s))
+            .Then("process", "ask_question")
+            .Then("ask_question", Workflow.End)
+            .AwaitInput("ask_question");
+
+        var lines = workflow.ToDsl();
+
+        lines.ShouldContain("ask(ask_question)");
+        lines.ShouldNotContain("interrupt(ask_question)");
+    }
+
     // ── ToDsl: AgenticPattern round-trip ─────────────────────────────
 
     [Test]

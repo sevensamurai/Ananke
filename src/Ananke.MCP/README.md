@@ -52,7 +52,7 @@ builder.Services.AddMcpServer(options => { options.ServerName = "my-server"; })
 
 ## Features
 
-- **MCP client** — `AddMcpServerToolsAsync(IMcpClient)` discovers remote tools and bridges them into `ToolKit` / `ToolDefinition` for transparent agent use
+- **MCP client** — `AddMcpServerToolsAsync(McpClient)` discovers remote tools and bridges them into `ToolKit` / `ToolDefinition` for transparent agent use
 - **MCP server** — register any `ToolKit` or `Workflow<T>` as MCP server capabilities
 - Supports both **stdio** and **HTTP** transports
 - Compatible with Claude Desktop, VS Code Copilot, and any MCP client

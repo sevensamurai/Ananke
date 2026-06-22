@@ -10,6 +10,20 @@ mapper, tool schema translator, and system prompt compiler for Claude Managed Ag
 
 ---
 
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `ClaudeDeployer` — the `IFederationDeployer` implementation; deploy / teardown Claude
+   Managed Agents (see platform adapter status for current limits) — `src/Ananke.Federation.Anthropic/ClaudeDeployer.cs`
+2. `ClaudeCredentialProvider` — resolves the Anthropic API key; `IFederationCredentialProvider`
+   implementation — `src/Ananke.Federation.Anthropic/ClaudeCredentialProvider.cs`
+3. `ClaudeWorkflowHost` — manages Claude-hosted cell lifecycle (spawn = register remote,
+   stop = deregister) — `src/Ananke.Federation.Anthropic/ClaudeWorkflowHost.cs`
+
+---
+
 ## Dependencies
 
 | Dependency | Why |

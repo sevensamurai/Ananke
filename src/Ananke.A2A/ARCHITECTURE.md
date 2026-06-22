@@ -12,6 +12,22 @@ Implements Google's Agent-to-Agent (A2A) protocol for Ananke:
 2. **Server:** Expose Ananke workflows as A2A-compatible endpoints
    via `WorkflowTaskAdapter` and `AgentCardBuilder`.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `A2AAgentModel` — wraps a remote A2A agent as an `IAgentModel`/`IStreamingAgentModel`,
+   the client-side entry point — `src/Ananke.A2A/Client/A2AAgentModel.cs`
+2. `WorkflowTaskAdapter` — exposes a local workflow as an A2A task handler, the server-side
+   entry point — `src/Ananke.A2A/Server/WorkflowTaskAdapter.cs`
+3. `AgentCardBuilder` — builds the A2A agent card metadata used to advertise a workflow's
+   capabilities — `src/Ananke.A2A/Server/AgentCardBuilder.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Orchestration` (project)

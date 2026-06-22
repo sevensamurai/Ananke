@@ -14,6 +14,24 @@ Separated from `Ananke.Orchestration` so that vector storage backends
 depend on knowledge types without pulling in the workflow engine.
 `Ananke.Orchestration` then layers bridge/tool types on top of this package.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `IKnowledgeStore` — the vector-indexed store contract — `SearchAsync`, `UpsertAsync`,
+   `DeleteAsync` — `src/Ananke.Orchestration.Knowledge/IKnowledgeStore.cs`
+2. `IKnowledgeCatalog` — document-level metadata catalog for two-phase discovery (browse,
+   then deep-search) — `src/Ananke.Orchestration.Knowledge/Catalog/IKnowledgeCatalog.cs`
+3. `DocumentProcessor` — orchestrates the extract → chunk → embed → store pipeline —
+   `src/Ananke.Orchestration.Knowledge/Documents/DocumentProcessor.cs`
+4. `IDocumentChunker` — splits extracted text into embedding-sized chunks; the pipeline
+   stage between extraction and storage — `src/Ananke.Orchestration.Knowledge/Documents/IDocumentChunker.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Abstractions` (project) — for `IAgentModel`, `IEmbeddingModel`, `AgentMessage`
@@ -97,9 +115,9 @@ the workflow engine, not in the reusable knowledge layer.
 
 | File | Namespace | Purpose |
 |------|-----------|---------|
-| `Knowledge/Tools/KnowledgeSearchTool.cs` | `Ananke.Orchestration.Knowledge.Tools` | Registers a knowledge store as a callable agent tool |
-| `Knowledge/Tools/KnowledgeTools.cs` | `Ananke.Orchestration.Knowledge.Tools` | Registers document processing + search as tools (ingest + query) |
-| `Knowledge/Catalog/KnowledgeCatalogTools.cs` | `Ananke.Orchestration.Knowledge.Catalog` | Registers catalog browse/search as agent tools |
+| `src/Ananke.Orchestration/Knowledge/Tools/KnowledgeSearchTool.cs` | `Ananke.Orchestration.Knowledge.Tools` | Registers a knowledge store as a callable agent tool |
+| `src/Ananke.Orchestration/Knowledge/Tools/KnowledgeTools.cs` | `Ananke.Orchestration.Knowledge.Tools` | Registers document processing + search as tools (ingest + query) |
+| `src/Ananke.Orchestration/Knowledge/Catalog/KnowledgeCatalogTools.cs` | `Ananke.Orchestration.Knowledge.Catalog` | Registers catalog browse/search as agent tools |
 
 ## Document Pipeline
 

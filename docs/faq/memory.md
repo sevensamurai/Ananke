@@ -240,20 +240,20 @@ var result = await packager.ImportAsync(
     episodes: targetEpisodeStore,
     options: new SkillImportOptions
     {
-        TrustScale = 0.7f   // scale down imported confidence — trust but verify
+        StrengthScale = 0.7f   // scale down imported confidence — trust but verify
     });
 
-Console.WriteLine($"Imported {result.Added} new, {result.Merged} merged, {result.Skipped} skipped");
+Console.WriteLine($"Imported {result.EntriesAdded} new, {result.EntriesMerged} merged, {result.EntriesSkipped} skipped");
 ```
 
 The importer applies **trust scaling** to every imported entry's confidence and
-strength. Set `TrustScale` below 1.0 to let the receiving agent re-validate the
+strength. Set `StrengthScale` below 1.0 to let the receiving agent re-validate the
 knowledge against its own environment before fully trusting it.
 
 ### Can I transfer skills between different agent domains?
 
 Yes, with care. The quality gates on export and trust scaling on import are the
-controls. For cross-domain transfer, set a lower `TrustScale` and run offline
+controls. For cross-domain transfer, set a lower `StrengthScale` and run offline
 learning sweeps so the receiving agent can reinforce, contradict, or decay the
 imported entries based on its own experience.
 
@@ -261,7 +261,7 @@ imported entries based on its own experience.
 
 When an imported entry is semantically similar (above the dedup threshold) to an
 existing entry, the packager merges rather than duplicates: evidence is combined,
-and confidence is updated according to the import's `TrustScale`. Entries below the
+and confidence is updated according to the import's `StrengthScale`. Entries below the
 similarity threshold are added as new entries.
 
 ---

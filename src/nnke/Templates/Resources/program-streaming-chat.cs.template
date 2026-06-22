@@ -1,36 +1,97 @@
+using System.Runtime.CompilerServices;
 using Ananke.Abstractions.Agents;
-using Ananke.Orchestration.Workflows;
-using Ananke.Orchestration.Streaming;
+using Ananke.Orchestration.Agents;
+using {{provider_package}};
 using Microsoft.Extensions.Configuration;
 
-// --- 1. Configuration ---
+// -------------------------------------------------------------------
+//  {{name}} -- Streaming Chat (console)
+//
+//  An interactive console chat loop backed by StreamingChatWorkflow --
+//  text deltas print to the console as they arrive from the model.
+//
+//  No API key?  SimulatedStreamingModel is used automatically.
+//  Have a key?  Add it to secrets.json -- the real model is picked up
+//               on the next dotnet run (no code change needed).
+//
+//  dotnet run
+// -------------------------------------------------------------------
+
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("secrets.json", optional: true)
     .Build();
 
-// --- 2. Model ---
-// var model = new OpenAIAgentModel(config["OpenAI:ApiKey"]!, "gpt-4.1-mini");
+var apiKey = config["{{provider_section}}:ApiKey"];
+var hasRealKey = !string.IsNullOrWhiteSpace(apiKey)
+    && !apiKey.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase);
 
-// --- 3. Workflow ---
-var workflow = new Workflow<ChatState>("{{name}}")
-    .Job("respond", async (state, ct) =>
-    {
-        Console.WriteLine("  Agent: (streaming response will appear here)");
-        // var reply = await model.CompleteAsync(state.Messages, ct);
-        return state with { LastResponse = "Hello from {{name}}!" };
-    })
-    .Then("respond", Workflow.End);
+IStreamingAgentModel model = hasRealKey
+    ? {{provider_class}}.Create(apiKey!, config["{{provider_section}}:Model"] ?? "{{model}}")
+    : new SimulatedStreamingModel();
 
-// --- 4. Stream events ---
-Console.WriteLine("  {{name}} streaming chat ready. Type a message and press Enter.");
-Console.Write("  You: ");
-var userInput = Console.ReadLine() ?? "";
+if (model is SimulatedStreamingModel)
+    Console.WriteLine("  [{{name}}] No API key found -- using SimulatedStreamingModel. " +
+        "Add \"{{provider_section}}\": { \"ApiKey\": \"...\" } to secrets.json to use a real model.");
 
-var initialState = new ChatState { UserInput = userInput };
+Console.WriteLine("  {{name}} streaming chat ready. Type a message and press Enter (blank line to quit).");
+Console.WriteLine();
 
-await foreach (var evt in workflow.StreamAsync(initialState))
+var messages = new List<AgentMessage>();
+var state = new ChatState { UserInput = "" };
+
+while (true)
 {
-    if (evt is WorkflowCompleted<ChatState> completed)
-        Console.WriteLine($"  Agent: {completed.Result.FinalState.LastResponse}");
+    Console.Write("  You: ");
+    var userInput = Console.ReadLine();
+    if (string.IsNullOrWhiteSpace(userInput))
+        break;
+
+    messages.Add(AgentMessage.User(userInput));
+
+    Console.Write("  Agent: ");
+    var execution = await StreamingChatWorkflow.Create("{{name}}", model)
+        .WithSystemPrompt("You are a helpful assistant. Answer concisely.")
+        .OnTextDelta(delta => { Console.Write(delta); return Task.CompletedTask; })
+        .RunAsync(messages, default);
+    Console.WriteLine();
+
+    messages = execution.State.Messages;
+    state = state with
+    {
+        UserInput = userInput,
+        LastResponse = execution.State.FullText,
+        History = [.. state.History, $"You: {userInput}", $"Agent: {execution.State.FullText}"],
+    };
+}
+
+Console.WriteLine();
+Console.WriteLine($"  Conversation ended after {state.History.Count / 2} turn(s).");
+
+// --- SimulatedStreamingModel: replace with a real provider ---
+// OpenAI:    var model = OpenAIChatAgentModel.Create(apiKey, "{{model}}");
+// Anthropic: var model = AnthropicAgentModel.Create(apiKey, "{{model}}");
+// Google:    var model = GeminiAgentModel.Create(apiKey, "{{model}}");
+
+internal sealed class SimulatedStreamingModel : IStreamingAgentModel
+{
+    private const string ReplyText =
+        "Hello! I am a simulated Ananke streaming agent. " +
+        "Add a real API key to secrets.json and I will be replaced automatically.";
+
+    public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
+        AgentRequest request,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        foreach (var word in ReplyText.Split(' '))
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(40, ct);
+            yield return new AgentStreamChunk { TextDelta = word + " " };
+        }
+        yield return new AgentStreamChunk { CompletedResponse = new AgentResponse { Text = ReplyText } };
+    }
+
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse { Text = ReplyText });
 }

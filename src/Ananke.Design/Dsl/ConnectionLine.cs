@@ -23,9 +23,23 @@ internal abstract record ConnectionLine
     /// <summary><c>a -&gt; router(b, c, End)</c></summary>
     internal sealed record Router(string From, string[] Options) : ConnectionLine;
 
+    /// <summary>
+    /// <c>a -&gt; loop(target, exit: x)</c> or <c>a -&gt; loop(target, exit: x, maxIterations: n)</c>
+    /// — conditional back-edge to <paramref name="LoopTarget"/>, exiting to
+    /// <paramref name="ExitTarget"/> once the bound condition is satisfied.
+    /// </summary>
+    internal sealed record Loop(string From, string LoopTarget, string ExitTarget, int? MaxIterations)
+        : ConnectionLine;
+
     /// <summary><c>subflow(name)</c> — marks a job as a nested sub-workflow.</summary>
     internal sealed record SubFlow(string Name) : ConnectionLine;
 
     /// <summary><c>interrupt(name)</c> — pauses execution before the named job.</summary>
     internal sealed record Interrupt(string JobName) : ConnectionLine;
+
+    /// <summary>
+    /// <c>ask(name)</c> — marks a job as a free-text, input-collecting turn: pauses before
+    /// the job (like <see cref="Interrupt"/>) plus a contract that resume injects the user's reply.
+    /// </summary>
+    internal sealed record Ask(string JobName) : ConnectionLine;
 }

@@ -37,15 +37,15 @@ enum TicketTransition { Assign, Resolve, Reopen, Close }
 enum TicketNotification { None }
 
 // 2. Define a context (identifies the entity being tracked)
-sealed record TicketContext(long Id) : IBaseContext
+sealed record TicketContext(string Id) : IBaseContext
 {
     public string? Title { get; set; }
 }
 
 // 3. Implement the state machine
-sealed class TicketMachine(IDistributedLock locker, StateMachineOptions? options = null)
+sealed class TicketMachine(IDistributedLock locker, IKeyValueDataAdapter store, StateMachineOptions? options = null)
     : AbstractStateMachine<TicketContext, TicketState, TicketTransition, TicketNotification>(
-        TicketState.Open, locker, options)
+        TicketState.Open, locker, store, options)
 {
     public string? ResolutionNote { get; set; }
 
@@ -56,6 +56,7 @@ sealed class TicketMachine(IDistributedLock locker, StateMachineOptions? options
             .On(TicketTransition.Resolve).To(TicketState.Resolved)
         .From(TicketState.Resolved)
             .On(TicketTransition.Reopen).To(TicketState.Open)
+        .From(TicketState.Resolved)
             .On(TicketTransition.Close).To(TicketState.Closed);
 
     public override Task<TransitionResult<TicketState>> TransitionAsync(
@@ -72,9 +73,11 @@ sealed class TicketMachine(IDistributedLock locker, StateMachineOptions? options
 ## Using the State Machine
 
 ```csharp
-var machine = new TicketMachine(new InMemoryDistributedLock());
+// InMemoryDistributedLock implements both IDistributedLock and IKeyValueDataAdapter
+var lockAndStore = new InMemoryDistributedLock();
+var machine = new TicketMachine(lockAndStore, lockAndStore);
 
-var ticket = new TicketContext(1) { Title = "Login page returns HTTP 500" };
+var ticket = new TicketContext("1") { Title = "Login page returns HTTP 500" };
 
 // Open → InProgress
 var result = await machine.TransitionAsync(ticket, TicketTransition.Assign);
@@ -93,13 +96,19 @@ result = await machine.TransitionAsync(ticket, TicketTransition.Close);
 
 ## Invalid Transitions
 
-Transitions not defined in the builder are rejected at runtime:
+By default (`StateMachineOptions.AllowImplicitSelfTransitions = true`), calling a transition
+that isn't defined for the current state is **not** an error — it's treated as a no-op
+self-transition (`result.Success == true`, state unchanged). To make undefined transitions
+fail instead, disable that option:
 
 ```csharp
+var strictOptions = new StateMachineOptions { AllowImplicitSelfTransitions = false };
+var machine = new TicketMachine(lockAndStore, lockAndStore, strictOptions);
+
 // Cannot Resolve before Assigning (Open → Resolved not defined)
 var result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 Console.WriteLine(result.Success);       // false
-Console.WriteLine(result.ErrorMessage);  // "No transition defined..."
+Console.WriteLine(result.ErrorMessage);  // "Invalid transition 'Resolve' from state 'Open'"
 ```
 
 ---
@@ -114,15 +123,18 @@ protected override Action<ITransitionBuilder<TicketState, TicketTransition>> Tra
     .From(TicketState.InProgress)
         .On(TicketTransition.Resolve)
         .To(TicketState.Resolved)
-        .WithGuard(() => !string.IsNullOrEmpty(ResolutionNote),
-            "ResolutionNote must be set before resolving");
+        .When(() => !string.IsNullOrEmpty(ResolutionNote));
 ```
+
+`.When(...)` (and the async `.WhenAsync(...)`) take only the condition — there's no way to
+attach a custom message to a specific guard. A failed guard always reports the same
+`ErrorMessage`:
 
 ```csharp
 machine.ResolutionNote = null;
 var result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 // result.Success == false
-// result.ErrorMessage == "ResolutionNote must be set before resolving"
+// result.ErrorMessage == "Transition guard condition not met"
 
 machine.ResolutionNote = "Fixed the bug";
 result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
@@ -133,7 +145,7 @@ result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 
 ## Middleware Pipeline
 
-Intercept every transition attempt with `IJobMiddleware<T>`:
+Intercept every transition attempt with `ITransitionMiddleware<TContext, TState, TTransition>`:
 
 ```csharp
 using Ananke.StateMachine.Middleware;
@@ -179,7 +191,7 @@ Console.WriteLine(result.Success);  // false
 // Operator remediation complete — reset the machine
 var reset = await machine.ResetAsync(ticket,
     "Migration re-applied — system verified healthy");
-Console.WriteLine(reset.CurrentStatus);  // Active
+Console.WriteLine(reset.CurrentStatus);  // Operative
 
 // Transitions resume
 result = await machine.TransitionAsync(ticket, TicketTransition.Assign);
@@ -199,14 +211,16 @@ dotnet add package Ananke.Redis
 ```csharp
 using Ananke.Redis;
 
-var locker = new RedisDistributedLock(redisConnection);
-var machine = new TicketMachine(locker);
+// RedisDistributedLock implements both IDistributedLock and IKeyValueDataAdapter
+var redisLock = new RedisDistributedLock(redisConnection);
+var machine = new TicketMachine(redisLock, redisLock);
 ```
 
 For dev/test:
 
 ```csharp
-var machine = new TicketMachine(new InMemoryDistributedLock());
+var lockAndStore = new InMemoryDistributedLock();
+var machine = new TicketMachine(lockAndStore, lockAndStore);
 ```
 
 ---
@@ -227,4 +241,4 @@ jobs. See [Guide 09 — Distributed Systems](09-distributed.md) for details.
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

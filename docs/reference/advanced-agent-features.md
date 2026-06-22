@@ -352,18 +352,17 @@ var strong = new ToolKit("research")
 
 ### Typed parameters
 
-For non-string parameters, use the generic `AddTool<T>` overloads. The JSON
-Schema `type` is inferred automatically (`int`/`long` → `"integer"`,
-`float`/`double`/`decimal` → `"number"`, `bool` → `"boolean"`):
+For non-string parameters, use the generic `AddTool<T>` overload (one type parameter — there is
+no `AddTool<T1, T2>`). The JSON Schema `type` is inferred automatically (`int`/`long` →
+`"integer"`, `float`/`double`/`decimal` → `"number"`, `bool` → `"boolean"`). For two or more
+typed parameters, use the `ToolBuilder` callback with `Param<T>` per parameter:
 
 ```csharp
 var tools = new ToolKit("math")
-    .AddTool<int, int>(
-        "add",
-        "Adds two integers and returns the sum.",
-        (a, b) => (a + b).ToString(),
-        ("a", "The first integer operand."),
-        ("b", "The second integer operand."));
+    .AddTool("add", "Adds two integers and returns the sum.", b => b
+        .Param<int>("a", "The first integer operand.")
+        .Param<int>("b", "The second integer operand.")
+        .OnExecute(args => ToolResult.Ok($"{args.Get<int>("a") + args.Get<int>("b")}")));
 ```
 
 The generated JSON Schema for this tool:

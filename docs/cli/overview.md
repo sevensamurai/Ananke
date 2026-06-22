@@ -62,7 +62,7 @@ nnke-platform --version
 ## Scaffold a new project
 
 ```bash
-nnke scaffold my-agent --template streaming-chat
+nnke new workflow my-agent --pattern streaming-chat
 cd my-agent
 ```
 
@@ -90,16 +90,6 @@ Opens `my-agent.mmd` in any Mermaid viewer (e.g., the VS Code extension or [merm
 
 ---
 
-## Run a manifest locally
-
-```bash
-nnke run my-agent.ananke.yml
-```
-
-Executes the workflow locally without API keys or cloud infrastructure. Useful for topology tracing, smoke testing, and fast iteration.
-
----
-
 ## Serve a manifest over local HTTP
 
 ```bash
@@ -119,7 +109,7 @@ Starts a local HTTP server that accepts workflow trigger requests. Useful for te
   "mcpServers": {
     "nnke": {
       "command": "nnke",
-      "args": ["mcp"]
+      "args": ["mcp-server"]
     }
   }
 }
@@ -130,9 +120,9 @@ Starts a local HTTP server that accepts workflow trigger requests. Useful for te
 ## Deploy with `nnke-platform`
 
 ```bash
-nnke-platform login --provider azure
-nnke-platform deploy my-agent.ananke.yml --env production
-nnke-platform status my-agent
+nnke-platform login --platform azure
+nnke-platform deploy my-agent.ananke.yml --platform azure-ai
+nnke-platform status --workflow my-agent
 ```
 
 `nnke-platform` handles credentials, cloud-native deployments, replica scaling, rollbacks, and federation mesh management.

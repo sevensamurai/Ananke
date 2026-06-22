@@ -14,10 +14,10 @@ For the shared rationale behind the CLI split and the high-level difference betw
 Use `nnke` when you are still shaping or validating a workflow locally.
 
 Core responsibilities:
-- scaffold a new workflow project or manifest
+- scaffold a new workflow, quickstart, chatbox, or named-pattern project
 - validate `.ananke.yml` topology files
 - export Mermaid diagrams
-- inspect an existing Ananke project for health and dependency issues
+- inspect an existing Ananke project for health and dependency issues, or an organic mesh/kernel's runtime state
 - browse Ananke docs and patterns from the terminal
 - expose those capabilities as MCP tools for AI clients
 
@@ -85,13 +85,16 @@ These are the primary commands available today:
 
 | Command | What it does |
 |---|---|
-| `nnke new workflow <name>` | Scaffold a runnable Ananke workflow project |
-| `nnke new manifest <name>` | Generate a standalone `.ananke.yml` manifest |
+| `nnke new quickstart <name>` | Scaffold a minimal single-agent console project (Guide 01) |
+| `nnke new workflow <name>` | Scaffold a complete workflow project (manifest-driven patterns also emit `.ananke.yml`) |
+| `nnke new chatbox <name>` | Scaffold a streaming conversational agent (ASP.NET Minimal API + SSE) |
+| `nnke new pattern <name> --pattern <key>` | Scaffold a named agentic-design-pattern project |
 | `nnke validate <file>` | Validate a manifest and its topology |
-| `nnke run <file>` | Run a manifest locally — topology trace, no LLM calls |
 | `nnke serve <file> [--port N]` | Serve a manifest over HTTP locally (NDJSON event stream) |
 | `nnke diagram <file>` | Export a Mermaid flowchart from a manifest |
 | `nnke inspect [dir]` | Analyze an existing Ananke project directory |
+| `nnke mesh` | Inspect organic mesh state — cells, lineage, memory, signals |
+| `nnke kernel` | Inspect organic workflow kernels — active cells, domains, division history |
 | `nnke docs --list` | List available documentation topics |
 | `nnke docs <topic>` | Read a specific doc topic |
 | `nnke docs --search "<query>"` | Search the docs from the terminal |
@@ -135,12 +138,14 @@ nnke new workflow SupportTriage --provider anthropic --pattern fan-out --json
 The scaffolded project includes a `.csproj`, `Program.cs`, state type, `secrets.json`,
 and for manifest-driven patterns a `.ananke.yml` file.
 
-### Create Only A Manifest
+### Manifest-Driven Patterns Also Emit YAML
 
-If you want just the topology file:
+There is no separate "manifest only" command. For manifest-driven patterns
+(`etl`, `fan-out`, `sequential`, `sub-workflow`), `nnke new workflow` emits a
+`.ananke.yml` alongside the project automatically:
 
 ```bash
-nnke new manifest ticket-pipeline --provider openai --pattern etl
+nnke new workflow ticket-pipeline --provider openai --pattern etl
 ```
 
 ### Validate A Manifest
@@ -237,7 +242,7 @@ This is the cleanest integration when you want AI tools to:
 - explain diagnostics
 - query available patterns
 
-For the broader protocol background, see [12 — MCP & Interop](12-mcp-and-interop.md).
+For the broader protocol background, see [12 — MCP & Interop](../guides/12-mcp-and-interop.md).
 
 ---
 
@@ -292,14 +297,14 @@ That is the point where `nnke` becomes especially useful.
 For example:
 
 ```bash
-nnke new manifest support-triage --pattern fan-out
+nnke new workflow support-triage --pattern fan-out
 nnke validate support-triage.ananke.yml
 nnke diagram support-triage.ananke.yml
 ```
 
 Related docs:
-- [13 — Design Tooling](13-design-tooling.md)
-- [Workflow DSL](reference/workflow-dsl.md)
+- [13 — Design Tooling](../guides/13-design-tooling.md)
+- [Workflow DSL](../reference/workflow-dsl.md)
 
 ### 3. Bind Behavior In .NET
 
@@ -312,10 +317,10 @@ Once the shape is right, implement the actual work in Ananke:
 - persistence and observability
 
 Start with:
-- [01 — Getting Started](01-getting-started.md)
-- [02 — Workflows](02-workflows.md)
-- [03 — Agents](03-agents.md)
-- [04 — Tools](04-tools.md)
+- [01 — Getting Started](../guides/01-getting-started.md)
+- [02 — Workflows](../guides/02-workflows.md)
+- [03 — Agents](../guides/03-agents.md)
+- [04 — Tools](../guides/04-tools.md)
 
 ### 4. Review And Iterate
 
@@ -347,12 +352,12 @@ Skip it when:
 
 If your main entry point is the tool rather than the framework itself, read in this order:
 
-1. [01 — Getting Started](01-getting-started.md)
-2. [13 — Design Tooling](13-design-tooling.md)
-3. [Workflow DSL](reference/workflow-dsl.md)
-4. [12 — MCP & Interop](12-mcp-and-interop.md)
-5. [02 — Workflows](02-workflows.md)
-6. [14 — Testing](14-testing.md)
+1. [01 — Getting Started](../guides/01-getting-started.md)
+2. [13 — Design Tooling](../guides/13-design-tooling.md)
+3. [Workflow DSL](../reference/workflow-dsl.md)
+4. [12 — MCP & Interop](../guides/12-mcp-and-interop.md)
+5. [02 — Workflows](../guides/02-workflows.md)
+6. [14 — Testing](../guides/14-testing.md)
 
 That sequence helps you move from CLI-assisted design into executable implementation without losing track
 of how the final workflow behaves at runtime.
@@ -365,14 +370,14 @@ of how the final workflow behaves at runtime.
 # install
 dotnet tool install -g nnke
 
+# scaffold a minimal single-agent project
+nnke new quickstart MyAgent
+
 # scaffold a workflow project
 nnke new workflow MyWorkflow --provider openai --pattern etl
 
 # validate topology
 nnke validate MyWorkflow.ananke.yml --json
-
-# run locally (topology trace, no LLM calls)
-nnke run MyWorkflow.ananke.yml --input "hello"
 
 # serve over local HTTP (NDJSON stream, default port 5000)
 nnke serve MyWorkflow.ananke.yml --port 5000
@@ -409,4 +414,4 @@ nnke mcp-server
 
 ---
 
-← [Back to Welcome](welcome.md)
+← [Back to Welcome](../welcome.md)

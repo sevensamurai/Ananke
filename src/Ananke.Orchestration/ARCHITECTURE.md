@@ -14,6 +14,25 @@ Agent model interfaces (`IAgentModel`, `AgentRequest`, etc.) live in `Ananke.Abs
 Knowledge types (`IKnowledgeStore`, `IKnowledgeCatalog`, etc.) live in `Ananke.Orchestration.Knowledge`.
 Compatibility is maintained with type-forwarding for several agent and knowledge types that used to live in this assembly.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `Workflow<TState>` — the fluent typed workflow builder: direct, routed, looped, fork/join,
+   and sub-workflow transitions, frozen after `Build()` — `src/Ananke.Orchestration/Workflows/Workflow.cs`
+2. `IWorkflowRunner` — executes, resumes, and streams `WorkflowDefinition<TState>` instances — `src/Ananke.Orchestration/Execution/IWorkflowRunner.cs`
+3. `WorkflowRunner` — the default execution engine: checkpoints, interrupts, fork/join
+   orchestration, middleware, and event streaming — `src/Ananke.Orchestration/Execution/WorkflowRunner.cs`
+4. `ToolKit` — named collection of `ToolDefinition` with tool-memory integration, routing
+   hooks, fault observation, and execution-strategy support — `src/Ananke.Orchestration/Tools/ToolKit.cs`
+5. `AgentJobFactory` — fluent builder factory for `AgentJob<TState,TResponse>` and
+   `TextAgentJob<TState>`, the `IJob`s that wrap an `IAgentModel` call — `src/Ananke.Orchestration/Agents/AgentJob.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Abstractions` (project)
@@ -26,13 +45,13 @@ Compatibility is maintained with type-forwarding for several agent and knowledge
 | Namespace | Contents |
 |-----------|----------|
 | `Ananke.Orchestration` | `AgenticPattern`, `JobRef`, type-forwards for selected agent/knowledge types |
-| `Ananke.Orchestration.Workflows` | `Workflow`, `Workflow<TState>`, `WorkflowDefinition`, `WorkflowExecution`, `WorkflowResult`, `ExecutionStatus` |
+| `Ananke.Orchestration.Workflows` | `Workflow`, `Workflow<TState>`, `WorkflowDefinition`, `WorkflowExecution`, `WorkflowResult`, `ExecutionStatus`, `WorkflowInputExtensions` |
 | `Ananke.Orchestration.Agents` | `AgentJob<TState,TResponse>`, `TextAgentJob<TState>`, `StreamingChatWorkflow`, `ChatSessionEvent`, `JsonSchemaGenerator`, token-usage capture helpers |
 | `Ananke.Orchestration.Agents.Context` | `IContextStrategy`, `SlidingWindowContextStrategy`, `SummarizingContextStrategy`, `ITokenCounter`, `ApproximateTokenCounter`, `AgentMessageExtensions` |
 | `Ananke.Orchestration.Agents.Middleware` | `IAgentModelMiddleware`, `MiddlewareAgentModel`, `GuardrailAgentModelMiddleware`, `LoggingAgentModelMiddleware`, `CachingAgentModel`, `ResilientAgentModel`, `SmartToolRouterMiddleware` |
 | `Ananke.Orchestration.Agents.Routing` | `IModelRouter`, `ModelRouter`, `CapabilityModelRouter`, `ModelCatalog`, `ModelProfile`, `ModelCapability`, `ModelCostRates`, `TaskRequirements` |
 | `Ananke.Orchestration.Jobs` | `IJob`, `DelegateJob`, `HandoffJob`, `HandoffProxy`, `SubFlowJob`, `SubFlowContext`, `SubFlowInterruptedException`, `InMemoryHandoffChannel`, `JobDescriptor`, `JobExecution`, `Handoff`, `InterruptMode` |
-| `Ananke.Orchestration.Routing` | `IRouter`, `DelegateRouter`, `AgentRouter`, `AgentRoutingException`, `Connections`, `ForkMode`, `ForkTarget`, `JoinDescriptor`, `LoopExitReason` |
+| `Ananke.Orchestration.Routing` | `IRouter`, `DelegateRouter`, `AgentRouter`, `AgentRoutingException`, `Connection` (abstract; `DirectConnection`, `RouterConnection<TState>`, `ForkConnection`, `LoopConnection<TState>`), `ForkMode`, `ForkTarget`, `JoinDescriptor`, `LoopExitReason` |
 | `Ananke.Orchestration.Tools` | `ToolKit`, `ToolBuilder`, `ToolDefinition`, `ToolArgs`, `ToolExecutionMode`, `ToolMetrics`, `IToolExecutorStrategy` |
 | `Ananke.Orchestration.Tools.Gating` | `IToolFaultObserver`, `ToolAffinityTracker`, `InMemoryToolMemory` |
 | `Ananke.Orchestration.Tools.Routing` | `ISmartToolRouter`, `CompositeSmartToolRouter`, `HeuristicTagStage`, `SemanticRecallStage`, `AffinityRerankStage`, `HealthFilterStage`, `LlmRouterStage`, `PinnedToolStage`, `PassThroughRouter`, `IRoutingPromptTemplate`, `DefaultRoutingPromptTemplate` |
@@ -42,30 +61,30 @@ Compatibility is maintained with type-forwarding for several agent and knowledge
 | `Ananke.Orchestration.Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore`, `Checkpoint` |
 | `Ananke.Orchestration.Memory` | `InMemoryConversationMemory`, `ConversationMemoryCleanupTimer` |
 | `Ananke.Orchestration.Middleware` | `IWorkflowJobMiddleware<TState>` |
-| `Ananke.Orchestration.Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder` |
+| `Ananke.Orchestration.Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder`, `InterviewBuilder`, `Interview` |
 | `Ananke.Orchestration.Streaming` | `WorkflowEvent`, `WorkflowStreamOptions`, `WorkflowEventExtensions` |
 | `Ananke.Orchestration.Execution` | `IWorkflowRunner`, `WorkflowRunner` |
 | `Ananke.Orchestration.Tracing` | `WorkflowTraceContext`, `NullTracer` |
 | `Ananke.Orchestration.Extensions` | `ServiceCollectionExtensions` |
 | `Ananke.Orchestration.Budget` | `BudgetConfig`, token usage helpers |
-| `Ananke.Orchestration.Credentials` | `ICredentialProvider` — provider-agnostic runtime credential resolution; implementations live in each `Ananke.Orchestration.{Provider}` package |
-| `Ananke.Orchestration.Translators` | `IJsonSchemaTranslator`, `IModelMapper`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-specific schema and prompt translation contracts |
+| ~~`Ananke.Orchestration.Credentials` / `Translators`~~ | Moved to `Ananke.Abstractions.Providers`: `ICredentialProvider`, `IJsonSchemaTranslator`, `IModelMapper`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-agnostic credential resolution and schema/prompt translation contracts; implementations live in each `Ananke.Orchestration.{Provider}` package |
 
 ## Key Types
 
-| Type | Kind | Purpose |
-|------|------|---------|
-| `Workflow<TState>` | Class | Fluent typed workflow builder with direct, routed, looped, fork/join, and sub-workflow transitions. Frozen after `Build()`. |
-| `IWorkflowRunner` | Interface | Executes, resumes, and streams `WorkflowDefinition<TState>` instances |
-| `WorkflowRunner` | Class | Default execution engine implementing checkpoints, interrupts, fork/join orchestration, middleware, and event streaming |
-| `AgentJobFactory` | Static class | Fluent builder factory for `AgentJob<TState,TResponse>` and `TextAgentJob<TState>` |
-| `AgentJob<TState,TResponse>` | Class | `IJob` that wraps an `IAgentModel` call with system prompt, tools, and response mapping |
-| `TextAgentJob<TState>` | Class | `IJob` wrapper for plain-text agent output, optional memory, context compaction, and tool loops |
-| `StreamingChatWorkflow` | Static class | Pre-built streaming agent-tools loop with delta callbacks, optional memory, and context strategies |
-| `ToolKit` | Class | Named collection of `ToolDefinition` with tool-memory integration, routing hooks, fault observation, and execution-strategy support |
-| `AgenticPattern` | Static class | Factory for `ReviewCritique<TState>` and `IterativeRefinement<TState>` pattern builders |
-| `ModelCatalog` | Class | Registry of `ModelProfile` entries for capability-based routing |
-| `CompositeSmartToolRouter` | Class | Pipeline-style smart tool router; compose stages (heuristic, semantic, affinity, health, LLM) via `ISmartToolRouter` |
+| Type | Kind | Purpose | Source |
+|------|------|---------|--------|
+| `Workflow<TState>` | Class | Fluent typed workflow builder with direct, routed, looped, fork/join, and sub-workflow transitions. Frozen after `Build()`. | `src/Ananke.Orchestration/Workflows/Workflow.cs` |
+| `IWorkflowRunner` | Interface | Executes, resumes, and streams `WorkflowDefinition<TState>` instances | `src/Ananke.Orchestration/Execution/IWorkflowRunner.cs` |
+| `WorkflowRunner` | Class | Default execution engine implementing checkpoints, interrupts, fork/join orchestration, middleware, and event streaming | `src/Ananke.Orchestration/Execution/WorkflowRunner.cs` |
+| `AgentJobFactory` | Static class | Fluent builder factory for `AgentJob<TState,TResponse>` and `TextAgentJob<TState>` | `src/Ananke.Orchestration/Agents/AgentJob.cs` |
+| `AgentJob<TState,TResponse>` | Class | `IJob` that wraps an `IAgentModel` call with system prompt, tools, and response mapping | `src/Ananke.Orchestration/Agents/AgentJob.cs` |
+| `TextAgentJob<TState>` | Class | `IJob` wrapper for plain-text agent output, optional memory, context compaction, and tool loops | `src/Ananke.Orchestration/Agents/TextAgentJob.cs` |
+| `StreamingChatWorkflow` | Static class | Pre-built streaming agent-tools loop with delta callbacks, optional memory, and context strategies | `src/Ananke.Orchestration/Agents/StreamingChatWorkflow.cs` |
+| `ToolKit` | Class | Named collection of `ToolDefinition` with tool-memory integration, routing hooks, fault observation, and execution-strategy support | `src/Ananke.Orchestration/Tools/ToolKit.cs` |
+| `AgenticPattern` | Static class | Factory for `ReviewCritique<TState>`, `IterativeRefinement<TState>`, and `Interview<TState>` pattern builders | `src/Ananke.Orchestration/AgenticPattern.cs` |
+| `WorkflowInputExtensions` | Static class | `ResumeWithInputAsync` — channel-agnostic fold-then-resume helper for `ask`/`AwaitInput` turns | `src/Ananke.Orchestration/Workflows/WorkflowInputExtensions.cs` |
+| `ModelCatalog` | Class | Registry of `ModelProfile` entries for capability-based routing | `src/Ananke.Orchestration/Agents/Routing/ModelCatalog.cs` |
+| `CompositeSmartToolRouter` | Class | Pipeline-style smart tool router; compose stages (heuristic, semantic, affinity, health, LLM) via `ISmartToolRouter` | `src/Ananke.Orchestration/Tools/Routing/CompositeSmartToolRouter.cs` |
 
 ## Workflow Execution Model
 
@@ -76,13 +95,13 @@ Workflow<TState>.RunAsync(initialState)
         JobExecution (runs IJob.ExecuteAsync, applies middleware)
         → Router decides next job(s)
     → When reaching Workflow.End:
-        WorkflowResult { State, Status, ExecutionHistory }
+        WorkflowResult<TState> { Success, FinalState, TotalDuration, JobsExecuted, History, Error, Exception }
 ```
 
 ## Extension Points
 
-- `IJob` — custom job logic
-- `IRouter` — custom routing decisions
+- `IJob<TState>` — custom job logic
+- `IRouter<TState>` — custom routing decisions
 - `IAgentModel` / `IStreamingAgentModel` — custom LLM providers (defined in `Ananke.Abstractions`)
 - `IWorkflowJobMiddleware<TState>` — cross-cutting concerns at the workflow-job level (logging, retry, auth)
 - `IAgentModelMiddleware` — model-level middleware (guardrails, caching, logging)
@@ -136,6 +155,8 @@ This project targets **ASP.NET Core / hosted services / console** hosts — none
 | `IContextStrategy` / `SlidingWindowContextStrategy` / `SummarizingContextStrategy` | Stable |
 | `IModelRouter` / `ModelCatalog` / `ModelProfile` | Stable |
 | `AgenticPattern` (`ReviewCritique`, `IterativeRefinement`) | Stable |
+| `AgenticPattern.Interview` / `InterviewBuilder` / `Interview<TState>` | **Preview** — new in ADR-arch-023; exercised end-to-end by an external demo, not yet by an in-repo one |
+| `Workflow<TState>.AwaitInput` / `WorkflowDefinition.InputJobs` / `WorkflowInputExtensions.ResumeWithInputAsync` | **Preview** — new in ADR-arch-023 |
 | `CompositeSmartToolRouter` / `ISmartToolRouter` pipeline stages | **Preview** — stage API may change |
 | `SmartToolRouterMiddleware` | **Preview** |
 | `IWorkflowRunner` / `WorkflowRunner` | Stable |

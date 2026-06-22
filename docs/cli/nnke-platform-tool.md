@@ -369,11 +369,11 @@ nnke-platform trends --deployment-id <id> --json
 
 - [nnke Tools Overview](nnke-tools.md)
 - [nnke Tool Companion](nnke-tool.md) — local design, scaffolding, and diagnostics
-- [09 — Distributed Systems](09-distributed.md) — Redis, MQTT, agent handoff
-- [12 — MCP & Interop](12-mcp-and-interop.md) — MCP server, A2A protocol
-- [16 — Agentic Patterns](16-agentic-patterns.md) — Smart Tool Router, organic patterns
-- [FAQ — Organic Colony & Cell Division](faq/organics.md) — division, apoptosis, mesh lifecycle
+- [09 — Distributed Systems](../guides/09-distributed.md) — Redis, MQTT, agent handoff
+- [12 — MCP & Interop](../guides/12-mcp-and-interop.md) — MCP server, A2A protocol
+- [16 — Agentic Patterns](../guides/16-agentic-patterns.md) — Smart Tool Router, organic patterns
+- [FAQ — Organic Colony & Cell Division](../faq/organics.md) — division, apoptosis, mesh lifecycle
 
 ---
 
-← [Back to Welcome](welcome.md)
+← [Back to Welcome](../welcome.md)

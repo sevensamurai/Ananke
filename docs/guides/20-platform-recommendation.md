@@ -260,7 +260,7 @@ var report = recommender.Evaluate(manifest, toolKit, weights: weights);
 ## Platform Profiles
 
 Platform qualitative data is stored in
-`Ananke.Federation/Recommendation/platform-profiles.json` (embedded resource).
+`src/Ananke.Federation/Recommendation/platform-profiles.json` (embedded resource).
 Each entry has:
 
 | Field | Meaning |
@@ -279,7 +279,6 @@ Use `nnke-platform profiles` to inspect the loaded profiles.
 
 ## See Also
 
-- [Federation overview](federation.md)
+- [`Ananke.Federation` README](https://github.com/sevensamurai/Ananke/tree/main/src/Ananke.Federation/README.md) — deployment, validation, and the local design loop
 - [`nnke-platform` tool reference](../cli/nnke-platform-tool.md)
-- [Deployability validation — guide 19](19-deployability-validation.md)
-- [`HybridRouter` — distribute cells across platforms](api/HybridRouter.md)
+- [`HybridRouter` source](https://github.com/sevensamurai/Ananke/tree/main/src/Ananke.Federation/Hosting/HybridRouter.cs) — distribute cells across platforms

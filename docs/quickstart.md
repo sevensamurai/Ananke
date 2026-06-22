@@ -36,14 +36,9 @@ using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.OpenAI;
 using Ananke.Orchestration.Tools;
+using Ananke.Orchestration.Workflows;
 using OpenAI.Chat;
 using System.ClientModel;
-
-record AssistantState
-{
-    public string UserInput { get; init; } = "";
-    public string Output { get; init; } = "";
-}
 
 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
     ?? throw new InvalidOperationException("Set OPENAI_API_KEY first.");
@@ -77,6 +72,12 @@ var result = await workflow.RunAsync(new AssistantState
 
 Console.WriteLine(result.State.Output);
 Console.WriteLine(result.Status);
+
+record AssistantState
+{
+    public string UserInput { get; init; } = "";
+    public string Output { get; init; } = "";
+}
 ```
 
 This is already an agentic workflow:
@@ -114,7 +115,7 @@ dotnet add package Ananke.Orchestration.Google
 ```csharp
 using Ananke.Orchestration.Google;
 
-IStreamingAgentModel model = GoogleAgentModel.Create(
+IStreamingAgentModel model = GeminiAgentModel.Create(
     apiKey,
     "gemini-2.5-pro");
 ```

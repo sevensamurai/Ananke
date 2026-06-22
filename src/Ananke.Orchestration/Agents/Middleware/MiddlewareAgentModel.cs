@@ -16,7 +16,7 @@ namespace Ananke.Orchestration.Agents.Middleware;
 ///   → MiddlewareAgentModel (PII redaction, guardrails, logging)
 ///     → ResilientAgentModel (429 retry)
 ///       → CachingAgentModel (response cache)
-///         → OpenAIAgentModel / AnthropicAgentModel / GoogleAgentModel
+///         → OpenAIChatAgentModel / AnthropicAgentModel / GeminiAgentModel
 /// </code>
 /// <para>
 /// Each layer is optional and independently composable.

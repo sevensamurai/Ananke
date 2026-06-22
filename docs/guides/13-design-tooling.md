@@ -6,7 +6,7 @@ and export validated graphs as Mermaid diagrams.
 
 **Demo:** [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo)
 
-→ **Full DSL reference:** [Workflow DSL Reference](reference/workflow-dsl.md)
+→ **Full DSL reference:** [Workflow DSL Reference](../reference/workflow-dsl.md)
 
 ---
 
@@ -217,12 +217,14 @@ When a manifest declares `tools:` sections, `WorkflowToolResolver` reads those
 declarations and builds per-job `ToolKit` instances automatically, so you don't
 have to wire tools by hand:
 
+`WorkflowToolResolver` is a static class — call `ResolveJobToolKitsAsync` directly:
+
 ```csharp
 using Ananke.Design.Tools;
 
 // Resolve all manifest-declared tools into a per-job map
-var resolver = new WorkflowToolResolver(bindings);
-IReadOnlyDictionary<string, ToolKit> toolKits = resolver.Resolve(manifest);
+IReadOnlyDictionary<string, ToolKit> toolKits =
+    await WorkflowToolResolver.ResolveJobToolKitsAsync(manifest, bindingResolver);
 
 // Bind agent jobs using the resolved kits
 foreach (var (jobName, jobDef) in manifest.Jobs.Where(j => j.Value.Type == "agent"))
@@ -238,34 +240,44 @@ foreach (var (jobName, jobDef) in manifest.Jobs.Where(j => j.Value.Type == "agen
 
 ### Smart-Router Stage Declarations
 
-YAML manifests can describe smart-router pipeline stages. Each stage is described by a
-`RouterStageDescriptor` and assembled by `RouterStageFactory` at bind time:
+A job's manifest entry can declare a `router:` block of smart-tool-router stages — narrowing
+or re-ranking which tools reach the model on that job's turn. This is **per-job tool routing**,
+unrelated to `Workflow.Decide`/job-to-job routing:
 
 ```yaml
 # my-workflow.ananke.yml (excerpt)
-router_stages:
-  - stage: semantic_recall
-    options:
-      top_k: 5
-  - stage: inflammation
-    options:
-      threshold: 0.4
+jobs:
+  triage:
+    type: agent
+    model: planner
+    tools: [search_kb, escalate]
+    router:
+      - kind: pinned
+        tools: [escalate]
+      - kind: semantic_recall
+        top_k: 5
 ```
 
-```csharp
-var stages = RouterStageFactory.Build(manifest.RouterStages);
-scaffold.BindRouter("route", Workflow.DecideWithSmartRouter(stages));
-```
+Valid `kind` values are `pinned`, `health_filter`, `semantic_recall`, `affinity_rerank`,
+`heuristic_tags`, and `llm` (which additionally requires `model:`) — see
+[16 — Agentic Patterns § Smart Tool Router](16-agentic-patterns.md#smart-tool-router) for what
+each stage does. Fields are flat under each stage item (`top_k:`, `tools:`, `model:`,
+`max_selected:`) — there's no nested `options:` key.
+
+`ResolveJobToolKitsAsync` builds the stages via `RouterStageFactory.Build` and attaches the
+result with `ToolKit.WithRouter(...)` automatically — there's nothing extra to wire by hand;
+the returned `ToolKit` for `triage` already has the smart router attached.
 
 ### Testing Tool Resolution
 
-For tests, replace the registry with `InMemoryToolBindingResolver` to avoid
-external registries:
+For tests, use `InMemoryToolBindingResolver` to avoid external registries:
 
 ```csharp
-var resolver = new WorkflowToolResolver(new InMemoryToolBindingResolver());
-var toolKits = resolver.Resolve(testManifest);
-// toolKits returns empty kits for any declared binding — safe for unit tests
+var resolver = new InMemoryToolBindingResolver()
+    .Register("my-binding-ref", someToolDefinition);
+
+var toolKits = await WorkflowToolResolver.ResolveJobToolKitsAsync(testManifest, resolver);
+// Jobs with no tool: references are simply omitted from the result
 ```
 
 ---
@@ -305,4 +317,4 @@ graph TD
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

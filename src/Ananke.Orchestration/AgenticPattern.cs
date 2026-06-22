@@ -36,6 +36,14 @@ namespace Ananke.Orchestration;
 ///     cycles until a quality threshold is met or the iteration cap is reached.
 ///     </description>
 ///   </item>
+///   <item>
+///     <term><see cref="Interview{TState}"/></term>
+///     <description>
+///     Interview (conversational) — a multi-turn, human-driven exchange that walks a
+///     question agenda held in state: welcome, icebreaker, then a turn loop where each
+///     reply can expand, skip, or update the remaining questions until the agenda is done.
+///     </description>
+///   </item>
 /// </list>
 /// <para>
 /// See also: <see cref="Agents.StreamingChatWorkflow"/> (streaming agent chat pattern)
@@ -147,5 +155,42 @@ public static class AgenticPattern
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return new IterativeRefinementBuilder<TState>(name);
+    }
+
+    /// <summary>
+    /// Creates a builder for the <b>Interview</b> (conversational) pattern: a multi-turn,
+    /// human-driven exchange — welcome, icebreaker, then a turn loop that walks a question
+    /// agenda held in <typeparamref name="TState"/>, where each reply can expand, skip, or
+    /// update the remaining questions until the agenda is exhausted.
+    /// </summary>
+    /// <typeparam name="TState">
+    /// The workflow state type. Must carry the question agenda/transcript that
+    /// <c>WithQuestion</c>, <c>WithNavigation</c>, and <c>Until</c> read and update.
+    /// </typeparam>
+    /// <param name="name">
+    /// Workflow name used in traces, logs, and diagram export.
+    /// </param>
+    /// <returns>A fluent builder. Call <see cref="InterviewBuilder{TState}.Build"/> to produce
+    /// the <see cref="Interview{TState}"/> (the workflow plus the host-side question/fold hooks).</returns>
+    /// <example>
+    /// <code>
+    /// var interview = AgenticPattern.Interview&lt;InterviewState&gt;("screening")
+    ///     .WithWelcome((s, ct) =&gt; Post(s, "Hi! This'll take about 10 minutes.", ct))
+    ///     .WithIcebreaker((s, ct) =&gt; Post(s, "To start easy: what are you proud of shipping?", ct))
+    ///     .WithQuestion(s =&gt; s.Agenda.Peek())
+    ///     .WithNavigation((answer, s) =&gt; Navigate(answer, s))
+    ///     .Until(s =&gt; s.Complete)
+    ///     .MaxTurns(40)
+    ///     .Build();
+    ///
+    /// var execution = await interview.Workflow.UseCheckpointing(store).RunAsync(new InterviewState());
+    /// // execution.Status == ExecutionStatus.Interrupted: show interview.GetQuestion(execution.State)
+    /// // on reply: interview.Workflow.ResumeAsync(execution.Id, s =&gt; interview.FoldAnswer(s, reply), ct)
+    /// </code>
+    /// </example>
+    public static InterviewBuilder<TState> Interview<TState>(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new InterviewBuilder<TState>(name);
     }
 }

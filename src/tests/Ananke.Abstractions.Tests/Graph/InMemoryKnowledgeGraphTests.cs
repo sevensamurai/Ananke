@@ -121,6 +121,29 @@ public sealed class InMemoryKnowledgeGraphTests
         result.ShouldBeNull();
     }
 
+    // ── GraphNode.EffectiveLabels ─────────────────────────────────────────────
+
+    [Test]
+    public void EffectiveLabels_NoLabelsSet_ReturnsJustKind()
+    {
+        var node = new GraphNode { Id = "a", Kind = "tag" };
+        node.EffectiveLabels.ShouldBe(["tag"]);
+    }
+
+    [Test]
+    public void EffectiveLabels_LabelsRepeatsKind_KindIsFirstWithoutDuplicate()
+    {
+        var node = new GraphNode { Id = "a", Kind = "Service", Labels = ["Component", "Service"] };
+        node.EffectiveLabels.ShouldBe(["Service", "Component"]);
+    }
+
+    [Test]
+    public void EffectiveLabels_LabelsExcludeKind_KindPrependedAndOthersPreserved()
+    {
+        var node = new GraphNode { Id = "a", Kind = "Service", Labels = ["Component"] };
+        node.EffectiveLabels.ShouldBe(["Service", "Component"]);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static GraphEdge MakeEdge(

@@ -85,7 +85,7 @@ public sealed class DegreeCentralityScorer : ICentralityScorer
 
             var node = await graph.GetNodeAsync(nodeId, ct).ConfigureAwait(false);
             if (node is null) continue;
-            if (nodeKindFilter is not null && node.Kind != nodeKindFilter) continue;
+            if (nodeKindFilter is not null && !node.EffectiveLabels.Contains(nodeKindFilter)) continue;
 
             allNodeIds.Add(nodeId);
 

@@ -20,12 +20,11 @@ dotnet tool install -g nnke
 
 | Command | What it does |
 |---|---|
-| `nnke new workflow <Name>` | Scaffold a runnable Ananke workflow project |
-| `nnke new manifest <Name>` | Generate a standalone `.ananke.yml` manifest |
-| `nnke new agent <Name>` | Scaffold an `AgentJob` class |
-| `nnke new state <Name>` | Scaffold a `sealed record` state type |
+| `nnke new quickstart <Name>` | Scaffold a minimal single-agent console project |
+| `nnke new workflow <Name>` | Scaffold a complete workflow project (manifest-driven patterns also emit `.ananke.yml`) |
+| `nnke new chatbox <Name>` | Scaffold a streaming conversational agent (ASP.NET Minimal API + SSE) |
+| `nnke new pattern <Name> --pattern <key>` | Scaffold a named agentic-design-pattern project |
 | `nnke validate <file>` | Validate manifest topology (dead ends, unreachable nodes, cycles) |
-| `nnke run <file>` | Run a manifest locally — topology trace, no LLM calls |
 | `nnke serve <file> [--port N]` | Serve a manifest over HTTP locally (NDJSON event stream) |
 | `nnke diagram <file>` | Export workflow as a Mermaid flowchart |
 | `nnke inspect [dir]` | Analyze an Ananke project for health and dependency issues |
@@ -55,6 +54,7 @@ dotnet tool install -g nnke-platform
 | `nnke-platform capabilities [--platform <p>]` | List known platform-native tool capabilities |
 | `nnke-platform profiles <file> [profile]` | List or inspect deployment profiles in a manifest |
 | `nnke-platform deploy <file> --platform <p>` | Deploy a workflow to a target platform |
+| `nnke-platform eval [<file>] [--candidates <p,p>] [--format text\|json\|markdown]` | Score a manifest against candidate platforms and rank them |
 | `nnke-platform status [--deployment-id <id>]` | Show live deployment status |
 | `nnke-platform teardown --deployment-id <id>` | Tear down a deployed workflow |
 | `nnke-platform trends [--deployment-id <id>]` | Show metrics trends for deployments |
@@ -79,9 +79,8 @@ dotnet tool install -g nnke-platform
 
 | Scenario | Use |
 |---|---|
-| Scaffold a new workflow, agent, or manifest | `nnke` |
+| Scaffold a new workflow, quickstart, or chatbox project | `nnke` |
 | Validate a manifest before committing | `nnke validate` |
-| Run a manifest locally without LLM calls | `nnke run` |
 | Serve a manifest over HTTP for local testing | `nnke serve` |
 | Generate a Mermaid diagram for a PR | `nnke diagram` |
 | Use AI editor tool-calls to design workflows | `nnke mcp-server` |

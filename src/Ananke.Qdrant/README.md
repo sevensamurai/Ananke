@@ -114,7 +114,7 @@ var catalog = new QdrantKnowledgeCatalog(
 
 ## Demo
 
-The [`LongTermMemoryDemo`](../demos/LongTermMemoryDemo/) shows the full pipeline end-to-end:
+The [`LongTermMemoryDemo`](../demos/03-memory-and-knowledge/LongTermMemoryDemo/) shows the full pipeline end-to-end:
 
 ```bash
 # In-memory store (no infrastructure needed)

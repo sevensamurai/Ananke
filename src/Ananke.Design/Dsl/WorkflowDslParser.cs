@@ -16,8 +16,11 @@ namespace Ananke.Design.Dsl;
 ///   <item><c>a -&gt; fork(b, c, mode: best-effort)</c> — parallel fork (BestEffort)</item>
 ///   <item><c>join(a, b) -&gt; c</c> — fan-in join</item>
 ///   <item><c>a -&gt; router(b, c, End)</c> — dynamic routing decision point</item>
+///   <item><c>a -&gt; loop(target, exit: x)</c> — conditional back-edge loop</item>
+///   <item><c>a -&gt; loop(target, exit: x, maxIterations: n)</c> — loop with an iteration cap (default 10)</item>
 ///   <item><c>subflow(name)</c> — marks a job as a nested sub-workflow</item>
 ///   <item><c>interrupt(name)</c> — pauses execution before the named job</item>
+///   <item><c>ask(name)</c> — marks a job as a free-text, input-collecting turn</item>
 /// </list>
 /// </remarks>
 internal static partial class WorkflowDslParser
@@ -44,6 +47,12 @@ internal static partial class WorkflowDslParser
         RegexOptions.IgnoreCase)]
     private static partial Regex RouterPattern();
 
+    // a -> loop(target, exit: x)  or  a -> loop(target, exit: x, maxIterations: n)
+    [GeneratedRegex(
+        @$"^(?<from>{Id})\s*->\s*loop\((?<args>[^)]+)\)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex LoopPattern();
+
     // subflow(name)
     [GeneratedRegex(
         @$"^subflow\((?<name>{Id})\)$",
@@ -55,6 +64,12 @@ internal static partial class WorkflowDslParser
         @$"^interrupt\((?<job>{Id})\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex InterruptPattern();
+
+    // ask(name)
+    [GeneratedRegex(
+        @$"^ask\((?<job>{Id})\)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex AskPattern();
 
     private static Regex ToolDirectivePattern() =>
         new(@"^tool\((?<args>.+)\)$", RegexOptions.IgnoreCase);
@@ -109,6 +124,10 @@ internal static partial class WorkflowDslParser
         if (match.Success)
             return ParseRouter(match, line);
 
+        match = LoopPattern().Match(line);
+        if (match.Success)
+            return ParseLoop(match, line);
+
         match = SubFlowPattern().Match(line);
         if (match.Success)
             return new ConnectionLine.SubFlow(match.Groups["name"].Value);
@@ -116,6 +135,10 @@ internal static partial class WorkflowDslParser
         match = InterruptPattern().Match(line);
         if (match.Success)
             return new ConnectionLine.Interrupt(match.Groups["job"].Value);
+
+        match = AskPattern().Match(line);
+        if (match.Success)
+            return new ConnectionLine.Ask(match.Groups["job"].Value);
 
         match = ToolDirectivePattern().Match(line);
         if (match.Success)
@@ -179,6 +202,36 @@ internal static partial class WorkflowDslParser
             throw new FormatException($"Router requires at least two options: '{line}'");
 
         return new ConnectionLine.Router(from, options);
+    }
+
+    private static ConnectionLine.Loop ParseLoop(Match match, string line)
+    {
+        var from = match.Groups["from"].Value;
+        var parts = SplitArgs(match.Groups["args"].Value);
+
+        if (parts.Length == 0)
+            throw new FormatException($"Loop requires a target: '{line}'");
+
+        var loopTarget = parts[0];
+        string? exitTarget = null;
+        int? maxIterations = null;
+
+        foreach (var part in parts.Skip(1))
+        {
+            if (part.StartsWith("exit:", StringComparison.OrdinalIgnoreCase))
+            {
+                exitTarget = part["exit:".Length..].Trim();
+            }
+            else if (part.StartsWith("maxIterations:", StringComparison.OrdinalIgnoreCase))
+            {
+                maxIterations = int.Parse(part["maxIterations:".Length..].Trim());
+            }
+        }
+
+        if (exitTarget is null)
+            throw new FormatException($"Loop requires an 'exit:' target: '{line}'");
+
+        return new ConnectionLine.Loop(from, loopTarget, exitTarget, maxIterations);
     }
 
     private static ConnectionLine.Tool ParseTool(Match match, string line)

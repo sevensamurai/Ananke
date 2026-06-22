@@ -83,6 +83,22 @@ public sealed class PageRankCentralityScorerTests
         scores.ContainsKey("e1").ShouldBeFalse();
     }
 
+    [Test]
+    public async Task ScoreAsync_NodeKindFilterMatchesSecondaryLabel_IncludesNode()
+    {
+        var graph = new InMemoryKnowledgeGraph();
+        await graph.UpsertNodeAsync(new GraphNode { Id = "s1", Kind = "Service", Labels = ["Component"] });
+        await graph.UpsertNodeAsync(new GraphNode { Id = "s2", Kind = "Service", Labels = ["Component"] });
+        await graph.UpsertNodeAsync(new GraphNode { Id = "e1", Kind = "Entity" });
+
+        await graph.UpsertEdgeAsync(Edge("s1", "s2"));
+
+        var scores = await _scorer.ScoreAsync(graph, nodeKindFilter: "Component");
+
+        scores.Count.ShouldBe(2);
+        scores.ContainsKey("e1").ShouldBeFalse();
+    }
+
     private static GraphEdge Edge(string from, string to) => new()
     {
         FromId     = from,

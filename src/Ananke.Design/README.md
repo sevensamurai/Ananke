@@ -94,8 +94,11 @@ var models = new ModelResolver()
 | Fork (best-effort) | `a -> fork(b, c, mode: best-effort)` | `.Then("a", Workflow.Fork("b", "c", ForkMode.BestEffort))` |
 | Join | `join(a, b) -> c` | `.Join(["a", "b"], "c", merge)` |
 | Router | `a -> router(b, c, End)` | `.Then("a", Workflow.Decide(...))` |
+| Loop | `a -> loop(target, exit: x)` | `.Loop("a", "target", "x", until)` |
+| Loop (capped) | `a -> loop(target, exit: x, maxIterations: n)` | `.Loop("a", "target", "x", until, n)` |
 | SubFlow | `subflow(name)` | `.SubFlow("name", inner, mapIn, mapOut)` |
 | Interrupt | `interrupt(name)` | `.InterruptBefore("name")` |
+| Ask (input turn) | `ask(name)` | `.AwaitInput("name")` |
 
 Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/Ananke/blob/main/docs/workflow-dsl.md)**
 
@@ -108,7 +111,7 @@ Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/
 | `ModelResolver` | Resolve manifest model aliases to live `IAgentModel` instances via registered provider factories |
 | `WorkflowDiagramExtensions` | `.ToMermaid()` export for any validated workflow graph |
 | `AgentTextResponse` | Default structured response type for agent jobs that return plain text |
-| `WorkflowDslParser` | Internal DSL parser — direct, fork, join, router, subflow, interrupt |
+| `WorkflowDslParser` | Internal DSL parser — direct, fork, join, router, loop, subflow, interrupt, ask |
 
 ## Mermaid diagram export
 

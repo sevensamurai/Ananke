@@ -19,12 +19,17 @@ public static class CliProcessRunner
     /// </summary>
     /// <param name="fileName">The executable to run (e.g. <c>"uvx"</c>).</param>
     /// <param name="arguments">Command-line arguments.</param>
+    /// <param name="workingDirectory">
+    /// Directory the process runs in. <see langword="null"/> (default) inherits the
+    /// current process's working directory.
+    /// </param>
     /// <param name="timeout">Maximum execution time. Defaults to <see cref="DefaultTimeout"/>.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Exit code, stdout, and stderr.</returns>
     public static async Task<CliProcessResult> RunAsync(
         string fileName,
         string arguments,
+        string? workingDirectory = null,
         TimeSpan? timeout = null,
         CancellationToken ct = default)
     {
@@ -37,6 +42,9 @@ public static class CliProcessRunner
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        if (workingDirectory is not null)
+            psi.WorkingDirectory = workingDirectory;
 
         using var process = Process.Start(psi);
         if (process is null)

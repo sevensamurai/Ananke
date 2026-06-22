@@ -10,6 +10,22 @@ using the SlackNet library. Normalizes Slack `MessageEvent`s into
 `PlatformMessage`, provides response capabilities (post, edit, react),
 and registers as an `IHostedService` for automatic start/stop.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `SlackAdapter` — `IMessagePlatformAdapter` — connects via Socket Mode or Events API and
+   dispatches to the handler — `src/Ananke.Platforms.Slack/SlackAdapter.cs`
+2. `SlackResponseSink` — `IPlatformResponseSink` — maps to `chat.postMessage`, `chat.update`,
+   `reactions.add` — `src/Ananke.Platforms.Slack/SlackResponseSink.cs`
+3. `SlackMessageMapper` — converts `SlackNet.Events.MessageEvent` to `PlatformMessage` —
+   `src/Ananke.Platforms.Slack/SlackMessageMapper.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Platforms` (project)

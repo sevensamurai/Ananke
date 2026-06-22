@@ -19,14 +19,14 @@ classDiagram
     }
 
     IStreamingAgentModel --|> IAgentModel
-    OpenAIAgentModel ..|> IStreamingAgentModel
+    OpenAIChatAgentModel ..|> IStreamingAgentModel
     AnthropicAgentModel ..|> IStreamingAgentModel
     GeminiAgentModel ..|> IStreamingAgentModel
 ```
 
 ### Key Design Decision
 
-Ananke defines its own `IAgentModel` rather than using `Microsoft.Extensions.AI.IChatClient`. This keeps the abstraction minimal, vendor-neutral, and tightly aligned with agent-specific concerns (tool calls, structured output, token budgets). See [design-decisions.md](../docs/reference/design-decisions.md).
+Ananke defines its own `IAgentModel` rather than using `Microsoft.Extensions.AI.IChatClient`. This keeps the abstraction minimal, vendor-neutral, and tightly aligned with agent-specific concerns (tool calls, structured output, token budgets).
 
 ## Message Types
 
@@ -54,8 +54,8 @@ Each provider package is a **thin adapter** that depends only on `Ananke.Abstrac
 
 ```mermaid
 flowchart LR
-    CALL[AgentJob call] --> GUARD[GuardrailMiddleware]
-    GUARD --> LOG[LoggingMiddleware]
+    CALL[AgentJob call] --> GUARD[GuardrailAgentModelMiddleware]
+    GUARD --> LOG[LoggingAgentModelMiddleware]
     LOG --> CACHE[CachingAgentModel]
     CACHE --> RETRY[ResilientAgentModel<br/>Polly 429 retry]
     RETRY --> PROVIDER[OpenAI / Anthropic / Google]
@@ -73,7 +73,7 @@ Two routing mechanisms are provided:
 
 ```csharp
 var router = new ModelRouter()
-    .When(req => req.Messages.Any(m => m.HasImage()), visionModel)
+    .When(req => req.Messages.Any(m => m.Parts?.Any(p => p is ImagePart) == true), visionModel)
     .Otherwise(defaultModel);
 ```
 

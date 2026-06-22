@@ -39,11 +39,12 @@ public async Task Pipeline_produces_expected_output()
     var workflow = new Workflow<PipelineState>("test-pipeline")
         .Job("fetch",     async (s, ct) => s with { Raw = "data" })
         .Job("transform", async (s, ct) => s with { Clean = s.Raw.ToUpperInvariant() })
-        .Chain("fetch", "transform");
+        .Chain("fetch", "transform")
+        .Then("transform", Workflow.End);
 
     var result = await workflow.RunAsync(new PipelineState());
 
-    Assert.Equal(WorkflowStatus.Completed, result.Status);
+    Assert.Equal(ExecutionStatus.Completed, result.Status);
     Assert.Equal("DATA", result.State.Clean);
 }
 ```
@@ -67,10 +68,10 @@ public class FakeAgentModel : IStreamingAgentModel
         return Task.FromResult(new AgentResponse { Text = _response });
     }
 
-    public async IAsyncEnumerable<StreamingAgentChunk> GenerateStreamAsync(
+    public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
         AgentRequest request, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        yield return new StreamingAgentChunk { Text = _response };
+        yield return new AgentStreamChunk { TextDelta = _response };
     }
 }
 ```
@@ -105,8 +106,9 @@ public async Task Agent_workflow_processes_fake_response()
 [Fact]
 public async Task Ticket_follows_happy_path()
 {
-    var machine = new TicketMachine(new InMemoryDistributedLock());
-    var ticket = new TicketContext(1);
+    var lockAndStore = new InMemoryDistributedLock();
+    var machine = new TicketMachine(lockAndStore, lockAndStore);
+    var ticket = new TicketContext("1");
 
     // Open → InProgress
     var r1 = await machine.TransitionAsync(ticket, TicketTransition.Assign);
@@ -123,8 +125,9 @@ public async Task Ticket_follows_happy_path()
 [Fact]
 public async Task Guard_blocks_resolve_without_note()
 {
-    var machine = new TicketMachine(new InMemoryDistributedLock());
-    var ticket = new TicketContext(1);
+    var lockAndStore = new InMemoryDistributedLock();
+    var machine = new TicketMachine(lockAndStore, lockAndStore);
+    var ticket = new TicketContext("1");
 
     await machine.TransitionAsync(ticket, TicketTransition.Assign);
 
@@ -148,18 +151,19 @@ public async Task Interrupt_and_resume_works()
         .Job("analyze", async (s, ct) => s with { Analysis = "done" })
         .Job("execute", async (s, ct) => s with { Executed = true })
         .Chain("analyze", "execute")
+        .Then("execute", Workflow.End)
         .InterruptBefore("execute")
         .UseCheckpointing(store);
 
     // First run — pauses
     var exec = await workflow.RunAsync(new ApprovalState());
-    Assert.Equal(WorkflowStatus.Interrupted, exec.Status);
+    Assert.Equal(ExecutionStatus.Interrupted, exec.Status);
     Assert.False(exec.State.Executed);
 
     // Resume with approval
     var resumed = await workflow.ResumeAsync(exec.Id,
         s => s with { Approved = true });
-    Assert.Equal(WorkflowStatus.Completed, resumed.Status);
+    Assert.Equal(ExecutionStatus.Completed, resumed.Status);
     Assert.True(resumed.State.Executed);
     Assert.True(resumed.State.Approved);
 }
@@ -212,7 +216,9 @@ public async Task Handoff_round_trip()
 
     var response = await channel.SendAsync<TicketHandoff, SpecialistResult>(
         "test-queue",
-        new TicketHandoff { TicketId = "TK-001", Summary = "Test" });
+        correlationId: Guid.NewGuid().ToString(),
+        new TicketHandoff { TicketId = "TK-001", Summary = "Test" },
+        timeout: TimeSpan.FromSeconds(5));
 
     Assert.Equal("Resolved: Test", response.Resolution);
 }
@@ -234,4 +240,4 @@ public async Task Handoff_round_trip()
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

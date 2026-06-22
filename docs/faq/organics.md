@@ -120,8 +120,8 @@ automatically.
 | **Purpose** | Specialization | Scaling |
 
 Division is mitosis with differentiation. Replication is mitosis without
-differentiation. Both use the same infrastructure (`IColony`, `ISkillPackager`,
-`ICapabilityLandscape`).
+differentiation. Both use the same infrastructure (`IWorkflowHost`, `ISkillPackager`,
+`ICapabilityMap`).
 
 ### Does the colony learn from its division decisions?
 
@@ -150,8 +150,8 @@ reference `Ananke.Organics`, nothing changes.
 
 ### What does the nervous system do?
 
-Cells emit periodic **heartbeat signals** (`CellSignal`) that carry their name,
-domain, and capabilities. The `ICapabilityLandscape` aggregates these into a
+Cells emit periodic **heartbeat signals** (`WorkflowSignal`) that carry their name,
+domain, and capabilities. The `ICapabilityMap` aggregates these into a
 live map. No signal for a configured duration = cell is dead.
 
 This replaces the registry pattern (explicit Register/Unregister):
@@ -161,17 +161,17 @@ This replaces the registry pattern (explicit Register/Unregister):
 
 ### How does this work in production? Is it just in-memory?
 
-`IColony` is hosting-agnostic. What "spawn" and "kill" mean depends on the
+`IWorkflowHost` is hosting-agnostic. What "spawn" and "kill" mean depends on the
 hosting model:
 
 | Model | Spawn | Kill | Best for |
 |---|---|---|---|
-| `InProcessColony` | `Task.Run` | Cancel token | Dev, demos, tests |
+| `InProcessWorkflowHost` | `Task.Run` | Cancel token | Dev, demos, tests |
 | Docker Compose | `docker run` | `docker stop` | Production |
 | Kubernetes | Create CRD | Delete CRD | Production (large) |
 
-The framework ships `InProcessColony`. Production hosting adapters are external
-implementations of `IColony`.
+The framework ships `InProcessWorkflowHost`. Production hosting adapters are external
+implementations of `IWorkflowHost`.
 
 ### Can a colony grow indefinitely?
 

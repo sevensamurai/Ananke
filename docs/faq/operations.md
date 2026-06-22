@@ -17,7 +17,7 @@ Yes. Every infrastructure contract ships with a zero-config in-memory implementa
 | `IKnowledgeStore` | `InMemoryKnowledgeStore` |
 | `IEmpiricalMemory` | `InMemoryEmpiricalMemory` |
 | `ICheckpointStore` | `InMemoryCheckpointStore` |
-| `IHandoffChannel<T>` | `InMemoryHandoffChannel<T>` |
+| `IHandoffChannel` | `InMemoryHandoffChannel` |
 | `IConversationMemory` | `InMemoryConversationMemory` |
 
 For LLM calls, implement `IStreamingAgentModel` with a stub that returns deterministic
@@ -35,7 +35,7 @@ var locker     = new InMemoryDistributedLock();
 var result = await workflow.RunAsync(initialState);
 
 // Assert on typed state and status
-result.Status.ShouldBe(WorkflowStatus.Completed);
+result.Status.ShouldBe(ExecutionStatus.Completed);
 result.State.Output.ShouldNotBeNullOrEmpty();
 ```
 
@@ -64,7 +64,11 @@ dotnet add package Ananke.OpenTelemetry
 ```
 
 ```csharp
-services.AddAnankeOtlpTracing(endpoint: "http://localhost:4317");
+services.AddTracingPipeline(o =>
+{
+    o.ServiceName = "my-service";
+    o.UseOtlp("http://localhost:4317");
+});
 ```
 
 See [Observability](../guides/10-observability.md).

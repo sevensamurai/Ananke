@@ -17,11 +17,13 @@ edges, and call `.RunAsync()`:
 
 ```csharp
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 
 var workflow = new Workflow<MyState>("example")
     .Job("step_a", async (state, ct) => state with { A = "done" })
     .Job("step_b", async (state, ct) => state with { B = "done" })
-    .Chain("step_a", "step_b");
+    .Chain("step_a", "step_b")
+    .Then("step_b", Workflow.End);
 
 var result = await workflow.RunAsync(new MyState());
 ```
@@ -31,7 +33,7 @@ var result = await workflow.RunAsync(new MyState());
 | Primitive | What it does |
 |---|---|
 | `.Then("a", "b")` | Direct edge — `a` routes to `b` |
-| `.Chain("a", "b", "c")` | Shorthand for `Then("a","b")` + `Then("b","c")`; last job is implicitly terminal |
+| `.Chain("a", "b", "c")` | Shorthand for `Then("a","b")` + `Then("b","c")` — `c` still needs its own `.Then("c", Workflow.End)` unless it has another outgoing edge |
 | `.Then("a", Workflow.Decide<S>(...))` | Conditional routing via lambda |
 | `.Then("a", Workflow.DecideWithAgent<S>(...))` | LLM-driven routing |
 | `.Then("a", Workflow.Fork("b", "c"))` | Fan-out to parallel branches |
@@ -110,7 +112,8 @@ var outer = new Workflow<OuterState>("pipeline")
     .SubFlow("validate", inner,
         mapIn:  outer => new InnerState { Input = outer.Data },
         mapOut: (outer, inner) => outer with { IsValid = inner.Valid })
-    .Chain("prepare", "validate");
+    .Chain("prepare", "validate")
+    .Then("validate", Workflow.End);
 ```
 
 ---
@@ -136,7 +139,7 @@ await foreach (var evt in workflow.StreamAsync(initialState))
             Console.WriteLine($"  state updated");
             break;
         case WorkflowCompleted<MyState> wc:
-            Console.WriteLine($"✅ Done: {wc.Result.Status}");
+            Console.WriteLine($"✅ Done: {wc.Result.Success}");
             break;
         case WorkflowFaulted<MyState> wf:
             Console.WriteLine($"❌ Faulted: {wf.Exception.Message}");
@@ -147,9 +150,9 @@ await foreach (var evt in workflow.StreamAsync(initialState))
 
 ---
 
-## Job Retry and Timeout
+## Per-Job Timeout
 
-Add resilience to individual jobs with Polly-based retry and per-job timeout:
+Set a timeout for an individual job with `.Timeout(jobName, ts)`:
 
 ```csharp
 var workflow = new Workflow<MyState>("resilient")
@@ -157,10 +160,15 @@ var workflow = new Workflow<MyState>("resilient")
     {
         var data = await CallExternalApi(ct);
         return state with { Data = data };
-    },
-    retry: 3,                                    // retry up to 3 times
-    timeout: TimeSpan.FromSeconds(10));          // 10s per attempt
+    })
+    .Timeout("flaky_api", TimeSpan.FromSeconds(10));   // throws TimeoutException after 10s
 ```
+
+There is no built-in retry for plain delegate jobs. Agent jobs get retry via
+`AgentJobFactory.Create(...).WithRetry(maxAttempts, baseDelay)` — see
+[11 — Advanced Agent Features](11-advanced-agents.md#job-level-retry-withretry). For a
+non-agent job, either retry inside the delegate yourself or write a custom
+`IWorkflowJobMiddleware<TState>` that loops on `next()`.
 
 ---
 
@@ -172,7 +180,10 @@ validates:
 - Fork targets are reachable
 - Join sources match fork branches
 
-A job with no outgoing edge is implicitly terminal — no explicit `Workflow.End` edge is needed.
+In a **single-job** workflow, that one job needs no outgoing edge — it's implicitly terminal.
+With two or more jobs, every job lacking an outgoing edge (including the last job in a
+`.Chain(...)`) must be wired to `Workflow.End` explicitly, or `Build()`/`RunAsync()` throws
+`"Job '{name}' has no outgoing connection."`
 
 ---
 
@@ -204,4 +215,4 @@ Console.WriteLine(workflow.ToMermaid());
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

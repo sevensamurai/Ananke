@@ -237,4 +237,4 @@ IKnowledgeCatalog catalog = new QdrantKnowledgeCatalog(
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

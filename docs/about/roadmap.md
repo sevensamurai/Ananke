@@ -1,9 +1,9 @@
 ﻿<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
-### Where We Are — v0.8.4
+### Where We Are — v0.8.6
 
-**0.8.4 is the current release.**
+**0.8.6 is the current release.**
 
 The core framework is feature-complete. Workflows, agents, state machines, empirical
 memory, distributed infrastructure, MCP/A2A interop, observability, design tooling,
@@ -35,6 +35,8 @@ The surface area that matters — `IStreamingAgentModel`, `IJob<T>`, `Workflow<T
 | **0.7.0** | `nnke` expanded into an agent-friendly CLI and MCP companion for design-time inspection, docs, and patterns. |
 | **0.8.0** | Release candidate: pluggable organics, federation, `nnke-platform` CLI and the Smart Tool Router completed the feature surface for 1.0. |
 | **0.8.4** | Platform review loops and studio scaffolding: richer Slack integrations (slash commands, interactivity, assistant pane, modals, approval blocks), work-review and budget gates in Organics, async review parking, `Ananke.Roles` package, OTel budget meter, `WorkItemReviewNotifier`, and `MiniAgencyDemo`. |
+| **0.8.5** | Agent trajectory observability and resilience (`TrajectorySnapshot`, `IAdaptiveHarnessPolicy`, `IHallucinationObserver`), Organics division governance (`IDivisionApprovalGate` with concrete gates, `IDivisionOutcomeTracker`), and Federation platform-fit scoring (`PlatformRecommender`). |
+| **0.8.6** | Declarative loops and conversational interview workflows (`loop()`/`ask()` DSL, `AgenticPattern.Interview`), multi-label knowledge graph nodes (`GraphNode.EffectiveLabels`), and a documentation drift guard (`scripts/check-docs.ps1`, `MAP.md`) that found and fixed real stale-doc drift across the repo. |
 | **0.8.x** | Bug fixes and minor improvements only. |
 | **1.0.0** | API lock — semantic versioning honoured from this point forward. |
 

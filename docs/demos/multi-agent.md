@@ -52,11 +52,13 @@ record AgentPipelineState
 ```csharp
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Workflows;
 
-var routerJob = AgentJob.Create<AgentPipelineState>("router", routerModel)
+var routerJob = AgentJobFactory.Create<AgentPipelineState>("router", routerModel)
     .WithSystemPrompt("Classify the user's request as 'code' or 'text'. Reply with one word only.")
-    .WithUserPrompt(s => s.Request)
-    .MapResponse((s, reply) => s with { Intent = reply.Trim().ToLower() });
+    .WithPrompt(s => s.Request)
+    .MapResult((s, reply) => s with { Intent = reply.Trim().ToLower() })
+    .Build();
 ```
 
 ---
@@ -64,15 +66,17 @@ var routerJob = AgentJob.Create<AgentPipelineState>("router", routerModel)
 ## Worker Jobs
 
 ```csharp
-var codeWorker = AgentJob.Create<AgentPipelineState>("code_worker", workerModel)
+var codeWorker = AgentJobFactory.Create<AgentPipelineState>("code_worker", workerModel)
     .WithSystemPrompt("You are an expert C# developer. Implement the requested feature.")
-    .WithUserPrompt(s => s.Request)
-    .MapResponse((s, reply) => s with { Draft = reply });
+    .WithPrompt(s => s.Request)
+    .MapResult((s, reply) => s with { Draft = reply })
+    .Build();
 
-var textWorker = AgentJob.Create<AgentPipelineState>("text_worker", workerModel)
+var textWorker = AgentJobFactory.Create<AgentPipelineState>("text_worker", workerModel)
     .WithSystemPrompt("You are a professional technical writer. Write clear, concise content.")
-    .WithUserPrompt(s => s.Request)
-    .MapResponse((s, reply) => s with { Draft = reply });
+    .WithPrompt(s => s.Request)
+    .MapResult((s, reply) => s with { Draft = reply })
+    .Build();
 ```
 
 ---
@@ -80,15 +84,16 @@ var textWorker = AgentJob.Create<AgentPipelineState>("text_worker", workerModel)
 ## Reviewer Job
 
 ```csharp
-var reviewerJob = AgentJob.Create<AgentPipelineState>("reviewer", reviewerModel)
+var reviewerJob = AgentJobFactory.Create<AgentPipelineState>("reviewer", reviewerModel)
     .WithSystemPrompt(
         "Review the draft. Reply with 'APPROVED' if it is good, or 'REJECTED: <reason>' if not.")
-    .WithUserPrompt(s => $"Request: {s.Request}\n\nDraft:\n{s.Draft}")
-    .MapResponse((s, reply) => s with
+    .WithPrompt(s => $"Request: {s.Request}\n\nDraft:\n{s.Draft}")
+    .MapResult((s, reply) => s with
     {
         Review   = reply,
         Approved = reply.StartsWith("APPROVED", StringComparison.OrdinalIgnoreCase)
-    });
+    })
+    .Build();
 ```
 
 ---

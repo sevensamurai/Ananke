@@ -10,6 +10,23 @@ Parse a YAML file into a `WorkflowManifest`, scaffold it into a
 `Workflow<TState>`, and export any workflow as a Mermaid diagram
 for documentation.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `WorkflowManifest` — the parsed YAML manifest (jobs, connections, model aliases,
+   system prompts) that the rest of the package operates on — `src/Ananke.Design/WorkflowManifest.cs`
+2. `WorkflowDslParser` — parses YAML text into a `WorkflowManifest` — `src/Ananke.Design/Dsl/WorkflowDslParser.cs`
+3. `WorkflowScaffold` — converts a `WorkflowManifest` into a runnable `Workflow<TState>`
+   instance — `src/Ananke.Design/WorkflowScaffold.cs`
+4. `WorkflowDiagramExtensions` — `workflow.ToMermaid()`, generates a Mermaid flowchart
+   from workflow topology — `src/Ananke.Design/WorkflowDiagramExtensions.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Orchestration` (project)

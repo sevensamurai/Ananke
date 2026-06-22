@@ -1,0 +1,134 @@
+# check-docs.ps1 allow-list
+# Identifiers named in docs that legitimately do NOT appear in src/**/*.cs.
+# One identifier per line; '#' starts a comment.
+#
+# Add an entry here ONLY when you have confirmed the name is a genuine external
+# library type, a third-party product, or a documented concept/placeholder —
+# NOT a stale or misspelled Ananke symbol. When in doubt, fix the doc instead.
+
+# --- Third-party products / services referenced in prose ---
+Ollama
+Jaeger
+Qdrant
+Memgraph
+Redis
+Discord
+Slack
+Docker
+Kubernetes
+Honeycomb
+Datadog
+BetterStack
+Grafana
+Tempo
+Azure
+Orleans
+Anthropic
+OpenAI
+Copilot
+Python
+PyPI
+NuGet
+Mermaid
+Markdown
+GitHub
+
+# --- Doc-only / placeholder identifiers ---
+MyState
+MyResponse
+MyWorkflow
+PipelineState
+AppState
+SearchQuery
+SearchResult
+TerminalReward
+MyAction
+MyAgent
+MyContext
+MyHandler
+
+# --- Real demo project names not in the default (demos-excluded) scan ---
+# These ARE real folders under src/demos/**, just not picked up because demo source
+# is excluded from the known-identifier set by default (see -IncludeExamples).
+LongTermMemoryDemo
+
+# --- Deliberate, documented legacy/preserved naming (explained in-doc) ---
+VertexAI               # Vertex AI -> Gemini Enterprise Agent Platform rebrand; VertexAI* class names kept for back-compat
+GoogleMemoryBankAdapter # explicitly hypothetical/future adapter, not a current type
+
+# --- MSBuild / .csproj property names (live in *.csproj, not *.cs) ---
+IsPackable
+IsRoslynComponent
+ImplicitUsings
+TargetFramework
+PackageId
+PackageTags
+TreatWarningsAsErrors
+VersionPrefix
+
+# --- External library / BCL / SDK types named in prose ---
+ActivityListener
+SynchronizationContext
+TokenCredential
+TestCluster
+OpenTelemetryProtocol
+ClientResultException
+AIPlatform            # Google.Cloud.AIPlatform.V1 SDK package name
+DeclarativeAgentDefinition   # Azure AI Agent Service declarative-agent JSON spec
+ISlashCommandHandler   # SlackNet SDK interface
+MapA2A                 # A2A.AspNetCore SDK extension method
+IChatClient             # Microsoft.Extensions.AI type, contrasted with Ananke's own IAgentModel
+AzureML                 # "AzureML Data Scientist" Azure RBAC role name
+Cognitive               # "Cognitive Services User" Azure RBAC role name
+Scientist               # "AzureML Data Scientist" Azure RBAC role name
+ClawHub                 # OpenClaw/ClawHub external registry product name
+Desktop                 # "Claude Desktop" product name in a Mermaid label
+
+# --- External datastores / products named in ARCHITECTURE prose ---
+RedLock
+Dragonfly
+Valkey
+
+# --- Architecture-diagram layer labels (Mermaid subgraph / ASCII box headings) ---
+Foundation
+Intelligence
+
+# --- Documented concept prefixes (real types are InMemory<Thing>, etc.) ---
+InMemory
+
+# --- Prose words / naming-convention examples that happen to be PascalCase ---
+Denver
+Caches
+Library
+Feature
+ClassUnderTest
+Acquire        # "Acquire distributed lock" prose in a flow diagram
+ActionType     # path-template placeholder {namespace}/{ActionType}/{Action}
+Birth          # "Birth/death genealogy store" folder description
+Debounced      # prose describing SSE delta-coalescing behavior
+Implemented    # markdown "✅ Implemented." bold-text artifact
+Incoming       # "Incoming message ->" flow-diagram prose
+Outcomes       # "Outcomes arrive ->" learning-loop prose
+PairRecall     # shorthand for the real PairRecallAsync method
+Point          # "Point-in-time mesh capture" folder description
+Points         # "Points at Dragonfly/Valkey/Redis" prose
+Posts          # "Posts ... placeholder" SSE flow-diagram prose
+Reviewer       # "Reviewer clicks Approve" prose
+Structural     # "Structural deployability validation" folder description
+Subsequent     # "Subsequent deltas" prose
+Inbound        # "Inbound Slack message" flow-diagram prose
+AddOrchestration   # "AddOrchestration{Provider}()" template placeholder describing a real per-provider DI convention
+Carlo          # "Monte Carlo reward propagation" Mermaid node label
+Monte          # "Monte Carlo reward propagation" Mermaid node label
+Consolidate    # "Consolidate" Mermaid node label
+Import         # "Import into another agent" Mermaid node label
+Layer          # "Sensing Layer" Mermaid node label
+ModelProfiles  # "registered ModelProfiles" Mermaid node label (plural of ModelProfile)
+Packaging      # "Skill Packaging" Mermaid subgraph title
+Ranked         # "Ranked chunks" Mermaid node label
+Reviewing      # illustrative state name in a generic Mermaid state diagram
+Side           # "Client Side" / "Server Side" Mermaid subgraph titles
+Delegate       # "IJob (Agent/Delegate/SubFlow)" Mermaid participant label
+Propagation    # "Monte Carlo Reward Propagation" Mermaid node label
+Save           # "Save checkpoint" Mermaid sequence-diagram message
+Yes            # Mermaid flowchart branch-edge label
