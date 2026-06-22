@@ -30,19 +30,29 @@ Safe coordination across multiple service instances:
 dotnet add package Ananke.Redis
 ```
 
+`RedisDistributedLock` takes a `CacheConfig` (host/port/credentials) via `IOptions<CacheConfig>`,
+not a pre-built connection — it establishes the actual Redis connection lazily on first use:
+
 ```csharp
+using Ananke.Abstractions.Config;
 using Ananke.Redis;
-using StackExchange.Redis;
+using Microsoft.Extensions.Options;
 
-var redis = await ConnectionMultiplexer.ConnectAsync("localhost:6379");
-var locker = new RedisDistributedLock(redis);
+var config = Options.Create(new CacheConfig { Host = "localhost", Port = 6379 });
+var locker = new RedisDistributedLock(config);
 
-// Use with a state machine
-var machine = new TicketMachine(locker);
+// Use with a state machine — RedisDistributedLock implements both
+// IDistributedLock and IKeyValueDataAdapter, so it serves as both arguments
+var machine = new TicketMachine(locker, locker);
 
-// Or use directly
-await using var handle = await locker.AcquireAsync("my-resource", TimeSpan.FromSeconds(30));
-// ... critical section ...
+// Or use directly — IDistributedLock wraps the critical section in a callback
+// rather than returning an acquire/release handle
+var result = await locker.RunCoordinatedActionAsync("my-resource", async () =>
+{
+    // ... critical section ...
+    return 0;
+});
+// result.LockAcquired / result.Success / result.Result
 ```
 
 For dev/test, use the in-memory alternative:
@@ -58,12 +68,14 @@ var locker = new InMemoryDistributedLock();
 General-purpose key-value storage for caching, state, and more:
 
 ```csharp
+using Ananke.Abstractions.Config;
 using Ananke.Redis;
+using Microsoft.Extensions.Options;
 
-var adapter = new RedisDataAdapter(redis);
+var adapter = new RedisDataAdapter(Options.Create(new CacheConfig { Host = "localhost", Port = 6379 }));
 
-await adapter.SetAsync("key", "value", TimeSpan.FromMinutes(5));
-var value = await adapter.GetAsync("key");
+await adapter.SetValueAsync("key", "value");
+var value = await adapter.GetValueAsync("key");
 ```
 
 Used by `CachingAgentModel` for LLM response caching and by
@@ -112,10 +124,10 @@ using Ananke.Orchestration.Jobs;
 
 // HandoffJob sends TicketHandoff and expects SpecialistResult back
 var handoffJob = Handoff.To<TicketState, TicketHandoff, SpecialistResult>(
-    channel,
     "specialist-queue",
-    mapOut:  state => new TicketHandoff { TicketId = state.TicketId, Summary = state.Description },
-    mapIn:   (state, result) => state with { Resolution = result.Resolution });
+    channel,
+    createMessage: state => new TicketHandoff { TicketId = state.TicketId, Summary = state.Description },
+    mapResult:     (state, result) => state with { Resolution = result.Resolution });
 ```
 
 ### Receiver (specialist service)
@@ -146,9 +158,11 @@ with full type inference:
 
 ```csharp
 using Ananke.Bridge;
+using Ananke.Orchestration.Workflows;
 
 // Define the FSM
-var lifecycle = new TicketLifecycleMachine(new InMemoryDistributedLock());
+var lockAndStore = new InMemoryDistributedLock();
+var lifecycle = new TicketLifecycleMachine(lockAndStore, lockAndStore);
 
 // Map workflow state to FSM context
 TicketLifecycleContext FsmContext(TicketState s) =>
@@ -166,7 +180,7 @@ var workflow = new Workflow<TicketState>("support-triage")
     .Then("fsm_triage", Workflow.Decide<TicketState>(s =>
         s.Category == "escalate" ? "escalate" : "auto_resolve"))
     // ... routing continues ...
-    // fsm_close is implicitly terminal
+    .Then("fsm_close", Workflow.End); // a multi-job workflow needs an explicit terminal edge
 ```
 
 Jobs prefixed with `fsm_` fire state machine transitions. Business logic
@@ -229,4 +243,4 @@ docker compose up -d    # starts Qdrant, MQTT, and Redis
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

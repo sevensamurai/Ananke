@@ -4,7 +4,7 @@
 Production-ready model decorators for response caching and resilient retries,
 decorator composition, and local/custom LLM endpoints.
 
-→ **Full reference:** [Advanced Agent Features](reference/advanced-agent-features.md)
+→ **Full reference:** [Advanced Agent Features](../reference/advanced-agent-features.md)
 
 ---
 
@@ -137,6 +137,111 @@ Event: llm.rate_limit_retry
 
 ---
 
+## Job-Level Retry (`WithRetry`)
+
+`ResilientAgentModel` (above) retries a single model call on HTTP 429. `WithRetry` is a
+different, complementary mechanism: it retries the **whole agent job** — model call and any
+tool round — on a transient failure, available on every `AgentJobFactory.Create(...)` builder:
+
+```csharp
+var agent = AgentJobFactory.Create<MyState, MyResponse>("classify", model)
+    .WithPrompt(s => s.Input)
+    .WithRetry(maxAttempts: 3, baseDelay: TimeSpan.FromMilliseconds(200))
+    .MapResult((s, r) => s with { Result = r })
+    .Build();
+```
+
+Each retry attempt increments the `ananke.model.retry` counter (meter
+`Ananke.Orchestration.Tools`, tag `agent_id`) — see [10 — Observability](10-observability.md) for
+wiring metrics into an OTEL exporter. Pair it with `WithTrajectoryObserver` (below) to also
+surface the retry count on the completed episode's `TrajectorySnapshot.RetryCount`.
+
+---
+
+## Hallucination Detection (`IHallucinationObserver`)
+
+When a model calls a tool name that isn't registered in the `ToolKit`, the agent doesn't crash
+or silently ignore it — it returns a well-formed error result to the model (so the model can
+self-correct on the next turn) and, if a hallucination observer is registered, reports a
+`HallucinatedToolCallEvent`:
+
+```csharp
+using Ananke.Abstractions.Tools;
+
+internal sealed class LoggingHallucinationObserver : IHallucinationObserver
+{
+    public ValueTask ReportAsync(HallucinatedToolCallEvent @event, CancellationToken ct = default)
+    {
+        Console.WriteLine($"[hallucination] agent={@event.AgentId} kit={@event.RequestedKitName} " +
+            $"requested unknown tool '{@event.RequestedToolName}'");
+        return ValueTask.CompletedTask;
+    }
+}
+
+var tools = new ToolKit("ops")
+    .AddTool("real_tool", "A real tool", () => ToolResult.Ok("..."))
+    .WithHallucinationObserver(new LoggingHallucinationObserver());
+```
+
+Each hallucinated call also increments the `ananke.tools.hallucination` counter (tags
+`agent_id`, `kit`, `requested_name`).
+
+---
+
+## Trajectory Observability & the Adaptive Harness
+
+A `TrajectorySnapshot` is a deterministic, per-episode outcome record — tool-call counts,
+hallucinations, faults, retries, and terminal reward — emitted when an agent job's episode
+completes. Register an observer with `WithTrajectoryObserver` to receive one per run:
+
+```csharp
+using Ananke.Abstractions.Trajectory;
+
+internal sealed class LoggingTrajectoryObserver : ITrajectoryObserver
+{
+    public ValueTask OnTrajectoryCompleteAsync(TrajectorySnapshot snapshot, CancellationToken ct = default)
+    {
+        Console.WriteLine($"[trajectory] episode={snapshot.EpisodeId} succeeded={snapshot.Succeeded} " +
+            $"retries={snapshot.RetryCount} hallucinations={snapshot.HallucinatedToolCalls}");
+        return ValueTask.CompletedTask;
+    }
+}
+
+var agent = AgentJobFactory.Create<MyState>("respond", model)
+    .WithPrompt(s => s.Input)
+    .WithTrajectoryObserver(new LoggingTrajectoryObserver())
+    .MapResult((s, text) => s with { Output = text })
+    .Build();
+```
+
+`Ananke.Orchestration` ships a default policy that *reacts* to these snapshots instead of just
+logging them — `CompositeAdaptiveHarnessPolicy` implements both `IAdaptiveHarnessPolicy` and
+`ITrajectoryObserver`, so registering it as the trajectory observer is enough to wire it in:
+
+```csharp
+using Ananke.Orchestration.Agents.Trajectory;
+
+var harness = new CompositeAdaptiveHarnessPolicy(
+    tracker: toolAffinityTracker,        // ToolAffinityTracker — same one backing the ToolKit's router
+    options: new AdaptiveHarnessOptions { KitName = "ops", HallucinationThreshold = 3 },
+    learningTrigger: offlineLearner);    // ILearningCycleTrigger — e.g. Ananke.Learning's OfflineLearner
+
+var agent = AgentJobFactory.Create<MyState>("respond", model)
+    .WithPrompt(s => s.Input)
+    .WithTrajectoryObserver(harness)
+    .MapResult((s, text) => s with { Output = text })
+    .Build();
+```
+
+It applies three rules per completed episode: hallucinations at or above
+`HallucinationThreshold` trigger a learning cycle; abandoned faults penalize the affinity of
+every tool tracked under `KitName`; a clean success (zero retries) rewards them. This is the
+seam where tool routing adapts from real outcomes instead of a fixed configuration — see
+[06 — Memory](06-memory.md) and [15 — Empirical Memory](15-empirical-memory.md) for what
+`ToolAffinityTracker` and the offline learner do with that signal.
+
+---
+
 ## Composing Decorators
 
 Both decorators implement `IStreamingAgentModel` and stack naturally.
@@ -187,4 +292,4 @@ var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

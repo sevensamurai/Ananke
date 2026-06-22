@@ -34,44 +34,48 @@ Each job receives a typed state, does work, and returns a new state.
 
 ```csharp
 using Ananke.Orchestration;
+using Ananke.Orchestration.Workflows;
 
-// 1. Define your state — a plain C# record
+// 1. Build the workflow
+var workflow = new Workflow<GreetingState>("hello")
+    .Job("greet", (state, ct) =>
+        Task.FromResult(state with { Greeting = $"Hello, {state.Name}!" }));
+
+// 2. Run it
+var result = await workflow.RunAsync(new GreetingState { Name = "World" });
+
+Console.WriteLine(result.State.Greeting);   // "Hello, World!"
+Console.WriteLine(result.Status);            // Completed
+
+// 3. Define your state — a plain C# record
 record GreetingState
 {
     public string Name { get; init; } = "";
     public string Greeting { get; init; } = "";
 }
-
-// 2. Build the workflow
-var workflow = new Workflow<GreetingState>("hello")
-    .Job("greet", (state, ct) =>
-        Task.FromResult(state with { Greeting = $"Hello, {state.Name}!" }));
-
-// 3. Run it
-var result = await workflow.RunAsync(new GreetingState { Name = "World" });
-
-Console.WriteLine(result.State.Greeting);   // "Hello, World!"
-Console.WriteLine(result.Status);            // Completed
 ```
 
 **What's happening:**
 - `Workflow<T>` is generic over your state type — the compiler enforces type safety end-to-end.
 - `.Job("greet", ...)` registers a named job with a delegate.
-- A job with no outgoing edge is automatically the terminal node — no explicit `.Then(…, Workflow.End)` needed.
+- A *single-job* workflow's job is automatically the terminal node — no explicit `.Then(…, Workflow.End)` needed. With two or more jobs, every job without an outgoing edge needs one (see the next section).
 - `.RunAsync()` executes the graph and returns a `WorkflowExecution<T>`.
 
 ---
 
 ## Chaining Multiple Jobs
 
-Use `.Chain()` to wire a sequence of jobs in one call:
+Use `.Chain()` to wire a sequence of jobs in one call. With two or more jobs, the last one
+still needs an explicit `.Then(..., Workflow.End)` — the "no outgoing edge needed" shortcut
+from the previous example only applies to a single-job workflow:
 
 ```csharp
 var workflow = new Workflow<PipelineState>("pipeline")
     .Job("fetch",     async (state, ct) => state with { Raw = "raw data" })
     .Job("transform", async (state, ct) => state with { Clean = state.Raw.ToUpperInvariant() })
     .Job("publish",   async (state, ct) => state with { Done = true })
-    .Chain("fetch", "transform", "publish");
+    .Chain("fetch", "transform", "publish")
+    .Then("publish", Workflow.End);
 
 var result = await workflow.RunAsync(new PipelineState());
 // result.State.Done == true
@@ -88,6 +92,7 @@ dotnet add package Ananke.Orchestration.OpenAI
 ```
 
 ```csharp
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.OpenAI;
 using System.ClientModel;
@@ -152,4 +157,4 @@ MyProject/
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

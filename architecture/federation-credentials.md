@@ -1,11 +1,11 @@
-﻿# Federation Credentials Matrix
+# Federation Credentials Matrix
 
 This document describes the credential types, required scopes, rotation procedures, and
 implementation status for each platform adapter in `Ananke.Federation`.
 
 > **See also:** [`organics-federation.md`](organics-federation.md) for the overall
 > federation architecture. The `IFederationCredentialProvider` interface lives in
-> `Ananke.Federation/Credentials/IFederationCredentialProvider.cs`.
+> `src/Ananke.Federation/Credentials/IFederationCredentialProvider.cs`.
 
 ---
 
@@ -13,9 +13,9 @@ implementation status for each platform adapter in `Ananke.Federation`.
 
 | Platform | Credential type | Required scopes / permissions | Rotation procedure | `IFederationCredentialProvider` implementation | Status |
 |---|---|---|---|---|---|
-| **Azure** | Azure Managed Identity _or_ Service Principal (client secret / certificate) | `Cognitive Services User`, `AzureML Data Scientist` (or equivalent for the target resource) | Rotate via Azure Key Vault secret rotation policy; MSI rotates automatically | `Ananke.Federation.Azure` — `AzureCredentialProvider` (stub) | Pending — see [tracking issue](#tracking-issues) |
-| **Google** | Service Account JSON key _or_ Workload Identity Federation | `roles/aiplatform.user` on the Vertex AI project | Rotate service account keys via `gcloud iam service-accounts keys create`; prefer Workload Identity (keyless) | `Ananke.Federation.Google` — `GoogleCredentialProvider` (stub) | Pending |
-| **Anthropic** | API key (bearer token) | N/A — key grants full account access; scope via sub-keys if available | Rotate via Anthropic Console; store in secrets manager, never in source | `Ananke.Federation.Anthropic` — `AnthropicCredentialProvider` (stub) | Pending |
+| **Azure** | Azure Managed Identity _or_ Service Principal (client secret / certificate) | `Cognitive Services User`, `AzureML Data Scientist` (or equivalent for the target resource) | Rotate via Azure Key Vault secret rotation policy; MSI rotates automatically | `Ananke.Federation.Azure` — `AzureAgentCredentialProvider` | Implemented |
+| **Google** | Service Account JSON key _or_ Workload Identity Federation | `roles/aiplatform.user` on the Vertex AI project | Rotate service account keys via `gcloud iam service-accounts keys create`; prefer Workload Identity (keyless) | `Ananke.Federation.Google` — `VertexAICredentialProvider` | Implemented |
+| **Anthropic** | API key (bearer token) | N/A — key grants full account access; scope via sub-keys if available | Rotate via Anthropic Console; store in secrets manager, never in source | `Ananke.Federation.Anthropic` — `ClaudeCredentialProvider` | Implemented |
 | **Local** | None — in-process, no remote auth | N/A | N/A | N/A (no credential provider needed for local deployments) | Implemented |
 
 ---
@@ -36,8 +36,13 @@ public interface IFederationCredentialProvider
 - `GetCredentialAsync` — resolves the raw credential object at runtime. Secrets are never
   stored in manifests; this method fetches them on demand from the host secrets store.
 - `ValidateAsync` — calls the platform and confirms the credential is accepted. Useful for
-  `nnke-platform whoami` and startup health checks. Default implementation throws
-  `NotImplementedException`; platform adapters override when their authentication flow is implemented.
+  `nnke-platform whoami` and startup health checks. This is a plain interface member with
+  no default implementation — every provider supplies its own:
+  - **`ClaudeCredentialProvider`** — without a `clientFactory`, returns `true` when
+    `ANTHROPIC_API_KEY` (or the constructor-supplied key) is present and non-empty. With a
+    `clientFactory` supplied, performs a live API round-trip (`PingAsync`).
+  - **`AzureAgentCredentialProvider`** / **`VertexAICredentialProvider`** — call
+    `GetCredentialAsync(Platform, ct)` and return whether the result is non-null.
 
 ---
 
@@ -55,14 +60,3 @@ Never commit API keys or service account JSON files to source control.
 The `~/.ananke/credentials.json` file written by `nnke-platform login` is stored
 with `chmod 600` (user-read only) and should be excluded from version control via
 `.gitignore`.
-
----
-
-## Tracking issues
-
-- Azure `AzureCredentialProvider.ValidateAsync` full implementation: tracked in backlog
-- Google `GoogleCredentialProvider.ValidateAsync` full implementation: tracked in backlog
-- Anthropic `AnthropicCredentialProvider.ValidateAsync` full implementation: tracked in backlog
-
-All three implementations are stubbed to `throw new NotImplementedException(...)` in v0.8.0.
-The `## Platform adapter status` table in each package's `README.md` lists per-method status.

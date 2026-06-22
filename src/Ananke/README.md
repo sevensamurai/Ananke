@@ -26,7 +26,7 @@ dotnet add package Ananke.Orchestration.OpenAI    # or Ananke.Orchestration.Anth
 | `Ananke.StateMachine` | Distributed FSM with RedLock coordination, middleware, fault/reset |
 | `Ananke.Orchestration` | Workflow builder, runner, agents, knowledge pipeline, checkpointing, tracing |
 
-The bridge glue code (`StateMachineTriggerJob`, `WorkflowTriggerAction`, `WorkflowCompletionTrigger`) is included directly — it connects state machine transitions to workflow executions and vice versa.
+The bridge glue code (`StateMachineTriggerJob`, `WorkflowCompletionTrigger`, `BridgeExtensions.StateMachineJob`/`.RunWorkflowAsync`) is included directly — it connects state machine transitions to workflow executions and vice versa.
 
 ## Quick start
 

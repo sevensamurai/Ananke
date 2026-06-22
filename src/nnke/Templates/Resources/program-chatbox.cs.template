@@ -41,9 +41,11 @@ builder.Configuration
 //   Anthropic → Ananke.Orchestration.Anthropic / "Anthropic": { "ApiKey": "sk-ant-..." }
 //   Google    → Ananke.Orchestration.Google    / "Google":    { "ApiKey": "AIza..."    }
 var apiKey = builder.Configuration["{{provider_section}}:ApiKey"];
+var hasRealKey = !string.IsNullOrWhiteSpace(apiKey)
+    && !apiKey.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase);
 
-IStreamingAgentModel model = !string.IsNullOrWhiteSpace(apiKey)
-    ? {{provider_class}}.Create(apiKey, builder.Configuration["{{provider_section}}:Model"] ?? "{{model}}")
+IStreamingAgentModel model = hasRealKey
+    ? {{provider_class}}.Create(apiKey!, builder.Configuration["{{provider_section}}:Model"] ?? "{{model}}")
     : new SimulatedStreamingModel();
 
 if (model is SimulatedStreamingModel)

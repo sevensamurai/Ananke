@@ -15,6 +15,21 @@ Platform-specific implementations live in separate packages:
 
 ---
 
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `IFederationDeployer` — the contract every platform package implements; start here to
+   understand the deploy/validate/teardown lifecycle — `src/Ananke.Federation/Deployment/IFederationDeployer.cs`
+2. `IDeployabilityValidator` — the offline check a manifest must pass before any deploy is
+   attempted — `src/Ananke.Federation/Validation/IDeployabilityValidator.cs`
+3. `IFederationCredentialProvider` — how every platform resolves secrets at runtime — `src/Ananke.Federation/Credentials/IFederationCredentialProvider.cs`
+4. `FederatedWorkflowHost` — the runtime composition root that routes a cell to a local or
+   platform-specific host — `src/Ananke.Federation/Hosting/FederatedWorkflowHost.cs`
+
+---
+
 ## Dependencies
 
 | Dependency | Why |
@@ -60,21 +75,21 @@ Ananke.Federation/
 
 ## Key Abstractions
 
-| Type | Kind | Purpose |
-|---|---|---|
-| `IFederationDeployer` | `interface` | Platform deployer — `ValidateAsync`, `DeployAsync`, `TeardownAsync`. One implementation per platform package. |
-| `IFederationCredentialProvider` | `interface` | Resolves platform credentials at runtime. `GetCredentialAsync` returns an opaque credential object. See [ValidateAsync status](#credential-validation-status). |
-| `IDeploymentRegistry` | `interface` | Tracks active deployments (`Register`, `Get`, `List`, `UpdateStatus`). Default: `InMemoryDeploymentRegistry`. |
-| `IDeployabilityValidator` | `interface` | Offline structural validation (no credentials, no network). Returns `DeployabilityReport` with FED001–FED023 diagnostic codes. |
-| `IPlatformValidator` | `interface` | Live platform validation (credentials + quota checks). Implemented by each provider package. |
-| `IRemoteCellMonitor` | `interface` | Polls remote cell health and execution metrics. One implementation per platform package. |
-| `ISystemPromptCompiler` | `interface` | Compiles a `WorkflowManifest` into a platform system prompt. Default: `ManifestSystemPromptCompiler`. |
-| `FederatedWorkflowHost` | `sealed class` | Composite `IWorkflowHost` — routes `StartAsync`/`StopAsync` to local or platform-specific hosts via `HybridRouter`. Falls back to local if no rule matches. |
-| `HybridRouter` | `sealed class` | Rule-based routing. Decisions are sticky for cell lifetime; migration = teardown + re-deploy. |
-| `FederatedDivisionPolicy` | `sealed class` | `IDivisionPolicy` decorator — enriches inner policy's `DivisionPlan` with `ChildSpec.TargetPlatform` based on deployment profiles and metrics trends. |
-| `PlatformDivisionApprovalGate` | `sealed class` | Requires human approval for platform-targeted divisions; delegates local-only divisions to an inner gate. |
-| `FederatedComplexityMonitor` | `sealed class` | `IHealthMonitor` + `IRemoteCellSource` — bridges local telemetry and remote platform metrics into unified `ComplexitySnapshot`. |
-| `RemoteMetricsTracker` | `sealed class` | Accumulates `MetricsSample` streams per deployment and computes `RemoteCellTrend` (Stable / Improving / Degrading). |
+| Type | Kind | Purpose | Source |
+|---|---|---|---|
+| `IFederationDeployer` | `interface` | Platform deployer — `ValidateAsync`, `DeployAsync`, `TeardownAsync`. One implementation per platform package. | `src/Ananke.Federation/Deployment/IFederationDeployer.cs` |
+| `IFederationCredentialProvider` | `interface` | Resolves platform credentials at runtime. `GetCredentialAsync` returns an opaque credential object. See [ValidateAsync status](#credential-validation-status). | `src/Ananke.Federation/Credentials/IFederationCredentialProvider.cs` |
+| `IDeploymentRegistry` | `interface` | Tracks active deployments (`RegisterAsync`, `GetAsync`, `ListAsync`, `UpdateStatusAsync`, `UpdateAsync`). Default: `InMemoryDeploymentRegistry`. | `src/Ananke.Federation/Deployment/IDeploymentRegistry.cs` |
+| `IDeployabilityValidator` | `interface` | Offline structural validation (no credentials, no network). Returns `DeployabilityReport` with FED001–FED023 diagnostic codes. | `src/Ananke.Federation/Validation/IDeployabilityValidator.cs` |
+| `IPlatformValidator` | `interface` | Live platform validation (credentials + quota checks). Implemented by each provider package. | `src/Ananke.Federation/Validation/IPlatformValidator.cs` |
+| `IRemoteCellMonitor` | `interface` | Polls remote cell health and execution metrics. One implementation per platform package. | `src/Ananke.Federation/Monitoring/IRemoteCellMonitor.cs` |
+| `ISystemPromptCompiler` | `interface` | Compiles a `WorkflowManifest` into a platform system prompt. Default: `ManifestSystemPromptCompiler`. Federation-local interface — distinct from `Ananke.Abstractions.Providers.ISystemPromptCompiler`. | `src/Ananke.Federation/Prompts/ISystemPromptCompiler.cs` |
+| `FederatedWorkflowHost` | `sealed class` | Composite `IWorkflowHost` — routes `StartAsync`/`StopAsync` to local or platform-specific hosts via `HybridRouter`. Falls back to local if no rule matches. | `src/Ananke.Federation/Hosting/FederatedWorkflowHost.cs` |
+| `HybridRouter` | `sealed class` | Rule-based routing. Decisions are sticky for cell lifetime; migration = teardown + re-deploy. | `src/Ananke.Federation/Hosting/HybridRouter.cs` |
+| `FederatedDivisionPolicy` | `sealed class` | `IDivisionPolicy` decorator — enriches inner policy's `DivisionPlan` with `ChildSpec.TargetPlatform` based on deployment profiles and metrics trends. | `src/Ananke.Federation/Division/FederatedDivisionPolicy.cs` |
+| `PlatformDivisionApprovalGate` | `sealed class` | Requires human approval for platform-targeted divisions; delegates local-only divisions to an inner gate. | `src/Ananke.Federation/Division/PlatformDivisionApprovalGate.cs` |
+| `FederatedComplexityMonitor` | `sealed class` | `IHealthMonitor` + `IRemoteCellSource` — bridges local telemetry and remote platform metrics into unified `ComplexitySnapshot`. | `src/Ananke.Federation/Hosting/FederatedComplexityMonitor.cs` |
+| `RemoteMetricsTracker` | `sealed class` | Accumulates `MetricsSample` streams per deployment and computes `RemoteCellTrend` (Stable / Improving / Degrading). | `src/Ananke.Federation/Monitoring/RemoteMetricsTracker.cs` |
 
 ---
 
@@ -121,13 +136,14 @@ Two-stage validation is always performed before deployment:
 
 ### Credential validation status
 
-`IFederationCredentialProvider.ValidateAsync()` has a **default interface implementation that throws `NotImplementedException`**. This is intentional — providers that have not yet implemented live credential validation will fail loudly rather than silently. Each platform adapter is expected to override this method. Current status:
+`IFederationCredentialProvider.ValidateAsync()` is a plain interface member — there is no
+default implementation, so every provider supplies its own. All three are implemented today:
 
-| Provider | `ValidateAsync` status |
+| Provider | `ValidateAsync` behaviour |
 |---|---|
-| `ClaudeCredentialProvider` (Anthropic) | Not yet implemented — throws |
-| `AzureAgentCredentialProvider` (Azure) | See provider package |
-| `VertexAICredentialProvider` (Google) | See provider package |
+| `ClaudeCredentialProvider` (Anthropic) | Without a `clientFactory`, returns `true` when `ANTHROPIC_API_KEY` (or the constructor-supplied key) is present and non-empty. With a `clientFactory` supplied, performs a live API round-trip (`PingAsync`). |
+| `AzureAgentCredentialProvider` (Azure) | Calls `GetCredentialAsync(Platform, ct)` and returns whether the result is non-null. |
+| `VertexAICredentialProvider` (Google) | Calls `GetCredentialAsync(Platform, ct)` and returns whether the result is non-null. |
 
 ---
 

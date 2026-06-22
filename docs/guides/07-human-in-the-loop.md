@@ -1,4 +1,4 @@
-﻿<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl -->
+﻿<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl, ask, awaitinput, conversational -->
 # 07 — Human-in-the-Loop
 
 Pause workflow execution at any step for human review, checkpoint the full state,
@@ -25,6 +25,7 @@ Pause the workflow before a specific job executes:
 ```csharp
 using Ananke.Orchestration;
 using Ananke.Orchestration.Checkpointing;
+using Ananke.Orchestration.Workflows;
 
 var checkpointStore = new InMemoryCheckpointStore();
 
@@ -36,6 +37,7 @@ var workflow = new Workflow<ApprovalState>("trade-approval")
     .Job("execute", async (state, ct) =>
         state with { Executed = true })
     .Chain("analyze", "review", "execute")
+    .Then("execute", Workflow.End)
     .InterruptBefore("execute")          // ← pause here
     .UseCheckpointing(checkpointStore);
 
@@ -72,9 +74,53 @@ Pause after a job completes (useful for reviewing results before proceeding):
 ```csharp
 var workflow = new Workflow<ContentState>("content-pipeline")
     .Chain("draft", "review", "publish")
+    .Then("publish", Workflow.End)
     .InterruptAfter("review")    // pause after review completes
     .UseCheckpointing(checkpointStore);
 ```
+
+---
+
+## Input-Collecting Turns (`AwaitInput`)
+
+`InterruptBefore`/`InterruptAfter` pause for an approval — a yes/no (or modify-and-continue)
+decision. A different shape is a **turn**: pause to collect a free-text reply, then fold it into
+state. `AwaitInput` marks a job as exactly that — it pauses before the job like `InterruptBefore`,
+plus records it in `WorkflowDefinition.InputJobs`:
+
+```csharp
+var workflow = new Workflow<InterviewState>("ask-name")
+    .Job("ask_question", async (state, ct) => state)   // no-op anchor for the turn
+    .Then("greet", "ask_question")
+    .AwaitInput("ask_question")          // pauses before ask_question, like InterruptBefore...
+    .UseCheckpointing(checkpointStore);  // ...plus marks it in WorkflowDefinition.InputJobs
+```
+
+`InputJobs` is how a host (a Slack bot, a chat UI) tells an input-collecting turn apart from a
+plain approval gate when it sees `ExecutionStatus.Interrupted` — useful when a workflow has both
+kinds of pause point.
+
+### Resuming a turn
+
+`ResumeAsync(executionId, stateTransform)` still works, but `WorkflowInputExtensions` provides a
+channel-agnostic shortcut that folds the reply into state for you:
+
+```csharp
+using Ananke.Orchestration.Workflows;
+
+// fold: (state, reply, ct) -> next state, e.g. appending to a transcript
+var resumed = await workflow.ResumeWithInputAsync(
+    execution.Id, execution.State, userReply, fold);
+```
+
+The adapter's only job is correlating the inbound message to `execution.Id` (by
+conversation/thread id) — fold-then-resume happens in one call.
+
+### Multi-turn conversations
+
+For a full interview — welcome → icebreaker → a loop of `AwaitInput` turns, with expand/skip/
+update navigation over a question agenda — use `AgenticPattern.Interview<TState>` instead of
+wiring `AwaitInput` by hand. See [Guide 16 — Agentic Patterns](16-agentic-patterns.md#interview-conversational).
 
 ---
 
@@ -102,6 +148,7 @@ var workflow = new Workflow<State>("content-approval")
         return state with { Published = true };
     })
     .Chain("draft", "review", "publish")
+    .Then("publish", Workflow.End)
     .InterruptBefore("publish")
     .UseCheckpointing(checkpointStore);
 
@@ -166,14 +213,14 @@ var item = new WorkItem
 {
     Id      = "wi-1",
     Title   = "Add login endpoint",
-    Kind    = WorkItemKind.Patch,
+    Kind    = WorkItemKind.PullRequest,
     Payload = "<diff content>",
 };
 
 // A gate decides what to do with it
-WorkReviewOutcome outcome = await gate.ReviewAsync(item, ct);
-// outcome.Decision  == WorkReviewDecision.Approved | Revised | Rejected
-// outcome.Comment   == optional reviewer note
+WorkReviewDecision decision = await gate.ReviewAsync(item, ct);
+// decision.Outcome  == WorkReviewOutcome.Approved | Revised | Rejected
+// decision.Comment  == reviewer note
 ```
 
 ### Built-in gate implementations
@@ -185,16 +232,28 @@ WorkReviewOutcome outcome = await gate.ReviewAsync(item, ct);
 | `LlmWorkReviewGate` | Uses a configured `IAgentModel` to review the payload |
 | `QuorumWorkReviewGate` | Wraps multiple gates; requires a configurable quorum to approve |
 
-### Budget gates
+### A note on "gates" — work review vs. division approval
 
-`BudgetApprovalGate` wraps an `IBudgetMeter` and blocks work when a rolling-window token or cost cap is exceeded:
+`IWorkReviewGate` above reviews **work items** (diffs, documents, plans) and returns a
+`WorkReviewOutcome`. A separate, similarly-named interface, `IDivisionApprovalGate`
+(`Ananke.Organics.Division.Approval`), reviews a proposed **cell division** — the governance
+checkpoint between `IDivisionPolicy` (which proposes splitting an overloaded cell) and
+`IWorkflowDivider` (which executes the split) — and returns a `DivisionApproval`. Both are
+human-in-the-loop "gates" in spirit, but they review different things and are not
+interchangeable. `BudgetApprovalGate` is a division-approval gate, not a work-review gate:
 
 ```csharp
-var meter   = new InMemoryBudgetMeter(windowMinutes: 60, tokenLimit: 100_000);
-var gate    = new BudgetApprovalGate(meter);
-var outcome = await gate.ReviewAsync(item, ct);
-// WorkReviewDecision.Rejected when the budget window is exhausted
+var meter = new InMemoryBudgetMeter(); // Ananke.Abstractions.Budget — rolling 1-hour window by default
+var gate  = new BudgetApprovalGate(meter, tokenCap: 100_000);
+
+DivisionApproval approval = await gate.ReviewAsync(plan, snapshot, ct);
+// approval.IsApproved == false once the cell's workflow has consumed >= 100_000 tokens
+// in the current window — blocks the division rather than a work item.
 ```
+
+The other built-in `IDivisionApprovalGate` implementations are `AutoApprovalGate` (always
+approves — the default), `CallbackApprovalGate` (delegates to an `async Func`), and
+`LlmApprovalGate` (uses an `IAgentModel` to review the plan).
 
 ---
 
@@ -209,18 +268,18 @@ Some review decisions don't arrive immediately — a Slack reaction, an email re
 ```csharp
 // Register the parking store (e.g. in DI)
 IWorkReviewParkingStore store = new InMemoryWorkReviewParkingStore();
-var gate = new ParkingCallbackWorkReviewGate(store);
+var gate = new ParkingCallbackWorkReviewGate(store, gateId: "content-review");
 
 // In the workflow job
-var outcome = await gate.ReviewAsync(item, ct);
-if (outcome.Decision == WorkReviewDecision.Pending)
+var decision = await gate.ReviewAsync(item, ct);
+if (decision.Outcome == WorkReviewOutcome.Pending)
 {
-    var parkingId = outcome.Comment;   // store this with your job execution id
+    var parkingId = decision.Comment;   // store this with your job execution id
     // workflow suspends here — caller is responsible for checkpointing
 }
 
 // Later — when the human decision arrives (e.g. from a Slack interaction handler)
-await gate.ResumeAsync(parkingId, WorkReviewDecision.Approved);
+await gate.ResumeAsync(parkingId, WorkReviewDecision.Approve("Looks good", reviewerId: "alice"));
 ```
 
 ### Surfacing the review request
@@ -253,4 +312,4 @@ The notifier is transport-neutral — it calls `IPlatformResponseSink.SendMessag
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

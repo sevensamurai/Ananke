@@ -75,9 +75,12 @@ flowchart TD
 
 ## `KnowledgeBase` Facade
 
-`KnowledgeBase` is the high-level API that composes the pipeline:
-- `IngestAsync(document)` — full pipeline from raw doc to indexed chunks
-- `SearchAsync(query, topK)` — semantic search with time-decay reranking
+`KnowledgeBase` is a read-side facade over one or more already-built `KnowledgeSection`s
+plus a shared `IKnowledgeCatalog` — it does not run the ingestion pipeline itself
+(that's `DocumentProcessor.ProcessAsync`, see above):
+- `SearchAsync(query, options?)` — searches all sections in parallel, merges results by
+  descending score (`options.TopK` applies per section)
+- `this[name]` / `TryGetSection(name, out section)` — look up a named section directly
 - Integrates with `KnowledgeSearchTool` for agent tool calling
 
 ## Time-Decay Reranking

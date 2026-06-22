@@ -19,16 +19,19 @@ dotnet add package Ananke.MCP
 
 ```csharp
 using Ananke.Orchestration.Tools;
+using Ananke.Orchestration.Workflows;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 var mathTools = new ToolKit("math")
-    .AddTool<double, double>("add", "Adds two numbers",
-        (a, b) => $"{a + b}",
-        ("a", "First number"), ("b", "Second number"))
-    .AddTool<double, double>("multiply", "Multiplies two numbers",
-        (a, b) => $"{a * b}",
-        ("a", "First number"), ("b", "Second number"));
+    .AddTool("add", "Adds two numbers", b => b
+        .Param<double>("a", "First number")
+        .Param<double>("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{args.Get<double>("a") + args.Get<double>("b")}")))
+    .AddTool("multiply", "Multiplies two numbers", b => b
+        .Param<double>("a", "First number")
+        .Param<double>("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{args.Get<double>("a") * args.Get<double>("b")}")));
 
 var builder = Host.CreateEmptyApplicationBuilder(settings: null);
 
@@ -60,7 +63,8 @@ var pipeline = new Workflow<PipelineState>("data-pipeline")
         { WordCount = state.Input?.Split(' ').Length ?? 0 }))
     .Job("format", (state, _) => Task.FromResult(state with
         { Output = state.Input!.ToUpperInvariant() }))
-    .Chain("validate", "enrich", "format");
+    .Chain("validate", "enrich", "format")
+    .Then("format", Workflow.End);
 
 builder.Services
     .AddMcpServer(options => { /* ... */ })
@@ -123,9 +127,12 @@ dotnet add package Ananke.A2A
 Call a remote A2A agent as if it were a local `IAgentModel`:
 
 ```csharp
-using Ananke.A2A;
+using Ananke.A2A.Client;
 
-var remoteAgent = new A2AAgentModel(new Uri("https://remote-agent.example.com/.well-known/agent.json"));
+var remoteAgent = new A2AAgentModel(new A2AAgentModelOptions
+{
+    AgentUrl = new Uri("https://remote-agent.example.com/.well-known/agent.json")
+});
 
 var response = await remoteAgent.GenerateAsync(new AgentRequest
 {
@@ -135,20 +142,34 @@ var response = await remoteAgent.GenerateAsync(new AgentRequest
 
 ### A2A Server — Expose Workflows
 
-Expose Ananke workflows as A2A-compliant endpoints:
+Expose Ananke workflows as A2A-compliant endpoints with `WorkflowTaskAdapter`, which bridges
+a text-in/text-out processing function (typically a workflow run) to A2A's `TaskManager`:
 
 ```csharp
-using Ananke.A2A;
+using A2A;
+using Ananke.A2A.Server;
 
-builder.Services.AddA2AServer(options =>
+var taskManager = new TaskManager();
+var adapter = new WorkflowTaskAdapter(async (text, ct) =>
 {
-    options.AgentCard = new AgentCardBuilder()
-        .WithName("my-agent")
-        .WithDescription("A data analysis agent")
-        .WithSkills(toolkit)
-        .Build();
+    var result = await workflow.RunAsync(new MyState { Input = text }, ct);
+    return result.FinalState.Output;
 });
+
+var agentCard = new AgentCardBuilder()
+    .WithName("my-agent")
+    .WithDescription("A data analysis agent")
+    .WithSkillsFrom(toolkit)
+    .Build("http://localhost:5100/agent");
+
+adapter.Attach(taskManager, agentCard);
 ```
+
+`Attach` wires `taskManager.OnMessageReceived` and the agent-card query callback. Mapping the
+HTTP endpoint itself (JSON-RPC `message/send` dispatch and the `/.well-known/agent-card.json`
+route) is a small amount of ASP.NET Minimal API code — see
+[`A2AEndpoints.cs`](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/AgentToAgentProtocolDemo/A2AEndpoints.cs)
+in the AgentToAgentProtocolDemo for a complete, runnable version.
 
 ---
 
@@ -182,4 +203,4 @@ var tool = new ToolDefinition
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

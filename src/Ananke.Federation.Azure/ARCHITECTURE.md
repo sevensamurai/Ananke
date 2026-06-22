@@ -10,6 +10,19 @@ mapper, tool schema translator, and system prompt compiler for Azure AI Agent Se
 
 ---
 
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `AzureAgentDeployer` — the `IFederationDeployer` implementation; full deploy / teardown
+   path against Azure AI Agent Service — `src/Ananke.Federation.Azure/AzureAgentDeployer.cs`
+2. `AzureAgentCredentialProvider` — resolves Azure credentials (`TokenCredential`, connection
+   string, or API key) — `src/Ananke.Federation.Azure/AzureAgentCredentialProvider.cs`
+3. `AzureWorkflowHost` — manages Azure-hosted cell lifecycle — `src/Ananke.Federation.Azure/AzureWorkflowHost.cs`
+
+---
+
 ## Dependencies
 
 | Dependency | Why |

@@ -28,7 +28,7 @@ relevant documentation guide and demo (where available).
 | **AgentJob** | Drop an LLM into a workflow job with tool calling and structured output | [03 — Agents](../guides/03-agents.md) | [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo) |
 | **OpenAI provider** | `OpenAIChatAgentModel` — GPT-4.1, GPT-4o, o-series, and any compatible endpoint | [03 — Agents](../guides/03-agents.md) | [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo) |
 | **Anthropic provider** | `AnthropicAgentModel` — Claude Sonnet, Haiku, Opus | [03 — Agents](../guides/03-agents.md) | — |
-| **Google Gemini provider** | `GoogleAgentModel` — Gemini 2.5 Pro, Flash | [03 — Agents](../guides/03-agents.md) | — |
+| **Google Gemini provider** | `GeminiAgentModel` — Gemini 2.5 Pro, Flash | [03 — Agents](../guides/03-agents.md) | — |
 | **Local / custom endpoints** | Ollama, LM Studio, vLLM, Azure OpenAI, Groq, Deepseek, Together AI | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
 | **Structured output** | Typed response deserialization via `AgentJob<TState, TResponse>` | [03 — Agents](../guides/03-agents.md) | — |
 | **Token-level streaming** | Stream individual tokens via `IStreamingAgentModel.GenerateStreamAsync` | [05 — Streaming Chat](../guides/05-streaming-chat.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
@@ -84,7 +84,7 @@ relevant documentation guide and demo (where available).
 |---|---|---|---|
 | **AbstractStateMachine** | Distributed FSM with typed states, transitions, and events | [08 — State Machine](../guides/08-state-machine.md) | [StateMachineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/StateMachineDemo) |
 | **Distributed locking** | Safe coordination across instances via `IDistributedLock` | [08 — State Machine](../guides/08-state-machine.md) | — |
-| **Middleware pipeline** | `IJobMiddleware<T>` — intercept every transition for logging, metrics, validation | [08 — State Machine](../guides/08-state-machine.md) | — |
+| **Middleware pipeline** | `ITransitionMiddleware<TContext, TState, TTransition>` — intercept every transition for logging, metrics, validation | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Guard conditions** | Block transitions based on runtime state | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Circuit breaking** | `OperationalStatus.Faulted` blocks all transitions until `ResetAsync` | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Lifecycle hooks** | `OnEnter` / `OnExit` per state | [08 — State Machine](../guides/08-state-machine.md) | — |
@@ -123,8 +123,8 @@ relevant documentation guide and demo (where available).
 | **CachingAgentModel** | LLM response caching via any `IKeyValueDataAdapter` (e.g. Redis) | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
 | **Decorator composition** | Stack resilience + caching (or any `IStreamingAgentModel` decorator) | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
 | **Polly integration** | Pass custom `ResiliencePipeline` for circuit breaker, timeout, etc. | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
-| **Job retry** | Polly-based retry built into the workflow runner | [02 — Workflows](../guides/02-workflows.md) | — |
-| **Job timeout** | Per-job `TimeSpan` timeout | [02 — Workflows](../guides/02-workflows.md) | — |
+| **Agent job retry** | `AgentJobFactory.Create(...).WithRetry(maxAttempts, baseDelay)` — retry built into agent jobs specifically, not plain delegate jobs | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
+| **Job timeout** | Per-job `TimeSpan` timeout via `Workflow<TState>.Timeout(jobName, ts)` | [02 — Workflows](../guides/02-workflows.md) | — |
 
 ## Infrastructure & Integration
 

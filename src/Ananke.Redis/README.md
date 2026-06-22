@@ -48,14 +48,20 @@ Both interfaces are backed by the same singleton, which manages the Redis connec
 - **Distributed locking** — RedLock algorithm for safe multi-instance coordination
 - **Key-value storage** — JSON serialized get/set/remove/exists via StackExchange.Redis
 - **Conversation memory** — `RedisConversationMemory` for persistent chat history
-- **DI-friendly** — `IOptions<CacheConfig>` pattern, or manual `SetupAsync()`
+- **DI-friendly** — constructed from `IOptions<CacheConfig>`; connects lazily on first use
 - **Replaces in-memory** — automatically overrides the default `InMemoryDistributedLock`
 
-## Not yet included
+## `ICheckpointStore` — manual wiring
 
-| Interface | Status | Notes |
-|---|---|---|
-| `ICheckpointStore` | ❌ Not yet | Built-in `InMemoryCheckpointStore` and `FileCheckpointStore` cover dev/single-instance. A Redis-backed implementation would use `RedisDataAdapter` for storage with `EXPIREAT` for TTL. See `ICheckpointStore` remarks for implementation guidance. |
+`RedisCheckpointStore` is a Redis-backed `ICheckpointStore` (JSON-serialized checkpoints,
+native `EXPIREAT` TTL). Unlike `RedisDistributedLock`/`RedisDataAdapter`, it is **not**
+registered automatically by `AddRedis(...)` — it takes a `ConnectionMultiplexer` directly
+and must be registered separately:
+
+```csharp
+services.AddSingleton<ICheckpointStore>(sp =>
+    new RedisCheckpointStore(ConnectionMultiplexer.Connect("localhost:6379")));
+```
 
 ## Documentation
 

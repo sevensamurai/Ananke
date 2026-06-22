@@ -9,6 +9,20 @@ Provides `IWorkflowTracer` implementation via OpenTelemetry `ActivitySource`,
 plus helpers for configuring OTLP export and registering a listener-backed
 `IBudgetMeter` that consumes federation token/cost counters.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `OtelTracingBuilder` — fluent builder for wiring up tracing: `OtelTracingBuilder.Build(o => ...)` — `src/Ananke.OpenTelemetry/OtelTracingBuilder.cs`
+2. `ActivitySourceTracer` — `IWorkflowTracer` backed by `System.Diagnostics.ActivitySource` — `src/Ananke.OpenTelemetry/ActivitySourceTracer.cs`
+3. `OpenTelemetryBudgetMeter` — `IBudgetMeter` backed by OpenTelemetry federation counters — `src/Ananke.OpenTelemetry/Budget/OpenTelemetryBudgetMeter.cs`
+4. `TracingExtensions` — DI extensions for tracing and budget-meter registration — `src/Ananke.OpenTelemetry/TracingExtensions.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Abstractions` (project)

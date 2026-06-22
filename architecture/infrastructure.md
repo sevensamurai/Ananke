@@ -47,7 +47,7 @@ stateDiagram-v2
 | `ICheckpointStore` | `RedisCheckpointStore` | Workflow checkpoint persistence; TTL via `EXPIREAT` |
 | `IConversationMemory` | `RedisConversationMemory` | Multi-turn conversation history per session; optional TTL |
 
-Registration: `services.AddAnankeRedis(options)`
+Registration: `services.AddRedis(options)`
 
 ---
 
@@ -62,7 +62,7 @@ Registration: `services.AddAnankeRedis(options)`
 
 Serialization: MessagePack for efficient binary encoding.
 
-Registration: `services.AddAnankeMqtt(options)`
+Registration: `services.AddMqtt<TContext, TAction>(configure)`
 
 ---
 

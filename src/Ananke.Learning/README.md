@@ -71,7 +71,7 @@ An **empirical entry** represents a learned pattern, skill, or heuristic. Entrie
 | `Reinforcement` | Signal applied to an entry — evidence, reward, source, and adjustments |
 | `RecallOptions`, `BrowseOptions`, `PairRecallOptions` | Recall and browse configuration |
 | `AffectOptions` | Configures prediction-error and affect-driven learning behavior |
-| `Episode`, `EpisodeStep`, `EpisodeOutcome` | Episode trajectory model used for credit assignment and skill packaging |
+| `Episode`, `EpisodeStep` | Episode trajectory model used for credit assignment and skill packaging — `Episode.TerminalReward` carries the outcome |
 | `OfflineLearnerOptions`, `OfflineLearningResult` | Offline sweep configuration and outcome summary |
 | `SkillExportOptions`, `SkillImportOptions`, `SkillExportResult`, `SkillImportResult` | Skill package transfer configuration and results |
 
@@ -126,7 +126,7 @@ var matches = await memory.RecallAsync(
 ```csharp
 await memory.ReinforceAsync(entry.Id, new Reinforcement
 {
-    Reward = 1.0f,
+    ConfidenceAdjustment = 0.1f,
     NewEvidence = ["won the game after using this strategy"],
     Source = "game-outcome"
 });
@@ -164,8 +164,8 @@ using Ananke.Learning.EntityMemory;
 var provider = new EntityMemoryProvider(
     conversationMemory,
     memory,
-    episodeStore,
-    knowledgeStore);
+    knowledgeStore,
+    episodeStore);
 
 var customerMemory = provider.GetOrCreate("customer-123");
 var customerPatterns = await customerMemory.Empirical.RecallAsync("billing dispute");
@@ -180,7 +180,7 @@ var packager = new SkillPackager();
 await using var writer = new JsonSkillPackageFormat().CreateWriter(stream);
 
 var export = await packager.ExportAsync(
-    new SkillExportOptions { Name = "support-playbook", Domain = "customer-support" },
+    new SkillExportOptions { Name = "support-playbook", Domain = "customer-support", Version = "1.0.0" },
     memory,
     writer,
     episodes: episodeStore);

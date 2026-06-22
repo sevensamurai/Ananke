@@ -9,6 +9,24 @@ Provides `IChannelReader/Writer` and `IHandoffChannel` implementations
 over MQTT topics. Used for distributed state machine coordination,
 inter-service messaging, and agent-to-agent handoffs.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `MqttChannelReader<TContext, TAction>` — `IChannelReader` over MQTT topics; subscribes and
+   deserializes messages — `src/Ananke.MQTT/MqttChannelReader.cs`
+2. `MqttChannelWriter<TAction>` — `IChannelWriter` over MQTT topics; publishes and serializes
+   with MessagePack — `src/Ananke.MQTT/MqttChannelWriter.cs`
+3. `MqttHandoffChannel` — `IHandoffChannel` implementing request/response over MQTT with
+   correlation IDs — `src/Ananke.MQTT/MqttHandoffChannel.cs`
+4. `ServiceCollectionExtensions` — `services.AddMqtt<TContext, TAction>(config)` DI registration,
+   the usual starting point for wiring this package in — `src/Ananke.MQTT/ServiceCollectionExtensions.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Abstractions` (project)

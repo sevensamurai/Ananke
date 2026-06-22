@@ -86,12 +86,13 @@ var execution = await StreamingChatWorkflow.Create("chat", model)
 
 ## State Machine Tracing
 
-`AbstractStateMachine` has a built-in `ActivitySource` that emits spans for
+`AbstractStateMachine` has a built-in `ActivitySource` that emits a `"transition"` span for
 every transition attempt:
 
-- Span name: `{MachineName}.{Transition}`
-- Attributes: `fsm.previous_state`, `fsm.current_state`, `fsm.success`
-- Failed transitions include `fsm.error_message`
+- Tags: `Ananke.context_id`, `Ananke.transition`, `Ananke.from_state`, `Ananke.to_state`, `Ananke.success`
+- Failed transitions set the span status to `ActivityStatusCode.Error` with `result.ErrorMessage`
+  as the description; an unhandled exception additionally adds an `"exception"` event with
+  `exception.type` / `exception.message` tags.
 
 No additional configuration is needed — the spans are emitted automatically
 when an `ActivityListener` is registered (which `AddTracingPipeline` does).
@@ -154,4 +155,4 @@ tracerProvider.ForceFlush(5_000);
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

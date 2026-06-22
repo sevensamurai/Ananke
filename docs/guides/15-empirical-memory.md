@@ -40,7 +40,7 @@ var entry = new EmpiricalEntry
 {
     Id = Guid.NewGuid().ToString("N"),
     Kind = EmpiricalKind.Pattern,
-    Description = "GC pause > 200ms causes downstream timeout spikes",
+    Description = SemanticDescription.FromText("GC pause > 200ms causes downstream timeout spikes"),
     Condition = "ServiceA GC pause exceeds 200ms",
     Effect = "ServiceB timeout rate spikes within 30 seconds",
     Tags = ["gc", "performance", "timeout"],
@@ -161,7 +161,7 @@ game, `GameAnalyzer` inspects the board and commits insights:
 await memory.CommitAsync(new EmpiricalEntry
 {
     Kind = EmpiricalKind.Heuristic,
-    Description = "Prefer center column in early moves — it participates in the most winning lines",
+    Description = SemanticDescription.FromText("Prefer center column in early moves — it participates in the most winning lines"),
     Tags = ["opening", "center"],
     Source = "game-analysis",
     Confidence = 0.35f,
@@ -355,4 +355,4 @@ builder.Services.AddOpenTelemetry()
 - [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) — OpenClaw skill pipeline and UCB-based adaptive routing evolution in isolation
 - [SelfImprovingWorkflowDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/SelfImprovingWorkflowDemo) — a workflow that records its own performance and uses empirical memory to refine its strategy across runs
 
-← [Learning Path](learning-path.md)
+← [Learning Path](../learning-path.md)

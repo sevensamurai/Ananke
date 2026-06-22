@@ -6,7 +6,7 @@ Define callable functions that LLMs can invoke during agent workflows using
 
 **Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 
-→ **Full API reference:** [Tools & ToolKit Reference](reference/tools-reference.md)
+→ **Full API reference:** [Tools & ToolKit Reference](../reference/tools-reference.md)
 
 ---
 
@@ -39,13 +39,21 @@ var toolkit = new ToolKit("search")
         "query", "The search query");
 ```
 
-### Two parameters
+### Two or more parameters
+
+The convenience overloads above only cover 0 or 1 parameters. For 2+ parameters, use the
+`ToolBuilder` callback:
 
 ```csharp
 var toolkit = new ToolKit("math")
-    .AddTool("add", "Adds two numbers",
-        (string a, string b) => $"{double.Parse(a) + double.Parse(b)}",
-        ("a", "First number"), ("b", "Second number"));
+    .AddTool("add", "Adds two numbers", b => b
+        .Param("a", "First number")
+        .Param("b", "Second number")
+        .OnExecute(args =>
+        {
+            var sum = double.Parse(args.Get("a")) + double.Parse(args.Get("b"));
+            return ToolResult.Ok($"{sum}");
+        }));
 ```
 
 ### Typed parameters
@@ -57,11 +65,15 @@ var toolkit = new ToolKit("math")
     .AddTool<int>("square", "Squares a number",
         (int n) => (n * n).ToString(),
         "value", "The number to square")           // → schema type "integer"
-    .AddTool<double, double>("multiply", "Multiplies two numbers",
-        (a, b) => $"{a * b}",
-        ("a", "First number"),                      // → "number"
-        ("b", "Second number"));                    // → "number"
+    .AddTool("multiply", "Multiplies two numbers", b => b
+        .Param<double>("a", "First number")        // → "number"
+        .Param<double>("b", "Second number")       // → "number"
+        .OnExecute(args =>
+            ToolResult.Ok($"{args.Get<double>("a") * args.Get<double>("b")}")));
 ```
+
+There's no generic `AddTool<T1, T2>` overload — `Param<T>` per parameter on the builder is how
+multiple typed parameters are declared.
 
 ### Async tools
 
@@ -200,12 +212,11 @@ var stockTools = new ToolKit("stock")
         "Gets the current stock price, daily change, and volume for a given ticker symbol.",
         GetStockPrice,
         "symbol", "The stock ticker symbol (e.g. AAPL, MSFT)")
-    .AddTool(
-        "buy_shares",
-        "Buys a specified number of shares at the current market price.",
-        BuyShares,
-        ("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)"),
-        ("quantity", "The number of shares to buy"));
+    .AddTool("buy_shares",
+        "Buys a specified number of shares at the current market price.", b => b
+        .Param("symbol", "The stock ticker symbol (e.g. AAPL, MSFT)")
+        .Param("quantity", "The number of shares to buy")
+        .OnExecute(args => BuyShares(args.Get("symbol"), args.Get("quantity"))));
 ```
 
 ---
@@ -222,4 +233,4 @@ var stockTools = new ToolKit("stock")
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

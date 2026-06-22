@@ -117,6 +117,7 @@ public static class ModelCatalog
         // Anthropic
         Anthropic.Claude4Sonnet, Anthropic.Claude4Opus,
         Anthropic.Claude3_7Sonnet, Anthropic.Claude3_5Haiku,
+        Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
 
         // Google
         Google.Gemini3_1Pro, Google.Gemini3_1Flash,
@@ -280,6 +281,36 @@ public static class ModelCatalog
             Name = "claude-3-5-haiku-20241022",
             Capabilities = ChatModel | ModelCapability.CodeGeneration | ModelCapability.Vision,
             IntelligenceTier = 2,
+            MaxContextTokens = 200_000,
+            SpeedTier = 5
+        };
+
+        /// <summary>Claude Opus 4.8 — current-generation frontier reasoning model.</summary>
+        public static ModelProfileTemplate ClaudeOpus4_8 { get; } = new()
+        {
+            Name = "claude-opus-4-8",
+            Capabilities = FrontierModel,
+            IntelligenceTier = 5,
+            MaxContextTokens = 1_000_000,
+            SpeedTier = 2
+        };
+
+        /// <summary>Claude Sonnet 4.6 — current-generation balanced frontier model.</summary>
+        public static ModelProfileTemplate ClaudeSonnet4_6 { get; } = new()
+        {
+            Name = "claude-sonnet-4-6",
+            Capabilities = FrontierModel,
+            IntelligenceTier = 4,
+            MaxContextTokens = 1_000_000,
+            SpeedTier = 3
+        };
+
+        /// <summary>Claude Haiku 4.5 — current-generation fast model (no Reasoning, by design).</summary>
+        public static ModelProfileTemplate ClaudeHaiku4_5 { get; } = new()
+        {
+            Name = "claude-haiku-4-5",
+            Capabilities = FullModel | ModelCapability.Vision,
+            IntelligenceTier = 3,
             MaxContextTokens = 200_000,
             SpeedTier = 5
         };

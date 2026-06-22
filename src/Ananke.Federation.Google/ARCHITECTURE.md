@@ -11,6 +11,19 @@ Gemini Enterprise Agent Platform.
 
 ---
 
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `VertexAIDeployer` — the `IFederationDeployer` implementation; full deploy / teardown
+   path against Gemini Enterprise Agent Platform agents — `src/Ananke.Federation.Google/VertexAIDeployer.cs`
+2. `VertexAICredentialProvider` — resolves Google credentials (service-account JSON or ADC)
+   — `src/Ananke.Federation.Google/VertexAICredentialProvider.cs`
+3. `VertexAIWorkflowHost` — manages Vertex AI hosted cell lifecycle — `src/Ananke.Federation.Google/VertexAIWorkflowHost.cs`
+
+---
+
 ## Dependencies
 
 | Dependency | Why |

@@ -20,6 +20,7 @@ for the full emulator catalogue.
 | **Monitoring** | `IRemoteCellMonitor`, `RemoteCellMetrics`, `RemoteCellHealth`, `MetricsSample`, `RemoteCellTrend`, `RemoteMetricsTracker` |
 | **Hosting** | `FederatedComplexityMonitor`, `FederatedWorkflowHost`, `HybridRouter` |
 | **Division** | `FederatedDivisionPolicy`, `PlatformDivisionApprovalGate` |
+| **Recommendation** | `IPlatformRecommender`, `PlatformRecommender` — scores platforms by capability fit, cost/latency band, telemetry-calibrated via `RemoteMetricsTracker` |
 | **Prompts** | `ISystemPromptCompiler`, `ManifestSystemPromptCompiler` |
 | **Credentials** | `IFederationCredentialProvider` |
 

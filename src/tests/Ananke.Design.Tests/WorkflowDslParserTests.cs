@@ -131,6 +131,58 @@ public class WorkflowDslParserTests
             WorkflowDslParser.Parse("a -> router(only)"));
     }
 
+    // ── Loop connections ──────────────────────────────────────────────
+
+    [Test]
+    public void Parse_Loop_ReturnsLoopWithNullMaxIterations()
+    {
+        var result = WorkflowDslParser.Parse("await_ci -> loop(code_cycle, exit: report)");
+
+        result.Count.ShouldBe(1);
+        var loop = result[0].ShouldBeOfType<ConnectionLine.Loop>();
+        loop.From.ShouldBe("await_ci");
+        loop.LoopTarget.ShouldBe("code_cycle");
+        loop.ExitTarget.ShouldBe("report");
+        loop.MaxIterations.ShouldBeNull();
+    }
+
+    [Test]
+    public void Parse_LoopWithMaxIterations_ReturnsMaxIterations()
+    {
+        var result = WorkflowDslParser.Parse("await_ci -> loop(code_cycle, exit: report, maxIterations: 25)");
+
+        var loop = result[0].ShouldBeOfType<ConnectionLine.Loop>();
+        loop.LoopTarget.ShouldBe("code_cycle");
+        loop.ExitTarget.ShouldBe("report");
+        loop.MaxIterations.ShouldBe(25);
+    }
+
+    [Test]
+    public void Parse_LoopCaseInsensitive_Succeeds()
+    {
+        var result = WorkflowDslParser.Parse("a -> LOOP(b, EXIT: c)");
+
+        var loop = result[0].ShouldBeOfType<ConnectionLine.Loop>();
+        loop.LoopTarget.ShouldBe("b");
+        loop.ExitTarget.ShouldBe("c");
+    }
+
+    [Test]
+    public void Parse_LoopMissingExit_Throws()
+    {
+        Should.Throw<FormatException>(() =>
+            WorkflowDslParser.Parse("a -> loop(b)"));
+    }
+
+    [Test]
+    public void Parse_LoopIsNotMisparsedAsDirect()
+    {
+        var result = WorkflowDslParser.Parse("a -> loop(b, exit: c)");
+
+        result.Count.ShouldBe(1);
+        result[0].ShouldBeOfType<ConnectionLine.Loop>();
+    }
+
     // ── Multi-line / comments / blank lines ──────────────────────────
 
     [Test]
@@ -257,6 +309,27 @@ public class WorkflowDslParserTests
         result[0].ShouldBeOfType<ConnectionLine.Interrupt>().JobName.ShouldBe("deploy");
     }
 
+    // ── Ask directive ─────────────────────────────────────────────────
+
+    [Test]
+    public void Parse_Ask_ReturnsAsk()
+    {
+        var result = WorkflowDslParser.Parse("ask(ask_question)");
+
+        result.Count.ShouldBe(1);
+        var ask = result[0].ShouldBeOfType<ConnectionLine.Ask>();
+        ask.JobName.ShouldBe("ask_question");
+    }
+
+    [Test]
+    public void Parse_AskCaseInsensitive_Succeeds()
+    {
+        var result = WorkflowDslParser.Parse("ASK(ask_question)");
+
+        result.Count.ShouldBe(1);
+        result[0].ShouldBeOfType<ConnectionLine.Ask>().JobName.ShouldBe("ask_question");
+    }
+
     [Test]
     public void Parse_ToolDirective_ReturnsTool()
     {
@@ -336,5 +409,49 @@ public class WorkflowDslParserTests
         result[3].ShouldBeOfType<ConnectionLine.Direct>();
         result[4].ShouldBeOfType<ConnectionLine.SubFlow>().Name.ShouldBe("refine");
         result[5].ShouldBeOfType<ConnectionLine.Interrupt>().JobName.ShouldBe("publish");
+    }
+
+    [Test]
+    public void Parse_MixedTopologyWithLoop_AllTypesRecognized()
+    {
+        var dsl = """
+            plan -> code_cycle
+            code_cycle -> await_ci
+            await_ci -> loop(code_cycle, exit: report)
+            report -> End
+            """;
+
+        var result = WorkflowDslParser.Parse(dsl);
+        result.Count.ShouldBe(4);
+        result[0].ShouldBeOfType<ConnectionLine.Direct>();
+        result[1].ShouldBeOfType<ConnectionLine.Direct>();
+        var loop = result[2].ShouldBeOfType<ConnectionLine.Loop>();
+        loop.From.ShouldBe("await_ci");
+        loop.LoopTarget.ShouldBe("code_cycle");
+        loop.ExitTarget.ShouldBe("report");
+        result[3].ShouldBeOfType<ConnectionLine.Direct>();
+    }
+
+    [Test]
+    public void Parse_MixedTopologyWithAskAndLoop_AllTypesRecognized()
+    {
+        var dsl = """
+            icebreaker -> ask_question
+            ask(ask_question)
+            ask_question -> navigate
+            navigate -> loop(ask_question, exit: wrap_up)
+            wrap_up -> End
+            """;
+
+        var result = WorkflowDslParser.Parse(dsl);
+        result.Count.ShouldBe(5);
+        result[0].ShouldBeOfType<ConnectionLine.Direct>();
+        result[1].ShouldBeOfType<ConnectionLine.Ask>().JobName.ShouldBe("ask_question");
+        result[2].ShouldBeOfType<ConnectionLine.Direct>();
+        var loop = result[3].ShouldBeOfType<ConnectionLine.Loop>();
+        loop.From.ShouldBe("navigate");
+        loop.LoopTarget.ShouldBe("ask_question");
+        loop.ExitTarget.ShouldBe("wrap_up");
+        result[4].ShouldBeOfType<ConnectionLine.Direct>();
     }
 }

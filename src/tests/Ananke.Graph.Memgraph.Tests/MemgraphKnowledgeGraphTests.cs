@@ -89,6 +89,53 @@ public class MemgraphKnowledgeGraphTests
         result.ShouldBeNull();
     }
 
+    // ── Multi-label round-trip ───────────────────────────────────────────────
+
+    [Test]
+    public async Task UpsertNode_WithExtraLabel_RoundTripsEffectiveLabels()
+    {
+        var node = new GraphNode
+        {
+            Id     = $"test-{Guid.NewGuid():N}",
+            Kind   = "Service",
+            Labels = ["Component"],
+        };
+
+        await _graph.UpsertNodeAsync(node);
+
+        var fetched = await _graph.GetNodeAsync(node.Id);
+        fetched.ShouldNotBeNull();
+        fetched!.EffectiveLabels.ShouldBe(["Service", "Component"]);
+    }
+
+    [Test]
+    public async Task UpsertNode_TwiceWithDifferentLabels_UnionsLabelsWithoutDuplicatingNode()
+    {
+        var id = $"test-{Guid.NewGuid():N}";
+        await _graph.UpsertNodeAsync(new GraphNode { Id = id, Kind = "Service", Labels = ["Component"] });
+        await _graph.UpsertNodeAsync(new GraphNode { Id = id, Kind = "Service", Labels = ["Deprecated"] });
+
+        var fetched = await _graph.GetNodeAsync(id);
+        fetched!.EffectiveLabels.ShouldBe(["Service", "Component", "Deprecated"]);
+
+        var before = await _graph.NodeCountAsync();
+        await _graph.UpsertNodeAsync(new GraphNode { Id = id, Kind = "Service" });
+        (await _graph.NodeCountAsync()).ShouldBe(before);
+    }
+
+    [Test]
+    public async Task UpsertNode_InvalidLabel_ThrowsArgumentException()
+    {
+        var node = new GraphNode
+        {
+            Id     = $"test-{Guid.NewGuid():N}",
+            Kind   = "Service",
+            Labels = ["has space"],
+        };
+
+        await Should.ThrowAsync<ArgumentException>(() => _graph.UpsertNodeAsync(node));
+    }
+
     // ── Edge round-trip ───────────────────────────────────────────────────────
 
     [Test]

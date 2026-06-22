@@ -4,6 +4,10 @@
 > Use it when planning redesigns, reviewing PRs, or onboarding AI assistants (Copilot, Claude, etc.).
 >
 > **Companion documents** (linked below) provide deeper dives into each vertical.
+>
+> Looking for a specific concept rather than the whole map? Start at [`MAP.md`](MAP.md) — it
+> routes by concept to the right companion doc, `docs/` guide, and source directory, and
+> explains how this file relates to [`src/ARCHITECTURE.md`](src/ARCHITECTURE.md).
 
 ---
 
@@ -246,7 +250,7 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 | `Execution/` | `...Execution` | `IWorkflowRunner`, `WorkflowRunner` |
 | `Checkpointing/` | `...Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore`, `FileCheckpointStore` |
 | `Streaming/` | `...Streaming` | `WorkflowEvent`, `WorkflowStreamOptions` |
-| `Patterns/` | `...Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder` |
+| `Patterns/` | `...Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder`, `InterviewBuilder`, `Interview<TState>` |
 | `Knowledge/` | `...Knowledge` | `KnowledgeSearchTool`, `KnowledgeCatalogTools` |
 | `Memory/` | `...Memory` | `InMemoryConversationMemory`, `ConversationMemoryCleanupTimer` |
 | `Middleware/` | `...Middleware` | `IJobMiddleware` |
@@ -464,6 +468,7 @@ For deeper architectural detail on each vertical, see:
 | [architecture/organics-federation.md](architecture/organics-federation.md) | Organic colony, cell division, federation, cross-cloud deployment |
 | [architecture/infrastructure.md](architecture/infrastructure.md) | Redis, MQTT, Qdrant, OpenTelemetry, ASP.NET Core integration |
 | [architecture/interop.md](architecture/interop.md) | MCP server, A2A protocol, external skill catalog, platform adapters |
+| [architecture/federation-credentials.md](architecture/federation-credentials.md) | Credential types, rotation, `IFederationCredentialProvider` per platform |
 
 ---
 

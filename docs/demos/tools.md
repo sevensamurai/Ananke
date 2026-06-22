@@ -16,6 +16,7 @@ Wire a `ToolKit` of utility functions into an agent and let the LLM decide when 
 ```csharp
 using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Agents;
+using Ananke.Orchestration.Workflows;
 
 // 1. Build the toolkit
 var toolkit = new ToolKit("utilities")
@@ -26,16 +27,18 @@ var toolkit = new ToolKit("utilities")
         (string topic) => $"Here is what I know about {topic}: …",
         "topic", "The topic to look up")
 
-    .AddTool("add", "Adds two numbers and returns the result",
-        (string a, string b) => $"{double.Parse(a) + double.Parse(b)}",
-        ("a", "First number"), ("b", "Second number"));
+    .AddTool("add", "Adds two numbers and returns the result", b => b
+        .Param("a", "First number")
+        .Param("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{double.Parse(args.Get("a")) + double.Parse(args.Get("b"))}")));
 
 // 2. Wire the toolkit into an agent job
-var agentJob = AgentJob.Create<AssistantState>("assistant", model)
+var agentJob = AgentJobFactory.Create<AssistantState>("assistant", model)
     .WithSystemPrompt("You are a helpful assistant. Use the available tools when appropriate.")
-    .WithUserPrompt(s => s.UserMessage)
+    .WithPrompt(s => s.UserMessage)
     .WithTools(toolkit)
-    .MapResponse((s, reply) => s with { Response = reply });
+    .MapResult((s, reply) => s with { Response = reply })
+    .Build();
 
 // 3. Run inside a workflow
 var workflow = new Workflow<AssistantState>("assistant-workflow")
@@ -60,10 +63,11 @@ var mathKit = new ToolKit("math")
         (int n) => (n * n).ToString(),
         "value", "The integer to square")           // schema type → "integer"
 
-    .AddTool<double, double>("power", "Raises base to exponent",
-        (double b, double e) => Math.Pow(b, e).ToString("G"),
-        ("base",     "The base value"),             // schema type → "number"
-        ("exponent", "The exponent"));
+    .AddTool("power", "Raises base to exponent", b => b
+        .Param<double>("base", "The base value")        // schema type → "number"
+        .Param<double>("exponent", "The exponent")
+        .OnExecute(args =>
+            ToolResult.Ok(Math.Pow(args.Get<double>("base"), args.Get<double>("exponent")).ToString("G"))));
 ```
 
 ---
@@ -111,12 +115,17 @@ var searchKit = new ToolKit("search")
 
 ## Combining multiple toolkits
 
+`WithTools` takes a single `ToolKit` — merge multiple kits into one first:
+
 ```csharp
-var combinedJob = AgentJob.Create<AppState>("agent", model)
+var combinedTools = new ToolKit("combined").Merge(webKit).Merge(mathKit).Merge(searchKit);
+
+var combinedJob = AgentJobFactory.Create<AppState>("agent", model)
     .WithSystemPrompt("You have access to web, math, and search tools.")
-    .WithUserPrompt(s => s.Input)
-    .WithTools(webKit, mathKit, searchKit)   // pass multiple toolkits
-    .MapResponse((s, reply) => s with { Output = reply });
+    .WithPrompt(s => s.Input)
+    .WithTools(combinedTools)
+    .MapResult((s, reply) => s with { Output = reply })
+    .Build();
 ```
 
 → [Full Tools reference](../reference/tools-reference.md)

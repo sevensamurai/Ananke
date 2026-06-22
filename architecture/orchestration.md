@@ -37,6 +37,7 @@ Key methods:
 - `.Loop(from, loopTarget, exitTarget, until, maxIterations)` — iteration loop with predicate exit condition
 - `.SubFlow(name, childWorkflow, mapIn, mapOut)` — nested workflow
 - `.InterruptBefore(name)` / `.InterruptAfter(name)` — human-in-the-loop pause points
+- `.AwaitInput(name)` — pauses before `name` like `InterruptBefore`, plus marks it in `WorkflowDefinition.InputJobs` so a host knows the resume should carry a free-text reply, not an approval (see `WorkflowInputExtensions.ResumeWithInputAsync`)
 - `.WithBudget(maxCost)` — cost budget cap (terminates with `BudgetExceeded` if exceeded)
 - `.UseCheckpointing(store)` — attach checkpoint store
 - `.UseTracing(tracer)` — attach `IWorkflowTracer`
@@ -83,8 +84,8 @@ Executes the compiled graph. Responsibilities:
 | `DelegateRouter` | User-provided `Func<T, string>` picks next job |
 | `AgentRouter` | LLM decides next job based on state |
 | `AgentRoutingException` | Thrown when `AgentRouter` produces an unresolvable target; includes the raw LLM response for diagnosis |
-| `Connections` | Static chain/then/fork/join topology |
-| `LoopExitReason` | Enum indicating why a loop terminated: `PredicateMet`, `MaxIterationsReached`, or `Interrupted` |
+| `Connection` (abstract) — `DirectConnection`, `RouterConnection<TState>`, `ForkConnection`, `LoopConnection<TState>` | Chain/then/fork/join topology edge types |
+| `LoopExitReason` | Enum indicating why a loop terminated: `ConditionMet` or `MaxIterationsReached` |
 
 ### Checkpointing
 
@@ -117,8 +118,14 @@ Token-level streaming from agents is emitted via `ChatSessionEvent` (separate ch
 Pre-wired builders on `AgenticPattern`:
 - `ReviewCritique<T>()` — generator → critic → approval loop
 - `IterativeRefinement<T>()` — single-agent refinement loop
+- `Interview<T>()` — conversational pattern: welcome → icebreaker → a turn loop over a question
+  agenda held in state, pausing each turn via `AwaitInput`. The reply only exists at resume time,
+  so `GetQuestion`/`FoldAnswer` are host-side hooks on the returned `Interview<T>`, not workflow
+  jobs. Optional `WithMemory` writes each turn to `IConversationMemory`; `WithTurnTimeout` exposes
+  a `PauseMessage` for a host to show on a quiet turn (the framework runs no timer itself).
 
-Both compile to standard `Workflow<T>` graphs with routers.
+All three compile to standard `Workflow<T>` graphs — the first two with routers/self-loops, the
+last with `AwaitInput` + a self-loop.
 
 ## Middleware
 

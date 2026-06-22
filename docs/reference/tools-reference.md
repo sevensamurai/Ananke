@@ -14,7 +14,8 @@ public record ToolParameter(
     string Name,             // JSON property key
     string Description,      // sent to the LLM
     string JsonType = "string",
-    IReadOnlyList<string>? Examples = null);
+    IReadOnlyList<string>? Examples = null,
+    bool IsRequired = false);
 ```
 
 | Property | Purpose |
@@ -90,13 +91,16 @@ var toolkit = new ToolKit("search")
         "query", "The search query");
 ```
 
-### Two parameters
+### Two or more parameters
+
+There's no tuple-based convenience overload for 2+ parameters — use the `ToolBuilder` callback:
 
 ```csharp
 var toolkit = new ToolKit("math")
-    .AddTool("add", "Adds two numbers",
-        (string a, string b) => $"{double.Parse(a) + double.Parse(b)}",
-        ("a", "First number"), ("b", "Second number"));
+    .AddTool("add", "Adds two numbers", b => b
+        .Param("a", "First number")
+        .Param("b", "Second number")
+        .OnExecute(args => ToolResult.Ok($"{double.Parse(args.Get("a")) + double.Parse(args.Get("b"))}")));
 ```
 
 ### Typed parameters
@@ -108,11 +112,19 @@ var toolkit = new ToolKit("math")
     .AddTool<int>("square", "Squares a number",
         (int n) => (n * n).ToString(),
         "value", "The number to square")           // → schema type "integer"
-    .AddTool<double, bool>("format", "Formats a number",
-        (double n, bool round) => round ? Math.Round(n).ToString() : n.ToString(),
-        ("number", "The number"),                   // → "number"
-        ("round", "Whether to round"));             // → "boolean"
+    .AddTool("format", "Formats a number", b => b
+        .Param<double>("number", "The number")        // → "number"
+        .Param<bool>("round", "Whether to round")     // → "boolean"
+        .OnExecute(args =>
+        {
+            var n = args.Get<double>("number");
+            var round = args.Get<bool>("round");
+            return ToolResult.Ok(round ? Math.Round(n).ToString() : n.ToString());
+        }));
 ```
+
+`AddTool<T>` (one type parameter) covers single-typed-parameter tools; there is no
+`AddTool<T1, T2>` — two or more typed parameters go through `ToolBuilder.Param<T>`, as above.
 
 ### Async tools
 

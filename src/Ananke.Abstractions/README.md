@@ -25,6 +25,28 @@ dotnet add package Ananke.Abstractions
 | `AgentRequest`, `AgentResponse`, `AgentStreamChunk` | Standard request/response/streaming payloads |
 | `AgentMessage`, `ContentPart`, `AgentToolCall`, `TokenUsage` | Multimodal message model and tool-call metadata |
 
+### Trajectory and adaptive harness contracts
+
+| Type | Description |
+|---|---|
+| `TrajectorySnapshot` | Per-episode outcome record — tool-call counts, hallucinations, faults, retries, terminal reward |
+| `ITrajectoryObserver` | Receives a `TrajectorySnapshot` when an episode completes |
+| `IAdaptiveHarnessPolicy` | Reacts to a completed trajectory by adapting tool affinities, memory, or routing |
+| `ILearningCycleTrigger` | Decouples adaptive-harness policies from the concrete offline learner |
+| `NullTrajectoryObserver`, `NullAdaptiveHarnessPolicy` | No-op defaults |
+
+`Ananke.Orchestration` ships the default implementation, `CompositeAdaptiveHarnessPolicy`.
+
+### Budget contracts
+
+| Type | Description |
+|---|---|
+| `IBudgetMeter` | Reads current token/cost spend for a workflow or role against a rolling window |
+| `BudgetSpend` | Snapshot of tokens-in/out and estimated cost for a role |
+| `InMemoryBudgetMeter` | Thread-safe in-process `IBudgetMeter` implementation |
+
+`Ananke.OpenTelemetry` ships an OTLP-backed implementation, `OpenTelemetryBudgetMeter`.
+
 ### Messaging and handoff channels
 
 | Type | Description |

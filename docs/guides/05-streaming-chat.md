@@ -176,4 +176,4 @@ var execution = await StreamingChatWorkflow.Create("chat", model)
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

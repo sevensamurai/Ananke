@@ -51,12 +51,16 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
     {
         await using var session = factory.OpenSession();
         var props = BuildNodeProps(node);
+        var labels = node.EffectiveLabels.Select(ValidateNodeLabel).ToList();
+
+        // Match purely on the structural :Node label + id, so a node's labels can change
+        // between upserts without ever creating a duplicate node. Labels can't be bound as
+        // query parameters, so the validated set is interpolated into a second SET clause.
+        var cypher = $"MERGE (n:Node {{id: $id}}) SET n += $props SET n:{string.Join(':', labels)}";
 
         await session.ExecuteWriteAsync(async tx =>
         {
-            await tx.RunAsync(
-                "MERGE (n:Node {id: $id}) SET n += $props",
-                new { id = node.Id, props }).ConfigureAwait(false);
+            await tx.RunAsync(cypher, new { id = node.Id, props }).ConfigureAwait(false);
         }).ConfigureAwait(false);
     }
 
@@ -225,6 +229,28 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         return label;
     }
 
+    private static readonly Regex NodeLabelPattern =
+        new(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+
+    /// <summary>
+    /// Validates that <paramref name="label"/> is a safe Cypher node-label identifier.
+    /// Unlike <see cref="ValidateRelationLabel"/>, no case transformation is applied — node-label
+    /// convention is PascalCase, not SCREAMING_SNAKE_CASE — and the literal <c>"Node"</c> label is
+    /// rejected, since it is reserved for the structural label every node already carries.
+    /// </summary>
+    private static string ValidateNodeLabel(string label)
+    {
+        if (label == "Node")
+            throw new ArgumentException(
+                "Label 'Node' is reserved for the structural node label.", nameof(label));
+        if (!NodeLabelPattern.IsMatch(label))
+            throw new ArgumentException(
+                $"Label '{label}' is not a valid Cypher identifier. Only letters, digits, and " +
+                "underscores are permitted, and it must not start with a digit.",
+                nameof(label));
+        return label;
+    }
+
     private static Dictionary<string, object?> BuildNodeProps(GraphNode node)
     {
         var d = new Dictionary<string, object?>
@@ -252,10 +278,16 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
             .Where(p => !reserved.Contains(p.Key))
             .ToDictionary(p => p.Key, p => p.Value?.ToString() ?? string.Empty);
 
+        var kind = n["kind"].As<string>();
+        var otherLabels = n.Labels
+            .Where(l => l != "Node" && l != kind)
+            .OrderBy(l => l, StringComparer.Ordinal);
+
         return new GraphNode
         {
-            Id   = n["id"].As<string>(),
-            Kind = n["kind"].As<string>(),
+            Id     = n["id"].As<string>(),
+            Kind   = kind,
+            Labels = [kind, .. otherLabels],
             Properties = props,
         };
     }

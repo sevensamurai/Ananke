@@ -13,7 +13,7 @@ Mark any workflow job with `.InterruptBefore("job-name")` or `.InterruptAfter("j
 When execution reaches that point, the workflow:
 
 1. Checkpoints the full typed state to `ICheckpointStore`
-2. Returns `WorkflowStatus.Interrupted` to the caller
+2. Returns `ExecutionStatus.Interrupted` to the caller
 3. Waits until `workflow.ResumeAsync(executionId, stateModifier)` is called
 
 The human reviews the state, optionally modifies it, then resumes.

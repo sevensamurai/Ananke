@@ -36,31 +36,35 @@ Two LLM-backed agents, one typed state record, one `.Chain()` call to wire them 
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.OpenAI;
+using Ananke.Orchestration.Workflows;
 
-record PipelineState(string Topic = "", string Facts = "", string Summary = "");
-
-// Swap for AnthropicAgentModel or GoogleAgentModel — the workflow is unchanged.
+// Swap for AnthropicAgentModel or GeminiAgentModel — the workflow is unchanged.
 var model = OpenAIChatAgentModel.Create(
     Environment.GetEnvironmentVariable("OPENAI_API_KEY")!, "gpt-4.1-mini");
 
-var researchJob = AgentJob.Create<PipelineState>("research", model)
+var researchJob = AgentJobFactory.Create<PipelineState>("research", model)
     .WithSystemPrompt("You are a research assistant. List three key facts concisely.")
-    .WithUserPrompt(s => $"Topic: {s.Topic}")
-    .MapResponse((s, text) => s with { Facts = text });
+    .WithPrompt(s => $"Topic: {s.Topic}")
+    .MapResult((s, text) => s with { Facts = text })
+    .Build();
 
-var reviewJob = AgentJob.Create<PipelineState>("review", model)
+var reviewJob = AgentJobFactory.Create<PipelineState>("review", model)
     .WithSystemPrompt("You are an editor. Distill the facts into one sentence.")
-    .WithUserPrompt(s => s.Facts)
-    .MapResponse((s, text) => s with { Summary = text });
+    .WithPrompt(s => s.Facts)
+    .MapResult((s, text) => s with { Summary = text })
+    .Build();
 
 var workflow = new Workflow<PipelineState>("research-pipeline")
     .Job("research", researchJob)
     .Job("review", reviewJob)
-    .Chain("research", "review");
+    .Chain("research", "review")
+    .Then("review", Workflow.End);
 
 var result = await workflow.RunAsync(new PipelineState { Topic = "CRISPR" });
 Console.WriteLine(result.State.Summary);
 Console.WriteLine(result.Status); // Completed
+
+record PipelineState(string Topic = "", string Facts = "", string Summary = "");
 ```
 
 

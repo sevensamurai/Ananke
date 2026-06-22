@@ -139,8 +139,9 @@ public sealed class OpenClawCatalog : ISkillCatalog
                 var result = await CliProcessRunner.RunAsync(
                     runner,
                     fullCommand,
-                    _processTimeout,
-                    toolCt).ConfigureAwait(false);
+                    workingDirectory: null,
+                    timeout: _processTimeout,
+                    ct: toolCt).ConfigureAwait(false);
                 sw.Stop();
 
                 if (result.Success)

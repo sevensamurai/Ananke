@@ -21,6 +21,24 @@ through their lineage.
 
 ---
 
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `OrganicHost` — the growth brain that monitors complexity, evaluates division policies,
+   and flows proposals through the approval gate — `src/Ananke.Organics/Kernel/OrganicHost.cs`
+2. `IWorkflowHost` — cell lifecycle (spawn / kill / list); default `InProcessWorkflowHost` —
+   `src/Ananke.Organics/Kernel/IWorkflowHost.cs`
+3. `OrganicWorkflow<TState>` — the execution wrapper over `Workflow<TState>` that feeds
+   results into `OrganicHost.ObserveExecution` — `src/Ananke.Organics/Kernel/OrganicWorkflow.cs`
+4. `IDivisionPolicy` — proposes a `DivisionPlan` when structural complexity exceeds
+   thresholds — `src/Ananke.Organics/Division/IDivisionPolicy.cs`
+5. `IWorkflowDivider` — executes an approved division plan: derive → seed → activate →
+   spawn → confirm → kill — `src/Ananke.Organics/Division/IWorkflowDivider.cs`
+
+---
+
 ## Dependencies
 
 | Dependency | Why |
@@ -54,7 +72,7 @@ Ananke.Organics/
 | `Ananke.Organics.Kernel.Lineage` | `ILineageStore`, `InMemoryLineageStore`, `CellLineage` |
 | `Ananke.Organics.Kernel.Snapshots` | `HostSnapshot`, `WorkflowSnapshotBuilder`, `HostSnapshotExporter`, `IWorkflowActivatorFactory`, `TypedWorkflowActivatorFactory`, `WorkflowActivator`, `PromptWorkflowDesigner` |
 | `Ananke.Organics.Division` | `IDivisionPolicy`, `ThresholdDivisionPolicy`, `ExperienceDrivenDivisionPolicy`, `IDivisionTransition`, `StopTheWorldDivisionTransition`, `IWorkflowDivider`, `WorkflowDivider`, `IDivisionOutcomeTracker`, `DivisionOutcomeTracker`, `WorkflowExecutionMonitor`, `ComplexitySnapshot`, `DivisionPlan`, `DivisionResult`, `DivisionSignal`, `DivisionExperience`, `MetabolicSignal`, `MetabolicThresholds`, `StructuralProfile`, `StructuralProfileFactory`, `MemoryProfile`, `FailurePattern`, `FailureClassifier`, `FailureClassifierBuilder`, `FailureClassifierProfiles`, `ToolKitClusterStrategy`, `DomainAffinityMemory`, `IRemoteCellSource`, `DivisionOptions` |
-| `Ananke.Organics.Division.Approval` | `IDivisionApprovalGate`, `AutoApprovalGate`, `LlmApprovalGate`, `CallbackApprovalGate`, `MetabolicDivisionApprovalGate`, `BudgetApprovalGate`, `IBudgetMeter`, `InMemoryBudgetMeter`, `BudgetSpend`, `DivisionApproval` |
+| `Ananke.Organics.Division.Approval` | `IDivisionApprovalGate`, `AutoApprovalGate`, `LlmApprovalGate`, `CallbackApprovalGate`, `MetabolicDivisionApprovalGate`, `BudgetApprovalGate`, `DivisionApproval`. `BudgetApprovalGate` consumes `IBudgetMeter` / `InMemoryBudgetMeter` / `BudgetSpend`, which live in `Ananke.Abstractions.Budget` (`src/Ananke.Abstractions/Budget/`), not this namespace. |
 | `Ananke.Organics.Division.Review` | `IWorkReviewGate`, `AutoWorkReviewGate`, `LlmWorkReviewGate`, `CallbackWorkReviewGate`, `QuorumWorkReviewGate`, `WorkReviewQuorum`, `WorkItem`, `WorkItemKind`, `WorkReviewDecision`, `WorkReviewOutcome`, `IWorkReviewParkingStore`, `InMemoryWorkReviewParkingStore`, `ParkingCallbackWorkReviewGate` |
 | `Ananke.Organics.Healing` | `IHealingPolicy`, `ThresholdHealingPolicy`, `IHealthMonitor`, `CompositeHealingPolicy`, `HealingPlan`, `HealthSnapshot`, `FailureOrigin`, `AgedCellPrunePolicy`, `IdleCellPrunePolicy` |
 | `Ananke.Organics.Sensing` | `ICapabilityMap`, `InMemoryCapabilityMap`, `IMeshAggregator`, `InMemoryMeshAggregator`, `IRequestRouter`, `KeywordRequestRouter`, `IDomainRouter`, `RoutingAffinityTracker`, `QuorumApprovalGate`, `MeshSignal`, `WorkflowSignal`, `SensedCapability` |
@@ -66,23 +84,23 @@ Ananke.Organics/
 
 ## Key Abstractions
 
-| Type | Kind | Purpose |
-|---|---|---|
-| `OrganicHost` | `sealed class` | Growth brain — monitors complexity, evaluates division policies, flows proposals through the approval gate, signals division. Does **not** manage cell lifecycle directly. |
-| `IWorkflowHost` | `interface` | Cell lifecycle (spawn / kill / list). Default: `InProcessWorkflowHost`. Production implementations are hosting-adapter concerns. |
-| `OrganicWorkflow<TState>` | `sealed class` | Thin execution wrapper over `Workflow<TState>` — feeds results into `OrganicHost.ObserveExecution` after each run. The inner workflow is never modified. |
-| `OrganicWorkflowExtensions.JoinHost` | Static extension | Entry point — `workflow.JoinHost(host, toolKit)` returns the observed wrapper. |
-| `IDivisionPolicy` | `interface` | Proposes a `DivisionPlan` when surface tension (structural complexity) exceeds thresholds. Returns `null` when healthy. |
-| `IDivisionApprovalGate` | `interface` | Governance gate between proposal and execution. Default: `AutoApprovalGate`. |
-| `IBudgetMeter` | `interface` | Reads rolling-window token and cost spend for a workflow key. Default: `InMemoryBudgetMeter`. |
-| `IWorkReviewGate` | `interface` | Reviews work products such as PRs or design docs and returns approved, rejected, revised, or pending decisions. |
-| `IWorkReviewParkingStore` | `interface` | Persists pending review state across threads (and optionally process restarts). Default: `InMemoryWorkReviewParkingStore`. |
-| `IWorkflowDivider` | `interface` | Executes the approved plan: derive → seed → activate → spawn → confirm → kill. Atomic — no partial divisions. |
-| `IHealingPolicy` | `interface` | Evaluates `HealthSnapshot` + `ComplexitySnapshot` to produce a `HealingPlan`. Returns `null` when healthy. |
-| `ICapabilityMap` | `interface` | Live registry of which domains each cell can handle (populated by heartbeat / sensing signals). |
-| `IRequestRouter` | `interface` | Routes a user message to the correct cell by sensing the capability landscape. |
-| `ILineageStore` | `interface` | Persistent birth/death log. Records survive cell death. Default: `InMemoryLineageStore`. |
-| `HostSnapshot` | `sealed record` | Point-in-time capture of the entire mesh topology (all cells, routing table, version). Supports rollback, diff, audit, and cross-deployment bootstrap. |
+| Type | Kind | Purpose | Source |
+|---|---|---|---|
+| `OrganicHost` | `sealed class` | Growth brain — monitors complexity, evaluates division policies, flows proposals through the approval gate, signals division. Does **not** manage cell lifecycle directly. | `src/Ananke.Organics/Kernel/OrganicHost.cs` |
+| `IWorkflowHost` | `interface` | Cell lifecycle (spawn / kill / list). Default: `InProcessWorkflowHost`. Production implementations are hosting-adapter concerns. | `src/Ananke.Organics/Kernel/IWorkflowHost.cs` |
+| `OrganicWorkflow<TState>` | `sealed class` | Thin execution wrapper over `Workflow<TState>` — feeds results into `OrganicHost.ObserveExecution` after each run. The inner workflow is never modified. | `src/Ananke.Organics/Kernel/OrganicWorkflow.cs` |
+| `OrganicWorkflowExtensions.JoinHost` | Static extension | Entry point — `workflow.JoinHost(host, toolKit)` returns the observed wrapper. | `src/Ananke.Organics/Kernel/OrganicWorkflowExtensions.cs` |
+| `IDivisionPolicy` | `interface` | Proposes a `DivisionPlan` when surface tension (structural complexity) exceeds thresholds. Returns `null` when healthy. | `src/Ananke.Organics/Division/IDivisionPolicy.cs` |
+| `IDivisionApprovalGate` | `interface` | Governance gate between proposal and execution. Default: `AutoApprovalGate`. | `src/Ananke.Organics/Division/Approval/IDivisionApprovalGate.cs` |
+| `IBudgetMeter` | `interface` | Reads rolling-window token and cost spend for a workflow key. Default: `InMemoryBudgetMeter`. | `src/Ananke.Abstractions/Budget/IBudgetMeter.cs` |
+| `IWorkReviewGate` | `interface` | Reviews work products such as PRs or design docs and returns approved, rejected, revised, or pending decisions. | `src/Ananke.Organics/Division/Review/IWorkReviewGate.cs` |
+| `IWorkReviewParkingStore` | `interface` | Persists pending review state across threads (and optionally process restarts). Default: `InMemoryWorkReviewParkingStore`. | `src/Ananke.Organics/Division/Review/IWorkReviewParkingStore.cs` |
+| `IWorkflowDivider` | `interface` | Executes the approved plan: derive → seed → activate → spawn → confirm → kill. Atomic — no partial divisions. | `src/Ananke.Organics/Division/IWorkflowDivider.cs` |
+| `IHealingPolicy` | `interface` | Evaluates `HealthSnapshot` + `ComplexitySnapshot` to produce a `HealingPlan`. Returns `null` when healthy. | `src/Ananke.Organics/Healing/IHealingPolicy.cs` |
+| `ICapabilityMap` | `interface` | Live registry of which domains each cell can handle (populated by heartbeat / sensing signals). | `src/Ananke.Organics/Sensing/ICapabilityMap.cs` |
+| `IRequestRouter` | `interface` | Routes a user message to the correct cell by sensing the capability landscape. | `src/Ananke.Organics/Sensing/IRequestRouter.cs` |
+| `ILineageStore` | `interface` | Persistent birth/death log. Records survive cell death. Default: `InMemoryLineageStore`. | `src/Ananke.Organics/Kernel/Lineage/ILineageStore.cs` |
+| `HostSnapshot` | `sealed record` | Point-in-time capture of the entire mesh topology (all cells, routing table, version). Supports rollback, diff, audit, and cross-deployment bootstrap. | `src/Ananke.Organics/Kernel/Snapshots/HostSnapshot.cs` |
 
 ---
 
@@ -104,6 +122,8 @@ OrganicWorkflow.RunAsync(state)
 ### Division flow
 
 ```
+IDivisionOutcomeTracker.RecordBaseline(divisionId, snapshot)   ← before evaluating the plan
+
 IDivisionPolicy.EvaluateAsync(snapshot, manifest)
   → DivisionPlan (proposed children + cluster strategy)
 
@@ -119,22 +139,32 @@ IWorkflowDivider.DivideAsync(plan, approval)
   → IWorkflowHost.StopAsync(parent)
   → ILineageStore.RecordBirthAsync(child) × N
   → ILineageStore.RecordDeathAsync(parent)
-  → IDivisionOutcomeTracker.RecordAsync(result)
+
+IDivisionOutcomeTracker.RewardAsync(divisionId, childSnapshots, originalPlan)
+  ← later, once children have accumulated enough post-division executions;
+    compares child ComplexitySnapshot entries to the recorded baseline and
+    reinforces/contradicts the empirical entries that influenced the plan
 ```
 
 If any child fails to start → all spawned children are torn down, parent survives.
 
 ### Healing flow
 
+`IHealthMonitor` and the `IHealingPolicy` strategies are implemented and unit-tested, but
+`OrganicHost` does not yet drive this loop automatically on a tick — evaluation is
+caller-driven today (see `OrganicGrowthOptions.ApoptosisPolicy` remarks for the intended
+background-loop wiring):
+
 ```
-OrganicHost (on evaluation tick)
-  → IHealthMonitor.GetSnapshot(name)        → HealthSnapshot
-  → IHealingPolicy.EvaluateAsync(health, complexity)
-      → null: cell healthy
-      → HealingPlan:
-          Strategy.Restart  → IWorkflowHost.StopAsync + StartAsync
-          Strategy.Rollback → restore prior HostSnapshot, respawn
-          Strategy.Prune    → AgedCellPrunePolicy / IdleCellPrunePolicy removes cell
+IHealthMonitor.GetSnapshotAsync(name)        → ComplexitySnapshot
+IHealthMonitor.GetHealthSnapshotAsync(name)  → HealthSnapshot? (null if insufficient data)
+
+IHealingPolicy.EvaluateAsync(health, complexity)
+  → null: cell healthy
+  → HealingPlan { Strategy }:
+      HealingStrategy.Restart  → IWorkflowHost.StopAsync + StartAsync
+      HealingStrategy.Rollback → restore prior HostSnapshot, respawn
+      HealingStrategy.Prune    → AgedCellPrunePolicy / IdleCellPrunePolicy removes cell
 ```
 
 ### Sensing and routing
@@ -276,8 +306,6 @@ A process restart loses:
 - division outcome history
 - routing affinity scores
 - parked review state (use a durable `IWorkReviewParkingStore` to survive restarts)
-- division outcome history
-- routing affinity scores
 
 Production deployments must supply persistent implementations of `ILineageStore`,
 `ICapabilityMap`, and `IEmpiricalMemory` (from `Ananke.Learning`).
@@ -304,9 +332,6 @@ Production deployments must supply persistent implementations of `ILineageStore`
 | `LlmApprovalGate` / `MetabolicDivisionApprovalGate` | **Preview** — LLM gate prompt format may change |
 | `PromptWorkflowDesigner` | **Preview** — autonomous topology evolution is experimental |
 | `QuorumApprovalGate` | **Preview** |
-| `IRemoteCellSource` / federated division path | **Preview** — federated host integration is not yet complete |
-
-Breaking changes to **Stable** surfaces require a documented design review.
 | `IRemoteCellSource` / federated division path | **Preview** — federated host integration is not yet complete |
 
 Breaking changes to **Stable** surfaces require a documented design review.

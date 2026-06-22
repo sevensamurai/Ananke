@@ -100,6 +100,7 @@ public sealed class Workflow<TState>
     private readonly Dictionary<string, Func<TState, Exception, Task>> _onFaultActions = [];
     private readonly Dictionary<string, TimeSpan> _timeouts = [];
     private readonly Dictionary<string, InterruptMode> _interrupts = [];
+    private readonly HashSet<string> _inputJobs = [];
     private readonly List<JoinDescriptor<TState>> _joins = [];
     private Func<TState, string, Exception, Task>? _onError;
     private string? _entryJob;
@@ -491,6 +492,26 @@ public sealed class Workflow<TState>
     public Workflow<TState> InterruptAfter(JobRef jobRef) =>
         InterruptAfter(jobRef.Name);
 
+    /// <summary>
+    /// Marks <paramref name="node"/> as an input-collecting turn: pauses execution before the
+    /// job (exactly like <see cref="InterruptBefore(string)"/>) and records it in
+    /// <see cref="WorkflowDefinition{TState}.InputJobs"/>, so a host can tell a turn awaiting a
+    /// free-text reply apart from an approval gate and resume with
+    /// <see cref="ResumeAsync(string, Func{TState, TState}, CancellationToken)"/> accordingly.
+    /// Input is always free text — there is no typed input contract. Requires
+    /// <see cref="UseCheckpointing"/> to be configured.
+    /// </summary>
+    public Workflow<TState> AwaitInput(string node)
+    {
+        InterruptBefore(node);
+        _inputJobs.Add(node);
+        return this;
+    }
+
+    /// <summary>Marks a job as an input-collecting turn using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> AwaitInput(JobRef node) =>
+        AwaitInput(node.Name);
+
     public Workflow<TState> UseRunner(IWorkflowRunner runner)
     {
         ThrowIfFrozen();
@@ -639,7 +660,7 @@ public sealed class Workflow<TState>
 
         ApplyLifecycleActions();
 
-        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins, _budget, _onError);
+        _cachedDefinition = new WorkflowDefinition<TState>(_name, _jobs, _connections, _entryJob, _metadata, _joins, _budget, _onError, _inputJobs);
         _frozen = true;
         return _cachedDefinition;
     }

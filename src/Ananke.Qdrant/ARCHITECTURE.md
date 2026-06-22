@@ -9,6 +9,24 @@ Provides vector-search-backed implementations of Ananke's knowledge and
 learning abstractions. Handles collection management, dense vector upsert/search,
 and metadata filtering.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `QdrantKnowledgeStore` — `IKnowledgeStore` implementation; vector knowledge storage with
+   similarity search — `src/Ananke.Qdrant/QdrantKnowledgeStore.cs`
+2. `QdrantEmpiricalMemory` — `IEmpiricalMemory` implementation; empirical pattern storage
+   with vector search — `src/Ananke.Qdrant/QdrantEmpiricalMemory.cs`
+3. `QdrantEpisodeStore` — `IEpisodeStore` implementation; episode persistence with vector
+   indexing — `src/Ananke.Qdrant/QdrantEpisodeStore.cs`
+4. `QdrantKnowledgeCatalog` — `IKnowledgeCatalog` implementation; document catalog with
+   vector-based discovery — `src/Ananke.Qdrant/QdrantKnowledgeCatalog.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Orchestration` (project)

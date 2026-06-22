@@ -48,11 +48,13 @@ public sealed class WorkflowScaffold<TState>
     private readonly HashSet<string> _jobNames;
     private readonly HashSet<string> _subFlowNames;
     private readonly HashSet<string> _interruptJobs;
+    private readonly HashSet<string> _askJobs;
     private readonly Dictionary<string, IJob<TState>> _boundJobs = [];
     private readonly Dictionary<string, Func<TState, CancellationToken, Task<TState>>> _boundDelegates = [];
     private readonly Dictionary<string, Func<TState[], TState>> _mergeFunctions = [];
     private readonly Dictionary<string, IRouter<TState>> _routers = [];
     private readonly Dictionary<string, Action<Workflow<TState>>> _subFlowBindings = [];
+    private readonly Dictionary<string, Func<TState, bool>> _loopConditions = [];
 
     internal WorkflowScaffold(string name, List<ConnectionLine> connections)
     {
@@ -84,6 +86,38 @@ public sealed class WorkflowScaffold<TState>
             throw new InvalidOperationException(
                 $"Interrupt directive(s) reference unknown job(s): {string.Join(", ", unknownInterrupts)}. " +
                 "Each interrupt target must appear in a connection.");
+
+        _askJobs = connections.OfType<ConnectionLine.Ask>()
+            .Select(a => a.JobName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var unknownAsks = _askJobs.Where(n => !_jobNames.Contains(n)).ToList();
+        if (unknownAsks.Count > 0)
+            throw new InvalidOperationException(
+                $"Ask directive(s) reference unknown job(s): {string.Join(", ", unknownAsks)}. " +
+                "Each ask target must appear in a connection.");
+
+        var loops = connections.OfType<ConnectionLine.Loop>().ToList();
+
+        var unknownLoopSources = loops.Select(l => l.From).Where(n => !_jobNames.Contains(n)).ToList();
+        if (unknownLoopSources.Count > 0)
+            throw new InvalidOperationException(
+                $"Loop directive(s) reference unknown source job(s): {string.Join(", ", unknownLoopSources)}. " +
+                "Each loop source must appear in a connection.");
+
+        var unknownLoopTargets = loops.Select(l => l.LoopTarget).Where(n => !_jobNames.Contains(n)).ToList();
+        if (unknownLoopTargets.Count > 0)
+            throw new InvalidOperationException(
+                $"Loop directive(s) reference unknown loop target(s): {string.Join(", ", unknownLoopTargets)}. " +
+                "Each loop target must appear in a connection.");
+
+        var unknownLoopExits = loops.Select(l => l.ExitTarget)
+            .Where(t => !string.Equals(t, "End", StringComparison.OrdinalIgnoreCase) && !_jobNames.Contains(t))
+            .ToList();
+        if (unknownLoopExits.Count > 0)
+            throw new InvalidOperationException(
+                $"Loop directive(s) reference unknown exit target(s): {string.Join(", ", unknownLoopExits)}. " +
+                "Each loop exit target must appear in a connection, or be 'End'.");
     }
 
     /// <summary>
@@ -174,6 +208,24 @@ public sealed class WorkflowScaffold<TState>
     }
 
     /// <summary>
+    /// Loop source jobs that have not yet been bound to an <c>until</c> condition via
+    /// <see cref="BindLoopCondition"/>.
+    /// </summary>
+    public IReadOnlySet<string> UnboundLoops
+    {
+        get
+        {
+            var loopSources = _connections
+                .OfType<ConnectionLine.Loop>()
+                .Select(l => l.From)
+                .ToHashSet();
+
+            loopSources.ExceptWith(_loopConditions.Keys);
+            return loopSources;
+        }
+    }
+
+    /// <summary>
     /// Binds a job name to a delegate implementation.
     /// </summary>
     public WorkflowScaffold<TState> Bind(string jobName, Func<TState, CancellationToken, Task<TState>> execute)
@@ -230,6 +282,28 @@ public sealed class WorkflowScaffold<TState>
                 $"'{jobName}' is not a router job in the DSL.");
 
         _routers[jobName] = router;
+        return this;
+    }
+
+    /// <summary>
+    /// Binds the <c>until</c> condition for a loop declared with <c>loop(target, exit: x)</c> in
+    /// the DSL. Required for each loop source before <see cref="Build"/>.
+    /// </summary>
+    /// <param name="from">The loop's source job name (the <c>a</c> in <c>a -&gt; loop(...)</c>).</param>
+    /// <param name="until">Evaluated after <paramref name="from"/> completes; <c>true</c> exits the loop.</param>
+    public WorkflowScaffold<TState> BindLoopCondition(string from, Func<TState, bool> until)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(from);
+        ArgumentNullException.ThrowIfNull(until);
+
+        var isLoopSource = _connections.OfType<ConnectionLine.Loop>().Any(l =>
+            string.Equals(l.From, from, StringComparison.OrdinalIgnoreCase));
+
+        if (!isLoopSource)
+            throw new InvalidOperationException(
+                $"'{from}' is not a loop source in the DSL.");
+
+        _loopConditions[from] = until;
         return this;
     }
 
@@ -313,8 +387,17 @@ public sealed class WorkflowScaffold<TState>
                     workflow.Then(r.From, _routers[r.From]);
                     break;
 
+                case ConnectionLine.Loop loop:
+                    var loopExit = string.Equals(loop.ExitTarget, "End", StringComparison.OrdinalIgnoreCase)
+                        ? Workflow.End : loop.ExitTarget;
+                    workflow.Loop(
+                        loop.From, loop.LoopTarget, loopExit,
+                        _loopConditions[loop.From], loop.MaxIterations ?? 10);
+                    break;
+
                 case ConnectionLine.SubFlow:
                 case ConnectionLine.Interrupt:
+                case ConnectionLine.Ask:
                 case ConnectionLine.Tool:
                 case ConnectionLine.Use:
                     break; // node annotations — handled separately
@@ -324,6 +407,10 @@ public sealed class WorkflowScaffold<TState>
         // Apply interrupt directives
         foreach (var job in _interruptJobs)
             workflow.InterruptBefore(job);
+
+        // Apply ask (input-turn) directives
+        foreach (var job in _askJobs)
+            workflow.AwaitInput(job);
 
         return workflow;
     }
@@ -363,6 +450,12 @@ public sealed class WorkflowScaffold<TState>
             throw new InvalidOperationException(
                 $"Unbound subflow(s): {string.Join(", ", unboundSubFlows)}. " +
                 "Call BindSubFlow() for each subflow before building.");
+
+        var unboundLoops = UnboundLoops;
+        if (unboundLoops.Count > 0)
+            throw new InvalidOperationException(
+                $"Unbound loop(s): {string.Join(", ", unboundLoops)}. " +
+                "Call BindLoopCondition() for each loop before building.");
     }
 
     private static ForkMode? ParseForkMode(string? mode) => mode?.ToLowerInvariant() switch
@@ -409,8 +502,10 @@ public sealed class WorkflowScaffold<TState>
                     foreach (var o in r.Options) TryAdd(o);
                     break;
 
+                case ConnectionLine.Loop:
                 case ConnectionLine.SubFlow:
                 case ConnectionLine.Interrupt:
+                case ConnectionLine.Ask:
                 case ConnectionLine.Tool:
                 case ConnectionLine.Use:
                     break; // node annotations — don't introduce new names
@@ -431,8 +526,12 @@ public sealed class WorkflowScaffold<TState>
             : $"{f.From} -> fork({string.Join(", ", f.Targets)}, mode: {f.Mode})",
         ConnectionLine.Join j => $"join({string.Join(", ", j.Sources)}) -> {j.Target}",
         ConnectionLine.Router r => $"{r.From} -> router({string.Join(", ", r.Options)})",
+        ConnectionLine.Loop l => l.MaxIterations is null
+            ? $"{l.From} -> loop({l.LoopTarget}, exit: {l.ExitTarget})"
+            : $"{l.From} -> loop({l.LoopTarget}, exit: {l.ExitTarget}, maxIterations: {l.MaxIterations})",
         ConnectionLine.SubFlow s => $"subflow({s.Name})",
         ConnectionLine.Interrupt i => $"interrupt({i.JobName})",
+        ConnectionLine.Ask a => $"ask({a.JobName})",
         _ => throw new InvalidOperationException($"Unsupported connection line type: {connection.GetType().Name}")
     };
 
@@ -477,7 +576,8 @@ public static class WorkflowScaffold
     /// <param name="dsl">
     /// Multi-line topology DSL. Each line is a connection or node directive:
     /// <c>a -&gt; b</c>, <c>a -&gt; fork(b, c)</c>, <c>join(a, b) -&gt; c</c>, <c>a -&gt; router(b, c)</c>,
-    /// <c>subflow(name)</c>, <c>interrupt(name)</c>.
+    /// <c>a -&gt; loop(target, exit: x)</c>, <c>subflow(name)</c>, <c>interrupt(name)</c>,
+    /// <c>ask(name)</c>.
     /// Lines starting with <c>#</c> are comments. Blank lines are ignored.
     /// </param>
     public static WorkflowScaffold<TState> Parse<TState>(string name, string dsl)

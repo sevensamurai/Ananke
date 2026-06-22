@@ -72,7 +72,7 @@ without touching business logic. Concretely:
 
 ### Is Ananke open source?
 
-Yes. Ananke is licensed under the [Apache 2.0 License](LICENSE).
+Yes. Ananke is licensed under the [Apache 2.0 License](https://github.com/sevensamurai/Ananke/blob/main/LICENSE).
 
 ---
 
@@ -113,7 +113,7 @@ dotnet add package Ananke.Documents              # PDF + Markdown extraction
 ### How many packages are there?
 
 Ananke is split into focused NuGet packages so you only take the dependencies you need.
-The full list is in the [README packages table](README.md#packages) and the
+The full list is in the [README packages table](https://github.com/sevensamurai/Ananke#packages) and the
 [Feature Index](../reference/features.md).
 
 ---

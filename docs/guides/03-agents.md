@@ -57,7 +57,7 @@ dotnet add package Ananke.Orchestration.Google
 ```csharp
 using Ananke.Orchestration.Google;
 
-IStreamingAgentModel model = GoogleAgentModel.Create(apiKey, "gemini-2.5-pro");
+IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-2.5-pro");
 ```
 
 ### Local / Custom Endpoints
@@ -102,17 +102,7 @@ Console.WriteLine(response.Text);  // "The capital of Japan is Tokyo."
 ```csharp
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
-
-// Define state and response types
-record ResearchState
-{
-    public string Country { get; init; } = "";
-    public string? Facts { get; init; }
-    public string? Analysis { get; init; }
-}
-
-record GatherResult { public string Summary { get; init; } = ""; }
-record AnalysisResult { public string Insight { get; init; } = ""; }
+using Ananke.Orchestration.Workflows;
 
 // Build agent jobs
 var gatherJob = new AgentJob<ResearchState, GatherResult>
@@ -134,10 +124,22 @@ var analyzeJob = new AgentJob<ResearchState, AnalysisResult>
 var workflow = new Workflow<ResearchState>("country-research")
     .Job("gather", gatherJob)
     .Job("analyze", analyzeJob)
-    .Chain("gather", "analyze");
+    .Chain("gather", "analyze")
+    .Then("analyze", Workflow.End);
 
 var result = await workflow.RunAsync(new ResearchState { Country = "Japan" });
 Console.WriteLine(result.State.Analysis);
+
+// State and response types
+record ResearchState
+{
+    public string Country { get; init; } = "";
+    public string? Facts { get; init; }
+    public string? Analysis { get; init; }
+}
+
+record GatherResult { public string Summary { get; init; } = ""; }
+record AnalysisResult { public string Insight { get; init; } = ""; }
 ```
 
 ### Structured Output
@@ -233,8 +235,8 @@ var request = new AgentRequest
 
 await foreach (var chunk in model.GenerateStreamAsync(request))
 {
-    if (chunk.Text is not null)
-        Console.Write(chunk.Text);
+    if (chunk.TextDelta is not null)
+        Console.Write(chunk.TextDelta);
 }
 ```
 
@@ -268,4 +270,4 @@ var workflow = StreamingChatWorkflow.Create("chat", model)
 
 ---
 
-← [Back to Learning Path](learning-path.md)
+← [Back to Learning Path](../learning-path.md)

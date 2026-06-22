@@ -11,14 +11,17 @@
 
 A workflow is a directed graph of **jobs** connected by edges. Each job receives a typed
 state object, performs work (optionally calling an LLM, tools, or external services), and
-returns a new state. The graph is validated at build time. A job with no outgoing edge is
-implicitly terminal — no explicit `.Then(…, Workflow.End)` is needed.
+returns a new state. The graph is validated at build time. The only exception to needing an
+explicit terminal edge is a workflow with a single job — with two or more jobs, every job
+without an outgoing connection (including the last one in a `.Chain(...)`) must be wired to
+`Workflow.End` explicitly, or `Build()`/`RunAsync()` throws:
 
 ```csharp
 var workflow = new Workflow<MyState>("my-workflow")
     .Job("step-a", async (state, ct) => state with { A = "done" })
     .Job("step-b", async (state, ct) => state with { B = "done" })
-    .Chain("step-a", "step-b");
+    .Chain("step-a", "step-b")
+    .Then("step-b", Workflow.End);
 
 var result = await workflow.RunAsync(new MyState());
 ```

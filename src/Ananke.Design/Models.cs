@@ -63,6 +63,15 @@ public static class Models
 
         /// <summary>Claude Haiku 3.5 — fastest, most compact.</summary>
         public const string Haiku35 = "claude-3-5-haiku";
+
+        /// <summary>Claude Opus 4.8 — current generation, most capable, complex reasoning.</summary>
+        public const string Opus48 = "claude-opus-4-8";
+
+        /// <summary>Claude Sonnet 4.6 — current generation, balanced performance and speed.</summary>
+        public const string Sonnet46 = "claude-sonnet-4-6";
+
+        /// <summary>Claude Haiku 4.5 — current generation, fastest, most compact.</summary>
+        public const string Haiku45 = "claude-haiku-4-5";
     }
 
     /// <summary>Google Gemini model identifiers. Already short wire names.</summary>

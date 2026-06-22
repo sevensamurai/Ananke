@@ -1,4 +1,4 @@
-<!-- topic: dsl-syntax, tags: dsl, topology, design, fork, join, router, subflow, interrupt, connections, manifest -->
+<!-- topic: dsl-syntax, tags: dsl, topology, design, fork, join, router, loop, subflow, interrupt, connections, manifest -->
 # Ananke.Design — Workflow DSL
 
 `Ananke.Design` provides a text-based DSL for declaring workflow topology separately from job implementations.
@@ -69,6 +69,22 @@ analyze -> router(enrich, validate, End)
 ```
 
 Declares `analyze` as a decision point with the listed options. Requires an `IRouter<TState>` bound via `BindRouter()`.
+
+### Loop (conditional back-edge)
+
+```
+await_ci -> loop(code_cycle, exit: report)
+```
+
+Declares `await_ci` as a loop point: each time it is reached, the bound condition decides whether to go back to `code_cycle` or continue to `report`. Requires a `Func<TState, bool>` ("until" — true means exit) bound via `BindLoopCondition()`.
+
+With an explicit iteration cap (default 10):
+
+```
+await_ci -> loop(code_cycle, exit: report, maxIterations: 25)
+```
+
+Once `maxIterations` is reached the loop exits to `exit:` even if the condition never becomes true — this guards against runaway loops without raising an exception.
 
 ### Comments and blank lines
 
@@ -164,6 +180,25 @@ var workflow = scaffold
     .Build();
 ```
 
+### Loop (conditional back-edge)
+
+```csharp
+var scaffold = WorkflowScaffold.Parse<CodeState>("ci-loop", """
+    plan -> code_cycle
+    code_cycle -> await_ci
+    await_ci -> loop(code_cycle, exit: report, maxIterations: 5)
+    report -> End
+    """);
+
+var workflow = scaffold
+    .Bind("plan", async (state, ct) => state with { Step = "planned" })
+    .Bind("code_cycle", async (state, ct) => state with { Attempts = state.Attempts + 1 })
+    .Bind("await_ci", async (state, ct) => state with { CiPassed = CheckCi(state) })
+    .Bind("report", async (state, ct) => state with { Reported = true })
+    .BindLoopCondition("await_ci", s => s.CiPassed)
+    .Build();
+```
+
 ### SubFlow (nested workflow)
 
 ```csharp
@@ -251,6 +286,7 @@ IReadOnlySet<string> all = scaffold.JobNames;
 IReadOnlySet<string> jobs     = scaffold.UnboundJobs;
 IReadOnlySet<string> merges   = scaffold.UnboundMerges;
 IReadOnlySet<string> routers  = scaffold.UnboundRouters;
+IReadOnlySet<string> loops    = scaffold.UnboundLoops;
 IReadOnlySet<string> subflows = scaffold.UnboundSubFlows;
 ```
 
@@ -272,14 +308,15 @@ string markdown = workflow.ToMarkdownMermaid();
 
 The scaffold validates at two stages:
 
-1. **Parse time** — syntax errors, minimum argument counts (fork ≥ 2 targets, join ≥ 2 sources, router ≥ 2 options), and directive targets referencing known jobs (subflow/interrupt)
-2. **Build time** — all jobs bound, all join merges bound, all routers bound, all subflows bound. The resulting `Workflow<TState>.Build()` then applies the standard graph validation (reachability, terminal connections, etc.)
+1. **Parse time** — syntax errors, minimum argument counts (fork ≥ 2 targets, join ≥ 2 sources, router ≥ 2 options), and directive targets referencing known jobs (loop/subflow/interrupt)
+2. **Build time** — all jobs bound, all join merges bound, all routers bound, all loops bound, all subflows bound. The resulting `Workflow<TState>.Build()` then applies the standard graph validation (reachability, terminal connections, etc.)
 
 Error messages are explicit:
 
 ```
 Unbound job(s): fetch_a, fetch_b. Call Bind() for each job before building.
 Unbound merge(s) for join target(s): combine. Call BindMerge() for each join target before building.
+Unbound loop(s): await_ci. Call BindLoopCondition() for each loop before building.
 Unbound subflow(s): refine. Call BindSubFlow() for each subflow before building.
 Job 'unknown' is not declared in the DSL. Known jobs: plan, fetch_a, fetch_b
 ```

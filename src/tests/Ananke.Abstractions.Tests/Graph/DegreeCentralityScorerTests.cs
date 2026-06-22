@@ -85,6 +85,23 @@ public sealed class DegreeCentralityScorerTests
     }
 
     [Test]
+    public async Task ScoreAsync_NodeKindFilterMatchesSecondaryLabel_IncludesNode()
+    {
+        // "a" already exists with Kind="tag" from SetUp; give it a secondary label too.
+        await _graph.UpsertNodeAsync(new GraphNode { Id = "a", Kind = "tag", Labels = ["Pinned"] });
+        await _graph.UpsertNodeAsync(new GraphNode { Id = "x", Kind = "entry" });
+        await _graph.UpsertEdgeAsync(new GraphEdge
+        {
+            FromId = "x", ToId = "a", Relation = "tagged", Provenance = EdgeProvenance.Extracted,
+        });
+
+        var scores = await _scorer.ScoreAsync(_graph, nodeKindFilter: "Pinned");
+
+        scores.ContainsKey("a").ShouldBeTrue();
+        scores.ContainsKey("x").ShouldBeFalse();
+    }
+
+    [Test]
     public async Task ScoreAsync_EmptyGraph_ReturnsEmptyDictionary()
     {
         var empty = new InMemoryKnowledgeGraph();

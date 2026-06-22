@@ -44,6 +44,13 @@ public sealed class WorkflowDefinition<TState>
     /// </summary>
     internal Func<TState, string, Exception, Task>? OnError { get; }
 
+    /// <summary>
+    /// Jobs marked via <see cref="Workflow{TState}.AwaitInput(string)"/> — input-collecting
+    /// turns. Always a subset of jobs with <see cref="InterruptMode.Before"/>: hosts use this
+    /// set to tell a turn awaiting a free-text reply apart from a plain approval gate.
+    /// </summary>
+    public IReadOnlySet<string> InputJobs { get; }
+
     internal WorkflowDefinition(
         string name,
         Dictionary<string, JobDescriptor<TState>> jobs,
@@ -52,7 +59,8 @@ public sealed class WorkflowDefinition<TState>
         IReadOnlyDictionary<string, string>? metadata = null,
         List<JoinDescriptor<TState>>? joins = null,
         BudgetConfig? budget = null,
-        Func<TState, string, Exception, Task>? onError = null)
+        Func<TState, string, Exception, Task>? onError = null,
+        IReadOnlySet<string>? inputJobs = null)
     {
         Name = name;
         Jobs = new Dictionary<string, JobDescriptor<TState>>(jobs);
@@ -62,6 +70,7 @@ public sealed class WorkflowDefinition<TState>
         Joins = joins is not null ? [.. joins] : [];
         Budget = budget;
         OnError = onError;
+        InputJobs = inputJobs ?? new HashSet<string>();
 
         Validate();
     }

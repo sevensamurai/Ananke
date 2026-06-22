@@ -11,6 +11,24 @@ into `PlatformMessage`, provides a response sink interface, and includes
 `StreamingMessageBridge` for the post-then-edit streaming pattern used
 by platforms that don't support true server-push.
 
+---
+
+## Start Here
+
+Read these first — they're the package's entry points; the rest of this file is reference
+detail to come back to.
+
+1. `IMessagePlatformAdapter` — platform connection lifecycle (`StartAsync`, `StopAsync`,
+   `IsConnected`); the contract every platform package implements — `src/Ananke.Platforms/IMessagePlatformAdapter.cs`
+2. `IPlatformResponseSink` — send responses back to the platform (`SendMessageAsync`,
+   `UpdateMessageAsync`, `SendTypingAsync`, `AddReactionAsync`) — `src/Ananke.Platforms/IPlatformResponseSink.cs`
+3. `IPlatformMessageHandler` — the business logic hook that routes messages to workflows —
+   `src/Ananke.Platforms/IPlatformMessageHandler.cs`
+4. `ConversationalMessageHandler` — session-aware, memory-integrated base handler wiring
+   `StreamingChatWorkflow` + `IConversationMemory` + `StreamingMessageBridge` — `src/Ananke.Platforms/Sessions/ConversationalMessageHandler.cs`
+
+---
+
 ## Dependencies
 
 - `Ananke.Orchestration` (project) — for `StreamingChatWorkflow`, `IConversationMemory`, `ToolKit`, `IContextStrategy`
