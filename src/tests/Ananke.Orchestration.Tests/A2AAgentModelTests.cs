@@ -75,7 +75,7 @@ public class A2AAgentModelTests
     private static A2AAgentModel MakeModel(FakeA2AHandler handler) =>
         new(new A2AAgentModelOptions
         {
-            AgentUrl   = new Uri("http://fake-a2a-agent/"),
+            AgentUrl = new Uri("http://fake-a2a-agent/"),
             HttpClient = new HttpClient(handler) { BaseAddress = new Uri("http://fake-a2a-agent/") }
         });
 
@@ -117,7 +117,7 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_MultiTurn_HistoryLengthSentToRemote()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         var request = new AgentRequest
         {
@@ -139,7 +139,7 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_MultiTurn_LastUserMessageIsCurrentTurn()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         var request = new AgentRequest
         {
@@ -160,7 +160,7 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_MultiTurn_ReturnsCorrectReplyPerCall()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         for (var i = 1; i <= 3; i++)
         {
@@ -176,12 +176,12 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_WithSystemPrompt_SystemPromptFusedIntoMessage()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         var request = new AgentRequest
         {
             SystemPrompt = "You are a helpful assistant.",
-            Messages     = [Ananke.Abstractions.Agents.AgentMessage.User("Hello")]
+            Messages = [Ananke.Abstractions.Agents.AgentMessage.User("Hello")]
         };
 
         await model.GenerateAsync(request);
@@ -195,12 +195,12 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_WithTools_ToolNamesAdvertisedInMetadata()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         var request = new AgentRequest
         {
             Messages = [Ananke.Abstractions.Agents.AgentMessage.User("Call a tool")],
-            Tools    = [new AgentTool("search", "Searches the web", "{}")]
+            Tools = [new AgentTool("search", "Searches the web", "{}")]
         };
 
         await model.GenerateAsync(request);
@@ -214,7 +214,7 @@ public class A2AAgentModelTests
     public async Task GenerateAsync_NoTools_NoToolMetadataInRequest()
     {
         var handler = new FakeA2AHandler();
-        var model   = MakeModel(handler);
+        var model = MakeModel(handler);
 
         await model.GenerateAsync(SimpleRequest());
 
@@ -227,8 +227,8 @@ public class A2AAgentModelTests
     public async Task GenerateStreamAsync_GracefullyHandlesEmptyOrInvalidStream()
     {
         var handler = new FakeA2AHandler { ResponseJson = "" };
-        var model   = MakeModel(handler);
-        var chunks  = new List<AgentStreamChunk>();
+        var model = MakeModel(handler);
+        var chunks = new List<AgentStreamChunk>();
 
         try
         {

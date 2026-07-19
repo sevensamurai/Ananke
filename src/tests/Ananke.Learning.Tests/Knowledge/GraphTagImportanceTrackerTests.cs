@@ -25,7 +25,7 @@ public sealed class GraphTagImportanceTrackerTests
     [Test]
     public async Task ComputeAsync_BridgeTagScoresHigherThanExpectedByDegreeAlone()
     {
-        var graph  = new InMemoryKnowledgeGraph();
+        var graph = new InMemoryKnowledgeGraph();
         // dedupThreshold>1.0 disables semantic dedup so all entries are stored independently.
         var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder(), dedupThreshold: 1.1f);
 
@@ -56,7 +56,7 @@ public sealed class GraphTagImportanceTrackerTests
     [Test]
     public async Task ComputeAsync_BelowMinSampleSize_ReturnsNull()
     {
-        var graph  = new InMemoryKnowledgeGraph();
+        var graph = new InMemoryKnowledgeGraph();
         var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder());
 
         // Only 2 entries — below default MinSampleSize of 10.
@@ -73,21 +73,21 @@ public sealed class GraphTagImportanceTrackerTests
 
     private static EmpiricalEntry MakeEntry(
         string id, string[] tagKeys, float[] weights) => new()
-    {
-        Id               = id,
-        Kind             = EmpiricalKind.Pattern,
-        Tags             = [],
-        Source           = "test",
-        Confidence       = 0.5f,
-        ObservationCount = 1,
-        Evidence         = [],
-        FirstObserved    = DateTimeOffset.UtcNow,
-        LastObserved     = DateTimeOffset.UtcNow,
-        Description      = new SemanticDescription
         {
-            Summary      = id,
-            SemanticTags = tagKeys.Zip(weights)
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Confidence = 0.5f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
+            Description = new SemanticDescription
+            {
+                Summary = id,
+                SemanticTags = tagKeys.Zip(weights)
                 .ToDictionary(t => t.First, t => t.Second),
-        },
-    };
+            },
+        };
 }

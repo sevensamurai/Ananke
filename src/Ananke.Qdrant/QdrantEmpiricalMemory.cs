@@ -101,6 +101,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private readonly AffectOptions? _affectOptions;
     private readonly IPredictionSource? _predictionSource;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private bool _initialized;
 
@@ -135,6 +136,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     /// <see cref="EmpiricalEntry.Confidence"/> as the prediction.
     /// </param>
     /// <param name="logger">Optional logger for diagnostic output.</param>
+    /// <param name="timeProvider">
+    /// Clock used for recency weighting, reinforcement cooldowns, and <c>last_observed</c>
+    /// timestamps. Defaults to <see cref="TimeProvider.System"/>; inject a fake in tests.
+    /// </param>
     public QdrantEmpiricalMemory(
         QdrantClient client,
         IEmbeddingModel embedder,
@@ -144,7 +149,8 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         TimeDecayOptions? decayOptions = null,
         AffectOptions? affectOptions = null,
         IPredictionSource? predictionSource = null,
-        ILogger<QdrantEmpiricalMemory>? logger = null)
+        ILogger<QdrantEmpiricalMemory>? logger = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(embedder);
@@ -159,6 +165,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         _affectOptions = affectOptions;
         _predictionSource = predictionSource;
         _logger = logger ?? NullLogger<QdrantEmpiricalMemory>.Instance;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
@@ -268,32 +275,19 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             cancellationToken: ct);
 
         // Client-side composite scoring: vectorScore × confidence × recencyWeight
+        var now = _timeProvider.GetUtcNow();
         var matches = results
             .Select(p =>
             {
                 var entry = MapScoredPointToEntry(p);
-                var recencyWeight = TimeDecay.ComputeWeight(entry.LastObserved, _decayOptions);
+                var recencyWeight = TimeDecay.ComputeWeight(entry.LastObserved, now, _decayOptions);
                 var compositeScore = p.Score * entry.Confidence * recencyWeight;
 
                 if (_affectOptions is not null)
                 {
-                    if (_affectOptions.StrengthHalfLifeDays is { } shl)
-                    {
-                        var elapsedDays = (float)(DateTimeOffset.UtcNow - entry.LastObserved).TotalDays;
-                        compositeScore *= MathF.Pow(2f, -elapsedDays / shl);
-                    }
-
-                    var effectiveValence = MathF.Abs(entry.Valence);
-                    if (_affectOptions.ValenceHalfLifeDays is { } vhl)
-                    {
-                        var elapsedDays = (float)(DateTimeOffset.UtcNow - entry.LastObserved).TotalDays;
-                        effectiveValence *= MathF.Pow(2f, -elapsedDays / vhl);
-                    }
-
-                    var priorityBoost = 1f + _affectOptions.MaxPriorityBoost
-                                           * entry.Intensity
-                                           * effectiveValence;
-                    compositeScore *= priorityBoost;
+                    compositeScore = EmpiricalScoring.ApplyPriorityBoost(
+                        compositeScore, entry.Valence, entry.Intensity, entry.LastObserved,
+                        _affectOptions, now);
                 }
 
                 return new EmpiricalMatch { Entry = entry, Score = compositeScore };
@@ -334,6 +328,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         var currentEvidence = GetStringList(point.Payload, EvidenceKey);
         var currentPrediction = point.Payload.TryGetValue(PredictionKey, out var predVal)
             ? (float?)predVal.DoubleValue : null;
+        var now = _timeProvider.GetUtcNow();
 
         Dictionary<string, Value> updatedPayload;
 
@@ -357,8 +352,8 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
             var lastObservedUnix = GetLong(point.Payload, LastObservedKey);
             var lastObserved = DateTimeOffset.FromUnixTimeSeconds(lastObservedUnix);
-            float hours = (float)(DateTimeOffset.UtcNow - lastObserved).TotalHours;
-            float cooldown = MathF.Min(1f, hours / _affectOptions.ReinforcementCooldownHours);
+            float cooldown = EmpiricalScoring.ComputeReinforcementCooldown(
+                lastObserved, _affectOptions.ReinforcementCooldownHours, now);
 
             float currentStrength = (float)GetDouble(point.Payload, StrengthKey, 0.5);
             float currentVariance = (float)GetDouble(point.Payload, VarianceKey, 1.0);
@@ -376,7 +371,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             {
                 [ConfidenceKey] = (double)newConfidence,
                 [ObservationCountKey] = currentCount + 1,
-                [LastObservedKey] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                [LastObservedKey] = now.ToUnixTimeSeconds(),
                 [EvidenceKey] = ToListValue(newEvidence),
                 [StrengthKey] = (double)MathF.Max(0f, currentStrength + strengthDelta),
                 [ValenceKey] = (double)newValence,
@@ -402,7 +397,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             {
                 [ConfidenceKey] = newConfidence,
                 [ObservationCountKey] = currentCount + 1,
-                [LastObservedKey] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                [LastObservedKey] = now.ToUnixTimeSeconds(),
                 [EvidenceKey] = ToListValue(newEvidence)
             };
 
@@ -445,6 +440,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
         var currentConfidence = GetDouble(point.Payload, ConfidenceKey);
         var currentEvidence = GetStringList(point.Payload, EvidenceKey);
+        var now = _timeProvider.GetUtcNow();
 
         Dictionary<string, Value> updatedPayload;
         double newConfidence;
@@ -469,7 +465,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
                 [ValenceKey] = (double)Math.Clamp(currentValence + _affectOptions.ContradictionValenceShift, -1.0, 1.0),
                 [IntensityKey] = (double)Math.Clamp(currentIntensity + _affectOptions.ContradictionIntensityShift, 0.0, 1.0),
                 [LastPredictionErrorKey] = 1.0,
-                [LastObservedKey] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                [LastObservedKey] = now.ToUnixTimeSeconds(),
                 [EvidenceKey] = ToListValue(TrimEvidence([.. currentEvidence, $"contradicted: {reason}"]))
             };
         }
@@ -482,7 +478,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             updatedPayload = new Dictionary<string, Value>
             {
                 [ConfidenceKey] = newConfidence,
-                [LastObservedKey] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                [LastObservedKey] = now.ToUnixTimeSeconds(),
                 [EvidenceKey] = ToListValue(TrimEvidence([.. currentEvidence, $"contradicted: {reason}"]))
             };
         }

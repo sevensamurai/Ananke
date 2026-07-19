@@ -55,7 +55,7 @@ Console.WriteLine("    nnke new workflow {{name}}-v2 --pattern sequential");
 //
 // Anthropic:
 //   dotnet add package Ananke.Orchestration.Anthropic
-//   var model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-4-20250514");
+//   var model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-5");
 //
 // Google:
 //   dotnet add package Ananke.Orchestration.Google

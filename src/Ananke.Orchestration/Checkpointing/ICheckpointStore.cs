@@ -1,4 +1,4 @@
-﻿namespace Ananke.Orchestration.Checkpointing;
+namespace Ananke.Orchestration.Checkpointing;
 
 /// <summary>
 /// Persistent storage for workflow checkpoints, enabling pause-and-resume semantics.

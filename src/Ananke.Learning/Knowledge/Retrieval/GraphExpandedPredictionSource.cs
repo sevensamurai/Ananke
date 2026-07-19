@@ -65,9 +65,9 @@ public sealed class GraphExpandedPredictionSource(
         // Step 4: recall the actual entries and weight by hop distance.
         // We approximate hop distance by position in the BFS result list
         // (earlier = closer). Contribution halves every neighborCount positions.
-        var weightedSum   = 0f;
-        var totalWeight   = 0f;
-        var retrieved     = 0;
+        var weightedSum = 0f;
+        var totalWeight = 0f;
+        var retrieved = 0;
 
         foreach (var candidateId in candidateEntryIds)
         {

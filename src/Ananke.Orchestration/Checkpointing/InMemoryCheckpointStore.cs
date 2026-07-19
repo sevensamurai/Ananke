@@ -8,6 +8,14 @@ public sealed class InMemoryCheckpointStore : ICheckpointStore
     private readonly record struct Entry(string Json, DateTimeOffset ExpiresAt);
 
     private readonly ConcurrentDictionary<string, Entry> _store = new();
+    private readonly TimeProvider _timeProvider;
+
+    /// <param name="timeProvider">
+    /// Clock used to evaluate checkpoint expiry. Defaults to <see cref="TimeProvider.System"/>;
+    /// inject a fake in tests to assert TTL behavior without sleeping.
+    /// </param>
+    public InMemoryCheckpointStore(TimeProvider? timeProvider = null) =>
+        _timeProvider = timeProvider ?? TimeProvider.System;
 
     public Task SaveAsync<TState>(Checkpoint<TState> checkpoint, CancellationToken ct = default)
     {
@@ -21,7 +29,7 @@ public sealed class InMemoryCheckpointStore : ICheckpointStore
         if (!_store.TryGetValue(executionId, out var entry))
             return Task.FromResult<Checkpoint<TState>?>(null);
 
-        if (entry.ExpiresAt <= DateTimeOffset.UtcNow)
+        if (entry.ExpiresAt <= _timeProvider.GetUtcNow())
         {
             _store.TryRemove(executionId, out _);
             return Task.FromResult<Checkpoint<TState>?>(null);
@@ -42,7 +50,7 @@ public sealed class InMemoryCheckpointStore : ICheckpointStore
         if (!_store.TryGetValue(executionId, out var entry))
             return Task.FromResult(false);
 
-        if (entry.ExpiresAt <= DateTimeOffset.UtcNow)
+        if (entry.ExpiresAt <= _timeProvider.GetUtcNow())
         {
             _store.TryRemove(executionId, out _);
             return Task.FromResult(false);
@@ -53,7 +61,7 @@ public sealed class InMemoryCheckpointStore : ICheckpointStore
 
     public Task CleanupExpiredAsync(CancellationToken ct = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         foreach (var key in _store.Keys.ToList())
         {
             if (_store.TryGetValue(key, out var entry) && entry.ExpiresAt <= now)

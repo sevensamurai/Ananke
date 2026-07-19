@@ -340,7 +340,9 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "test", Description = "desc", Parameters = [],
+            Name = "test",
+            Description = "desc",
+            Parameters = [],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
 
@@ -352,7 +354,9 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "test", Description = "desc", Parameters = [],
+            Name = "test",
+            Description = "desc",
+            Parameters = [],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
 
@@ -364,7 +368,9 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Searches", Parameters = [],
+            Name = "search",
+            Description = "Searches",
+            Parameters = [],
             Tags = ["retrieval", "web"],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
@@ -377,7 +383,9 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Searches", Parameters = [],
+            Name = "search",
+            Description = "Searches",
+            Parameters = [],
             Examples = ["search for cats", "find documents about AI"],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
@@ -406,7 +414,8 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Searches",
+            Name = "search",
+            Description = "Searches",
             Parameters = [new ToolParameter("query", "Search query",
                 Examples: ["distributed consensus", "Raft vs Paxos"])],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
@@ -423,7 +432,8 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Searches",
+            Name = "search",
+            Description = "Searches",
             Parameters = [new ToolParameter("query", "Search query")],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
@@ -455,7 +465,8 @@ public class ToolKitTests
         var kit = new ToolKit("test")
             .AddTool(new ToolDefinition
             {
-                Name = "tool-a", Description = "A",
+                Name = "tool-a",
+                Description = "A",
                 Parameters = [],
                 Requires = [alwaysOk],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
@@ -474,7 +485,8 @@ public class ToolKitTests
         var kit = new ToolKit("test")
             .AddTool(new ToolDefinition
             {
-                Name = "tool-b", Description = "B",
+                Name = "tool-b",
+                Description = "B",
                 Parameters = [],
                 Requires = [missing],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
@@ -504,14 +516,18 @@ public class ToolKitTests
         var kit = new ToolKit("test")
             .AddTool(new ToolDefinition
             {
-                Name = "tool-x", Description = "X",
-                Parameters = [], Requires = [shared],
+                Name = "tool-x",
+                Description = "X",
+                Parameters = [],
+                Requires = [shared],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
             })
             .AddTool(new ToolDefinition
             {
-                Name = "tool-y", Description = "Y",
-                Parameters = [], Requires = [shared],
+                Name = "tool-y",
+                Description = "Y",
+                Parameters = [],
+                Requires = [shared],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
             });
 
@@ -529,14 +545,18 @@ public class ToolKitTests
         var kit = new ToolKit("test")
             .AddTool(new ToolDefinition
             {
-                Name = "good-tool", Description = "G",
-                Parameters = [], Requires = [ok],
+                Name = "good-tool",
+                Description = "G",
+                Parameters = [],
+                Requires = [ok],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
             })
             .AddTool(new ToolDefinition
             {
-                Name = "bad-tool", Description = "B",
-                Parameters = [], Requires = [bad],
+                Name = "bad-tool",
+                Description = "B",
+                Parameters = [],
+                Requires = [bad],
                 Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
             });
 
@@ -707,7 +727,9 @@ public class ToolKitTests
 
         var result = await tool.ExecuteAsync(new Dictionary<string, object?>
         {
-            ["a"] = 1.5, ["b"] = 2, ["round"] = true
+            ["a"] = 1.5,
+            ["b"] = 2,
+            ["round"] = true
         });
         result.Value.ShouldBe("4");
     }
@@ -811,7 +833,9 @@ public class ToolKitTests
     {
         var tool = new ToolDefinition
         {
-            Name = "test", Description = "desc", Parameters = [],
+            Name = "test",
+            Description = "desc",
+            Parameters = [],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
 

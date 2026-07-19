@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Ananke.Abstractions;
 using Ananke.Abstractions.Channels;
 using Ananke.Abstractions.Config;

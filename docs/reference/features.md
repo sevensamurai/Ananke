@@ -1,4 +1,4 @@
-﻿<!-- topic: features, tags: feature-index, reference, capabilities -->
+<!-- topic: features, tags: feature-index, reference, capabilities -->
 # Ananke — Feature Index
 
 A quick-reference of every feature in the framework. Each entry links to the

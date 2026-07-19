@@ -24,8 +24,10 @@ public class InMemoryToolFaultObserverTests
     {
         await _memory.UpsertAsync(new ToolMemoryEntry
         {
-            KitName = kit, ToolName = tool,
-            Description = $"Tool {tool}", Health = health
+            KitName = kit,
+            ToolName = tool,
+            Description = $"Tool {tool}",
+            Health = health
         });
     }
 
@@ -126,8 +128,10 @@ public class ToolHealthRecoveryTests
     {
         await _memory.UpsertAsync(new ToolMemoryEntry
         {
-            KitName = kit, ToolName = tool,
-            Description = $"Tool {tool}", Health = health
+            KitName = kit,
+            ToolName = tool,
+            Description = $"Tool {tool}",
+            Health = health
         });
     }
 

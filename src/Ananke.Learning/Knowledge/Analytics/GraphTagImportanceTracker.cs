@@ -54,9 +54,9 @@ public sealed class GraphTagImportanceTracker(
 
         return new TagImportanceMap
         {
-            Importances     = importances,
+            Importances = importances,
             EntriesAnalyzed = total,
-            ComputedAt      = DateTimeOffset.UtcNow,
+            ComputedAt = DateTimeOffset.UtcNow,
         };
     }
 }

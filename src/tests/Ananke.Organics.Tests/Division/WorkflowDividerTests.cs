@@ -306,7 +306,7 @@ public class WorkflowDividerTests
         Name = "parent",
         Models = new Dictionary<string, ModelDefinition>
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
         },
         Jobs = new Dictionary<string, JobDefinition>
         {

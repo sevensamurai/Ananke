@@ -3,7 +3,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Orchestration.OpenAI</PackageId>
-    <Description>OpenAI provider for Ananke.Orchestration � ChatClient-based IStreamingAgentModel implementation with tool calling and structured output support.</Description>
+    <Description>OpenAI provider for Ananke.Orchestration — ChatClient-based IStreamingAgentModel implementation with tool calling and structured output support.</Description>
   </PropertyGroup>
 
   <ItemGroup>

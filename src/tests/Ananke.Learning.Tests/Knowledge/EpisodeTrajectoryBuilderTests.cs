@@ -9,14 +9,14 @@ namespace Ananke.Learning.Tests.Knowledge;
 public sealed class EpisodeTrajectoryBuilderTests
 {
     private InMemoryKnowledgeGraph _graph = null!;
-    private InMemoryEpisodeStore   _store = null!;
+    private InMemoryEpisodeStore _store = null!;
     private EpisodeTrajectoryBuilder _builder = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _graph   = new InMemoryKnowledgeGraph();
-        _store   = new InMemoryEpisodeStore();
+        _graph = new InMemoryKnowledgeGraph();
+        _store = new InMemoryEpisodeStore();
         _builder = new EpisodeTrajectoryBuilder(_store);
     }
 
@@ -92,14 +92,14 @@ public sealed class EpisodeTrajectoryBuilderTests
 
     private static Episode MakeEpisode(string id, string[] entryIds) => new()
     {
-        Id             = id,
+        Id = id,
         TerminalReward = 1f,
-        StartedAt      = DateTimeOffset.UtcNow,
-        CompletedAt    = DateTimeOffset.UtcNow,
-        Steps          = entryIds.Select((eid, i) => new EpisodeStep
+        StartedAt = DateTimeOffset.UtcNow,
+        CompletedAt = DateTimeOffset.UtcNow,
+        Steps = entryIds.Select((eid, i) => new EpisodeStep
         {
             StepIndex = i,
-            EntryId   = eid,
+            EntryId = eid,
         }).ToList(),
     };
 }

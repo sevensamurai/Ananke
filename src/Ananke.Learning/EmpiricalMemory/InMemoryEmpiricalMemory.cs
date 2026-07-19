@@ -31,6 +31,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     private readonly int _maxEntries;
     private readonly IEmpiricalGraphProjector? _graphProjector;
     private readonly IKnowledgeGraph? _graph;
+    private readonly TimeProvider _timeProvider;
 
     // ── Observability ────────────────────────────────────────────
     private static readonly ActivitySource Activity = new(AnankeSourceNames.EmpiricalMemory);
@@ -84,6 +85,10 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     /// Strategy that translates an <see cref="EmpiricalEntry"/> into graph nodes/edges.
     /// Ignored when <paramref name="graph"/> is <see langword="null"/>.
     /// </param>
+    /// <param name="timeProvider">
+    /// Clock used for recency weighting, reinforcement cooldowns, and <c>LastObserved</c>
+    /// timestamps. Defaults to <see cref="TimeProvider.System"/>; inject a fake in tests.
+    /// </param>
     public InMemoryEmpiricalMemory(
         IEmbeddingModel embedder,
         float dedupThreshold = 0.9f,
@@ -93,7 +98,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         int maxEntries = 10_000,
         ILogger<InMemoryEmpiricalMemory>? logger = null,
         IKnowledgeGraph? graph = null,
-        IEmpiricalGraphProjector? graphProjector = null)
+        IEmpiricalGraphProjector? graphProjector = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(embedder);
         if (maxEntries <= 0)
@@ -107,6 +113,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
         _logger = logger ?? NullLogger<InMemoryEmpiricalMemory>.Instance;
         _graph = graph;
         _graphProjector = graphProjector;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
@@ -181,6 +188,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
         var queryEmbedding = await _embedder.EmbedAsync(situation, ct);
         var scored = new List<EmpiricalMatch>();
+        var now = _timeProvider.GetUtcNow();
 
         // 5.6: Use per-Kind index to narrow the scan when a Kind filter is specified.
         IEnumerable<StoredEntry> candidates = options.Kind is not null
@@ -194,28 +202,14 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                 continue;
 
             var vectorScore = CosineSimilarity(queryEmbedding.Span, stored.Embedding.Span);
-            var recencyWeight = TimeDecay.ComputeWeight(stored.Entry.LastObserved, _decayOptions);
+            var recencyWeight = TimeDecay.ComputeWeight(stored.Entry.LastObserved, now, _decayOptions);
             var compositeScore = vectorScore * stored.Entry.Confidence * recencyWeight;
 
             if (_affectOptions is not null)
             {
-                if (_affectOptions.StrengthHalfLifeDays is { } shl)
-                {
-                    var elapsedDays = (float)(DateTimeOffset.UtcNow - stored.Entry.LastObserved).TotalDays;
-                    compositeScore *= MathF.Pow(2f, -elapsedDays / shl);
-                }
-
-                var effectiveValence = MathF.Abs(stored.Entry.Valence);
-                if (_affectOptions.ValenceHalfLifeDays is { } vhl)
-                {
-                    var elapsedDays = (float)(DateTimeOffset.UtcNow - stored.Entry.LastObserved).TotalDays;
-                    effectiveValence *= MathF.Pow(2f, -elapsedDays / vhl);
-                }
-
-                var priorityBoost = 1f + _affectOptions.MaxPriorityBoost
-                                       * stored.Entry.Intensity
-                                       * effectiveValence;
-                compositeScore *= priorityBoost;
+                compositeScore = EmpiricalScoring.ApplyPriorityBoost(
+                    compositeScore, stored.Entry.Valence, stored.Entry.Intensity,
+                    stored.Entry.LastObserved, _affectOptions, now);
             }
 
             if (compositeScore >= options.ScoreThreshold)
@@ -252,6 +246,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                 freshPrediction = await _predictionSource.PredictAsync(peek.Entry, this, ct);
         }
 
+        var now = _timeProvider.GetUtcNow();
+
         lock (_writeLock)
         {
             if (!_entries.TryGetValue(entryId, out var stored))
@@ -269,8 +265,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                 float predictionError = MathF.Abs(predicted - actual);
 
                 // Cooldown
-                float hours = (float)(DateTimeOffset.UtcNow - stored.Entry.LastObserved).TotalHours;
-                float cooldown = MathF.Min(1f, hours / _affectOptions.ReinforcementCooldownHours);
+                float cooldown = EmpiricalScoring.ComputeReinforcementCooldown(
+                    stored.Entry.LastObserved, _affectOptions.ReinforcementCooldownHours, now);
 
                 // Strength: confirming ≈ +lr, maximally surprising ≈ 0
                 float strengthDelta = _affectOptions.LearningRate * (1f - predictionError) * cooldown;
@@ -296,7 +292,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                     Intensity = newIntensity,
                     LastPredictionError = predictionError,
                     ObservationCount = stored.Entry.ObservationCount + 1,
-                    LastObserved = DateTimeOffset.UtcNow,
+                    LastObserved = now,
                     Evidence = TrimEvidence([.. stored.Entry.Evidence, .. reinforcement.NewEvidence])
                 };
             }
@@ -313,7 +309,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                     Confidence = Math.Min(1.0f, stored.Entry.Confidence + adjustment),
                     Strength = newStrength,
                     ObservationCount = stored.Entry.ObservationCount + 1,
-                    LastObserved = DateTimeOffset.UtcNow,
+                    LastObserved = now,
                     Evidence = TrimEvidence([.. stored.Entry.Evidence, .. reinforcement.NewEvidence])
                 };
             }
@@ -330,6 +326,8 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        var now = _timeProvider.GetUtcNow();
 
         lock (_writeLock)
         {
@@ -354,7 +352,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                     Valence = Math.Clamp(stored.Entry.Valence + _affectOptions.ContradictionValenceShift, -1f, 1f),
                     Intensity = Math.Clamp(stored.Entry.Intensity + _affectOptions.ContradictionIntensityShift, 0f, 1f),
                     LastPredictionError = 1f,
-                    LastObserved = DateTimeOffset.UtcNow,
+                    LastObserved = now,
                     Evidence = TrimEvidence([.. stored.Entry.Evidence, $"contradicted: {reason}"])
                 };
             }
@@ -365,7 +363,7 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
                 updated = stored.Entry with
                 {
                     Confidence = Math.Max(0f, stored.Entry.Confidence - penalty),
-                    LastObserved = DateTimeOffset.UtcNow,
+                    LastObserved = now,
                     Evidence = TrimEvidence([.. stored.Entry.Evidence, $"contradicted: {reason}"])
                 };
             }
@@ -574,11 +572,12 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
     {
         string? worstId = null;
         var worstScore = float.MaxValue;
+        var now = _timeProvider.GetUtcNow();
 
         foreach (var (id, stored) in _entries)
         {
             var score = stored.Entry.Confidence
-                        * TimeDecay.ComputeWeight(stored.Entry.LastObserved, _decayOptions);
+                        * TimeDecay.ComputeWeight(stored.Entry.LastObserved, now, _decayOptions);
             if (score < worstScore)
             {
                 worstScore = score;

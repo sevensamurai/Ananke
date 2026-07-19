@@ -163,7 +163,7 @@ Console.WriteLine();
 foreach (var score in fitReport.Scores)
 {
     var blocked = score.Total == 0 && score.Reasons.Any(r => r.Kind == FitReasonKind.Block);
-    var badge   = score.Platform == fitReport.Recommended ? " ★" : blocked ? " ⚠" : "";
+    var badge = score.Platform == fitReport.Recommended ? " ★" : blocked ? " ⚠" : "";
     Console.WriteLine($"  {score.Platform,-22} {score.Total * 100,3:F0}%{badge}");
     foreach (var r in score.Reasons.Take(3))
         Console.WriteLine($"    {(r.Kind == FitReasonKind.Plus ? "+" : r.Kind == FitReasonKind.Block ? "✗" : "−")} {r.Message}");

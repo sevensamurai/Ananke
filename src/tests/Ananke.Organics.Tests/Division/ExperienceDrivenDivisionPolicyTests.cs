@@ -16,7 +16,7 @@ public class ExperienceDrivenDivisionPolicyTests
         Name = "test-cell",
         Models = new Dictionary<string, ModelDefinition>
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
         },
         Jobs = new Dictionary<string, JobDefinition>
         {
@@ -28,37 +28,37 @@ public class ExperienceDrivenDivisionPolicyTests
 
     private static ComplexitySnapshot MakeSnapshot(
         int toolCount = 10, int tagClusters = 3) => new()
-    {
-        WorkflowName = "test-cell",
-        ToolCount = toolCount,
-        JobCount = 3,
-        TagClusterCount = tagClusters,
-        RoutingEntropy = 0.8f,
-        ResourceSpan = 3,
-        ContextUtilization = 0.45f,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = "test-cell",
+            ToolCount = toolCount,
+            JobCount = 3,
+            TagClusterCount = tagClusters,
+            RoutingEntropy = 0.8f,
+            ResourceSpan = 3,
+            ContextUtilization = 0.45f,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeDivisionEntry(
         string id, float valence = 0.7f, float strength = 0.8f,
         float variance = 0.3f, int observations = 5) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Heuristic,
-        Tags = ["division"],
-        Source = "division-outcome-tracker",
-        Description = SemanticDescription.FromText("Domain-cluster splits work well"),
-        Confidence = 0.8f,
-        Valence = valence,
-        Strength = strength,
-        Variance = variance,
-        ObservationCount = observations,
-        Evidence = ["div-outcome:positive"],
-        FirstObserved = DateTimeOffset.UtcNow.AddDays(-7),
-        LastObserved = DateTimeOffset.UtcNow.AddHours(-1),
-        Situation = "high tool count with distinct tag clusters",
-        PreferredApproach = "split on domain-tool clusters"
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Heuristic,
+            Tags = ["division"],
+            Source = "division-outcome-tracker",
+            Description = SemanticDescription.FromText("Domain-cluster splits work well"),
+            Confidence = 0.8f,
+            Valence = valence,
+            Strength = strength,
+            Variance = variance,
+            ObservationCount = observations,
+            Evidence = ["div-outcome:positive"],
+            FirstObserved = DateTimeOffset.UtcNow.AddDays(-7),
+            LastObserved = DateTimeOffset.UtcNow.AddHours(-1),
+            Situation = "high tool count with distinct tag clusters",
+            PreferredApproach = "split on domain-tool clusters"
+        };
 
     // ── Cold start ──────────────────────────────────────────────────
 

@@ -418,9 +418,13 @@ internal static class McpToolRegistry
                     cellCount = snap.Cells.Count,
                     cells = snap.Cells.Select(c => new
                     {
-                        name = c.Name, domain = c.Domain, splitFrom = c.SplitFrom,
-                        toolCount = c.Tools.Count, tools = c.Tools,
-                        models = c.Models.Keys.ToList(), memoryDomains = c.MemoryProfile?.Domains
+                        name = c.Name,
+                        domain = c.Domain,
+                        splitFrom = c.SplitFrom,
+                        toolCount = c.Tools.Count,
+                        tools = c.Tools,
+                        models = c.Models.Keys.ToList(),
+                        memoryDomains = c.MemoryProfile?.Domains
                     }),
                     routing = snap.RoutingTable
                 });
@@ -448,16 +452,24 @@ internal static class McpToolRegistry
                 var cell = snap.Cells.FirstOrDefault(c =>
                     c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
                 if (cell is null)
-                    return Serialize(new { status = "not_found", cellName,
-                        available = snap.Cells.Select(c => c.Name).ToList() });
+                    return Serialize(new
+                    {
+                        status = "not_found",
+                        cellName,
+                        available = snap.Cells.Select(c => c.Name).ToList()
+                    });
                 var divs = snap.DivisionHistory
                     .Where(d => d.ParentWorkflow.Equals(cellName, StringComparison.OrdinalIgnoreCase)
                              || d.Children.Contains(cellName, StringComparer.OrdinalIgnoreCase))
                     .ToList();
                 return Serialize(new
                 {
-                    status = "ok", name = cell.Name, domain = cell.Domain, splitFrom = cell.SplitFrom,
-                    tools = cell.Tools, jobs = cell.Jobs.Keys.ToList(),
+                    status = "ok",
+                    name = cell.Name,
+                    domain = cell.Domain,
+                    splitFrom = cell.SplitFrom,
+                    tools = cell.Tools,
+                    jobs = cell.Jobs.Keys.ToList(),
                     models = cell.Models.Select(m => new { alias = m.Key, provider = m.Value.Provider, model = m.Value.Model }),
                     memoryDomains = cell.MemoryProfile?.Domains,
                     divisionEvents = divs.Select(d => new { at = d.OccurredAt, parent = d.ParentWorkflow, children = d.Children, reason = d.Reason })
@@ -495,12 +507,19 @@ internal static class McpToolRegistry
                 var page = all.OrderByDescending(e => e.Confidence).Take(effectiveTop).ToList();
                 return Serialize(new
                 {
-                    status = "ok", total = all.Count, showing = page.Count,
+                    status = "ok",
+                    total = all.Count,
+                    showing = page.Count,
                     entries = page.Select(e => new
                     {
-                        id = e.Id, kind = e.Kind.ToString().ToLowerInvariant(),
-                        entityId = e.EntityId, tags = e.Tags, confidence = e.Confidence,
-                        observations = e.ObservationCount, summary = e.Description.Summary, lastObserved = e.LastObserved
+                        id = e.Id,
+                        kind = e.Kind.ToString().ToLowerInvariant(),
+                        entityId = e.EntityId,
+                        tags = e.Tags,
+                        confidence = e.Confidence,
+                        observations = e.ObservationCount,
+                        summary = e.Description.Summary,
+                        lastObserved = e.LastObserved
                     })
                 });
             }
@@ -550,8 +569,13 @@ internal static class McpToolRegistry
                 if (!lineageMap.ContainsKey(cellName))
                     return Serialize(new { status = "not_found", cellName, available = lineageMap.Keys.ToList() });
 
-                return Serialize(new { status = "ok", cell = cellName,
-                    ancestors = Ancestors(cellName), descendants = Descendants(cellName) });
+                return Serialize(new
+                {
+                    status = "ok",
+                    cell = cellName,
+                    ancestors = Ancestors(cellName),
+                    descendants = Descendants(cellName)
+                });
             }
             catch (Exception ex) { return Serialize(new { status = "error", message = ex.Message }); }
         },

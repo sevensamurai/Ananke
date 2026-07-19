@@ -1,4 +1,4 @@
-﻿# Ananke.AspNetCore
+# Ananke.AspNetCore
 
 [![NuGet](https://img.shields.io/nuget/v/Ananke.AspNetCore.svg)](https://www.nuget.org/packages/Ananke.AspNetCore)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)

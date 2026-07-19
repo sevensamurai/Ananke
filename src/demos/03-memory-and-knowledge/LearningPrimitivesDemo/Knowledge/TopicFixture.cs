@@ -10,19 +10,19 @@ namespace LearningPrimitivesDemo.Knowledge;
 internal static class TopicFixture
 {
     // ── Topic A — GC Pauses ──────────────────────────────────────────
-    internal const string TagGcPause   = "cause/gc-pause";
+    internal const string TagGcPause = "cause/gc-pause";
     internal const string TagJvmFreeze = "effect/jvm-freeze";
-    internal const string TagBackend   = "service/backend";
+    internal const string TagBackend = "service/backend";
 
     // ── Topic B — DB Deadlocks ───────────────────────────────────────
     internal const string TagLockConten = "cause/lock-contention";
-    internal const string TagDbTimeout  = "effect/db-timeout";
-    internal const string TagDatabase   = "service/database";
+    internal const string TagDbTimeout = "effect/db-timeout";
+    internal const string TagDatabase = "service/database";
 
     // ── Topic C — Network Flapping ───────────────────────────────────
-    internal const string TagNicReset   = "cause/nic-reset";
+    internal const string TagNicReset = "cause/nic-reset";
     internal const string TagPacketLoss = "effect/packet-loss";
-    internal const string TagGateway    = "service/gateway";
+    internal const string TagGateway = "service/gateway";
 
     // ── Bridge — connects Topic A and Topic C ────────────────────────
     /// <summary>
@@ -45,8 +45,8 @@ internal static class TopicFixture
         tags: new Dictionary<string, float>
         {
             [TagHighLatency] = 1.0f,
-            [TagGcPause]     = 0.7f,
-            [TagNicReset]    = 0.7f,
+            [TagGcPause] = 0.7f,
+            [TagNicReset] = 0.7f,
         },
         valence: 0f,          // neutral — excluded from valence-based importance
         confidence: 0.65f,
@@ -67,9 +67,9 @@ internal static class TopicFixture
                 $"GC pause incident {i}: backend JVM heap pressure causes freeze",
                 new Dictionary<string, float>
                 {
-                    [TagGcPause]   = 0.9f,
+                    [TagGcPause] = 0.9f,
                     [TagJvmFreeze] = 0.8f,
-                    [TagBackend]   = 0.7f,
+                    [TagBackend] = 0.7f,
                 },
                 valence: i < 6 ? 0.8f : -0.6f,
                 confidence: 0.80f, observationCount: 5));
@@ -84,8 +84,8 @@ internal static class TopicFixture
                 new Dictionary<string, float>
                 {
                     [TagLockConten] = 0.9f,
-                    [TagDbTimeout]  = 0.8f,
-                    [TagDatabase]   = 0.7f,
+                    [TagDbTimeout] = 0.8f,
+                    [TagDatabase] = 0.7f,
                 },
                 valence: i < 8 ? 0.9f : -0.3f,
                 confidence: 0.85f, observationCount: 5));
@@ -99,9 +99,9 @@ internal static class TopicFixture
                 $"Network flap incident {i}: NIC reset causes packet loss at gateway",
                 new Dictionary<string, float>
                 {
-                    [TagNicReset]   = 0.9f,
+                    [TagNicReset] = 0.9f,
                     [TagPacketLoss] = 0.8f,
-                    [TagGateway]    = 0.7f,
+                    [TagGateway] = 0.7f,
                 },
                 valence: i < 5 ? 0.7f : -0.7f,
                 confidence: 0.75f, observationCount: 5));
@@ -122,20 +122,20 @@ internal static class TopicFixture
         int observationCount) =>
         new()
         {
-            Id               = id,
-            Kind             = EmpiricalKind.Pattern,
-            Tags             = [.. tags.Keys],
-            Source           = "fixture",
-            Description      = new SemanticDescription
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [.. tags.Keys],
+            Source = "fixture",
+            Description = new SemanticDescription
             {
-                Summary      = summary,
+                Summary = summary,
                 SemanticTags = tags,
             },
-            Confidence       = confidence,
+            Confidence = confidence,
             ObservationCount = observationCount,
-            Evidence         = [],
-            FirstObserved    = DateTimeOffset.UtcNow.AddDays(-30),
-            LastObserved     = DateTimeOffset.UtcNow,
-            Valence          = valence,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow.AddDays(-30),
+            LastObserved = DateTimeOffset.UtcNow,
+            Valence = valence,
         };
 }

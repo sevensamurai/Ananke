@@ -31,11 +31,11 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
 
         return command switch
         {
-            "view"        => View(args),
-            "create"      => Create(args),
+            "view" => View(args),
+            "create" => Create(args),
             "str_replace" => StrReplace(args),
-            "insert"      => Insert(args),
-            _             => Task.FromResult(ToolResult.Fatal($"Unknown text_editor command: '{command}'"))
+            "insert" => Insert(args),
+            _ => Task.FromResult(ToolResult.Fatal($"Unknown text_editor command: '{command}'"))
         };
     }
 

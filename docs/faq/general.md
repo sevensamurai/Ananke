@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-general, tags: faq, general, installation, setup, install, nuget, requirements -->
+<!-- topic: faq-general, tags: faq, general, installation, setup, install, nuget, requirements -->
 # FAQ — General & Installation
 
 ← [Back to all FAQs](../faq.md)

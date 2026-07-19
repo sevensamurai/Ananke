@@ -23,7 +23,7 @@ public class MemgraphKnowledgeGraphTests
 
     private static readonly GraphConnectionOptions Options = new()
     {
-        Uri      = "bolt://localhost:7687",
+        Uri = "bolt://localhost:7687",
         Username = "memgraph",
         Password = string.Empty,
     };
@@ -68,7 +68,7 @@ public class MemgraphKnowledgeGraphTests
     {
         var node = new GraphNode
         {
-            Id   = $"test-{Guid.NewGuid():N}",
+            Id = $"test-{Guid.NewGuid():N}",
             Kind = "entry",
             Properties = new Dictionary<string, string> { ["color"] = "blue" },
         };
@@ -96,8 +96,8 @@ public class MemgraphKnowledgeGraphTests
     {
         var node = new GraphNode
         {
-            Id     = $"test-{Guid.NewGuid():N}",
-            Kind   = "Service",
+            Id = $"test-{Guid.NewGuid():N}",
+            Kind = "Service",
             Labels = ["Component"],
         };
 
@@ -128,8 +128,8 @@ public class MemgraphKnowledgeGraphTests
     {
         var node = new GraphNode
         {
-            Id     = $"test-{Guid.NewGuid():N}",
-            Kind   = "Service",
+            Id = $"test-{Guid.NewGuid():N}",
+            Kind = "Service",
             Labels = ["has space"],
         };
 
@@ -148,11 +148,11 @@ public class MemgraphKnowledgeGraphTests
 
         var edge = new GraphEdge
         {
-            FromId     = a.Id,
-            ToId       = b.Id,
-            Relation   = "tagged",
+            FromId = a.Id,
+            ToId = b.Id,
+            Relation = "tagged",
             Provenance = EdgeProvenance.Extracted,
-            Weight     = 0.9f,
+            Weight = 0.9f,
         };
         await _graph.UpsertEdgeAsync(edge);
 
@@ -202,14 +202,14 @@ public class MemgraphKnowledgeGraphTests
     [Test]
     public async Task ExpandAsync_ReturnsReachableNodes()
     {
-        var root  = MakeNode("entry");
+        var root = MakeNode("entry");
         var child = MakeNode("tag");
         var grand = MakeNode("tag");
         await _graph.UpsertNodeAsync(root);
         await _graph.UpsertNodeAsync(child);
         await _graph.UpsertNodeAsync(grand);
 
-        await _graph.UpsertEdgeAsync(new GraphEdge { FromId = root.Id,  ToId = child.Id, Relation = "CHILD", Provenance = EdgeProvenance.Inferred, Weight = 1f });
+        await _graph.UpsertEdgeAsync(new GraphEdge { FromId = root.Id, ToId = child.Id, Relation = "CHILD", Provenance = EdgeProvenance.Inferred, Weight = 1f });
         await _graph.UpsertEdgeAsync(new GraphEdge { FromId = child.Id, ToId = grand.Id, Relation = "CHILD", Provenance = EdgeProvenance.Inferred, Weight = 1f });
 
         var expanded = await _graph.ExpandAsync([root.Id], hops: 2, maxNodes: 100);
@@ -248,8 +248,8 @@ public class MemgraphKnowledgeGraphTests
             var psi = new ProcessStartInfo("docker", "info")
             {
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
-                UseShellExecute        = false,
+                RedirectStandardError = true,
+                UseShellExecute = false,
             };
             using var process = Process.Start(psi);
             process?.WaitForExit(3_000);

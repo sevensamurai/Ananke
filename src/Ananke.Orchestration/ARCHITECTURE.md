@@ -155,8 +155,8 @@ This project targets **ASP.NET Core / hosted services / console** hosts — none
 | `IContextStrategy` / `SlidingWindowContextStrategy` / `SummarizingContextStrategy` | Stable |
 | `IModelRouter` / `ModelCatalog` / `ModelProfile` | Stable |
 | `AgenticPattern` (`ReviewCritique`, `IterativeRefinement`) | Stable |
-| `AgenticPattern.Interview` / `InterviewBuilder` / `Interview<TState>` | **Preview** — new in ADR-arch-023; exercised end-to-end by an external demo, not yet by an in-repo one |
-| `Workflow<TState>.AwaitInput` / `WorkflowDefinition.InputJobs` / `WorkflowInputExtensions.ResumeWithInputAsync` | **Preview** — new in ADR-arch-023 |
+| `AgenticPattern.Interview` / `InterviewBuilder` / `Interview<TState>` | **Preview** — exercised end-to-end by an external demo, not yet by an in-repo one |
+| `Workflow<TState>.AwaitInput` / `WorkflowDefinition.InputJobs` / `WorkflowInputExtensions.ResumeWithInputAsync` | **Preview** |
 | `CompositeSmartToolRouter` / `ISmartToolRouter` pipeline stages | **Preview** — stage API may change |
 | `SmartToolRouterMiddleware` | **Preview** |
 | `IWorkflowRunner` / `WorkflowRunner` | Stable |

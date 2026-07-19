@@ -24,7 +24,7 @@ public class MemgraphPageRankScorerTests
 
     private static readonly GraphConnectionOptions Options = new()
     {
-        Uri      = "bolt://localhost:7687",
+        Uri = "bolt://localhost:7687",
         Username = "memgraph",
         Password = string.Empty,
     };
@@ -50,7 +50,7 @@ public class MemgraphPageRankScorerTests
     [SetUp]
     public void SetUp()
     {
-        _graph  = new MemgraphKnowledgeGraph(_factory);
+        _graph = new MemgraphKnowledgeGraph(_factory);
         _scorer = new MemgraphPageRankScorer(_factory);
     }
 
@@ -73,7 +73,10 @@ public class MemgraphPageRankScorerTests
         await _graph.UpsertNodeAsync(other);
         await _graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = a.Id, ToId = b.Id, Relation = "CALLS", Provenance = EdgeProvenance.Extracted,
+            FromId = a.Id,
+            ToId = b.Id,
+            Relation = "CALLS",
+            Provenance = EdgeProvenance.Extracted,
         });
 
         var scores = await _scorer.ScoreAsync(_graph, nodeKindFilter: "Component");
@@ -93,8 +96,8 @@ public class MemgraphPageRankScorerTests
             var psi = new ProcessStartInfo("docker", "info")
             {
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
-                UseShellExecute        = false,
+                RedirectStandardError = true,
+                UseShellExecute = false,
             };
             using var process = Process.Start(psi);
             process?.WaitForExit(3_000);

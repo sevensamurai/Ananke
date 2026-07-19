@@ -14,7 +14,7 @@ sealed class CarEngineStateMachine(
 {
     /// <summary>
     /// Guard state: fuel level of the vehicle currently being transitioned.
-    /// Set before calling <c>Drive</c> — the guard closes over this value.
+    /// Set before calling <c>Drive</c> â€” the guard closes over this value.
     /// </summary>
     public double CurrentFuelLevel { get; set; }
 
@@ -32,11 +32,11 @@ sealed class CarEngineStateMachine(
             .On(EngineTransition.Park).To(EngineState.Parked)
         // Lifecycle hooks
         .State(EngineState.Running)
-            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Running — engine started"))
-            .OnExit(async () =>  Console.WriteLine("    ?? [OnExit]  Running — engine state changing"))
+            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Running â€” engine started"))
+            .OnExit(async () => Console.WriteLine("    ?? [OnExit]  Running â€” engine state changing"))
         .State(EngineState.Moving)
-            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Moving — trip segment started"))
-            .OnExit(async () =>  Console.WriteLine("    ?? [OnExit]  Moving — trip segment ended"));
+            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Moving â€” trip segment started"))
+            .OnExit(async () => Console.WriteLine("    ?? [OnExit]  Moving â€” trip segment ended"));
 
     public override Task<TransitionResult<EngineState>> TransitionAsync(
         CarContext ctx, EngineTransition t)

@@ -145,12 +145,12 @@ public class LoopTests
     [Test]
     public void Loop_UndefinedLoopTarget_Throws()
     {
-        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined loop target
-                var workflow = new Workflow<LoopState>("bad-loop")
-                    .Job("a", (s, _) => Task.FromResult(s))
-                    .Loop("a", loopTarget: "nonexistent", exitTarget: Workflow.End,
-                          until: _ => true, maxIterations: 3);
-        #pragma warning restore ANANKE001
+#pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined loop target
+        var workflow = new Workflow<LoopState>("bad-loop")
+            .Job("a", (s, _) => Task.FromResult(s))
+            .Loop("a", loopTarget: "nonexistent", exitTarget: Workflow.End,
+                  until: _ => true, maxIterations: 3);
+#pragma warning restore ANANKE001
 
         Should.Throw<InvalidOperationException>(() => workflow.Build())
             .Message.ShouldContain("nonexistent");
@@ -159,12 +159,12 @@ public class LoopTests
     [Test]
     public void Loop_UndefinedExitTarget_Throws()
     {
-        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined exit target
-                var workflow = new Workflow<LoopState>("bad-exit")
-                    .Job("a", (s, _) => Task.FromResult(s))
-                    .Loop("a", loopTarget: "a", exitTarget: "nonexistent",
-                          until: _ => true, maxIterations: 3);
-        #pragma warning restore ANANKE001
+#pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined exit target
+        var workflow = new Workflow<LoopState>("bad-exit")
+            .Job("a", (s, _) => Task.FromResult(s))
+            .Loop("a", loopTarget: "a", exitTarget: "nonexistent",
+                  until: _ => true, maxIterations: 3);
+#pragma warning restore ANANKE001
 
         Should.Throw<InvalidOperationException>(() => workflow.Build())
             .Message.ShouldContain("nonexistent");
@@ -183,12 +183,12 @@ public class LoopTests
     [Test]
     public void Loop_UndefinedSource_Throws()
     {
-        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined loop source
-                var workflow = new Workflow<LoopState>("bad-source")
-                    .Job("a", (s, _) => Task.FromResult(s))
-                    .Loop("nonexistent", loopTarget: "a", exitTarget: Workflow.End,
-                          until: _ => true, maxIterations: 3);
-        #pragma warning restore ANANKE001
+#pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined loop source
+        var workflow = new Workflow<LoopState>("bad-source")
+            .Job("a", (s, _) => Task.FromResult(s))
+            .Loop("nonexistent", loopTarget: "a", exitTarget: Workflow.End,
+                  until: _ => true, maxIterations: 3);
+#pragma warning restore ANANKE001
 
         Should.Throw<InvalidOperationException>(() => workflow.Build())
             .Message.ShouldContain("nonexistent");

@@ -5,6 +5,7 @@ using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tracing;
 using Ananke.Abstractions.Trajectory;
 using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Agents.Trajectory;
 using Ananke.Orchestration.Jobs;
@@ -27,6 +28,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
     private readonly int _maxToolRounds;
     private readonly int _maxRetryAttempts;
     private readonly TimeSpan _retryBaseDelay;
+    private readonly Func<Exception, bool> _shouldRetry;
     private readonly int? _maxContextTokens;
     private readonly IConversationMemory? _memory;
     private readonly Func<TState, string>? _sessionIdBuilder;
@@ -57,6 +59,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         int maxToolRounds,
         int maxRetryAttempts,
         TimeSpan retryBaseDelay,
+        Func<Exception, bool> shouldRetry,
         int? maxContextTokens,
         IConversationMemory? memory,
         Func<TState, string>? sessionIdBuilder,
@@ -77,6 +80,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         _maxToolRounds = maxToolRounds;
         _maxRetryAttempts = maxRetryAttempts;
         _retryBaseDelay = retryBaseDelay;
+        _shouldRetry = shouldRetry;
         _maxContextTokens = maxContextTokens;
         _memory = memory;
         _sessionIdBuilder = sessionIdBuilder;
@@ -234,10 +238,15 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                 await using var toolSpan = llmSpan?.StartSpan($"tool:{call.FunctionName}", SpanKind.ToolCall);
                 toolSpan?.SetAttribute("tool_round", toolRound.ToString());
 
-                var args = ParseToolArgs(call.Arguments);
                 ToolResult toolResult;
 
-                if (_toolExecutors!.TryGetValue(call.FunctionName, out var executor))
+                if (!TryParseToolArgs(call.Arguments, call.FunctionName, out var args, out var parseError))
+                {
+                    toolSpan?.SetAttribute("tool.malformed_arguments", "true");
+                    toolResult = parseError;
+                    snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: true);
+                }
+                else if (_toolExecutors!.TryGetValue(call.FunctionName, out var executor))
                 {
                     toolResult = await executor.ExecuteAsync(args, ct);
                     snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: toolResult.IsError);
@@ -332,6 +341,32 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         return await ExecuteStructuredAsync(messages, snapshotBuilder, ct);
     }
 
+    /// <summary>
+    /// Parses tool-call arguments, tolerating malformed JSON from the model instead of throwing.
+    /// A parse failure produces a retryable <see cref="ToolResult.Error(string)"/> asking the
+    /// model to re-emit the call — the same self-correction shape as an unknown tool name.
+    /// </summary>
+    private static bool TryParseToolArgs(
+        string arguments,
+        string functionName,
+        out IReadOnlyDictionary<string, object?> args,
+        out ToolResult parseError)
+    {
+        try
+        {
+            args = ParseToolArgs(arguments);
+            parseError = default!;
+            return true;
+        }
+        catch (JsonException)
+        {
+            args = null!;
+            parseError = ToolResult.Error(
+                $"Invalid JSON arguments for '{functionName}'. Re-emit the call with valid JSON.");
+            return false;
+        }
+    }
+
     private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
     {
         var dict = new Dictionary<string, object?>();
@@ -346,6 +381,15 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
          request.Messages.Sum(m => (m.Content?.Length ?? 0) +
             (m.ToolCalls?.Sum(tc => tc.Arguments.Length + tc.FunctionName.Length) ?? 0)) +
          (request.Tools?.Sum(t => t.Name.Length + t.Description.Length + t.ParametersJsonSchema.Length) ?? 0)) / 4;
+
+    /// <summary>
+    /// Default retry predicate: HTTP 429 rate-limit errors (see
+    /// <see cref="ResilientAgentModel.IsRateLimitException"/>) and <see cref="TimeoutException"/>.
+    /// Everything else — 4xx auth/validation errors, <see cref="GuardrailException"/>, arbitrary
+    /// application exceptions — is treated as non-retryable and rethrown on the first occurrence.
+    /// </summary>
+    private static bool DefaultShouldRetry(Exception ex) =>
+        ResilientAgentModel.IsRateLimitException(ex) || ex is TimeoutException;
 
     private async Task<AgentResponse> GenerateWithRetryAsync(
         AgentRequest request,
@@ -367,6 +411,11 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                 return response;
             }
             catch (OperationCanceledException) { throw; }
+            catch (GuardrailException) { throw; }
+            catch (Exception ex) when (!_shouldRetry(ex))
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 lastException = ex;
@@ -408,6 +457,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private int _maxToolRounds = 3;
         private int _maxRetryAttempts = 3;
         private TimeSpan _retryBaseDelay = TimeSpan.FromSeconds(1);
+        private Func<Exception, bool>? _shouldRetry;
         private int? _maxContextTokens;
         private IConversationMemory? _memory;
         private Func<TState, string>? _sessionIdBuilder;
@@ -452,11 +502,23 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return this;
         }
 
-        public Builder WithRetry(int maxAttempts = 3, TimeSpan? baseDelay = null)
+        /// <summary>
+        /// Configures retry behaviour for transient LLM failures.
+        /// </summary>
+        /// <param name="maxAttempts">Maximum number of call attempts (including the first). Default 3.</param>
+        /// <param name="baseDelay">Initial delay between retries (exponential backoff). Default 1 second.</param>
+        /// <param name="shouldRetry">
+        /// Predicate deciding whether an exception is worth retrying. Defaults to
+        /// <see cref="ResilientAgentModel.IsRateLimitException"/> or a <see cref="TimeoutException"/>.
+        /// A non-retryable exception is rethrown immediately — no backoff, no attempt burned.
+        /// <see cref="GuardrailException"/> is never retried regardless of this predicate.
+        /// </param>
+        public Builder WithRetry(int maxAttempts = 3, TimeSpan? baseDelay = null, Func<Exception, bool>? shouldRetry = null)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(maxAttempts, 1);
             _maxRetryAttempts = maxAttempts;
             _retryBaseDelay = baseDelay ?? TimeSpan.FromSeconds(1);
+            _shouldRetry = shouldRetry;
             return this;
         }
 
@@ -543,6 +605,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return new AgentJob<TState, TResponse>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
                 tools, toolExecutors, _onResponse, _maxToolRounds, _maxRetryAttempts, _retryBaseDelay,
+                _shouldRetry ?? DefaultShouldRetry,
                 _maxContextTokens, _memory, _sessionIdBuilder, _contextStrategy, logger,
                 hallucinationObserver, _trajectoryObserver, kitName);
         }

@@ -18,8 +18,8 @@ public class GodNodeDetectorTests
     {
         // hub serves 4 domains; each leaf serves only 1 domain
         var capabilityMap = new InMemoryCapabilityMap(signalTimeout: TimeSpan.FromMinutes(5));
-        capabilityMap.Register(Signal("hub",    "search"));
-        capabilityMap.Register(Signal("hub",    "catalog"));
+        capabilityMap.Register(Signal("hub", "search"));
+        capabilityMap.Register(Signal("hub", "catalog"));
         capabilityMap.Register(Signal("leaf-a", "payments"));
         capabilityMap.Register(Signal("leaf-b", "shipping"));
         capabilityMap.Register(Signal("leaf-c", "returns"));
@@ -32,20 +32,26 @@ public class GodNodeDetectorTests
         // Manually add extra edges to give hub high degree
         await graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "cell:hub", ToId = "domain:catalog",
-            Relation = "serves", Provenance = EdgeProvenance.Extracted,
+            FromId = "cell:hub",
+            ToId = "domain:catalog",
+            Relation = "serves",
+            Provenance = EdgeProvenance.Extracted,
             Properties = new Dictionary<string, string> { ["source"] = "test" }
         });
         await graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "cell:hub", ToId = "domain:extra1",
-            Relation = "serves", Provenance = EdgeProvenance.Extracted,
+            FromId = "cell:hub",
+            ToId = "domain:extra1",
+            Relation = "serves",
+            Provenance = EdgeProvenance.Extracted,
             Properties = new Dictionary<string, string> { ["source"] = "test" }
         });
         await graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "cell:hub", ToId = "domain:extra2",
-            Relation = "serves", Provenance = EdgeProvenance.Extracted,
+            FromId = "cell:hub",
+            ToId = "domain:extra2",
+            Relation = "serves",
+            Provenance = EdgeProvenance.Extracted,
             Properties = new Dictionary<string, string> { ["source"] = "test" }
         });
 

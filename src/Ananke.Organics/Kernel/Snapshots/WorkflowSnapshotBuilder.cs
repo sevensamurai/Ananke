@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Organics.Division;
 using Ananke.Orchestration.Tools;
 
@@ -47,7 +48,7 @@ public sealed class WorkflowSnapshotBuilder
     };
     private Dictionary<string, ModelSnapshot> _models = new()
     {
-        ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+        ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
     };
     private MemoryProfile? _memoryProfile;
 

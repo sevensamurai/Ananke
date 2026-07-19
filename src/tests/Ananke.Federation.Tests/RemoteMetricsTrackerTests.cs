@@ -189,12 +189,12 @@ public sealed class RemoteMetricsTrackerTests
         long totalTokens,
         long toolCallCount,
         double errorRate = 0) => new()
-    {
-        DeploymentId = deploymentId,
-        ExecutionCount = executionCount,
-        TotalTokens = totalTokens,
-        ToolCallCount = toolCallCount,
-        ErrorRate = errorRate,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            DeploymentId = deploymentId,
+            ExecutionCount = executionCount,
+            TotalTokens = totalTokens,
+            ToolCallCount = toolCallCount,
+            ErrorRate = errorRate,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 }

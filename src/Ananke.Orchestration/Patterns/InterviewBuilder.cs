@@ -16,7 +16,7 @@ public sealed class Interview<TState>
     /// <summary>
     /// Default message posted when a turn has gone quiet long enough that the host treats it
     /// as paused rather than abandoned. The framework never sends this itself — the host shows
-    /// it when its own pending-input wait exceeds <see cref="TurnTimeout"/>. See ADR-arch-023 §4.4:
+    /// it when its own pending-input wait exceeds <see cref="TurnTimeout"/>. By design,
     /// a turn timeout pauses, it never aborts — the execution stays checkpointed and resumable,
     /// and the next reply resumes it via <see cref="FoldAnswer"/> exactly like an on-time one.
     /// </summary>
@@ -28,19 +28,20 @@ public sealed class Interview<TState>
 
     /// <summary>
     /// Reads the question to show the user from the paused state (the <c>WithQuestion</c>
-    /// selector), writing it to conversation memory first if <c>WithMemory</c> was configured.
-    /// Call this when the run/resume result is <see cref="ExecutionStatus.Interrupted"/> at the
-    /// turn job.
+    /// selector). Pure — does not touch conversation memory. Call this when the run/resume
+    /// result is <see cref="ExecutionStatus.Interrupted"/> at the turn job, then call
+    /// <see cref="CommitTurnAsync"/> once the turn is actually complete.
     /// </summary>
     public Func<TState, CancellationToken, Task<string>> GetQuestion { get; }
 
     /// <summary>
     /// Folds the user's free-text reply into state (the <c>WithNavigation</c> expand/skip/update
-    /// delegate), writing the reply to conversation memory first if <c>WithMemory</c> was
-    /// configured. The reply only exists at resume time, so call this <em>before</em>
+    /// delegate). Pure — does not touch conversation memory. The reply only exists at resume
+    /// time, so call this <em>before</em>
     /// <see cref="Workflow{TState}.ResumeAsync(string, Func{TState, TState}, CancellationToken)"/>
     /// and pass a transform that returns the already-computed result, e.g.
     /// <c>var next = await interview.FoldAnswer(state, reply, ct); await workflow.ResumeAsync(id, _ =&gt; next, ct);</c>.
+    /// Call <see cref="CommitTurnAsync"/> after the resume succeeds to persist the turn.
     /// </summary>
     public Func<TState, string, CancellationToken, Task<TState>> FoldAnswer { get; }
 
@@ -54,18 +55,73 @@ public sealed class Interview<TState>
     /// <summary>The message to show the user when a turn times out. See <see cref="DefaultPauseMessage"/>.</summary>
     public string PauseMessage { get; }
 
+    private readonly IConversationMemory? _memory;
+    private readonly Func<TState, string>? _conversationId;
+
     internal Interview(
         Workflow<TState> workflow,
         Func<TState, CancellationToken, Task<string>> getQuestion,
         Func<TState, string, CancellationToken, Task<TState>> foldAnswer,
         TimeSpan? turnTimeout,
-        string pauseMessage)
+        string pauseMessage,
+        IConversationMemory? memory,
+        Func<TState, string>? conversationId)
     {
         Workflow = workflow;
         GetQuestion = getQuestion;
         FoldAnswer = foldAnswer;
         TurnTimeout = turnTimeout;
         PauseMessage = pauseMessage;
+        _memory = memory;
+        _conversationId = conversationId;
+    }
+
+    /// <summary>
+    /// Persists a completed turn (the question shown and the answer received) to conversation
+    /// memory, as one assistant(<paramref name="question"/>) + user(<paramref name="answer"/>)
+    /// write — a no-op when <c>WithMemory</c> was not configured.
+    /// </summary>
+    /// <param name="state">The state as of the resumed turn — used to resolve the conversation id.</param>
+    /// <param name="question">The exact question text shown to the user (the value <see cref="GetQuestion"/> returned).</param>
+    /// <param name="answer">The exact reply text the user gave.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <remarks>
+    /// <para>
+    /// Call this <em>after</em> <see cref="Workflow{TState}.ResumeAsync(string, Func{TState, TState}, CancellationToken)"/>
+    /// has succeeded, not before — writing the transcript before the resume is confirmed risks a
+    /// desync where memory shows an answer the workflow itself never recorded (if the resume then
+    /// fails). This replaces the old behavior where <see cref="GetQuestion"/>/<see cref="FoldAnswer"/>
+    /// wrote to memory eagerly, which could duplicate the question (if a host called
+    /// <see cref="GetQuestion"/> more than once, e.g. across a retry) or desync the answer.
+    /// </para>
+    /// <para>
+    /// <b>Idempotent</b>: safe to call more than once for the same turn — if the tail of the
+    /// existing history already matches this exact (question, answer) pair, the call is a no-op
+    /// rather than writing a duplicate. There is no separate turn counter; hosts are expected to
+    /// call this once per successful resume, and the tail-comparison exists to tolerate an
+    /// accidental repeat (e.g. a host retry), not to replace that expectation.
+    /// </para>
+    /// </remarks>
+    public async Task CommitTurnAsync(
+        TState state, string question, string answer, CancellationToken ct = default)
+    {
+        if (_memory is null || _conversationId is null)
+            return;
+
+        var sessionId = _conversationId(state);
+        var history = await _memory.GetHistoryAsync(sessionId, ct);
+
+        if (history.Count >= 2)
+        {
+            var priorQuestion = history[^2];
+            var priorAnswer = history[^1];
+            if (priorQuestion.Role == AgentRole.Assistant && priorQuestion.Content == question &&
+                priorAnswer.Role == AgentRole.User && priorAnswer.Content == answer)
+                return; // already committed
+        }
+
+        await _memory.AddAsync(
+            sessionId, [AgentMessage.Assistant(question), AgentMessage.User(answer)], ct);
     }
 }
 
@@ -90,10 +146,20 @@ public sealed class Interview<TState>
 ///   the user.</item>
 ///   <item>On reply, resume via
 ///   <c>var next = await interview.FoldAnswer(state, reply, ct); await workflow.ResumeAsync(executionId, _ =&gt; next, ct);</c>.</item>
+///   <item>Once the resume call above has returned successfully, call
+///   <c>await interview.CommitTurnAsync(next, question, reply, ct)</c> to persist the turn to
+///   conversation memory (no-op if <c>WithMemory</c> wasn't configured). <c>GetQuestion</c> and
+///   <c>FoldAnswer</c> are pure — persistence only happens here, and only once the resume is
+///   confirmed, so a failed resume never leaves a transcript entry for a turn the workflow
+///   didn't actually record.</item>
 /// </list>
 /// <para>
 /// Welcome and icebreaker are ordinary jobs (run once, before the loop) — provide them to
-/// open with a greeting before the first question.
+/// open with a greeting before the first question. Both are optional; when neither is
+/// configured, <see cref="Build"/> registers a no-op <c>start</c> job as the workflow's entry
+/// point instead (<c>start → ask_question ⇄ loop(...)</c>) — <c>ask_question</c> pauses via
+/// <c>AwaitInput</c>, which cannot be applied to a workflow's entry job, so something has to
+/// occupy that slot even when there's nothing to say before the first question.
 /// </para>
 /// <para>
 /// Create instances via <see cref="AgenticPattern.Interview{TState}"/>.
@@ -222,12 +288,6 @@ public sealed class InterviewBuilder<TState>
             throw new InvalidOperationException(
                 $"Interview '{_name}': termination predicate is required. Call Until().");
 
-        if (_welcome is null && _icebreaker is null)
-            throw new InvalidOperationException(
-                $"Interview '{_name}': at least one of WithWelcome() or WithIcebreaker() is " +
-                "required — the turn job pauses via AwaitInput(), which cannot be applied to " +
-                "the workflow's entry job.");
-
         var workflow = new Workflow<TState>(_name);
 
         string? previous = null;
@@ -245,9 +305,16 @@ public sealed class InterviewBuilder<TState>
             previous = "icebreaker";
         }
 
+        if (previous is null)
+        {
+            // No welcome or icebreaker: ask_question pauses via AwaitInput(), which cannot be
+            // applied to the workflow's entry job, so a no-op job takes the entry slot instead.
+            workflow.Job("start", (state, _) => Task.FromResult(state));
+            previous = "start";
+        }
+
         workflow.Job("ask_question", (state, _) => Task.FromResult(state));
-        if (previous is not null)
-            workflow.Then(previous, "ask_question");
+        workflow.Then(previous, "ask_question");
 
         workflow
             .AwaitInput("ask_question")
@@ -256,27 +323,17 @@ public sealed class InterviewBuilder<TState>
 
         var question = _question;
         var navigation = _navigation;
-        var memory = _memory;
-        var conversationId = _conversationId;
 
-        Func<TState, CancellationToken, Task<string>> getQuestion = memory is null
-            ? (state, _) => Task.FromResult(question(state))
-            : async (state, ct) =>
-            {
-                var text = question(state);
-                await memory.AddAsync(conversationId!(state), AgentMessage.Assistant(text), ct);
-                return text;
-            };
+        // Pure — no conversation-memory writes here. Persistence happens post-commit via
+        // Interview<TState>.CommitTurnAsync, called by the host after ResumeAsync succeeds.
+        Func<TState, CancellationToken, Task<string>> getQuestion =
+            (state, _) => Task.FromResult(question(state));
 
-        Func<TState, string, CancellationToken, Task<TState>> foldAnswer = memory is null
-            ? (state, answer, _) => Task.FromResult(navigation(answer, state))
-            : async (state, answer, ct) =>
-            {
-                await memory.AddAsync(conversationId!(state), AgentMessage.User(answer), ct);
-                return navigation(answer, state);
-            };
+        Func<TState, string, CancellationToken, Task<TState>> foldAnswer =
+            (state, answer, _) => Task.FromResult(navigation(answer, state));
 
         return new Interview<TState>(
-            workflow, getQuestion, foldAnswer, _turnTimeout, Interview<TState>.DefaultPauseMessage);
+            workflow, getQuestion, foldAnswer, _turnTimeout, Interview<TState>.DefaultPauseMessage,
+            _memory, _conversationId);
     }
 }

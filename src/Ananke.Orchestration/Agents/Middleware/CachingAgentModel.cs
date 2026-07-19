@@ -21,9 +21,20 @@ namespace Ananke.Orchestration.Agents.Middleware;
 /// </para>
 /// <para>
 /// The cache key is a SHA256 hash of the semantically-relevant parts of the request:
-/// <c>SystemPrompt</c>, <c>Messages</c>, <c>Tools</c>, and <c>ResponseFormat</c>.
-/// <c>Metadata</c> and <c>StoreCompletions</c> are excluded because they do not
-/// affect model output.
+/// <c>SystemPrompt</c>, <c>Messages</c>, <c>Tools</c>, <c>ResponseFormat</c>, and the model's
+/// <c>cacheScope</c>. <c>Metadata</c> and <c>StoreCompletions</c> are excluded because
+/// they do not affect model output.
+/// </para>
+/// <para>
+/// <b>Instances wrapping different models must use distinct <c>cacheScope</c> values</b>
+/// when they share one <see cref="IKeyValueDataAdapter"/> (the normal case with a single Redis) —
+/// otherwise identical prompts sent to different models collide on the same cache key and each
+/// silently serves the other's cached response. The default (<c>inner.GetType().FullName</c>)
+/// covers the different-provider case (an OpenAI-backed wrapper and an Anthropic-backed wrapper
+/// never collide) but does <b>not</b> cover two instances of the <i>same</i> provider class
+/// configured with different model names (e.g. a Haiku-backed classifier and an Opus-backed
+/// writer both using <c>AnthropicAgentModel</c>) — callers in that situation must pass an
+/// explicit <c>cacheScope</c>, typically the model name itself.
 /// </para>
 /// </remarks>
 public sealed class CachingAgentModel : IStreamingAgentModel
@@ -32,6 +43,8 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     private readonly IKeyValueDataAdapter _cache;
     private readonly TimeSpan _ttl;
     private readonly string _keyPrefix;
+    private readonly string _cacheScope;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// Creates a caching wrapper around an existing streaming agent model.
@@ -40,11 +53,23 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     /// <param name="cache">Key-value store used for caching (e.g. <c>RedisDataAdapter</c>).</param>
     /// <param name="ttl">How long cached responses remain valid. Expired entries are treated as misses.</param>
     /// <param name="keyPrefix">Optional prefix for cache keys. Defaults to <c>"ananke:llm-cache"</c>.</param>
+    /// <param name="cacheScope">
+    /// Identity mixed into the cache key so wrappers around different models don't collide.
+    /// Defaults to <c>inner.GetType().FullName</c> — sufficient when each wrapped provider class
+    /// is used for exactly one model, but callers wrapping the same provider class with different
+    /// model names (see remarks) must pass a distinct value, typically the model name.
+    /// </param>
+    /// <param name="timeProvider">
+    /// Clock used for cache expiry. Defaults to <see cref="TimeProvider.System"/>; inject a fake
+    /// in tests to assert TTL behavior without sleeping.
+    /// </param>
     public CachingAgentModel(
         IStreamingAgentModel inner,
         IKeyValueDataAdapter cache,
         TimeSpan ttl,
-        string keyPrefix = "ananke:llm-cache")
+        string keyPrefix = "ananke:llm-cache",
+        string? cacheScope = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(cache);
@@ -55,20 +80,22 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         _cache = cache;
         _ttl = ttl;
         _keyPrefix = keyPrefix;
+        _cacheScope = cacheScope ?? inner.GetType().FullName!;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
         var cacheKey = BuildCacheKey(request);
-        var cached = await TryGetCachedAsync(cacheKey);
+        var cached = await TryGetCachedAsync(cacheKey, ct);
         if (cached is not null)
             return cached;
 
         var response = await _inner.GenerateAsync(request, ct);
 
         if (!response.RequiresAction)
-            await CacheResponseAsync(cacheKey, response);
+            await CacheResponseAsync(cacheKey, response, ct);
 
         return response;
     }
@@ -79,7 +106,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var cacheKey = BuildCacheKey(request);
-        var cached = await TryGetCachedAsync(cacheKey);
+        var cached = await TryGetCachedAsync(cacheKey, ct);
         if (cached is not null)
         {
             if (cached.Text is not null)
@@ -99,7 +126,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         }
 
         if (completed is not null && !completed.RequiresAction)
-            await CacheResponseAsync(cacheKey, completed);
+            await CacheResponseAsync(cacheKey, completed, ct);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -111,6 +138,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     {
         var hashInput = JsonSerializer.Serialize(new
         {
+            _cacheScope,
             request.SystemPrompt,
             request.Messages,
             request.Tools,
@@ -121,14 +149,16 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         return $"{_keyPrefix}:{Convert.ToHexStringLower(hash)}";
     }
 
-    private async Task<AgentResponse?> TryGetCachedAsync(string cacheKey)
+    private async Task<AgentResponse?> TryGetCachedAsync(string cacheKey, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         var json = await _cache.GetValueAsync(cacheKey);
         if (json is null)
             return null;
 
         var entry = JsonSerializer.Deserialize<CacheEntry>(json, JsonOptions);
-        if (entry is null || DateTimeOffset.UtcNow >= entry.ExpiresAt)
+        if (entry is null || _timeProvider.GetUtcNow() >= entry.ExpiresAt)
         {
             try { await _cache.RemoveAsync(cacheKey); }
             catch (Exception) { /* best-effort cleanup — errors logged by the adapter */ }
@@ -138,12 +168,14 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         return entry.Response;
     }
 
-    private async Task CacheResponseAsync(string cacheKey, AgentResponse response)
+    private async Task CacheResponseAsync(string cacheKey, AgentResponse response, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         var entry = new CacheEntry
         {
             Response = response,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(_ttl)
+            ExpiresAt = _timeProvider.GetUtcNow().Add(_ttl)
         };
 
         var json = JsonSerializer.Serialize(entry, JsonOptions);

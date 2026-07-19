@@ -1,4 +1,4 @@
-﻿<!-- topic: welcome, tags: landing, overview, start, navigation, docs, nnke -->
+<!-- topic: welcome, tags: landing, overview, start, navigation, docs, nnke -->
 
 ## What Makes Ananke Different
 

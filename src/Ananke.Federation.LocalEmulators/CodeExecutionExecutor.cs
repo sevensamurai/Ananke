@@ -52,9 +52,9 @@ internal sealed class CodeExecutionExecutor : IPlatformNativeExecutor
     private static (string? Interpreter, string Extension) ResolveInterpreter(string language) =>
         language.ToLowerInvariant() switch
         {
-            "python" or "python3"          => ("python3", "py"),
+            "python" or "python3" => ("python3", "py"),
             "javascript" or "node" or "js" => ("node", "js"),
-            "bash" or "sh"                 => ("bash", "sh"),
+            "bash" or "sh" => ("bash", "sh"),
             "csharp" or "c#" or "dotnet-script" => ("dotnet-script", "csx"),
             _ => (null, "txt")
         };

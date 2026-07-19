@@ -3,7 +3,7 @@
   <PropertyGroup>
 	<IsPackable>true</IsPackable>
 	<PackageId>Ananke.A2A</PackageId>
-	<Description>A2A (Agent-to-Agent) protocol integration for Ananke — call remote A2A agents as IAgentModel implementations and expose Ananke workflows as A2A-compliant endpoints. Enables cross-framework agent interoperability alongside MCP tool connectivity.</Description>
+	<Description>A2A (Agent-to-Agent) protocol integration for Ananke â€” call remote A2A agents as IAgentModel implementations and expose Ananke workflows as A2A-compliant endpoints. Enables cross-framework agent interoperability alongside MCP tool connectivity.</Description>
 	<!-- A2A SDK only ships preview packages; suppress stable-on-prerelease warning -->
 	<NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>

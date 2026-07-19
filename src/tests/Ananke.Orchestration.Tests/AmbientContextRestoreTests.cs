@@ -42,14 +42,14 @@ public class AmbientContextRestoreTests
     public async Task TraceContext_OnEnterAndOnExit_SeeJobScopedContext()
     {
         // OnEnter and OnExit run inside the job's try block and must see the trace
-        // pointing at the current job — proving the ambient value is set before they run.
+        // pointing at the current job â€” proving the ambient value is set before they run.
         TraceInfo? traceOnEnter = null;
-        TraceInfo? traceOnExit  = null;
+        TraceInfo? traceOnExit = null;
 
         await new Workflow<CounterState>("trace-lifecycle")
             .Job("work", (s, _) => Task.FromResult(s with { Value = 1 }))
             .OnEnter("work", s => { traceOnEnter = WorkflowTraceContext.Value; return Task.CompletedTask; })
-            .OnExit ("work", s => { traceOnExit  = WorkflowTraceContext.Value; return Task.CompletedTask; })
+            .OnExit("work", s => { traceOnExit = WorkflowTraceContext.Value; return Task.CompletedTask; })
             .Then("work", Workflow.End)
             .RunAsync(new CounterState());
 
@@ -124,7 +124,7 @@ public class AmbientContextRestoreTests
     public async Task TokenUsage_AttributedPerJob_CumulativeSumIsCorrect()
     {
         // Two jobs each use distinct token amounts.
-        // CumulativeUsage must equal the exact sum — proving tokens aren't
+        // CumulativeUsage must equal the exact sum â€” proving tokens aren't
         // double-counted or leaked between accumulators.
         var modelA = new FixedUsageModel(inputTokens: 100, outputTokens: 40);
         var modelB = new FixedUsageModel(inputTokens: 200, outputTokens: 80);

@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Organics.Kernel.Snapshots;
 using Ananke.Organics.Division;
 using Shouldly;
@@ -40,7 +41,7 @@ public class HostSnapshotExporterTests
         var yaml = HostSnapshotExporter.ToYaml(snapshot);
 
         yaml.ShouldContain("provider: openai");
-        yaml.ShouldContain("model: gpt-4o-mini");
+        yaml.ShouldContain($"model: {Models.OpenAI.Gpt54Mini}");
     }
 
     [Test]
@@ -142,7 +143,7 @@ public class HostSnapshotExporterTests
 
         var model = restored.Cells[0].Models["default"];
         model.Provider.ShouldBe("openai");
-        model.Model.ShouldBe("gpt-4o-mini");
+        model.Model.ShouldBe(Models.OpenAI.Gpt54Mini);
     }
 
     [Test]
@@ -288,7 +289,7 @@ public class HostSnapshotExporterTests
                 },
                 Models = new Dictionary<string, ModelSnapshot>
                 {
-                    ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                    ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
                 }
             }
         ]
@@ -314,7 +315,7 @@ public class HostSnapshotExporterTests
                 },
                 Models = new Dictionary<string, ModelSnapshot>
                 {
-                    ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                    ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
                 },
                 MemoryProfile = new MemoryProfile
                 {
@@ -346,7 +347,7 @@ public class HostSnapshotExporterTests
                 },
                 Models = new Dictionary<string, ModelSnapshot>
                 {
-                    ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                    ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
                 },
                 MemoryProfile = new MemoryProfile
                 {
@@ -368,7 +369,7 @@ public class HostSnapshotExporterTests
                 },
                 Models = new Dictionary<string, ModelSnapshot>
                 {
-                    ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                    ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
                 },
                 MemoryProfile = new MemoryProfile
                 {
@@ -419,7 +420,7 @@ public class HostSnapshotExporterTests
                 },
                 Models = new Dictionary<string, ModelSnapshot>
                 {
-                    ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                    ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
                 }
             }
         ]

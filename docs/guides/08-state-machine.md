@@ -1,4 +1,4 @@
-﻿<!-- topic: state-machine, tags: state-machine, distributed, locking, guard, middleware, circuit-breaker, transitions -->
+<!-- topic: state-machine, tags: state-machine, distributed, locking, guard, middleware, circuit-breaker, transitions -->
 # 08 — State Machine
 
 Build production-grade finite state machines with distributed locking, guard

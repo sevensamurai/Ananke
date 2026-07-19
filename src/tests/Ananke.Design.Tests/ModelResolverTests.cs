@@ -95,12 +95,12 @@ public class ModelResolverTests
         var models = resolver.Resolve(manifest, key => key switch
         {
             "OpenAI:ApiKey" => "sk-test-key",
-            "OpenAI:Model" => "gpt-4.1",
+            "OpenAI:Model" => Models.OpenAI.Gpt55,
             _ => null
         });
 
         var fake = models["fast"].ShouldBeOfType<FakeAgentModel>();
-        fake.Model.ShouldBe("gpt-4.1");
+        fake.Model.ShouldBe(Models.OpenAI.Gpt55);
     }
 
     [Test]
@@ -219,7 +219,7 @@ public class ModelResolverTests
             "    model: gpt-4.1-mini",
             "  smart:",
             "    provider: anthropic",
-            "    model: claude-sonnet-4",
+            "    model: claude-sonnet-5",
             "jobs:",
             "connections:",
         ]);

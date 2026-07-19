@@ -1,4 +1,4 @@
-﻿<!-- topic: quickstart, tags: install, quickstart, workflow, agent, openai, anthropic, google -->
+<!-- topic: quickstart, tags: install, quickstart, workflow, agent, openai, anthropic, google -->
 # Quickstart
 
 Build a minimal agentic workflow in one file.

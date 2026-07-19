@@ -1,4 +1,4 @@
-﻿using Ananke.Documents;
+using Ananke.Documents;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
@@ -53,7 +53,7 @@ var config = new ConfigurationBuilder()
 
 var apiKey = config["OpenAI:ApiKey"]
     ?? throw new InvalidOperationException("OpenAI:ApiKey missing from secrets.json");
-var modelName = config["OpenAI:Model"] ?? "gpt-4.1-mini";
+var modelName = config["OpenAI:Model"] ?? Models.OpenAI.Gpt54Mini;
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.WriteLine("-----------------------------------------------------------");

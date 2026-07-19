@@ -1,4 +1,4 @@
-﻿<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
+<!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
 ### Where We Are — v0.8.6

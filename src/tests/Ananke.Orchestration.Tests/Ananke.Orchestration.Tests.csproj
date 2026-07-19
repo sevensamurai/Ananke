@@ -36,6 +36,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\..\Ananke.Design\Ananke.Design.csproj" />
     <ProjectReference Include="..\..\Ananke\Ananke.csproj" />
     <ProjectReference Include="..\..\Ananke.Skills\Ananke.Skills.csproj" />
     <ProjectReference Include="..\..\Ananke.MCP\Ananke.MCP.csproj" />

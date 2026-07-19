@@ -34,9 +34,9 @@ public sealed class MemgraphPageRankScorer(MemgraphSessionFactory factory) : ICe
             var results = new Dictionary<string, float>(StringComparer.Ordinal);
             while (await cursor.FetchAsync().ConfigureAwait(false))
             {
-                var node  = cursor.Current["node"].As<INode>();
-                var rank  = (float)cursor.Current["rank"].As<double>();
-                var id    = node["id"].As<string>();
+                var node = cursor.Current["node"].As<INode>();
+                var rank = (float)cursor.Current["rank"].As<double>();
+                var id = node["id"].As<string>();
 
                 if (nodeKindFilter is null || node.Labels.Contains(nodeKindFilter))
                     results[id] = rank;

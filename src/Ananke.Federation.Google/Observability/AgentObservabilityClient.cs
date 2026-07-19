@@ -111,18 +111,18 @@ internal sealed class AgentObservabilityClient : IAgentObservabilityClient
                         : 0L)
                 : 0L;
 
-            if (metricType.Contains("execution_count"))   executions = pointSum;
-            else if (metricType.Contains("token_count"))  tokens     = pointSum;
-            else if (metricType.Contains("tool_calls"))   toolCalls  = pointSum;
-            else if (metricType.Contains("error_count"))  errors     = pointSum;
+            if (metricType.Contains("execution_count")) executions = pointSum;
+            else if (metricType.Contains("token_count")) tokens = pointSum;
+            else if (metricType.Contains("tool_calls")) toolCalls = pointSum;
+            else if (metricType.Contains("error_count")) errors = pointSum;
         }
 
         return new ObservabilitySnapshot
         {
             ExecutionCount = executions,
-            TotalTokens    = tokens,
-            ToolCallCount  = toolCalls,
-            ErrorRate      = executions > 0 ? (double)errors / executions : 0.0
+            TotalTokens = tokens,
+            ToolCallCount = toolCalls,
+            ErrorRate = executions > 0 ? (double)errors / executions : 0.0
         };
     }
 
@@ -150,7 +150,7 @@ internal sealed class AgentObservabilityClient : IAgentObservabilityClient
         {
             StartTime = startTime,
             LatencyMs = latencyMs,
-            IsError   = isError
+            IsError = isError
         };
         return true;
     }

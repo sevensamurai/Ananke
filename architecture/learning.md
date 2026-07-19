@@ -1,4 +1,4 @@
-﻿# Architecture: Empirical Learning
+# Architecture: Empirical Learning
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers empirical memory, episodes, offline learning, skill packaging, and exploration strategies.
 

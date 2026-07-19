@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using ToolExecutionMode = Ananke.Abstractions.Providers.ToolExecutionMode;
 using Ananke.Federation.Validation;
@@ -19,12 +20,12 @@ public sealed class DeployabilityValidatorTests
         Dictionary<string, ModelDefinition>? models = null,
         Dictionary<string, JobDefinition>? jobs = null,
         List<string>? connections = null) => new()
-    {
-        Name = name,
-        Models = models ?? new() { ["default"] = new() { Provider = "openai", Model = "gpt-4.1-mini" } },
-        Jobs = jobs ?? new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
-        Connections = connections ?? ["agent1"]
-    };
+        {
+            Name = name,
+            Models = models ?? new() { ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini } },
+            Jobs = jobs ?? new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
+            Connections = connections ?? ["agent1"]
+        };
 
     private static ToolKit MakeToolKit(params ToolExecutionMode[] modes)
     {
@@ -48,7 +49,7 @@ public sealed class DeployabilityValidatorTests
                     case ToolExecutionMode.PlatformNative:
                         b.PlatformNative("code_execution");
                         break;
-                    // Local is the default
+                        // Local is the default
                 }
             });
         }
@@ -136,7 +137,7 @@ public sealed class DeployabilityValidatorTests
     {
         var manifest = MakeManifest(models: new()
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4.1-mini", Endpoint = "http://localhost:11434/v1" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini, Endpoint = "http://localhost:11434/v1" }
         });
 
         var report = _validator.Validate(manifest, MakeToolKit(ToolExecutionMode.Callback), "vertex-ai");

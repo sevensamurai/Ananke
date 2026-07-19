@@ -56,12 +56,12 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
         // Upsert entry node.
         await graph.UpsertNodeAsync(new GraphNode
         {
-            Id   = EntryId(entry.Id),
+            Id = EntryId(entry.Id),
             Kind = "entry",
             Properties = new Dictionary<string, string>
             {
                 ["source"] = entry.Source,
-                ["kind"]   = entry.Kind.ToString().ToLowerInvariant(),
+                ["kind"] = entry.Kind.ToString().ToLowerInvariant(),
             },
         }, ct);
 
@@ -78,11 +78,11 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
 
             await graph.UpsertEdgeAsync(new GraphEdge
             {
-                FromId     = EntryId(entry.Id),
-                ToId       = tagNodeId,
-                Relation   = "tagged",
+                FromId = EntryId(entry.Id),
+                ToId = tagNodeId,
+                Relation = "tagged",
                 Provenance = EdgeProvenance.Extracted,
-                Weight     = weight,
+                Weight = weight,
             }, ct);
         }
 
@@ -96,15 +96,15 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                 var coWeight = MathF.Sqrt(wA * wB); // geometric mean
 
                 var fromId = TagId(tagKeys[i]);
-                var toId   = TagId(tagKeys[j]);
+                var toId = TagId(tagKeys[j]);
 
                 var edge = new GraphEdge
                 {
-                    FromId     = fromId,
-                    ToId       = toId,
-                    Relation   = "co_occurs",
+                    FromId = fromId,
+                    ToId = toId,
+                    Relation = "co_occurs",
                     Provenance = EdgeProvenance.Inferred,
-                    Weight     = coWeight,
+                    Weight = coWeight,
                 };
 
                 await graph.UpsertEdgeAsync(edge, ct);

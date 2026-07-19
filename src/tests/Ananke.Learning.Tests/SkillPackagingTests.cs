@@ -62,14 +62,14 @@ public class SkillPackagingTests
         float minStrength = 0.3f,
         float minConfidence = 0.2f,
         int minObservations = 2) => new()
-    {
-        Name = "test-skill",
-        Domain = "test",
-        Version = "1.0.0",
-        MinStrength = minStrength,
-        MinConfidence = minConfidence,
-        MinObservations = minObservations
-    };
+        {
+            Name = "test-skill",
+            Domain = "test",
+            Version = "1.0.0",
+            MinStrength = minStrength,
+            MinConfidence = minConfidence,
+            MinObservations = minObservations
+        };
 
     private async Task<(SkillExportResult Export, MemoryStream Stream)> ExportToStreamAsync(
         SkillExportOptions? options = null,

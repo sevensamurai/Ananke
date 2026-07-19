@@ -1,4 +1,4 @@
-﻿# DesignPipelineDemo
+# DesignPipelineDemo
 
 Declarative ETL pipeline that loads its graph topology, model config, and system prompts from a YAML manifest — then binds job implementations in code and runs the workflow.
 
@@ -165,7 +165,7 @@ models:
     model: gpt-4.1-mini
   analyst:
     provider: anthropic
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-5
 ```
 
 ### `jobs`

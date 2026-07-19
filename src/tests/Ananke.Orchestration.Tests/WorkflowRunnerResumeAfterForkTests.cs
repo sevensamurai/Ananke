@@ -24,10 +24,10 @@ public class WorkflowRunnerResumeAfterForkTests
 
     private WorkflowDefinition<CounterState> BuildForkWorkflow(string name = "resume-fork") =>
         new Workflow<CounterState>(name)
-            .Job("start",    (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Job("start", (s, _) => Task.FromResult(s with { Value = 1 }))
             .Job("branch-a", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "a"], Value = s.Value + 10 }))
             .Job("branch-b", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "b"], Value = s.Value + 100 }))
-            .Job("merge",    (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "merged"] }))
+            .Job("merge", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "merged"] }))
             .Then("start", Workflow.Fork("branch-a", "branch-b"))
             .Join(["branch-a", "branch-b"], "merge",
                 states => new CounterState
@@ -47,7 +47,7 @@ public class WorkflowRunnerResumeAfterForkTests
         // Run until "start" produces a checkpoint, then simulate the runner
         // being restarted from that checkpoint (before the fork fires).
         var definition = BuildForkWorkflow("resume-before-fork");
-        var runner     = new WorkflowRunner(_store);
+        var runner = new WorkflowRunner(_store);
 
         // First run — will complete normally; we capture the checkpoint at "start"
         // by intercepting the store after the job runs.
@@ -57,21 +57,21 @@ public class WorkflowRunnerResumeAfterForkTests
         // Rebuild a synthetic checkpoint at "start" so we can resume from that point.
         var syntheticCheckpoint = new Checkpoint<CounterState>
         {
-            ExecutionId  = Guid.NewGuid().ToString(),
+            ExecutionId = Guid.NewGuid().ToString(),
             WorkflowName = definition.Name,
-            CurrentJob   = "start",
-            State        = new CounterState { Value = 1 },
-            Status       = ExecutionStatus.Running,
-            History      = [],
-            CreatedAt    = DateTimeOffset.UtcNow
+            CurrentJob = "start",
+            State = new CounterState { Value = 1 },
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         var resumed = await runner.ResumeAsync(definition, syntheticCheckpoint);
 
         resumed.Status.ShouldBe(ExecutionStatus.Completed);
         resumed.Result!.Success.ShouldBeTrue();
-        resumed.Result.FinalState.Trail.ShouldContain("a",      "branch-a must execute on resume");
-        resumed.Result.FinalState.Trail.ShouldContain("b",      "branch-b must execute on resume");
+        resumed.Result.FinalState.Trail.ShouldContain("a", "branch-a must execute on resume");
+        resumed.Result.FinalState.Trail.ShouldContain("b", "branch-b must execute on resume");
         resumed.Result.FinalState.Trail.ShouldContain("merged", "merge job must fire on resume");
     }
 
@@ -79,17 +79,17 @@ public class WorkflowRunnerResumeAfterForkTests
     public async Task ResumeAsync_WithStateTransform_AppliedBeforeForkReplay()
     {
         var definition = BuildForkWorkflow("resume-transform");
-        var runner     = new WorkflowRunner(_store);
+        var runner = new WorkflowRunner(_store);
 
         var checkpoint = new Checkpoint<CounterState>
         {
-            ExecutionId  = Guid.NewGuid().ToString(),
+            ExecutionId = Guid.NewGuid().ToString(),
             WorkflowName = definition.Name,
-            CurrentJob   = "start",
-            State        = new CounterState { Value = 1 },
-            Status       = ExecutionStatus.Running,
-            History      = [],
-            CreatedAt    = DateTimeOffset.UtcNow
+            CurrentJob = "start",
+            State = new CounterState { Value = 1 },
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         // Transform doubles Value before replay — branches see Value=2 instead of 1.
@@ -110,7 +110,7 @@ public class WorkflowRunnerResumeAfterForkTests
         // Build a workflow that saves a checkpoint after "branch-a" completes
         // (simulating an interrupt before "merge"). Resume must still reach Completed.
         var definition = BuildForkWorkflow("resume-before-merge");
-        var runner     = new WorkflowRunner(_store);
+        var runner = new WorkflowRunner(_store);
 
         // Full run to capture real checkpoint state after "start"
         await runner.RunAsync(definition, new CounterState());
@@ -118,14 +118,14 @@ public class WorkflowRunnerResumeAfterForkTests
         // Synthetic: interrupted BEFORE merge, both branches logically done
         var checkpoint = new Checkpoint<CounterState>
         {
-            ExecutionId          = Guid.NewGuid().ToString(),
-            WorkflowName         = definition.Name,
-            CurrentJob           = "branch-a",
+            ExecutionId = Guid.NewGuid().ToString(),
+            WorkflowName = definition.Name,
+            CurrentJob = "branch-a",
             InterruptedBeforeJob = "merge",
-            State                = new CounterState { Value = 111, Trail = ["a", "b"] },
-            Status               = ExecutionStatus.Running,
-            History              = [],
-            CreatedAt            = DateTimeOffset.UtcNow
+            State = new CounterState { Value = 111, Trail = ["a", "b"] },
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         var resumed = await runner.ResumeAsync(definition, checkpoint);
@@ -139,11 +139,11 @@ public class WorkflowRunnerResumeAfterForkTests
     public async Task ResumeAsync_Fork_BestEffortMode_OneFaultyBranch_Completes()
     {
         var definition = new Workflow<CounterState>("resume-fork-besteffort")
-            .Job("start",    (s, _) => Task.FromResult(s with { Value = 1 }))
-            .Job("ok-branch",  (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "ok"] }))
+            .Job("start", (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Job("ok-branch", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "ok"] }))
             .Job("bad-branch", (CounterState _, CancellationToken _) =>
                 throw new InvalidOperationException("bad"))
-            .Job("merge",    (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "merged"] }))
+            .Job("merge", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "merged"] }))
             .Then("start", Workflow.Fork(ForkMode.BestEffort, "ok-branch", "bad-branch"))
             .Join(["ok-branch", "bad-branch"], "merge", states => states[0])
             .Then("merge", Workflow.End)
@@ -154,13 +154,13 @@ public class WorkflowRunnerResumeAfterForkTests
 
         var checkpoint = new Checkpoint<CounterState>
         {
-            ExecutionId  = Guid.NewGuid().ToString(),
+            ExecutionId = Guid.NewGuid().ToString(),
             WorkflowName = definition.Name,
-            CurrentJob   = "start",
-            State        = new CounterState { Value = 1 },
-            Status       = ExecutionStatus.Running,
-            History      = [],
-            CreatedAt    = DateTimeOffset.UtcNow
+            CurrentJob = "start",
+            State = new CounterState { Value = 1 },
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         var resumed = await runner.ResumeAsync(definition, checkpoint);
@@ -176,17 +176,17 @@ public class WorkflowRunnerResumeAfterForkTests
     public async Task RunAsync_ForkThenResume_JobsExecutedCountIsCorrect()
     {
         var definition = BuildForkWorkflow("fork-jobs-count");
-        var runner     = new WorkflowRunner(_store);
+        var runner = new WorkflowRunner(_store);
 
         var checkpoint = new Checkpoint<CounterState>
         {
-            ExecutionId  = Guid.NewGuid().ToString(),
+            ExecutionId = Guid.NewGuid().ToString(),
             WorkflowName = definition.Name,
-            CurrentJob   = "start",
-            State        = new CounterState { Value = 1 },
-            Status       = ExecutionStatus.Running,
-            History      = [],
-            CreatedAt    = DateTimeOffset.UtcNow
+            CurrentJob = "start",
+            State = new CounterState { Value = 1 },
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         var resumed = await runner.ResumeAsync(definition, checkpoint);

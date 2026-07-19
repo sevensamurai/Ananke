@@ -207,7 +207,9 @@ public static class HostSnapshotExporter
             if (currentBlock is not null && modelProvider is not null && modelName is not null)
                 workflowModels[currentBlock] = new ModelSnapshot
                 {
-                    Provider = modelProvider, Model = modelName, Endpoint = modelEndpoint
+                    Provider = modelProvider,
+                    Model = modelName,
+                    Endpoint = modelEndpoint
                 };
             modelProvider = null;
             modelName = null;

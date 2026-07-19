@@ -1,4 +1,4 @@
-﻿namespace Ananke.Orchestration.Routing;
+namespace Ananke.Orchestration.Routing;
 
 /// <summary>
 /// Thrown by <see cref="AgentRouter{TState}"/> when the LLM response cannot be

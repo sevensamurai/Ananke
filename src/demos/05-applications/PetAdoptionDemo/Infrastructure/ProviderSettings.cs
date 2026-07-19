@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.AspNetCore.Configuration;
 using Ananke.Orchestration.Google;
 using Ananke.Orchestration.OpenAI;
@@ -12,11 +13,11 @@ internal static class ProviderRegistration
     {
         return new AgentModelFactory()
             .RegisterProvider("OpenAI",
-                defaultModel: "gpt-4.1-mini",
+                defaultModel: Models.OpenAI.Gpt54Mini,
                 agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model),
                 embeddingFactory: (key, model) => OpenAIEmbeddingModel.Create(key, model))
             .RegisterProvider("Google",
-                defaultModel: "gemini-2.5-flash",
+                defaultModel: Models.Google.Gemini35Flash,
                 agentFactory: (key, model) => GeminiAgentModel.Create(key, model),
                 embeddingFactory: (key, model) => GeminiEmbeddingModel.Create(key, model));
     }

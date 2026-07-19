@@ -101,9 +101,9 @@ public sealed class PageRankCentralityScorerTests
 
     private static GraphEdge Edge(string from, string to) => new()
     {
-        FromId     = from,
-        ToId       = to,
-        Relation   = "co_occurs",
+        FromId = from,
+        ToId = to,
+        Relation = "co_occurs",
         Provenance = EdgeProvenance.Inferred,
     };
 }

@@ -14,7 +14,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     private readonly string _model;
     private readonly int _maxTokens;
 
-    public AnthropicAgentModel(AnthropicClient client, string model = "claude-sonnet-4", int maxTokens = 4096)
+    public AnthropicAgentModel(AnthropicClient client, string model = Models.Anthropic.Sonnet5, int maxTokens = 4096)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);

@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-memory, tags: faq, memory, rag, vector, empirical, learning, skills, episodes, catalog -->
+<!-- topic: faq-memory, tags: faq, memory, rag, vector, empirical, learning, skills, episodes, catalog -->
 # FAQ — Memory & Learning
 
 ← [Back to all FAQs](../faq.md)

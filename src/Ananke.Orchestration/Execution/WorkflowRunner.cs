@@ -25,6 +25,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
     private readonly bool _storeCompletions;
     private readonly ILogger<WorkflowRunner> _logger;
     private readonly TimeSpan _checkpointTtl;
+    private readonly TimeProvider _timeProvider;
 
     public WorkflowRunner(
         ICheckpointStore? checkpointStore = null,
@@ -32,7 +33,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         IWorkflowTracer? tracer = null,
         bool storeCompletions = true,
         ILoggerFactory? loggerFactory = null,
-        TimeSpan? checkpointTtl = null)
+        TimeSpan? checkpointTtl = null,
+        TimeProvider? timeProvider = null)
     {
         _checkpointStore = checkpointStore;
         _middlewares = middlewares?.ToList() ?? [];
@@ -41,6 +43,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         _logger = loggerFactory?.CreateLogger<WorkflowRunner>()
             ?? NullLogger<WorkflowRunner>.Instance;
         _checkpointTtl = checkpointTtl ?? TimeSpan.FromDays(7);
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<WorkflowExecution<TState>> RunAsync<TState>(
@@ -215,15 +218,17 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                             "Call UseCheckpointing() on the workflow builder.");
 
                     execution.Status = ExecutionStatus.Interrupted;
-                    var interruptCheckpoint = Checkpoint<TState>.CreateInterrupt(execution, currentJobName, _checkpointTtl);
+                    var interruptCheckpoint = Checkpoint<TState>.CreateInterrupt(execution, currentJobName, _checkpointTtl, _timeProvider);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
                     LogInterruptedBefore(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
-                        JobName = currentJobName, State = execution.State
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
+                        JobName = currentJobName,
+                        State = execution.State
                     }, ct);
 
                     return execution;
@@ -242,7 +247,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     {
                         await EmitEventAsync(events, new ForkStarted<TState>
                         {
-                            WorkflowName = definition.Name, ExecutionId = execution.Id,
+                            WorkflowName = definition.Name,
+                            ExecutionId = execution.Id,
                             Targets = resumeFork.Targets
                         }, ct);
 
@@ -250,13 +256,16 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                         await EmitEventAsync(events, new JoinCompleted<TState>
                         {
-                            WorkflowName = definition.Name, ExecutionId = execution.Id,
-                            Target = currentJobName, State = execution.State
+                            WorkflowName = definition.Name,
+                            ExecutionId = execution.Id,
+                            Target = currentJobName,
+                            State = execution.State
                         }, ct);
 
                         await EmitEventAsync(events, new StateUpdated<TState>
                         {
-                            WorkflowName = definition.Name, ExecutionId = execution.Id,
+                            WorkflowName = definition.Name,
+                            ExecutionId = execution.Id,
                             State = execution.State
                         }, ct);
 
@@ -298,7 +307,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 await EmitEventAsync(events, new JobStarted<TState>
                 {
-                    WorkflowName = definition.Name, ExecutionId = execution.Id,
+                    WorkflowName = definition.Name,
+                    ExecutionId = execution.Id,
                     JobName = currentJobName
                 }, ct);
 
@@ -317,14 +327,17 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     await EmitEventAsync(events, new JobCompleted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
-                        JobName = currentJobName, Duration = jobSw.Elapsed,
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
+                        JobName = currentJobName,
+                        Duration = jobSw.Elapsed,
                         State = execution.State
                     }, ct);
 
                     await EmitEventAsync(events, new StateUpdated<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
                         State = execution.State
                     }, ct);
                 }
@@ -340,15 +353,17 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     execution.Status = ExecutionStatus.Interrupted;
                     var interruptCheckpoint = Checkpoint<TState>.CreateInterrupt(
-                        execution, currentJobName, _checkpointTtl);
+                        execution, currentJobName, _checkpointTtl, _timeProvider);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
                     LogInterruptedBySubflow(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
-                        JobName = currentJobName, State = execution.State
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
+                        JobName = currentJobName,
+                        State = execution.State
                     }, ct);
 
                     return execution;
@@ -384,7 +399,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 if (_checkpointStore is not null)
                 {
-                    var checkpoint = Checkpoint<TState>.Create(execution, _checkpointTtl);
+                    var checkpoint = Checkpoint<TState>.Create(execution, _checkpointTtl, _timeProvider);
                     await _checkpointStore.SaveAsync(checkpoint, ct);
                 }
 
@@ -415,7 +430,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                             // state is consistent with the terminal execution status.
                             if (_checkpointStore is not null)
                             {
-                                var budgetCheckpoint = Checkpoint<TState>.Create(execution, _checkpointTtl);
+                                var budgetCheckpoint = Checkpoint<TState>.Create(execution, _checkpointTtl, _timeProvider);
                                 await _checkpointStore.SaveAsync(budgetCheckpoint, ct);
                             }
 
@@ -443,15 +458,17 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     execution.Status = ExecutionStatus.Interrupted;
                     // Re-save checkpoint with interrupted status (normal checkpoint was already saved above)
-                    var interruptCheckpoint = Checkpoint<TState>.Create(execution, _checkpointTtl);
+                    var interruptCheckpoint = Checkpoint<TState>.Create(execution, _checkpointTtl, _timeProvider);
                     await _checkpointStore.SaveAsync(interruptCheckpoint, ct);
 
                     LogInterruptedAfter(definition.Name, execution.Id, currentJobName);
 
                     await EmitEventAsync(events, new Interrupted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
-                        JobName = currentJobName, State = execution.State
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
+                        JobName = currentJobName,
+                        State = execution.State
                     }, ct);
 
                     return execution;
@@ -463,7 +480,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 {
                     await EmitEventAsync(events, new ForkStarted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
                         Targets = forkConn.Targets
                     }, ct);
 
@@ -471,13 +489,16 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     await EmitEventAsync(events, new JoinCompleted<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
-                        Target = currentJobName, State = execution.State
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
+                        Target = currentJobName,
+                        State = execution.State
                     }, ct);
 
                     await EmitEventAsync(events, new StateUpdated<TState>
                     {
-                        WorkflowName = definition.Name, ExecutionId = execution.Id,
+                        WorkflowName = definition.Name,
+                        ExecutionId = execution.Id,
                         State = execution.State
                     }, ct);
 
@@ -536,7 +557,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
             await EmitEventAsync(events, new WorkflowCompleted<TState>
             {
-                WorkflowName = definition.Name, ExecutionId = execution.Id,
+                WorkflowName = definition.Name,
+                ExecutionId = execution.Id,
                 Result = execution.Result
             }, ct);
 
@@ -561,8 +583,10 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
             await EmitEventAsync(events, new WorkflowFaulted<TState>
             {
-                WorkflowName = definition.Name, ExecutionId = execution.Id,
-                Exception = ex, State = execution.State
+                WorkflowName = definition.Name,
+                ExecutionId = execution.Id,
+                Exception = ex,
+                State = execution.State
             });
         }
 

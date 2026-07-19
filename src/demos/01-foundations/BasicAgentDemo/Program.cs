@@ -86,16 +86,16 @@ var apiKey = config["OpenAI:ApiKey"]
         "Add { \"OpenAI\": { \"ApiKey\": \"sk-...\" } } to secrets.json");
 
 IStreamingAgentModel miniModel = new OpenAIChatAgentModel(
-    new ChatClient("gpt-4.1-mini", new ApiKeyCredential(apiKey)));
+    new ChatClient(Models.OpenAI.Gpt54Mini, new ApiKeyCredential(apiKey)));
 
 IStreamingAgentModel fullModel = new OpenAIChatAgentModel(
-    new ChatClient("gpt-4.1", new ApiKeyCredential(apiKey)));
+    new ChatClient(Models.OpenAI.Gpt55, new ApiKeyCredential(apiKey)));
 
 // =====================================================================
 //  LEVEL 1 — Direct model call (simplest LLM usage)
 // =====================================================================
 Console.WriteLine();
-Console.WriteLine("-- Level 1: Direct model call (gpt-4.1-mini) -----------");
+Console.WriteLine("-- Level 1: Direct model call (gpt-5.4-mini) -----------");
 
 var directResponse = await miniModel.GenerateAsync(new AgentRequest
 {
@@ -118,10 +118,10 @@ var miniRates = new ModelCostRates(CostPer1KInputTokens: 0.0004m, CostPer1KOutpu
 var fullRates = new ModelCostRates(CostPer1KInputTokens: 0.002m, CostPer1KOutputTokens: 0.008m);
 
 var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
-    .AddModel(ModelCatalog.OpenAI.Gpt4_1Mini.ToProfile(miniModel, miniRates))
-    .AddModel(ModelCatalog.OpenAI.Gpt4_1.ToProfile(fullModel, fullRates));
+    .AddModel(ModelCatalog.OpenAI.Gpt54Mini.ToProfile(miniModel, miniRates))
+    .AddModel(ModelCatalog.OpenAI.Gpt55.ToProfile(fullModel, fullRates));
 
-// 2a — Simple text request ? routes to gpt-4.1-mini (cheaper, meets requirements)
+// 2a — Simple text request ? routes to gpt-5.4-mini (cheaper, meets requirements)
 var simpleRequest = new AgentRequest
 {
     SystemPrompt = "You are a concise assistant.",
@@ -131,7 +131,7 @@ var simpleModel = router.Select(simpleRequest);
 var simpleResponse = await simpleModel.GenerateAsync(simpleRequest);
 Console.WriteLine($"  [Simple]    ? {ModelName(simpleModel)} ? {simpleResponse.Text}");
 
-// 2b — Reasoning request ? metadata bumps requirements, routes to gpt-4.1
+// 2b — Reasoning request ? metadata bumps requirements, routes to gpt-5.5
 var reasoningRequest = new AgentRequest
 {
     SystemPrompt = "You are a senior software architect.",

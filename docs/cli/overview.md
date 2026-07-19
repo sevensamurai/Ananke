@@ -1,4 +1,4 @@
-﻿<!-- topic: cli-overview, tags: nnke, nnke-platform, dotnet-tool, cli, scaffold, validate, mermaid, run, serve, mcp, local-execution -->
+<!-- topic: cli-overview, tags: nnke, nnke-platform, dotnet-tool, cli, scaffold, validate, mermaid, run, serve, mcp, local-execution -->
 # CLI Overview
 
 Ananke ships two CLI tools because design-time workflow work and platform operations are different jobs.

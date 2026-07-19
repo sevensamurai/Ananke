@@ -41,9 +41,9 @@ public sealed class DegreeCentralityScorerTests
         foreach (var (from, to) in Edges)
             await _graph.UpsertEdgeAsync(new GraphEdge
             {
-                FromId     = from,
-                ToId       = to,
-                Relation   = "co_occurs",
+                FromId = from,
+                ToId = to,
+                Relation = "co_occurs",
                 Provenance = EdgeProvenance.Inferred,
             });
     }
@@ -75,7 +75,10 @@ public sealed class DegreeCentralityScorerTests
         await _graph.UpsertNodeAsync(new GraphNode { Id = "x", Kind = "entry" });
         await _graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "x", ToId = "a", Relation = "tagged", Provenance = EdgeProvenance.Extracted,
+            FromId = "x",
+            ToId = "a",
+            Relation = "tagged",
+            Provenance = EdgeProvenance.Extracted,
         });
 
         var scores = await _scorer.ScoreAsync(_graph, nodeKindFilter: "tag");
@@ -92,7 +95,10 @@ public sealed class DegreeCentralityScorerTests
         await _graph.UpsertNodeAsync(new GraphNode { Id = "x", Kind = "entry" });
         await _graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "x", ToId = "a", Relation = "tagged", Provenance = EdgeProvenance.Extracted,
+            FromId = "x",
+            ToId = "a",
+            Relation = "tagged",
+            Provenance = EdgeProvenance.Extracted,
         });
 
         var scores = await _scorer.ScoreAsync(_graph, nodeKindFilter: "Pinned");

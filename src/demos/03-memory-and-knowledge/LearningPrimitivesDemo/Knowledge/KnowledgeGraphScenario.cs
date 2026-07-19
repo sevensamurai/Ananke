@@ -75,24 +75,24 @@ internal static class KnowledgeGraphScenario
         // with Topic C tags — reachable via TagGcPause → TagHighLatency → TagNicReset.
         var probeEntry = new EmpiricalEntry
         {
-            Id               = "probe-query",
-            Kind             = EmpiricalKind.Pattern,
-            Tags             = [TopicFixture.TagGcPause, TopicFixture.TagHighLatency],
-            Source           = "demo",
-            Description      = new SemanticDescription
+            Id = "probe-query",
+            Kind = EmpiricalKind.Pattern,
+            Tags = [TopicFixture.TagGcPause, TopicFixture.TagHighLatency],
+            Source = "demo",
+            Description = new SemanticDescription
             {
-                Summary      = "Investigating high-latency events linked to GC pressure",
+                Summary = "Investigating high-latency events linked to GC pressure",
                 SemanticTags = new Dictionary<string, float>
                 {
-                    [TopicFixture.TagGcPause]     = 1.0f,
+                    [TopicFixture.TagGcPause] = 1.0f,
                     [TopicFixture.TagHighLatency] = 0.8f,
                 },
             },
-            Confidence       = 0.5f,
+            Confidence = 0.5f,
             ObservationCount = 1,
-            Evidence         = [],
-            FirstObserved    = DateTimeOffset.UtcNow,
-            LastObserved     = DateTimeOffset.UtcNow,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
         };
 
         // Baseline: TagOverlapPredictionSource (no graph)
@@ -104,7 +104,7 @@ internal static class KnowledgeGraphScenario
         var graphPrediction = await graphSource.PredictAsync(probeEntry, memory);
 
         var baselineStr = baselinePrediction is null ? "null (no basis)" : $"{baselinePrediction:F4}";
-        var graphStr    = graphPrediction    is null ? "null (no basis)" : $"{graphPrediction:F4}";
+        var graphStr = graphPrediction is null ? "null (no basis)" : $"{graphPrediction:F4}";
 
         Print("  ┌────────────────────────────────────┬──────────────────┐", ConsoleColor.DarkCyan);
         Print("  │ Source                             │ Prediction       │", ConsoleColor.DarkCyan);
@@ -126,11 +126,11 @@ internal static class KnowledgeGraphScenario
 
         Section(4, "Tag importance: PageRank vs. frequency");
 
-        var graphTracker     = new GraphTagImportanceTracker(graph, new TagImportanceOptions { MinSampleSize = 5 });
+        var graphTracker = new GraphTagImportanceTracker(graph, new TagImportanceOptions { MinSampleSize = 5 });
         var frequencyTracker = new TagImportanceTracker(new TagImportanceOptions { MinSampleSize = 5 });
 
-        var pageRankMap   = await graphTracker.ComputeAsync(memory);
-        var frequencyMap  = await frequencyTracker.ComputeAsync(memory);
+        var pageRankMap = await graphTracker.ComputeAsync(memory);
+        var frequencyMap = await frequencyTracker.ComputeAsync(memory);
 
         var prTop5 = pageRankMap?.Importances
             .OrderByDescending(kv => kv.Value).Take(5).ToList()
@@ -171,7 +171,7 @@ internal static class KnowledgeGraphScenario
         await exporter.ExportAsync(outDir);
 
         var reportPath = Path.Combine(outDir, "MEMORY_REPORT.md");
-        var graphPath  = Path.Combine(outDir, "memory-graph.json");
+        var graphPath = Path.Combine(outDir, "memory-graph.json");
 
         Print($"  ✅ Files written to: {outDir}", ConsoleColor.Green);
         Print($"     • {Path.GetFileName(reportPath)}", ConsoleColor.DarkGray);

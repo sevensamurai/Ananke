@@ -1,4 +1,4 @@
-﻿# Architecture: Infrastructure
+# Architecture: Infrastructure
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers Redis, MQTT, Qdrant, OpenTelemetry, StateMachine, and ASP.NET Core integration.
 

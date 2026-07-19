@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-organics, tags: faq, organics, colony, division, scaling, self-organization, workflows -->
+<!-- topic: faq-organics, tags: faq, organics, colony, division, scaling, self-organization, workflows -->
 # FAQ — Organic Colony & Cell Division
 
 ← [Back to all FAQs](../faq.md)

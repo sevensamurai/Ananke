@@ -3,7 +3,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Orchestration.Anthropic</PackageId>
-    <Description>Anthropic provider for Ananke.Orchestration � Claude-based IStreamingAgentModel implementation with tool calling support.</Description>
+    <Description>Anthropic provider for Ananke.Orchestration — Claude-based IStreamingAgentModel implementation with tool calling support.</Description>
     <DefaultItemExcludes>$(DefaultItemExcludes);_explore\**</DefaultItemExcludes>
   </PropertyGroup>
 

@@ -39,6 +39,12 @@ public sealed record ModelProfileTemplate
     /// <summary>Speed tier (1–5).</summary>
     public int SpeedTier { get; init; } = 1;
 
+    /// <summary>Lifecycle stage of this template. Carried into <see cref="ToProfile(IAgentModel, ModelCostRates)"/>.</summary>
+    public ModelStatus Status { get; init; } = ModelStatus.Current;
+
+    /// <summary>Recommended replacement model name when <see cref="Status"/> is not <see cref="ModelStatus.Current"/>.</summary>
+    public string? ReplacedBy { get; init; }
+
     /// <summary>
     /// Creates a complete <see cref="ModelProfile"/> by binding this template
     /// to a live <paramref name="model"/> instance with explicit cost <paramref name="rates"/>.
@@ -58,7 +64,9 @@ public sealed record ModelProfileTemplate
             CostPer1KInputTokens = rates.CostPer1KInputTokens,
             CostPer1KOutputTokens = rates.CostPer1KOutputTokens,
             MaxContextTokens = MaxContextTokens,
-            SpeedTier = SpeedTier
+            SpeedTier = SpeedTier,
+            Status = Status,
+            ReplacedBy = ReplacedBy
         };
     }
 
@@ -113,15 +121,19 @@ public static class ModelCatalog
         OpenAI.Gpt4_1, OpenAI.Gpt4_1Mini, OpenAI.Gpt4_1Nano,
         OpenAI.O3, OpenAI.O3Mini, OpenAI.O4Mini,
         OpenAI.Gpt4o, OpenAI.Gpt4oMini,
+        OpenAI.Gpt5, OpenAI.Gpt5Mini, OpenAI.Gpt5Nano, OpenAI.Gpt52,
+        OpenAI.Gpt54, OpenAI.Gpt54Mini, OpenAI.Gpt54Nano, OpenAI.Gpt55,
+        OpenAI.Gpt56Sol, OpenAI.Gpt56Terra, OpenAI.Gpt56Luna,
 
         // Anthropic
-        Anthropic.Claude4Sonnet, Anthropic.Claude4Opus,
-        Anthropic.Claude3_7Sonnet, Anthropic.Claude3_5Haiku,
+        Anthropic.ClaudeOpus4_1,
         Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
+        Anthropic.ClaudeSonnet5, Anthropic.ClaudeFable5,
 
         // Google
         Google.Gemini3_1Pro, Google.Gemini3_1Flash,
-        Google.Gemini2_5Pro, Google.Gemini2_5Flash, Google.Gemini2_0Flash,
+        Google.Gemini2_5Pro, Google.Gemini2_5Flash,
+        Google.Gemini3_5Flash, Google.Gemini3_1FlashLite,
 
         // Meta (open-weight — self-hosted)
         Meta.Llama4Scout, Meta.Llama4Maverick,
@@ -150,6 +162,34 @@ public static class ModelCatalog
     private const ModelCapability FrontierModel =
         FullModel | ModelCapability.Reasoning | ModelCapability.Vision;
 
+    /// <summary>
+    /// Builds a template with its <see cref="ModelProfileTemplate.Status"/> and
+    /// <see cref="ModelProfileTemplate.ReplacedBy"/> looked up from
+    /// <see cref="ModelLifecycleData"/> by <paramref name="name"/> — the same
+    /// single-source-of-truth data <c>Ananke.Design.ModelCatalog</c> and the <c>ANNKE002</c>
+    /// analyzer read, so a template's lifecycle can't drift from theirs by hand-editing one and
+    /// not the others. A <paramref name="name"/> absent from the data is
+    /// <see cref="ModelStatus.Current"/>.
+    /// </summary>
+    private static ModelProfileTemplate CreateTemplate(
+        string name, ModelCapability capabilities, int intelligenceTier, int maxContextTokens, int speedTier)
+    {
+        var (status, replacedBy) = ModelLifecycleData.Entries.TryGetValue(name, out var entry)
+            ? (entry.Status, entry.ReplacedBy)
+            : (ModelStatus.Current, null);
+
+        return new ModelProfileTemplate
+        {
+            Name = name,
+            Capabilities = capabilities,
+            IntelligenceTier = intelligenceTier,
+            MaxContextTokens = maxContextTokens,
+            SpeedTier = speedTier,
+            Status = status,
+            ReplacedBy = replacedBy
+        };
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  OpenAI
     // ─────────────────────────────────────────────────────────────
@@ -157,85 +197,87 @@ public static class ModelCatalog
     /// <summary>OpenAI model templates (capabilities and context only — no pricing).</summary>
     public static class OpenAI
     {
+        // This catalog must keep resolving deprecated model constants for its own Name
+        // assignments below — ANNKE001 is expected and intentional here, not a call site to fix.
+#pragma warning disable ANNKE001
+
         /// <summary>GPT-4.1 — flagship model with 1M context.</summary>
-        public static ModelProfileTemplate Gpt4_1 { get; } = new()
-        {
-            Name = "gpt-4.1",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 4,
-            MaxContextTokens = 1_047_576,
-            SpeedTier = 3
-        };
+        public static ModelProfileTemplate Gpt4_1 { get; } =
+            CreateTemplate(Models.OpenAI.Gpt41, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_047_576, speedTier: 3);
 
         /// <summary>GPT-4.1 Mini — balanced cost/performance.</summary>
-        public static ModelProfileTemplate Gpt4_1Mini { get; } = new()
-        {
-            Name = "gpt-4.1-mini",
-            Capabilities = FullModel | ModelCapability.Vision,
-            IntelligenceTier = 3,
-            MaxContextTokens = 1_047_576,
-            SpeedTier = 4
-        };
+        public static ModelProfileTemplate Gpt4_1Mini { get; } =
+            CreateTemplate(Models.OpenAI.Gpt41Mini, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 1_047_576, speedTier: 4);
 
         /// <summary>GPT-4.1 Nano — fastest, cheapest GPT-4.1 variant.</summary>
-        public static ModelProfileTemplate Gpt4_1Nano { get; } = new()
-        {
-            Name = "gpt-4.1-nano",
-            Capabilities = ChatModel | ModelCapability.LargeContext,
-            IntelligenceTier = 2,
-            MaxContextTokens = 1_047_576,
-            SpeedTier = 5
-        };
+        public static ModelProfileTemplate Gpt4_1Nano { get; } =
+            CreateTemplate(Models.OpenAI.Gpt41Nano, ChatModel | ModelCapability.LargeContext, intelligenceTier: 2, maxContextTokens: 1_047_576, speedTier: 5);
 
         /// <summary>o3 — frontier reasoning model.</summary>
-        public static ModelProfileTemplate O3 { get; } = new()
-        {
-            Name = "o3",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 5,
-            MaxContextTokens = 200_000,
-            SpeedTier = 1
-        };
+        public static ModelProfileTemplate O3 { get; } =
+            CreateTemplate(Models.OpenAI.O3, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 1);
 
         /// <summary>o3-mini — fast reasoning.</summary>
-        public static ModelProfileTemplate O3Mini { get; } = new()
-        {
-            Name = "o3-mini",
-            Capabilities = FullModel | ModelCapability.Reasoning,
-            IntelligenceTier = 4,
-            MaxContextTokens = 200_000,
-            SpeedTier = 3
-        };
+        public static ModelProfileTemplate O3Mini { get; } =
+            CreateTemplate(Models.OpenAI.O3Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3);
 
         /// <summary>o4-mini — latest compact reasoning model.</summary>
-        public static ModelProfileTemplate O4Mini { get; } = new()
-        {
-            Name = "o4-mini",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 4,
-            MaxContextTokens = 200_000,
-            SpeedTier = 3
-        };
+        public static ModelProfileTemplate O4Mini { get; } =
+            CreateTemplate(Models.OpenAI.O4Mini, FrontierModel, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3);
 
         /// <summary>GPT-4o — prior-gen frontier model.</summary>
-        public static ModelProfileTemplate Gpt4o { get; } = new()
-        {
-            Name = "gpt-4o",
-            Capabilities = FrontierModel | ModelCapability.AudioInput,
-            IntelligenceTier = 4,
-            MaxContextTokens = 128_000,
-            SpeedTier = 3
-        };
+        public static ModelProfileTemplate Gpt4o { get; } =
+            CreateTemplate(Models.OpenAI.Gpt4o, FrontierModel | ModelCapability.AudioInput, intelligenceTier: 4, maxContextTokens: 128_000, speedTier: 3);
 
         /// <summary>GPT-4o Mini — prior-gen compact model.</summary>
-        public static ModelProfileTemplate Gpt4oMini { get; } = new()
-        {
-            Name = "gpt-4o-mini",
-            Capabilities = FullModel | ModelCapability.Vision,
-            IntelligenceTier = 2,
-            MaxContextTokens = 128_000,
-            SpeedTier = 4
-        };
+        public static ModelProfileTemplate Gpt4oMini { get; } =
+            CreateTemplate(Models.OpenAI.Gpt4oMini, FullModel | ModelCapability.Vision, intelligenceTier: 2, maxContextTokens: 128_000, speedTier: 4);
+
+        /// <summary>GPT-5 — prior-gen reasoning and coding model.</summary>
+        public static ModelProfileTemplate Gpt5 { get; } =
+            CreateTemplate(Models.OpenAI.Gpt5, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3);
+
+        /// <summary>GPT-5 Mini — prior-gen fast, cost-efficient reasoning.</summary>
+        public static ModelProfileTemplate Gpt5Mini { get; } =
+            CreateTemplate(Models.OpenAI.Gpt5Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 4);
+
+        /// <summary>GPT-5 Nano — prior-gen smallest, cheapest.</summary>
+        public static ModelProfileTemplate Gpt5Nano { get; } =
+            CreateTemplate(Models.OpenAI.Gpt5Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 2, maxContextTokens: 400_000, speedTier: 5);
+
+        /// <summary>GPT-5.2 — prior-gen incremental update over GPT-5.</summary>
+        public static ModelProfileTemplate Gpt52 { get; } =
+            CreateTemplate(Models.OpenAI.Gpt52, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3);
+
+        /// <summary>GPT-5.4 — legacy, 1M-class context.</summary>
+        public static ModelProfileTemplate Gpt54 { get; } =
+            CreateTemplate(Models.OpenAI.Gpt54, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2);
+
+        /// <summary>GPT-5.4 Mini — legacy, fast distillation of GPT-5.4.</summary>
+        public static ModelProfileTemplate Gpt54Mini { get; } =
+            CreateTemplate(Models.OpenAI.Gpt54Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 4);
+
+        /// <summary>GPT-5.4 Nano — legacy, fastest, cheapest of the 5.4 line.</summary>
+        public static ModelProfileTemplate Gpt54Nano { get; } =
+            CreateTemplate(Models.OpenAI.Gpt54Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 5);
+
+        /// <summary>GPT-5.5 — legacy flagship for complex reasoning and coding.</summary>
+        public static ModelProfileTemplate Gpt55 { get; } =
+            CreateTemplate(Models.OpenAI.Gpt55, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+
+        /// <summary>GPT-5.6 Sol — current-gen flagship: frontier reasoning for coding, research, and agentic/computer-use work, 1.05M-class context.</summary>
+        public static ModelProfileTemplate Gpt56Sol { get; } =
+            CreateTemplate(Models.OpenAI.Gpt56Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2);
+
+        /// <summary>GPT-5.6 Terra — current-gen, balances capability and cost (mini-tier equivalent).</summary>
+        public static ModelProfileTemplate Gpt56Terra { get; } =
+            CreateTemplate(Models.OpenAI.Gpt56Terra, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 1_050_000, speedTier: 4);
+
+        /// <summary>GPT-5.6 Luna — current-gen fastest, lowest-cost of the 5.6 line (nano-tier equivalent).</summary>
+        public static ModelProfileTemplate Gpt56Luna { get; } =
+            CreateTemplate(Models.OpenAI.Gpt56Luna, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 1_050_000, speedTier: 5);
+
+#pragma warning restore ANNKE001
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -245,75 +287,45 @@ public static class ModelCatalog
     /// <summary>Anthropic Claude model templates.</summary>
     public static class Anthropic
     {
-        /// <summary>Claude 4 Sonnet — balanced frontier model.</summary>
-        public static ModelProfileTemplate Claude4Sonnet { get; } = new()
-        {
-            Name = "claude-sonnet-4-20250514",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 4,
-            MaxContextTokens = 200_000,
-            SpeedTier = 3
-        };
+        // Claude4Sonnet/Claude4Opus (claude-sonnet-4/claude-opus-4, backed by the sole snapshot
+        // claude-*-4-20250514, retired 2026-06-15), Claude3_7Sonnet (claude-3-7-sonnet-20250219,
+        // retired 2026-02-19), and Claude3_5Haiku (claude-3-5-haiku-20241022, retired 2026-02-19)
+        // were removed — the provider no longer serves these. See
+        // docs/reference/model-deprecations.md.
 
-        /// <summary>Claude 4 Opus — highest-capability Anthropic model.</summary>
-        public static ModelProfileTemplate Claude4Opus { get; } = new()
-        {
-            Name = "claude-opus-4-20250514",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 5,
-            MaxContextTokens = 200_000,
-            SpeedTier = 1
-        };
+        // This catalog must keep resolving deprecated model constants for its own Name
+        // assignments below — ANNKE001 is expected and intentional here, not a call site to fix.
+#pragma warning disable ANNKE001
 
-        /// <summary>Claude 3.7 Sonnet — prior-gen balanced model with extended thinking.</summary>
-        public static ModelProfileTemplate Claude3_7Sonnet { get; } = new()
-        {
-            Name = "claude-3-7-sonnet-20250219",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 4,
-            MaxContextTokens = 200_000,
-            SpeedTier = 3
-        };
+        /// <summary>
+        /// Claude Opus 4.1 — deprecated 2026-06-05, tentative retirement 2026-08-05.
+        /// Context window not independently confirmed (predates Anthropic's current-docs 1M-context
+        /// generation) — set to the standard 200K tier all earlier Claude models shipped with.
+        /// </summary>
+        public static ModelProfileTemplate ClaudeOpus4_1 { get; } =
+            CreateTemplate(Models.Anthropic.Opus41, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 2);
 
-        /// <summary>Claude 3.5 Haiku — fastest Anthropic model.</summary>
-        public static ModelProfileTemplate Claude3_5Haiku { get; } = new()
-        {
-            Name = "claude-3-5-haiku-20241022",
-            Capabilities = ChatModel | ModelCapability.CodeGeneration | ModelCapability.Vision,
-            IntelligenceTier = 2,
-            MaxContextTokens = 200_000,
-            SpeedTier = 5
-        };
+        /// <summary>Claude Opus 4.8 — prior-generation frontier reasoning model.</summary>
+        public static ModelProfileTemplate ClaudeOpus4_8 { get; } =
+            CreateTemplate(Models.Anthropic.Opus48, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
 
-        /// <summary>Claude Opus 4.8 — current-generation frontier reasoning model.</summary>
-        public static ModelProfileTemplate ClaudeOpus4_8 { get; } = new()
-        {
-            Name = "claude-opus-4-8",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 5,
-            MaxContextTokens = 1_000_000,
-            SpeedTier = 2
-        };
-
-        /// <summary>Claude Sonnet 4.6 — current-generation balanced frontier model.</summary>
-        public static ModelProfileTemplate ClaudeSonnet4_6 { get; } = new()
-        {
-            Name = "claude-sonnet-4-6",
-            Capabilities = FrontierModel,
-            IntelligenceTier = 4,
-            MaxContextTokens = 1_000_000,
-            SpeedTier = 3
-        };
+        /// <summary>Claude Sonnet 4.6 — prior-generation balanced frontier model.</summary>
+        public static ModelProfileTemplate ClaudeSonnet4_6 { get; } =
+            CreateTemplate(Models.Anthropic.Sonnet46, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3);
 
         /// <summary>Claude Haiku 4.5 — current-generation fast model (no Reasoning, by design).</summary>
-        public static ModelProfileTemplate ClaudeHaiku4_5 { get; } = new()
-        {
-            Name = "claude-haiku-4-5",
-            Capabilities = FullModel | ModelCapability.Vision,
-            IntelligenceTier = 3,
-            MaxContextTokens = 200_000,
-            SpeedTier = 5
-        };
+        public static ModelProfileTemplate ClaudeHaiku4_5 { get; } =
+            CreateTemplate(Models.Anthropic.Haiku45, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 200_000, speedTier: 5);
+
+        /// <summary>Claude Sonnet 5 — current-generation balanced frontier model.</summary>
+        public static ModelProfileTemplate ClaudeSonnet5 { get; } =
+            CreateTemplate(Models.Anthropic.Sonnet5, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3);
+
+        /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
+        public static ModelProfileTemplate ClaudeFable5 { get; } =
+            CreateTemplate(Models.Anthropic.Fable5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+
+#pragma warning restore ANNKE001
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -323,57 +335,44 @@ public static class ModelCatalog
     /// <summary>Google Gemini model templates.</summary>
     public static class Google
     {
+        // This catalog must keep resolving deprecated model constants for its own Name
+        // assignments below — ANNKE001 is expected and intentional here, not a call site to fix.
+#pragma warning disable ANNKE001
+
         /// <summary>Gemini 3.1 Pro — Agent Platform GA flagship, frontier reasoning with 2M context.</summary>
-        public static ModelProfileTemplate Gemini3_1Pro { get; } = new()
-        {
-            Name = "gemini-3.1-pro",
-            Capabilities = FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput,
-            IntelligenceTier = 5,
-            MaxContextTokens = 2_097_152,
-            SpeedTier = 2
-        };
+        public static ModelProfileTemplate Gemini3_1Pro { get; } =
+            CreateTemplate(Models.Google.Gemini31Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 2_097_152, speedTier: 2);
 
         /// <summary>Gemini 3.1 Flash — Agent Platform GA fast model with reasoning and multimodal input.</summary>
-        public static ModelProfileTemplate Gemini3_1Flash { get; } = new()
-        {
-            Name = "gemini-3.1-flash",
-            Capabilities = FullModel | ModelCapability.Reasoning | ModelCapability.Vision
-                         | ModelCapability.AudioInput | ModelCapability.VideoInput,
-            IntelligenceTier = 4,
-            MaxContextTokens = 1_048_576,
-            SpeedTier = 4
-        };
+        public static ModelProfileTemplate Gemini3_1Flash { get; } =
+            CreateTemplate(Models.Google.Gemini31Flash,
+                FullModel | ModelCapability.Reasoning | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
+                intelligenceTier: 4, maxContextTokens: 1_048_576, speedTier: 4);
 
         /// <summary>Gemini 2.5 Pro — frontier reasoning model with 1M context.</summary>
-        public static ModelProfileTemplate Gemini2_5Pro { get; } = new()
-        {
-            Name = "gemini-2.5-pro",
-            Capabilities = FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput,
-            IntelligenceTier = 5,
-            MaxContextTokens = 1_048_576,
-            SpeedTier = 2
-        };
+        public static ModelProfileTemplate Gemini2_5Pro { get; } =
+            CreateTemplate(Models.Google.Gemini25Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 2);
 
         /// <summary>Gemini 2.5 Flash — fast, cost-effective with thinking.</summary>
-        public static ModelProfileTemplate Gemini2_5Flash { get; } = new()
-        {
-            Name = "gemini-2.5-flash",
-            Capabilities = FullModel | ModelCapability.Reasoning | ModelCapability.Vision
-                         | ModelCapability.AudioInput | ModelCapability.VideoInput,
-            IntelligenceTier = 3,
-            MaxContextTokens = 1_048_576,
-            SpeedTier = 4
-        };
+        public static ModelProfileTemplate Gemini2_5Flash { get; } =
+            CreateTemplate(Models.Google.Gemini25Flash,
+                FullModel | ModelCapability.Reasoning | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
+                intelligenceTier: 3, maxContextTokens: 1_048_576, speedTier: 4);
 
-        /// <summary>Gemini 2.0 Flash — prior-gen fast model.</summary>
-        public static ModelProfileTemplate Gemini2_0Flash { get; } = new()
-        {
-            Name = "gemini-2.0-flash",
-            Capabilities = FullModel | ModelCapability.Vision | ModelCapability.AudioInput,
-            IntelligenceTier = 3,
-            MaxContextTokens = 1_048_576,
-            SpeedTier = 4
-        };
+        // Gemini2_0Flash (gemini-2.0-flash, shutdown 2026-06-01) was removed — already past its
+        // shutdown date. See docs/reference/model-deprecations.md.
+
+        /// <summary>Gemini 3.5 Flash — current-gen, frontier-level agentic and coding performance.</summary>
+        public static ModelProfileTemplate Gemini3_5Flash { get; } =
+            CreateTemplate(Models.Google.Gemini35Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4);
+
+        /// <summary>Gemini 3.1 Flash-Lite — most cost-effective Gemini 3 model, high-throughput.</summary>
+        public static ModelProfileTemplate Gemini3_1FlashLite { get; } =
+            CreateTemplate(Models.Google.Gemini31FlashLite,
+                FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
+                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5);
+
+#pragma warning restore ANNKE001
     }
 
     // ─────────────────────────────────────────────────────────────

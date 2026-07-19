@@ -168,8 +168,8 @@ public sealed class PlatformRecommender : IPlatformRecommender
         {
             extra.Add(new FitReason
             {
-                Kind      = diag.Severity == DeployDiagnosticSeverity.Error ? FitReasonKind.Block : FitReasonKind.Minus,
-                Message   = $"[live] {diag.Message}",
+                Kind = diag.Severity == DeployDiagnosticSeverity.Error ? FitReasonKind.Block : FitReasonKind.Minus,
+                Message = $"[live] {diag.Message}",
                 Component = diag.Component,
                 Capability = diag.Code
             });
@@ -183,7 +183,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
 
         return score with
         {
-            Total   = blocked ? 0.0 : score.Total,
+            Total = blocked ? 0.0 : score.Total,
             Reasons = reasons
         };
     }
@@ -232,7 +232,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
 
         var capScore = ScoreCapabilityCoverage(platform, toolKit, reasons);
         var strScore = ScoreStrengthAlignment(platform, manifest, reasons);
-        var clScore  = ScoreCostLatency(platform, manifest, reasons, metricsTracker);
+        var clScore = ScoreCostLatency(platform, manifest, reasons, metricsTracker);
         var govScore = ScoreGovernance(platform, manifest, reasons);
 
         // A Block reason zeroes the total
@@ -251,22 +251,22 @@ public sealed class PlatformRecommender : IPlatformRecommender
                             + weights.GovernanceWeight;
 
             total = totalWeight == 0 ? 0 :
-                (capScore  * weights.CapabilityWeight
-               + strScore  * weights.StrengthWeight
-               + clScore   * weights.CostLatencyWeight
-               + govScore  * weights.GovernanceWeight)
+                (capScore * weights.CapabilityWeight
+               + strScore * weights.StrengthWeight
+               + clScore * weights.CostLatencyWeight
+               + govScore * weights.GovernanceWeight)
                / totalWeight;
         }
 
         return new PlatformFitScore
         {
-            Platform            = platform,
-            Total               = Math.Round(total, 4),
-            CapabilityCoverage  = Math.Round(capScore, 4),
-            StrengthAlignment   = Math.Round(strScore, 4),
-            CostLatencyFit      = Math.Round(clScore, 4),
-            GovernanceFit       = Math.Round(govScore, 4),
-            Reasons             = reasons
+            Platform = platform,
+            Total = Math.Round(total, 4),
+            CapabilityCoverage = Math.Round(capScore, 4),
+            StrengthAlignment = Math.Round(strScore, 4),
+            CostLatencyFit = Math.Round(clScore, 4),
+            GovernanceFit = Math.Round(govScore, 4),
+            Reasons = reasons
         };
     }
 
@@ -300,20 +300,20 @@ public sealed class PlatformRecommender : IPlatformRecommender
                 covered++;
                 reasons.Add(new FitReason
                 {
-                    Kind       = FitReasonKind.Plus,
-                    Message    = $"native: {cap}",
+                    Kind = FitReasonKind.Plus,
+                    Message = $"native: {cap}",
                     Capability = cap,
-                    Component  = toolName
+                    Component = toolName
                 });
             }
             else
             {
                 reasons.Add(new FitReason
                 {
-                    Kind       = FitReasonKind.Minus,
-                    Message    = $"missing capability: {cap} (tool: {toolName})",
+                    Kind = FitReasonKind.Minus,
+                    Message = $"missing capability: {cap} (tool: {toolName})",
                     Capability = cap,
-                    Component  = toolName
+                    Component = toolName
                 });
             }
         }
@@ -346,7 +346,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
                 sum += 1;
                 reasons.Add(new FitReason
                 {
-                    Kind    = FitReasonKind.Plus,
+                    Kind = FitReasonKind.Plus,
                     Message = $"{platform} is strong at {tag}"
                 });
             }
@@ -355,7 +355,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
                 sum -= 1;
                 reasons.Add(new FitReason
                 {
-                    Kind    = FitReasonKind.Minus,
+                    Kind = FitReasonKind.Minus,
                     Message = $"{platform} is weak at {tag}"
                 });
             }
@@ -379,7 +379,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
             return 0.5;
 
         // P6: Apply telemetry calibration if tracker data is available
-        var costBand    = profile.CostBand;
+        var costBand = profile.CostBand;
         var latencyBand = profile.LatencyBand;
         ApplyTelemetryCalibration(platform, metricsTracker, ref costBand, ref latencyBand, reasons);
 
@@ -392,10 +392,10 @@ public sealed class PlatformRecommender : IPlatformRecommender
             // Map the platform band to a rough per-run estimate so we can compare
             var expectedCost = costBand.ToLowerInvariant() switch
             {
-                "low"    => 0.10,
+                "low" => 0.10,
                 "medium" => 0.45,
-                "high"   => 1.00,
-                _        => 0.45
+                "high" => 1.00,
+                _ => 0.45
             };
 
             if (expectedCost > maxCost)
@@ -404,7 +404,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
                 score -= dist * penaltyPerBand;
                 reasons.Add(new FitReason
                 {
-                    Kind    = FitReasonKind.Minus,
+                    Kind = FitReasonKind.Minus,
                     Message = $"cost band '{costBand}' may exceed budget ${maxCost:F2}/run"
                 });
             }
@@ -415,10 +415,10 @@ public sealed class PlatformRecommender : IPlatformRecommender
         {
             var expectedLatency = latencyBand.ToLowerInvariant() switch
             {
-                "low"    => 800,
+                "low" => 800,
                 "medium" => 2000,
-                "high"   => 4000,
-                _        => 2000
+                "high" => 4000,
+                _ => 2000
             };
 
             if (expectedLatency > maxLatency)
@@ -427,7 +427,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
                 score -= dist * penaltyPerBand;
                 reasons.Add(new FitReason
                 {
-                    Kind    = FitReasonKind.Minus,
+                    Kind = FitReasonKind.Minus,
                     Message = $"latency band '{latencyBand}' may exceed SLO {maxLatency}ms p50"
                 });
             }
@@ -471,7 +471,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
             costBand = BumpBandUp(costBand);
             reasons.Add(new FitReason
             {
-                Kind    = FitReasonKind.Minus,
+                Kind = FitReasonKind.Minus,
                 Message = $"cost band adjusted to '{costBand}' (calibrated from telemetry: tokens trending up)"
             });
         }
@@ -480,7 +480,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
             costBand = BumpBandDown(costBand);
             reasons.Add(new FitReason
             {
-                Kind    = FitReasonKind.Plus,
+                Kind = FitReasonKind.Plus,
                 Message = $"cost band adjusted to '{costBand}' (calibrated from telemetry: tokens trending down)"
             });
         }
@@ -488,7 +488,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
         {
             reasons.Add(new FitReason
             {
-                Kind    = FitReasonKind.Plus,
+                Kind = FitReasonKind.Plus,
                 Message = $"cost/latency calibrated from telemetry ({trend.SampleCount} samples, stable)"
             });
         }
@@ -496,14 +496,14 @@ public sealed class PlatformRecommender : IPlatformRecommender
 
     private static string BumpBandUp(string band) => band.ToLowerInvariant() switch
     {
-        "low"  => "medium",
-        _      => "high"
+        "low" => "medium",
+        _ => "high"
     };
 
     private static string BumpBandDown(string band) => band.ToLowerInvariant() switch
     {
-        "high"   => "medium",
-        _        => "low"
+        "high" => "medium",
+        _ => "low"
     };
 
     private static int BandDistance(string from, string to)

@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.AspNetCore.Configuration;
 using Ananke.Orchestration.OpenAI;
 
@@ -20,7 +21,7 @@ internal static class AgentConfig
     {
         var factory = new AgentModelFactory()
             .RegisterProvider("OpenAI",
-                defaultModel: "gpt-4.1-mini",
+                defaultModel: Models.OpenAI.Gpt54Mini,
                 agentFactory: (key, model) => OpenAIChatAgentModel.Create(key, model));
 
         return factory.FromConfiguration(config);

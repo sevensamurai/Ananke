@@ -19,12 +19,12 @@ public class InMemoryCapabilityMapTests
         string domain,
         DateTimeOffset? timestamp = null,
         IReadOnlyList<string>? capabilities = null) => new()
-    {
-        WorkflowName = workflowName,
-        Domain = domain,
-        Capabilities = capabilities ?? ["tool-a"],
-        Timestamp = timestamp ?? DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = workflowName,
+            Domain = domain,
+            Capabilities = capabilities ?? ["tool-a"],
+            Timestamp = timestamp ?? DateTimeOffset.UtcNow
+        };
 
     // ── Absorb + Sense ──────────────────────────────────────────────
 

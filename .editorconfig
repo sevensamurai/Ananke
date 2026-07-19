@@ -1,16 +1,37 @@
+# Canonical encoding/EOL policy
+# UTF-8 WITHOUT BOM everywhere. LF everywhere, except Windows-native scripts
+# and VS-owned solution/project XML which are CRLF.
 root = true
 
 [*]
-charset = utf-8-bom
+charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
+indent_style = space
 
 [*.md]
 trim_trailing_whitespace = false
 
-[*.{cmd,bat,ps1,sln,slnx}]
-end_of_line = crlf
+[*.cs]
+indent_size = 4
 
-[*.{cs,csproj,props,targets,editorconfig,gitattributes,json,md,yml,yaml,xml,config,txt}]
-charset = utf-8-bom
+# ANNKE001: deprecated-model-constant usage — a warning by default, dial per-project via
+# WarningsNotAsErrors/NoWarn if needed. See docs/reference/model-deprecations.md.
+dotnet_diagnostic.ANNKE001.severity = warning
+
+# ANNKE002/ANNKE003: deprecated/retired model string literal (Ananke.Analyzers/
+# DeprecatedModelLiteralAnalyzer). ANNKE002 (Deprecated) is a warning; ANNKE003 (Retired) is an
+# error and is not meant to be dialed down — the provider no longer serves the model at all.
+dotnet_diagnostic.ANNKE002.severity = warning
+dotnet_diagnostic.ANNKE003.severity = error
+
+[*.{json,yml,yaml,xml,config,nuspec,resx}]
+indent_size = 2
+
+[*.{csproj,fsproj,props,targets,sln,slnx}]
+end_of_line = crlf
+indent_size = 2
+
+[*.{cmd,bat,ps1,psm1}]
+end_of_line = crlf

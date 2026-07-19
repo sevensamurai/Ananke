@@ -85,7 +85,7 @@ internal static class EvalCommand
             var candidates = parseResult.GetValue(candidatesOption);
             var capW = parseResult.GetValue(capabilityWeightOption);
             var strW = parseResult.GetValue(strengthWeightOption);
-            var clW  = parseResult.GetValue(costLatencyWeightOption);
+            var clW = parseResult.GetValue(costLatencyWeightOption);
             var govW = parseResult.GetValue(governanceWeightOption);
             var format = parseResult.GetValue(formatOption) ?? "text";
             var live = parseResult.GetValue(liveOption);
@@ -94,10 +94,10 @@ internal static class EvalCommand
 
             var weights = new RecommendationWeights
             {
-                CapabilityWeight  = capW  ?? 1.0,
-                StrengthWeight    = strW  ?? 1.0,
-                CostLatencyWeight = clW   ?? 0.5,
-                GovernanceWeight  = govW  ?? 1.5
+                CapabilityWeight = capW ?? 1.0,
+                StrengthWeight = strW ?? 1.0,
+                CostLatencyWeight = clW ?? 0.5,
+                GovernanceWeight = govW ?? 1.5
             };
 
             await ExecuteAsync(file, candidates, weights, json ? "json" : format, live, emitRules);
@@ -257,19 +257,19 @@ internal static class EvalCommand
             {
                 "platform" => ToolExecutionMode.PlatformNative,
                 "callback" => ToolExecutionMode.Callback,
-                "mcp"      => ToolExecutionMode.Mcp,
-                "openapi"  => ToolExecutionMode.OpenApi,
-                _          => ToolExecutionMode.Local
+                "mcp" => ToolExecutionMode.Mcp,
+                "openapi" => ToolExecutionMode.OpenApi,
+                _ => ToolExecutionMode.Local
             };
 
             kit.AddTool(new ToolDefinition
             {
-                Name             = entry.Name,
-                Description      = entry.Description,
-                Parameters       = [],
-                ExecutionMode    = mode,
+                Name = entry.Name,
+                Description = entry.Description,
+                Parameters = [],
+                ExecutionMode = mode,
                 PlatformCapability = mode == ToolExecutionMode.PlatformNative ? binding.Reference : null,
-                Execute          = (_, _) => Task.FromResult(ToolResult.Ok("stub"))
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("stub"))
             });
         }
 
@@ -296,26 +296,26 @@ internal static class EvalCommand
             recommended = report.Recommended,
             weights = new
             {
-                capability  = report.Weights.CapabilityWeight,
-                strength    = report.Weights.StrengthWeight,
+                capability = report.Weights.CapabilityWeight,
+                strength = report.Weights.StrengthWeight,
                 costLatency = report.Weights.CostLatencyWeight,
-                governance  = report.Weights.GovernanceWeight
+                governance = report.Weights.GovernanceWeight
             },
             scores = report.Scores.Select(s => new
             {
-                platform           = s.Platform,
-                total              = s.Total,
+                platform = s.Platform,
+                total = s.Total,
                 capabilityCoverage = s.CapabilityCoverage,
-                strengthAlignment  = s.StrengthAlignment,
-                costLatencyFit     = s.CostLatencyFit,
-                governanceFit      = s.GovernanceFit,
-                blocked            = s.Total == 0 && s.Reasons.Any(r => r.Kind == FitReasonKind.Block),
-                reasons            = s.Reasons.Select(r => new
+                strengthAlignment = s.StrengthAlignment,
+                costLatencyFit = s.CostLatencyFit,
+                governanceFit = s.GovernanceFit,
+                blocked = s.Total == 0 && s.Reasons.Any(r => r.Kind == FitReasonKind.Block),
+                reasons = s.Reasons.Select(r => new
                 {
-                    kind       = r.Kind.ToString().ToLowerInvariant(),
-                    message    = r.Message,
+                    kind = r.Kind.ToString().ToLowerInvariant(),
+                    message = r.Message,
                     capability = r.Capability,
-                    component  = r.Component
+                    component = r.Component
                 })
             })
         });
@@ -373,9 +373,9 @@ internal static class EvalCommand
             {
                 var prefix = r.Kind switch
                 {
-                    FitReasonKind.Plus  => "+",
+                    FitReasonKind.Plus => "+",
                     FitReasonKind.Minus => "−",
-                    _                  => "✗"
+                    _ => "✗"
                 };
                 sb.AppendLine($"- {prefix} {r.Message}");
             }
@@ -389,7 +389,7 @@ internal static class EvalCommand
     {
         const int width = 20;
         var filled = (int)Math.Round(pct / 100.0 * width);
-        var empty  = width - filled;
+        var empty = width - filled;
         return $"[{new string('█', filled)}{new string('░', empty)}]";
     }
 }

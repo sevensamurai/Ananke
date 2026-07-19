@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-workflows, tags: faq, workflows, state-machine, routing, middleware, graph -->
+<!-- topic: faq-workflows, tags: faq, workflows, state-machine, routing, middleware, graph -->
 # FAQ — Workflows & State Machine
 
 ← [Back to all FAQs](../faq.md)

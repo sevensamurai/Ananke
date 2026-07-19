@@ -129,7 +129,7 @@ public class WorkflowActivatorTests
             },
             Models = new Dictionary<string, ModelSnapshot>
             {
-                ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
             }
         };
 
@@ -158,7 +158,7 @@ public class WorkflowActivatorTests
             },
             Models = new Dictionary<string, ModelSnapshot>
             {
-                ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
             }
         };
 
@@ -198,7 +198,7 @@ public class WorkflowActivatorTests
             },
             Models = new Dictionary<string, ModelSnapshot>
             {
-                ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+                ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
             }
         };
 
@@ -228,7 +228,7 @@ public class WorkflowActivatorTests
         },
         Models = new Dictionary<string, ModelSnapshot>
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
         }
     };
 

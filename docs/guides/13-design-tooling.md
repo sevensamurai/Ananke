@@ -1,4 +1,4 @@
-﻿<!-- topic: design-tooling, tags: dsl, manifest, yaml, topology, mermaid, scaffold, design, nnke -->
+<!-- topic: design-tooling, tags: dsl, manifest, yaml, topology, mermaid, scaffold, design, nnke -->
 # 13 — Design Tooling
 
 Define workflow topologies in a text DSL or YAML manifest, bind code at runtime,
@@ -137,7 +137,7 @@ models:
     config_key: OpenAI:ApiKey
   analyst:
     provider: anthropic
-    model: claude-sonnet-4
+    model: claude-sonnet-5
     config_key: Anthropic:ApiKey
 
 jobs:
@@ -208,6 +208,38 @@ scaffold
 
 var workflow = scaffold.Build();
 ```
+
+### Model Validation
+
+`ModelCatalog.Validate(provider, model)` checks a manifest's `model:` string against the known
+catalog for that provider and returns a lifecycle-aware result — it never rewrites the string
+(whatever the manifest says is what reaches the SDK), it only tells you whether it recognizes it:
+
+| Model status | `IsValid` | `Message` |
+|---|---|---|
+| Current or Legacy (e.g. `claude-sonnet-5`, `claude-opus-4-8`) | `true` | `null` |
+| Deprecated (e.g. `gpt-4.1`) | `true` | `"'gpt-4.1' is deprecated; use 'gpt-5.6-sol' instead."` |
+| Retired | `false` | names the replacement, if there is one |
+| Ambiguous family name (e.g. `sonnet` with no version) | `false` | `"'sonnet' is ambiguous for provider 'anthropic'. Specify a version."`, `Suggestions` lists the candidates |
+| Unknown to this provider, or an unrecognized provider entirely | `true` | a warning naming the provider/model — passed through, not rejected, so a brand-new model the catalog hasn't been updated for yet still works |
+
+In practice, `Retired` currently never fires: a model confirmed retired by its provider is removed
+from `Models.cs`/`ModelCatalog` outright rather than kept around with a `Retired` lifecycle entry
+(see [Model Deprecations](../reference/model-deprecations.md#removed-models-retired-then-deleted)),
+so a manifest referencing one falls into the "unknown to this provider" row above instead. The
+`Retired` branch stays in `Validate()` for the window between "provider announced a firm date" and
+"we've verified and removed the constant."
+
+```csharp
+var result = ModelCatalog.Validate("openai", manifestModelString);
+if (!result.IsValid)
+    logger.LogWarning("Manifest model rejected: {Message}", result.Message);
+else if (result.Message is not null)
+    logger.LogInformation(result.Message); // deprecated or unrecognized — still usable
+```
+
+See [Model Deprecations](../reference/model-deprecations.md) for the full lifecycle policy
+(Current/Legacy/Deprecated/Retired) and the current per-provider status tables.
 
 ---
 

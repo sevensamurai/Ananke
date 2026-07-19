@@ -1,4 +1,4 @@
-﻿name: Build and Deployment Pipeline
+name: Build and Deployment Pipeline
 
 on:
   pull_request:
@@ -20,6 +20,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Check encoding (no UTF-8 BOM)
+        shell: pwsh
+        run: pwsh scripts/fix-encoding.ps1 -Check
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

@@ -1,4 +1,4 @@
-﻿<!-- topic: demos-multi-agent, tags: demo, multi-agent, orchestration, router, worker, reviewer, agentic-patterns, review-critique, advanced-agents -->
+<!-- topic: demos-multi-agent, tags: demo, multi-agent, orchestration, router, worker, reviewer, agentic-patterns, review-critique, advanced-agents -->
 # Demo — Multi-Agent
 
 Build a router → worker → reviewer pipeline using Ananke's workflow primitives and the `AgenticPattern` library.

@@ -124,10 +124,10 @@ public class EmulatorImplementationTests
         var mem = registry.TryResolve("memory_bank")!;
 
         await mem.ExecuteAsync(new Dictionary<string, object?>
-            { ["operation"] = "store", ["key"] = "deployment-tip", ["value"] = "use canary deploys" });
+        { ["operation"] = "store", ["key"] = "deployment-tip", ["value"] = "use canary deploys" });
 
         var result = await mem.ExecuteAsync(new Dictionary<string, object?>
-            { ["operation"] = "search", ["query"] = "canary" });
+        { ["operation"] = "search", ["query"] = "canary" });
 
         result.IsError.ShouldBeFalse();
         result.Value.ShouldContain("canary");
@@ -142,12 +142,12 @@ public class EmulatorImplementationTests
         var mem = registry.TryResolve("memory")!;
 
         await mem.ExecuteAsync(new Dictionary<string, object?>
-            { ["operation"] = "store", ["key"] = "temp", ["value"] = "x" });
+        { ["operation"] = "store", ["key"] = "temp", ["value"] = "x" });
         await mem.ExecuteAsync(new Dictionary<string, object?>
-            { ["operation"] = "delete", ["key"] = "temp" });
+        { ["operation"] = "delete", ["key"] = "temp" });
 
         var result = await mem.ExecuteAsync(new Dictionary<string, object?>
-            { ["operation"] = "recall", ["key"] = "temp" });
+        { ["operation"] = "recall", ["key"] = "temp" });
 
         result.IsError.ShouldBeFalse();
         result.Value.ShouldContain("No memory found");
@@ -246,7 +246,7 @@ public class EmulatorImplementationTests
 
             // View
             var viewed = await editor.ExecuteAsync(new Dictionary<string, object?>
-                { ["command"] = "view", ["path"] = "notes.txt" });
+            { ["command"] = "view", ["path"] = "notes.txt" });
             viewed.IsError.ShouldBeFalse();
             viewed.Value.ShouldBe("hello world");
 
@@ -261,7 +261,7 @@ public class EmulatorImplementationTests
             replaced.IsError.ShouldBeFalse();
 
             var afterReplace = await editor.ExecuteAsync(new Dictionary<string, object?>
-                { ["command"] = "view", ["path"] = "notes.txt" });
+            { ["command"] = "view", ["path"] = "notes.txt" });
             afterReplace.Value.ShouldBe("hello Ananke");
         }
         finally
@@ -303,7 +303,7 @@ public class EmulatorImplementationTests
 
             var executor = new FileSearchExecutor(searchRoot: root);
             var result = await executor.ExecuteAsync(new Dictionary<string, object?>
-                { ["query"] = "emulator" });
+            { ["query"] = "emulator" });
 
             result.IsError.ShouldBeFalse();
             result.Value.ShouldContain("notes.md");

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Ananke.Abstractions.Agents;
 
 namespace Ananke.Tool.Templates;
 
@@ -43,9 +44,9 @@ internal static partial class TemplateEngine
     /// </summary>
     public static string DefaultModel(string provider) => provider switch
     {
-        "anthropic" => "claude-sonnet-4-20250514",
-        "google" => "gemini-2.5-flash",
-        _ => "gpt-4.1-mini",
+        "anthropic" => Models.Anthropic.Sonnet5,
+        "google" => Models.Google.Gemini35Flash,
+        _ => Models.OpenAI.Gpt56Terra,
     };
 
     /// <summary>

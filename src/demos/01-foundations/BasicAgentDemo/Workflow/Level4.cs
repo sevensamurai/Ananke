@@ -25,7 +25,7 @@ internal static class Level4
             ?? throw new InvalidOperationException("BetterStack:OtlpSourceToken missing");
         var apiKey = config["OpenAI:ApiKey"]
             ?? throw new InvalidOperationException("OpenAI:ApiKey missing");
-        var modelName = config["OpenAI:Model"] ?? "gpt-4.1-mini";
+        var modelName = config["OpenAI:Model"] ?? Models.OpenAI.Gpt54Mini;
 
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
         Activity.ForceDefaultIdFormat = true;

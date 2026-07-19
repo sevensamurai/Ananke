@@ -1,4 +1,4 @@
-﻿using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Routing;
 using Shouldly;
 

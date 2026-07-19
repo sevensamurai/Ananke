@@ -1,4 +1,4 @@
-﻿# Ananke.Design
+# Ananke.Design
 
 [![NuGet](https://img.shields.io/nuget/v/Ananke.Design.svg)](https://www.nuget.org/packages/Ananke.Design)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sevensamurai/Ananke/blob/main/LICENSE)
@@ -112,6 +112,26 @@ Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/
 | `WorkflowDiagramExtensions` | `.ToMermaid()` export for any validated workflow graph |
 | `AgentTextResponse` | Default structured response type for agent jobs that return plain text |
 | `WorkflowDslParser` | Internal DSL parser — direct, fork, join, router, loop, subflow, interrupt, ask |
+| `ModelCatalog` | Validates `model:` strings in manifests against known provider models; flags ambiguous bare family names (`sonnet`, `gpt-5`) |
+
+## Keeping the model catalog current
+
+`ModelCatalog` (this package) and `Ananke.Orchestration.Agents.Routing.ModelCatalog` (capability
+routing) both read from the shared `Models` constants in `Ananke.Abstractions`. Providers
+(OpenAI, Anthropic, Google) ship new model generations every few months — often renaming or
+retiring the previous one within the same year — so **this drifts fast**. Each time a release
+touches provider models, or at minimum once per release cycle:
+
+1. Check each provider's current model lineup (OpenAI's [models page](https://developers.openai.com/api/docs/models),
+   Anthropic's [models overview](https://docs.claude.com/en/docs/about-claude/models), Google's
+   [Gemini models page](https://ai.google.dev/gemini-api/docs/models)) against `Models.cs`.
+2. Add new constants; register them in both `ModelCatalog`s (`Families`/`KnownModels` here,
+   a `ModelProfileTemplate` in Orchestration's).
+3. Run `ModelConstantsConformanceTests` (`Ananke.Orchestration.Tests`) — it fails loudly if a
+   constant is missing from either catalog, so it's the fastest way to confirm the update is
+   complete.
+4. Don't guess at unconfirmed / preview-only models — if a provider announces something not yet
+   generally available, leave it out until it's actually reachable via the API.
 
 ## Mermaid diagram export
 

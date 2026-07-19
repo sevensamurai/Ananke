@@ -322,16 +322,29 @@ public class AgenticPatternTests
     }
 
     [Test]
-    public void Interview_MissingWelcomeAndIcebreaker_Throws()
+    public async Task Build_NoWelcomeNoIcebreaker_StartsAtFirstQuestion()
     {
-        var builder = AgenticPattern.Interview<InterviewState>("test")
+        // Neither WithWelcome() nor WithIcebreaker() is required — Build() registers a no-op
+        // "start" entry job in their place, since ask_question (which pauses via AwaitInput)
+        // cannot itself be the workflow's entry job.
+        var interview = AgenticPattern.Interview<InterviewState>("no-opener")
             .WithQuestion(s => s.Agenda[0])
             .WithNavigation((_, s) => s)
-            .Until(s => s.Complete);
+            .Until(s => s.Complete)
+            .Build();
 
-        var ex = Should.Throw<InvalidOperationException>(() => builder.Build());
-        ex.Message.ShouldContain("WithWelcome");
-        ex.Message.ShouldContain("WithIcebreaker");
+        var workflow = interview.Workflow.UseCheckpointing(new InMemoryCheckpointStore());
+
+        var def = workflow.Build();
+        def.EntryJob.ShouldBe("start");
+        def.Jobs.ShouldContainKey("ask_question");
+        def.InputJobs.ShouldContain("ask_question");
+
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["q1"] });
+
+        execution.Status.ShouldBe(ExecutionStatus.Interrupted);
+        var question = await interview.GetQuestion(execution.State, CancellationToken.None);
+        question.ShouldBe("q1");
     }
 
     [Test]
@@ -536,9 +549,17 @@ public class AgenticPatternTests
         var question = await interview.GetQuestion(execution.State, default);
         question.ShouldBe("fav-color");
 
+        // GetQuestion is pure — nothing written yet.
+        (await memory.GetHistoryAsync("conversation-1")).ShouldBeEmpty();
+
         var next = await interview.FoldAnswer(execution.State, "blue", default);
         execution = await workflow.ResumeAsync(execution.Id, _ => next);
         execution.Status.ShouldBe(ExecutionStatus.Completed);
+
+        // FoldAnswer is pure too — still nothing written until the host explicitly commits.
+        (await memory.GetHistoryAsync("conversation-1")).ShouldBeEmpty();
+
+        await interview.CommitTurnAsync(execution.State, question, "blue", default);
 
         var history = await memory.GetHistoryAsync("conversation-1");
         history.Count.ShouldBe(2);
@@ -546,6 +567,47 @@ public class AgenticPatternTests
         history[0].Content.ShouldBe("fav-color");
         history[1].Role.ShouldBe(AgentRole.User);
         history[1].Content.ShouldBe("blue");
+    }
+
+    [Test]
+    public async Task CommitTurnAsync_WithoutMemoryConfigured_IsNoOp()
+    {
+        var interview = AgenticPattern.Interview<InterviewState>("no-memory")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(new InMemoryCheckpointStore());
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["q1"] });
+
+        // Should not throw even though WithMemory() was never called.
+        await interview.CommitTurnAsync(execution.State, "q1", "answer", default);
+    }
+
+    [Test]
+    public async Task CommitTurnAsync_CalledTwiceForSameTurn_DoesNotDuplicate()
+    {
+        var memory = new InMemoryConversationMemory();
+
+        var interview = AgenticPattern.Interview<InterviewState>("idempotent-commit")
+            .WithWelcome((s, _) => Task.FromResult(s))
+            .WithQuestion(s => s.Agenda[0])
+            .WithNavigation((_, s) => s)
+            .Until(s => s.Complete)
+            .WithMemory(memory, s => s.ConversationId)
+            .Build();
+
+        var workflow = interview.Workflow.UseCheckpointing(new InMemoryCheckpointStore());
+        var execution = await workflow.RunAsync(new InterviewState { Agenda = ["fav-color"] });
+
+        // Simulate a host retry: commit the same (question, answer) pair twice.
+        await interview.CommitTurnAsync(execution.State, "fav-color", "blue", default);
+        await interview.CommitTurnAsync(execution.State, "fav-color", "blue", default);
+
+        var history = await memory.GetHistoryAsync("conversation-1");
+        history.Count.ShouldBe(2); // not 4 — the second call was a no-op
     }
 
     [Test]
@@ -590,7 +652,7 @@ public class AgenticPatternTests
     public async Task Interview_FakeAdapter_ResumesViaResumeWithInputAsync_AgendaAdvances()
     {
         // A fake platform adapter: it owns nothing but a paused execution id and the next
-        // inbound message — exactly the shape a Slack/Discord adapter would have (ADR §4, B4).
+        // inbound message — exactly the shape a Slack/Discord adapter would have.
         var store = new InMemoryCheckpointStore();
 
         var interview = AgenticPattern.Interview<InterviewState>("adapter-driven")

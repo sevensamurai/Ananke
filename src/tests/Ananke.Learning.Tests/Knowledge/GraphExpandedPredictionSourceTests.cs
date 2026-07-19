@@ -20,7 +20,7 @@ public sealed class GraphExpandedPredictionSourceTests
     [Test]
     public async Task PredictAsync_MultiHopEntry_IsReachableViaGraphExpansion()
     {
-        var graph  = new InMemoryKnowledgeGraph();
+        var graph = new InMemoryKnowledgeGraph();
         var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder());
 
         // Populate graph: tag chain A → B → C.
@@ -55,7 +55,7 @@ public sealed class GraphExpandedPredictionSourceTests
     [Test]
     public async Task PredictAsync_EntryWithNoTags_ReturnsNull()
     {
-        var graph  = new InMemoryKnowledgeGraph();
+        var graph = new InMemoryKnowledgeGraph();
         var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder());
 
         var entry = await memory.CommitAsync(MakeEntry("e1", [], []));
@@ -68,7 +68,7 @@ public sealed class GraphExpandedPredictionSourceTests
     [Test]
     public async Task PredictAsync_EmptyGraph_ReturnsNull()
     {
-        var graph  = new InMemoryKnowledgeGraph();
+        var graph = new InMemoryKnowledgeGraph();
         var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder());
 
         var entry = await memory.CommitAsync(MakeEntry("e1", ["topic/A"], [0.9f]));
@@ -82,21 +82,21 @@ public sealed class GraphExpandedPredictionSourceTests
 
     private static EmpiricalEntry MakeEntry(
         string id, string[] tagKeys, float[] weights) => new()
-    {
-        Id               = id,
-        Kind             = EmpiricalKind.Pattern,
-        Tags             = [],
-        Source           = "test",
-        Confidence       = 0.7f,
-        ObservationCount = 1,
-        Evidence         = [],
-        FirstObserved    = DateTimeOffset.UtcNow,
-        LastObserved     = DateTimeOffset.UtcNow,
-        Description      = new SemanticDescription
         {
-            Summary      = id,
-            SemanticTags = tagKeys.Zip(weights)
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Confidence = 0.7f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
+            Description = new SemanticDescription
+            {
+                Summary = id,
+                SemanticTags = tagKeys.Zip(weights)
                 .ToDictionary(t => t.First, t => t.Second),
-        },
-    };
+            },
+        };
 }

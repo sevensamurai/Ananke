@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;

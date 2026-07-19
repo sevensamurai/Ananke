@@ -1,11 +1,8 @@
-﻿# EditorConfig — enforced by Visual Studio, Roslyn, and dotnet format
+# EditorConfig — enforced by Visual Studio, Roslyn, and dotnet format
 # https://editorconfig.org
-root = true
+# Indentation + analyzer configuration. Encoding/EOL policy lives in the repo-root .editorconfig.
 
-# All files: UTF-8 with BOM (safe default for MSBuild/VS toolchain), LF line endings
 [*]
-charset                  = utf-8
-end_of_line              = crlf
 indent_style             = space
 insert_final_newline     = true
 trim_trailing_whitespace = true
@@ -182,6 +179,9 @@ dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 [tests/Ananke.Analyzers.Tests/UndefinedJobNameAnalyzerTests.cs]
 dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 
+[tests/Ananke.Analyzers.Tests/AmbientClockAnalyzerTests.cs]
+dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
 [tests/Ananke.Orchestration.Tests/NociceptionTests.cs]
 dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 
@@ -205,3 +205,151 @@ dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 
 [tests/Ananke.Organics.Tests/**/*.cs]
 dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
+
+# ── ANANKE_TIME_001 legacy suppression ────────────────────────────────────────
+# Files below pre-date the TimeProvider-injection rule (only the decay/expiry group was
+# migrated so far). New files in any project are expected to comply.
+# Remove entries here as each file is migrated.
+[Ananke.Abstractions/Graph/GraphEdge.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation/Deployment/InMemoryDeploymentRegistry.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation/Deployment/JsonFileDeploymentRegistry.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation/Deployment/LocalFederationDeployer.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation/Hosting/FederatedComplexityMonitor.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation/Monitoring/RemoteMetricsTracker.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Anthropic/ClaudeDeployer.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Anthropic/ClaudeRemoteCellMonitor.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Azure/AzureAgentDeployer.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Azure/AzureRemoteCellMonitor.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Google/Observability/AgentObservabilityClient.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Google/VertexAIDeployer.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Federation.Google/VertexAIRemoteCellMonitor.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Graph.Memgraph/MemgraphKnowledgeGraph.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Learning/EmpiricalMemory/EmpiricalMemoryTools.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Learning/Features/TagImportanceTracker.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Learning/Knowledge/Analytics/GraphTagImportanceTracker.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Learning/Skills/SkillPackager.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Agents/AgentJob.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Agents/TextAgentJob.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Agents/Trajectory/TrajectorySnapshotBuilder.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Jobs/JobExecution.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Streaming/WorkflowEvent.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration/Tools/Faults/ToolPruner.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration.Knowledge/Catalog/CatalogAwareKnowledgeStore.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Orchestration.Knowledge/TimeDecay.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Division/Approval/DivisionApproval.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Division/WorkflowDivider.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Division/WorkflowExecutionMonitor.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Healing/HealthSnapshot.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Kernel/OrganicHost.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Sensing/InMemoryCapabilityMap.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Sensing/InMemoryMeshAggregator.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.Organics/Topology/Reporting/ColonyReportExporter.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.StateMachine/AbstractStateMachine.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[Ananke.StateMachine/TransitionResult.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+# Demo, CLI tool, and test projects — ambient-clock reads there are either an application
+# entrypoint concern (demos/CLI) or legitimate fixed-offset fixture construction (tests), not
+# the ambient-clock-in-a-reusable-component problem this rule targets. Suppress globally.
+[demos/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke-platform/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke-platform-google/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke-platform-azure/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke-platform-anthropic/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[nnke-platform-all/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+[tests/**/*.cs]
+dotnet_diagnostic.ANANKE_TIME_001.severity = none
+
+# ── ANNKE001/ANNKE002 in tests ────────────────────────────────────────────────
+# Test fixtures deliberately reference deprecated model ids and constants: mapper TestCases
+# exercise deprecated→current translation, catalog tests assert the Deprecated validation
+# path, and the analyzer's own tests need flagged literals as input. That is categorically
+# different from production code drifting onto a deprecated model, which these rules exist
+# to catch (and which TreatWarningsAsErrors now fails the build on).
+dotnet_diagnostic.ANNKE001.severity = none
+dotnet_diagnostic.ANNKE002.severity = none

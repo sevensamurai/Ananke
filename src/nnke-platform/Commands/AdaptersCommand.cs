@@ -154,4 +154,4 @@ internal static class AdaptersCommand
         return allOk ? 0 : 2;
     }
 
-    }
+}

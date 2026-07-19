@@ -13,36 +13,31 @@ public sealed class AnthropicModelMapper : IModelMapper
     private static readonly Dictionary<string, string> Mappings =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            // Anthropic → passthrough (already native)
-            ["anthropic/claude-opus-4"]      = "claude-opus-4",
-            ["anthropic/claude-sonnet-4"]    = "claude-sonnet-4",
-            ["anthropic/claude-3-5-sonnet"]  = "claude-3-5-sonnet",
-            ["anthropic/claude-3-5-haiku"]   = "claude-3-5-haiku",
+            // Anthropic → passthrough (already native). Note: claude-opus-4/claude-sonnet-4/
+            // claude-3-5-sonnet/claude-3-5-haiku entries were removed — those models are retired.
+            // Current-gen Anthropic passthrough keys were never added here; tracked as a
+            // follow-up, not fixed as part of the retired-model cleanup.
 
             // OpenAI → nearest Claude equivalent
-            ["openai/gpt-4.1"]      = "claude-sonnet-4",
-            ["openai/gpt-4.1-mini"] = "claude-3-5-haiku",
-            ["openai/gpt-4.1-nano"] = "claude-3-5-haiku",
-            ["openai/gpt-4o"]       = "claude-sonnet-4",
-            ["openai/gpt-4o-mini"]  = "claude-3-5-haiku",
-            ["openai/o3"]           = "claude-sonnet-4",
-            ["openai/o3-mini"]      = "claude-3-5-haiku",
-            ["openai/o4-mini"]      = "claude-3-5-haiku",
+            ["openai/gpt-4.1"] = "claude-sonnet-5",
+            ["openai/gpt-4.1-mini"] = "claude-haiku-4-5",
+            ["openai/gpt-4.1-nano"] = "claude-haiku-4-5",
+            ["openai/gpt-4o"] = "claude-sonnet-5",
+            ["openai/gpt-4o-mini"] = "claude-haiku-4-5",
+            ["openai/o3"] = "claude-sonnet-5",
+            ["openai/o3-mini"] = "claude-haiku-4-5",
+            ["openai/o4-mini"] = "claude-haiku-4-5",
 
             // Google → nearest Claude equivalent
-            ["google/gemini-2.5-pro"]       = "claude-sonnet-4",
-            ["google/gemini-2.5-flash"]     = "claude-3-5-haiku",
-            ["google/gemini-2.0-flash"]     = "claude-3-5-haiku",
-            ["google/gemini-2.0-flash-lite"]= "claude-3-5-haiku",
+            ["google/gemini-2.5-pro"] = "claude-sonnet-5",
+            ["google/gemini-2.5-flash"] = "claude-haiku-4-5",
         };
 
     private static readonly Dictionary<string, ModelCapabilityFlags> Capabilities =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["claude-opus-4"]    = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
-            ["claude-sonnet-4"]  = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
-            ["claude-3-5-sonnet"]= ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
-            ["claude-3-5-haiku"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+            ["claude-sonnet-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+            ["claude-haiku-4-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
         };
 
     /// <inheritdoc />

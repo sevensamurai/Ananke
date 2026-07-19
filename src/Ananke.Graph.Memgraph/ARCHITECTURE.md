@@ -48,6 +48,5 @@ detail to come back to.
 
 - All node/edge writes go through parameterized Cypher (no string-built queries).
 - `MemgraphKnowledgeGraph` stores `GraphNode.Kind` as both a node property and an actual
-  Cypher label when `Labels`/`EffectiveLabels` are populated (see ADR-arch-020 in
-  `internals/design/`), enabling label-scoped `MATCH` queries from PageRank/community
-  detection without a full graph scan.
+  Cypher label when `Labels`/`EffectiveLabels` are populated, enabling label-scoped `MATCH`
+  queries from PageRank/community detection without a full graph scan.

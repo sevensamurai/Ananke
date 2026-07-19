@@ -1,4 +1,4 @@
-﻿<!-- topic: demos, tags: documentation, demos, examples, runnable-projects, catalog -->
+<!-- topic: demos, tags: documentation, demos, examples, runnable-projects, catalog -->
 # Demos
 
 Runnable Ananke projects mapped to the documentation. Use this page when you want to see a feature implemented end-to-end instead of reading the guide first.

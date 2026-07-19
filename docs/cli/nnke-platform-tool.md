@@ -1,4 +1,4 @@
-﻿<!-- topic: nnke-platform, tags: nnke-platform, dotnet-tool, federation, deployment, cloud, azure, google, anthropic, mesh, organics, local-loop, emulators, local-emulated, local-design-loop, foundry, gemini-enterprise, platform-native -->
+<!-- topic: nnke-platform, tags: nnke-platform, dotnet-tool, federation, deployment, cloud, azure, google, anthropic, mesh, organics, local-loop, emulators, local-emulated, local-design-loop, foundry, gemini-enterprise, platform-native -->
 # nnke-platform Tool Companion
 
 `nnke-platform` is the operations CLI for Ananke federation: validate deployability, manage remote deployments, inspect live health, and work with platform-specific runtime concerns.
@@ -204,7 +204,7 @@ Existing manifests using `azure-ai` or `vertex-ai` continue to work unchanged.
 ## Local Design Loop *(v-next)*
 
 > **Planned — not yet available.** The `nnke-platform up --emulate <platform>` verb and
-> `Ananke.Federation.LocalEmulators` package are scoped to the next release (ADR CLI-7).
+> `Ananke.Federation.LocalEmulators` package are scoped to the next release.
 > For now, use `nnke run` or `nnke serve` for federation-free local execution.
 > Manifests that declare platform-native capabilities will fail fast with diagnostic `FED061`
 > and a hint pointing here.

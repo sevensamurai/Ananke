@@ -24,26 +24,26 @@ public class WorkflowBuilderTests
     [Test]
     public void Build_WithUndefinedConnectionTarget_Throws()
     {
-        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined connection target
-                var workflow = new Workflow<CounterState>("bad-conn")
-                    .Job("a", (s, _) => Task.FromResult(s))
-                    .Then("a", "nonexistent");
-        #pragma warning restore ANANKE001
+#pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined connection target
+        var workflow = new Workflow<CounterState>("bad-conn")
+            .Job("a", (s, _) => Task.FromResult(s))
+            .Then("a", "nonexistent");
+#pragma warning restore ANANKE001
 
-                Should.Throw<InvalidOperationException>(() => workflow.Build());
+        Should.Throw<InvalidOperationException>(() => workflow.Build());
     }
 
     [Test]
     public void Build_WithUndefinedConnectionSource_Throws()
     {
-        #pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined connection source
-                var workflow = new Workflow<CounterState>("bad-source")
-                    .Job("a", (s, _) => Task.FromResult(s))
-                    .Then("nonexistent", "a")
-                    .Then("a", Workflow.End);
-        #pragma warning restore ANANKE001
+#pragma warning disable ANANKE001 // intentional: testing runtime validation of undefined connection source
+        var workflow = new Workflow<CounterState>("bad-source")
+            .Job("a", (s, _) => Task.FromResult(s))
+            .Then("nonexistent", "a")
+            .Then("a", Workflow.End);
+#pragma warning restore ANANKE001
 
-                Should.Throw<InvalidOperationException>(() => workflow.Build());
+        Should.Throw<InvalidOperationException>(() => workflow.Build());
     }
 
     [Test]

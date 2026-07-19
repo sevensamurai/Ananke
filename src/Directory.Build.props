@@ -9,12 +9,23 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- ANNKE001: deprecated-model-constant usage (see Models.cs / docs/reference/model-deprecations.md).
+         ANNKE002: deprecated-model string literal (Ananke.Analyzers/DeprecatedModelLiteralAnalyzer).
+         ANNKE003: retired-model string literal.
+         All three fail the build like any other warning
+         (TreatWarningsAsErrors above) — a deprecated/retired model reference in new code is a
+         bug, not a nudge. Legitimate references (translation-table entries that must keep
+         resolving a deprecated-but-functional model, family-name keys that happen to
+         string-equal a model id, the model-lifecycle catalogs' own definitions) are wrapped in
+         `#pragma warning disable/restore ANNKE00x` at the exact site, with a one-line reason;
+         test fixtures are blanket-suppressed in src/.editorconfig's [tests/**/*.cs] section
+         (deprecated ids there are fixture data for translation/validation tests, not drift). -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <!-- Coordinated version across all packages -->
   <PropertyGroup>
-    <VersionPrefix>0.8.6</VersionPrefix>
+    <VersionPrefix>0.8.7</VersionPrefix>
     <MsExtensionsVersion>10.0.7</MsExtensionsVersion>
   </PropertyGroup>
 
@@ -45,6 +56,21 @@
                       OutputItemType="Analyzer"
                       SetTargetFramework="TargetFramework=netstandard2.0"
                       PrivateAssets="all" />
+    <!-- CodeFixProviders load from the same analyzers/dotnet/cs slot as DiagnosticAnalyzers, so
+         this is wired the same way as the reference above — it just lives in a separate assembly
+         (see Ananke.Analyzers.CodeFixes.csproj) because of RS1038. -->
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Ananke.Analyzers.CodeFixes\Ananke.Analyzers.CodeFixes.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      PrivateAssets="all" />
+    <!-- ANNKE002/ANNKE003 (Ananke.Analyzers/DeprecatedModelLiteralAnalyzer) reads this file via
+         AdditionalFiles at compile time. AdditionalFiles declared inside Ananke.Analyzers.csproj
+         itself only apply when compiling that project — an analyzer running inside a *consuming*
+         project's compilation (which is how every other project uses it, via the ProjectReference
+         above) only sees AdditionalFiles declared in that consuming project, so this has to be
+         wired here too, not just in Ananke.Analyzers.csproj. -->
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)Ananke.Abstractions\Agents\model-lifecycle.json" />
   </ItemGroup>
 
   <!-- Include per-project README if present, otherwise fall back to repo-root README -->

@@ -32,15 +32,15 @@ public sealed class JsonFileDeploymentRegistryTests
         string workflow = "test-workflow",
         string platform = "vertex-ai",
         DeploymentStatus status = DeploymentStatus.Pending) => new()
-    {
-        DeploymentId = id,
-        WorkflowName = workflow,
-        Platform = platform,
-        Version = "1.0.0",
-        Status = status,
-        CreatedAt = DateTimeOffset.UtcNow,
-        UpdatedAt = DateTimeOffset.UtcNow
-    };
+        {
+            DeploymentId = id,
+            WorkflowName = workflow,
+            Platform = platform,
+            Version = "1.0.0",
+            Status = status,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
 
     // ── basic CRUD ────────────────────────────────────────────────────────────
 

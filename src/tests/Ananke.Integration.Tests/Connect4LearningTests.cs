@@ -494,35 +494,35 @@ public class Connect4LearningTests
         string id, int gameNumber, int col,
         string summary,
         Dictionary<string, float> tags) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = [$"game_{gameNumber}", $"col_{col}", $"move_4"],
-        Source = "game_observation",
-        Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
-        Confidence = 0.3f,
-        ObservationCount = 1,
-        Evidence = [$"game {gameNumber}: agent played col {col + 1}"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [$"game_{gameNumber}", $"col_{col}", $"move_4"],
+            Source = "game_observation",
+            Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
+            Confidence = 0.3f,
+            ObservationCount = 1,
+            Evidence = [$"game {gameNumber}: agent played col {col + 1}"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeOutcome(
         string id, int gameNumber, string result,
         string summary,
         Dictionary<string, float> tags) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = [$"game_{gameNumber}", "outcome", result],
-        Source = "game_outcome",
-        Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
-        Confidence = result is "win" or "loss" ? 0.5f : 0.2f,
-        ObservationCount = 1,
-        Evidence = [$"game {gameNumber}: {result}"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [$"game_{gameNumber}", "outcome", result],
+            Source = "game_outcome",
+            Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
+            Confidence = result is "win" or "loss" ? 0.5f : 0.2f,
+            ObservationCount = 1,
+            Evidence = [$"game {gameNumber}: {result}"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeHeuristic(
         string id,
@@ -530,18 +530,18 @@ public class Connect4LearningTests
         Dictionary<string, float> tags,
         string situation,
         string preferred) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Heuristic,
-        Tags = ["win"],
-        Source = "game_analysis",
-        Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
-        Situation = situation,
-        PreferredApproach = preferred,
-        Confidence = 0.3f,
-        ObservationCount = 1,
-        Evidence = ["game 1: agent won"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Heuristic,
+            Tags = ["win"],
+            Source = "game_analysis",
+            Description = new SemanticDescription { Summary = summary, SemanticTags = tags },
+            Situation = situation,
+            PreferredApproach = preferred,
+            Confidence = 0.3f,
+            ObservationCount = 1,
+            Evidence = ["game 1: agent won"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 }

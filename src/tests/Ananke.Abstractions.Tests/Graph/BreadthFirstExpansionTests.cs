@@ -73,9 +73,9 @@ public sealed class BreadthFirstExpansionTests
         for (var i = 0; i < ids.Length - 1; i++)
             await _graph.UpsertEdgeAsync(new GraphEdge
             {
-                FromId     = ids[i],
-                ToId       = ids[i + 1],
-                Relation   = "follows",
+                FromId = ids[i],
+                ToId = ids[i + 1],
+                Relation = "follows",
                 Provenance = EdgeProvenance.Extracted,
             });
     }

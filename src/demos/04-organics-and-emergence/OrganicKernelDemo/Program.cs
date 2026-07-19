@@ -61,7 +61,7 @@ Console.WriteLine();
 // ── Tool registry ───────────────────────────────────────────────────
 
 var catalogTools = BookstoreTools.CreateCatalogTools();
-var orderTools   = BookstoreTools.CreateOrderTools();
+var orderTools = BookstoreTools.CreateOrderTools();
 var toolRegistry = BookstoreTools.CreateFullRegistry(catalogTools, orderTools);
 
 Print($"  📦 Tool registry: {toolRegistry.Tools.Count} tools", ConsoleColor.Gray);
@@ -278,7 +278,8 @@ Print($"  🧬 Total: {allTools.Tools.Count} tools", ConsoleColor.Gray);
 
 capabilityMap.Register(new WorkflowSignal
 {
-    WorkflowName = genesis.Name, Domain = genesis.Domain,
+    WorkflowName = genesis.Name,
+    Domain = genesis.Domain,
     Capabilities = allTools.Tools.Keys.ToList(),
     Timestamp = DateTimeOffset.UtcNow
 });
@@ -329,7 +330,9 @@ PrintSnapshot(snapshot2);
 
 var snapshotV1 = new HostSnapshot
 {
-    KernelId = "bookstore", Version = 1, TakenAt = DateTimeOffset.UtcNow,
+    KernelId = "bookstore",
+    Version = 1,
+    TakenAt = DateTimeOffset.UtcNow,
     Cells = [new WorkflowSnapshotBuilder(genesis.Name, genesis.Domain).Tools(allTools).Build()]
 };
 
@@ -536,7 +539,9 @@ if (approvedSignal is not null)
 
     var snapshotV2 = new HostSnapshot
     {
-        KernelId = "bookstore", Version = 2, TakenAt = DateTimeOffset.UtcNow,
+        KernelId = "bookstore",
+        Version = 2,
+        TakenAt = DateTimeOffset.UtcNow,
         Cells = divisionPlan.Children.Select(child =>
             new WorkflowSnapshotBuilder(child.Name, child.Domain)
                 .Tools(child.Tools).SplitFrom(divisionPlan.ParentWorkflow)

@@ -26,13 +26,13 @@ internal sealed class GoogleDataServiceExecutor : IPlatformNativeExecutor
     {
         var result = _capability switch
         {
-            "bigquery"         => BigQueryFixture(args),
-            "spanner"          => SpannerFixture(args),
-            "bigtable"         => BigtableFixture(args),
-            "pubsub"           => PubSubFixture(args),
-            "maps"             => MapsFixture(args),
+            "bigquery" => BigQueryFixture(args),
+            "spanner" => SpannerFixture(args),
+            "bigtable" => BigtableFixture(args),
+            "pubsub" => PubSubFixture(args),
+            "maps" => MapsFixture(args),
             "artifact_service" => ArtifactServiceFixture(args),
-            _                  => (object)new { capability = _capability, note = "[STUB] No fixture defined." }
+            _ => (object)new { capability = _capability, note = "[STUB] No fixture defined." }
         };
         return Task.FromResult(ToolResult.Json(result));
     }

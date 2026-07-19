@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using Ananke.Organics.Kernel;
 using Ananke.Organics.Kernel.Snapshots;
@@ -24,7 +25,7 @@ public class WorkflowReplicatorTests
         await _host.DisposeAsync();
     }
 
-    // â”€â”€ Core replication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Core replication ─────────────────────────────────────────────────────────────
 
     [Test]
     public async Task ReplicateAsync_SpawnsClone()
@@ -89,7 +90,7 @@ public class WorkflowReplicatorTests
         result.MemoryProfile.Domains.ShouldContain("general");
     }
 
-    // â”€â”€ Null guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Null guards ─────────────────────────────────────────────────────────────────
 
     [Test]
     public async Task ReplicateAsync_NullSource_Throws()
@@ -121,7 +122,7 @@ public class WorkflowReplicatorTests
             () => replicator.ReplicateAsync("source", "clone"));
     }
 
-    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Helpers ─────────────────────────────────────────────────────────────────────
 
     private WorkflowReplicator CreateReplicator(
         Func<string, MemoryProfile>? memoryProfileFactory = null) =>
@@ -142,7 +143,7 @@ public class WorkflowReplicatorTests
         Name = name,
         Models = new Dictionary<string, ModelDefinition>
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4o-mini" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
         },
         Jobs = new Dictionary<string, JobDefinition>
         {
@@ -152,7 +153,7 @@ public class WorkflowReplicatorTests
         Connections = ["handle -> process", "process -> End"]
     };
 
-    // â”€â”€ Test doubles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Test doubles ────────────────────────────────────────────────────────────────
 
     private sealed class StubActivatorFactory : IWorkflowActivatorFactory
     {

@@ -11,12 +11,12 @@ public sealed class SlackApprovalCallbackTests
 {
     private static PlatformInteractionEvent MakeBlockAction(string actionId, string userId,
         string? value = null) => new()
-    {
-        Kind = PlatformInteractionKind.BlockAction,
-        ActionId = actionId,
-        UserId = userId,
-        Value = value
-    };
+        {
+            Kind = PlatformInteractionKind.BlockAction,
+            ActionId = actionId,
+            UserId = userId,
+            Value = value
+        };
 
     [Test]
     public async Task HandleInteractionAsync_ApproveAction_InvokesOnDecisionWithApprovedOutcome()

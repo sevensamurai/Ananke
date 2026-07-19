@@ -31,28 +31,37 @@ public class WeightedRoutingTests
         var smartModel = new FakeModel();
 
         var router = new CapabilityModelRouter(new RoutingWeights
+        {
+            CostWeight = 0.1m,
+            SpeedWeight = 5.0m,
+            IntelligenceWeight = 0m
+        })
+            .AddModel(new ModelProfile
             {
-                CostWeight = 0.1m,
-                SpeedWeight = 5.0m,
-                IntelligenceWeight = 0m
+                Name = "fast",
+                Model = fastModel,
+                Capabilities = ModelCapability.TextGeneration,
+                CostPer1KTokens = 1.0m,
+                SpeedTier = 5,
+                IntelligenceTier = 1
             })
             .AddModel(new ModelProfile
             {
-                Name = "fast", Model = fastModel,
+                Name = "cheap",
+                Model = cheapModel,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 1.0m, SpeedTier = 5, IntelligenceTier = 1
+                CostPer1KTokens = 0.01m,
+                SpeedTier = 1,
+                IntelligenceTier = 1
             })
             .AddModel(new ModelProfile
             {
-                Name = "cheap", Model = cheapModel,
+                Name = "smart",
+                Model = smartModel,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 0.01m, SpeedTier = 1, IntelligenceTier = 1
-            })
-            .AddModel(new ModelProfile
-            {
-                Name = "smart", Model = smartModel,
-                Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 5.0m, SpeedTier = 2, IntelligenceTier = 5
+                CostPer1KTokens = 5.0m,
+                SpeedTier = 2,
+                IntelligenceTier = 5
             });
 
         var request = new AgentRequest { Messages = [AgentMessage.User("test")] };
@@ -69,22 +78,28 @@ public class WeightedRoutingTests
         var smartModel = new FakeModel();
 
         var router = new CapabilityModelRouter(new RoutingWeights
+        {
+            CostWeight = 0m,
+            SpeedWeight = 0m,
+            IntelligenceWeight = 10.0m
+        })
+            .AddModel(new ModelProfile
             {
-                CostWeight = 0m,
-                SpeedWeight = 0m,
-                IntelligenceWeight = 10.0m
+                Name = "fast",
+                Model = fastModel,
+                Capabilities = ModelCapability.TextGeneration,
+                CostPer1KTokens = 0.1m,
+                SpeedTier = 5,
+                IntelligenceTier = 2
             })
             .AddModel(new ModelProfile
             {
-                Name = "fast", Model = fastModel,
+                Name = "smart",
+                Model = smartModel,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 0.1m, SpeedTier = 5, IntelligenceTier = 2
-            })
-            .AddModel(new ModelProfile
-            {
-                Name = "smart", Model = smartModel,
-                Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 5.0m, SpeedTier = 1, IntelligenceTier = 5
+                CostPer1KTokens = 5.0m,
+                SpeedTier = 1,
+                IntelligenceTier = 5
             });
 
         var request = new AgentRequest { Messages = [AgentMessage.User("test")] };
@@ -107,15 +122,21 @@ public class WeightedRoutingTests
         var router = new CapabilityModelRouter(new RoutingWeights())
             .AddModel(new ModelProfile
             {
-                Name = "balanced", Model = balanced,
+                Name = "balanced",
+                Model = balanced,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 0.5m, SpeedTier = 4, IntelligenceTier = 3
+                CostPer1KTokens = 0.5m,
+                SpeedTier = 4,
+                IntelligenceTier = 3
             })
             .AddModel(new ModelProfile
             {
-                Name = "extreme", Model = extreme,
+                Name = "extreme",
+                Model = extreme,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 10.0m, SpeedTier = 5, IntelligenceTier = 5
+                CostPer1KTokens = 10.0m,
+                SpeedTier = 5,
+                IntelligenceTier = 5
             });
 
         var request = new AgentRequest { Messages = [AgentMessage.User("test")] };
@@ -135,15 +156,19 @@ public class WeightedRoutingTests
                 p => p.MaxContextTokens / Math.Max(p.CostPer1KTokens, 0.001m))
             .AddModel(new ModelProfile
             {
-                Name = "big", Model = bigContext,
+                Name = "big",
+                Model = bigContext,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 0.1m, MaxContextTokens = 1_000_000
+                CostPer1KTokens = 0.1m,
+                MaxContextTokens = 1_000_000
             })
             .AddModel(new ModelProfile
             {
-                Name = "small", Model = smallContext,
+                Name = "small",
+                Model = smallContext,
                 Capabilities = ModelCapability.TextGeneration,
-                CostPer1KTokens = 0.05m, MaxContextTokens = 8_000
+                CostPer1KTokens = 0.05m,
+                MaxContextTokens = 8_000
             });
 
         var request = new AgentRequest { Messages = [AgentMessage.User("test")] };
@@ -181,13 +206,15 @@ public class WeightedRoutingTests
         var router = new CapabilityModelRouter(new RoutingWeights { SpeedWeight = 100m })
             .AddModel(new ModelProfile
             {
-                Name = "incapable", Model = incapable,
+                Name = "incapable",
+                Model = incapable,
                 Capabilities = ModelCapability.TextGeneration,
                 SpeedTier = 5
             })
             .AddModel(new ModelProfile
             {
-                Name = "capable", Model = capable,
+                Name = "capable",
+                Model = capable,
                 Capabilities = ModelCapability.TextGeneration | ModelCapability.StructuredOutput,
                 SpeedTier = 1
             });
@@ -211,7 +238,8 @@ public class WeightedRoutingTests
         var router = new CapabilityModelRouter(new RoutingWeights())
             .AddModel(new ModelProfile
             {
-                Name = "test", Model = model,
+                Name = "test",
+                Model = model,
                 Capabilities = ModelCapability.TextGeneration,
                 CostPer1KInputTokens = 0.01m,
                 CostPer1KOutputTokens = 0.03m
@@ -236,11 +264,11 @@ public class WeightedRoutingTests
 
         // Weights: strongly favour speed and low cost, intelligence less important
         var router = new CapabilityModelRouter(new RoutingWeights
-            {
-                CostWeight = 2.0m,
-                SpeedWeight = 3.0m,
-                IntelligenceWeight = 0.5m
-            })
+        {
+            CostWeight = 2.0m,
+            SpeedWeight = 3.0m,
+            IntelligenceWeight = 0.5m
+        })
             .AddModel(ModelCatalog.OpenAI.Gpt4_1Mini
                 .ToProfile(cloudModel, new ModelCostRates(0.0004m, 0.0016m)))
             .AddModel(ModelCatalog.Meta.Llama3_2_3B
