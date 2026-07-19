@@ -3,7 +3,14 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Abstractions</PackageId>
-    <Description>Shared interfaces and contracts for the Ananke distributed framework — IDistributedLock, IKeyValueDataAdapter, IChannelReader/Writer, and configuration types.</Description>
+    <Description>Shared interfaces and contracts for the Ananke distributed framework â€” IDistributedLock, IKeyValueDataAdapter, IChannelReader/Writer, and configuration types.</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Single source of truth for model lifecycle status, read at runtime by ModelLifecycleData
+         and at compile time by Ananke.Analyzers' ANNKE002 (see the AdditionalFiles entry in
+         Ananke.Analyzers.csproj referencing this same file). -->
+    <EmbeddedResource Include="Agents\model-lifecycle.json" />
+  </ItemGroup>
 
 </Project>

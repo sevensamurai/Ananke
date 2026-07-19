@@ -1,5 +1,6 @@
 using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Checkpointing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -249,5 +250,57 @@ public class CheckpointTests
 
         loaded.ShouldBeNull();
         _store.Count.ShouldBe(0);
+    }
+
+    // ── TimeProvider injection (no ambient clocks) ────
+
+    [Test]
+    public async Task LoadAsync_InjectedClockAdvancedPastExpiry_ReturnsNull()
+    {
+        var clock = new FakeTimeProvider();
+        var store = new InMemoryCheckpointStore(clock);
+
+        var checkpoint = new Checkpointing.Checkpoint<CounterState>
+        {
+            ExecutionId = "clock-test",
+            WorkflowName = "test",
+            CurrentJob = "a",
+            State = new CounterState(),
+            Status = ExecutionStatus.Running,
+            History = [],
+            CreatedAt = clock.GetUtcNow(),
+            ExpiresAt = clock.GetUtcNow().AddMinutes(5)
+        };
+        await store.SaveAsync(checkpoint);
+
+        (await store.ExistsAsync("clock-test")).ShouldBeTrue(); // not yet expired
+
+        clock.Advance(TimeSpan.FromMinutes(6)); // no real wait
+
+        (await store.LoadAsync<CounterState>("clock-test")).ShouldBeNull();
+        store.Count.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task WorkflowRunner_InjectedClock_StampsCheckpointCreatedAtFromClock()
+    {
+        var clock = new FakeTimeProvider();
+        var store = new InMemoryCheckpointStore(clock);
+        var runner = new Ananke.Orchestration.Execution.WorkflowRunner(store, timeProvider: clock);
+
+        var definition = new Workflow<CounterState>("clock-stamped")
+            .Job("a", (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Job("boom", (_, _) => throw new InvalidOperationException("stop"))
+            .Chain("a", "boom", Workflow.End)
+            .UseCheckpointing(store)
+            .Build();
+
+        clock.Advance(TimeSpan.FromDays(3)); // move the fake clock away from its epoch — no real wait
+
+        var execution = await runner.RunAsync(definition, new CounterState());
+        execution.Status.ShouldBe(ExecutionStatus.Faulted);
+
+        var checkpoint = await store.LoadAsync<CounterState>(execution.Id);
+        checkpoint!.CreatedAt.ShouldBe(clock.GetUtcNow());
     }
 }

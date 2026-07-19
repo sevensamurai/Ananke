@@ -33,6 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
     <ProjectReference Include="..\..\Ananke.StateMachine\Ananke.StateMachine.csproj" />
     <ProjectReference Include="..\Ananke.TestHelpers\Ananke.TestHelpers.csproj" />
   </ItemGroup>

@@ -272,8 +272,11 @@ public class OrganicHostTests
         var monitor = new WorkflowExecutionMonitor();
         monitor.RegisterWorkflow("remote-cell", new StructuralProfile
         {
-            ToolCount = 4, JobCount = 1, TagClusterCount = 1,
-            ResourceSpan = 2, ContextUtilization = 0.3f
+            ToolCount = 4,
+            JobCount = 1,
+            TagClusterCount = 1,
+            ResourceSpan = 2,
+            ContextUtilization = 0.3f
         });
 
         var source = new StubRemoteCellSource(["remote-cell"]);
@@ -302,8 +305,11 @@ public class OrganicHostTests
         var monitor = new WorkflowExecutionMonitor();
         monitor.RegisterWorkflow("remote-cell", new StructuralProfile
         {
-            ToolCount = 4, JobCount = 1, TagClusterCount = 1,
-            ResourceSpan = 2, ContextUtilization = 0.3f
+            ToolCount = 4,
+            JobCount = 1,
+            TagClusterCount = 1,
+            ResourceSpan = 2,
+            ContextUtilization = 0.3f
         });
 
         var source = new StubRemoteCellSource(["remote-cell"]);

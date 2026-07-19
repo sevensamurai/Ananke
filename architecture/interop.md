@@ -1,4 +1,4 @@
-﻿# Architecture: Interop — MCP, A2A, Skills, Platforms
+# Architecture: Interop — MCP, A2A, Skills, Platforms
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers protocol bridges, external skill catalog, and messaging platform adapters.
 

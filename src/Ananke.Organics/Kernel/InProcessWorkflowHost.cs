@@ -194,7 +194,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         internal void SetLoop(Task t) => _loop = t;
 
         internal readonly TaskCompletionSource StartedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal readonly TaskCompletionSource PausedTcs  = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource PausedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal readonly TaskCompletionSource StoppedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

@@ -257,18 +257,18 @@ public class EntityMemoryProviderTests
 
     private static EmpiricalEntry MakePattern(
         string id, string description, float confidence = 0.5f) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = [],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static Episode MakeEpisode(string id, float reward) => new()
     {

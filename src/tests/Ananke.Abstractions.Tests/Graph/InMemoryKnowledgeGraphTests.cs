@@ -151,10 +151,10 @@ public sealed class InMemoryKnowledgeGraphTests
         EdgeProvenance provenance, float weight = 1f) =>
         new()
         {
-            FromId     = from,
-            ToId       = to,
-            Relation   = relation,
+            FromId = from,
+            ToId = to,
+            Relation = relation,
             Provenance = provenance,
-            Weight     = weight,
+            Weight = weight,
         };
 }

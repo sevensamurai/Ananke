@@ -46,7 +46,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task ValidateAsync_MinimalManifest_ReturnsDeployableReport()
     {
         var deployer = CreateDeployer();
-        var report   = await deployer.ValidateAsync(Manifest(), Kit());
+        var report = await deployer.ValidateAsync(Manifest(), Kit());
 
         report.ShouldNotBeNull();
         report.IsDeployable.ShouldBeTrue("A valid minimal manifest must be reported as deployable.");
@@ -56,7 +56,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task ValidateAsync_Report_HasNullOrEmptyErrors_WhenDeployable()
     {
         var deployer = CreateDeployer();
-        var report   = await deployer.ValidateAsync(Manifest(), Kit());
+        var report = await deployer.ValidateAsync(Manifest(), Kit());
 
         if (report.IsDeployable)
             report.Errors.ShouldBeEmpty("Deployable report must not contain error diagnostics.");
@@ -66,7 +66,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task DeployAsync_ReturnsRecord_WithNonEmptyDeploymentId()
     {
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         record.ShouldNotBeNull();
         record.DeploymentId.ShouldNotBeNullOrWhiteSpace("DeploymentId must be non-empty after deploy.");
@@ -77,7 +77,7 @@ public abstract class FederationDeployerConformanceTests
     {
         const string name = "my-workflow";
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(name), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(name), Kit(), Opts());
 
         record.WorkflowName.ShouldBe(name, "WorkflowName in record must match the manifest name.");
     }
@@ -86,7 +86,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task DeployAsync_ReturnsRecord_WithMatchingPlatform()
     {
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         record.Platform.ShouldBe(deployer.Platform,
             "Platform in the record must match the deployer's declared platform.");
@@ -96,7 +96,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task DeployAsync_ReturnsRecord_WithActiveOrDeployingStatus()
     {
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         record.Status.ShouldBeOneOf(
             [DeploymentStatus.Active, DeploymentStatus.Deploying],
@@ -106,9 +106,9 @@ public abstract class FederationDeployerConformanceTests
     [Test]
     public async Task DeployAsync_ReturnsRecord_WithPositiveTimestamps()
     {
-        var before   = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         record.CreatedAt.ShouldBeGreaterThan(before, "CreatedAt must be a recent UTC timestamp.");
         record.UpdatedAt.ShouldBeGreaterThanOrEqualTo(record.CreatedAt,
@@ -119,7 +119,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task TeardownAsync_ExistingDeployment_DoesNotThrow()
     {
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         await Should.NotThrowAsync(() => deployer.TeardownAsync(record.DeploymentId));
     }
@@ -136,7 +136,7 @@ public abstract class FederationDeployerConformanceTests
     public async Task MarkFailedAsync_ExistingDeployment_DoesNotThrow()
     {
         var deployer = CreateDeployer();
-        var record   = await deployer.DeployAsync(Manifest(), Kit(), Opts());
+        var record = await deployer.DeployAsync(Manifest(), Kit(), Opts());
 
         await Should.NotThrowAsync(() => deployer.MarkFailedAsync(record.DeploymentId));
     }
@@ -154,8 +154,8 @@ public abstract class FederationDeployerConformanceTests
     {
         var deployer = CreateDeployer();
         var manifest = Manifest();
-        var kit      = Kit();
-        var opts     = new DeployOptions { Platform = deployer.Platform, Force = true, Tags = ["conformance"] };
+        var kit = Kit();
+        var opts = new DeployOptions { Platform = deployer.Platform, Force = true, Tags = ["conformance"] };
 
         await deployer.DeployAsync(manifest, kit, opts);
         // Forced re-deploy of the same manifest must not throw.
@@ -166,10 +166,10 @@ public abstract class FederationDeployerConformanceTests
     public async Task DeployAsync_Tags_ArePropagatedToRecord()
     {
         var deployer = CreateDeployer();
-        var opts     = new DeployOptions
+        var opts = new DeployOptions
         {
             Platform = deployer.Platform,
-            Tags     = ["tag-a", "tag-b"]
+            Tags = ["tag-a", "tag-b"]
         };
         var record = await deployer.DeployAsync(Manifest(), Kit(), opts);
 

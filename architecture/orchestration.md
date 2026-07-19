@@ -1,4 +1,4 @@
-﻿# Architecture: Orchestration Engine
+# Architecture: Orchestration Engine
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers the workflow engine, job execution, routing, streaming, and checkpointing.
 

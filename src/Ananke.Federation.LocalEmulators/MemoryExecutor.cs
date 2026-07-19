@@ -52,11 +52,11 @@ internal sealed class MemoryExecutor : IPlatformNativeExecutor
 
         return operation.ToLowerInvariant() switch
         {
-            "store" or "save" or "write"  => Store(args),
+            "store" or "save" or "write" => Store(args),
             "recall" or "read" or "fetch" => Recall(args),
-            "delete" or "remove"          => Delete(args),
-            "list"                        => ListKeys(),
-            "search"                      => Search(args),
+            "delete" or "remove" => Delete(args),
+            "list" => ListKeys(),
+            "search" => Search(args),
             _ => Task.FromResult(ToolResult.Fatal($"Unknown memory operation '{operation}'. " +
                                                   "Supported: store, recall, delete, list, search"))
         };

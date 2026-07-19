@@ -21,11 +21,11 @@ public abstract class JsonSchemaTranslatorConformanceTests
     private static IReadOnlyDictionary<string, object> SimpleObjectSchema() =>
         new Dictionary<string, object>
         {
-            ["type"]       = "object",
+            ["type"] = "object",
             ["properties"] = new Dictionary<string, object>
             {
                 ["name"] = new Dictionary<string, object> { ["type"] = "string" },
-                ["age"]  = new Dictionary<string, object> { ["type"] = "integer" }
+                ["age"] = new Dictionary<string, object> { ["type"] = "integer" }
             },
             ["required"] = new[] { "name" }
         };
@@ -36,7 +36,7 @@ public abstract class JsonSchemaTranslatorConformanceTests
     private static IReadOnlyDictionary<string, object> ArraySchema() =>
         new Dictionary<string, object>
         {
-            ["type"]  = "array",
+            ["type"] = "array",
             ["items"] = new Dictionary<string, object> { ["type"] = "number" }
         };
 

@@ -20,7 +20,7 @@ public sealed class KnowledgeReportExporter(
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented      = true,
+        WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
@@ -148,7 +148,7 @@ public sealed class KnowledgeReportExporter(
     private async Task<List<object>> CollectAllEdgesAsync(
         IReadOnlyList<GraphNode> nodes, CancellationToken ct)
     {
-        var seen  = new HashSet<string>();
+        var seen = new HashSet<string>();
         var edges = new List<object>();
 
         foreach (var node in nodes)
@@ -162,11 +162,11 @@ public sealed class KnowledgeReportExporter(
 
                 edges.Add(new
                 {
-                    from_id    = edge.FromId,
-                    to_id      = edge.ToId,
-                    relation   = edge.Relation,
+                    from_id = edge.FromId,
+                    to_id = edge.ToId,
+                    relation = edge.Relation,
                     provenance = edge.Provenance.ToString().ToLowerInvariant(),
-                    weight     = edge.Weight,
+                    weight = edge.Weight,
                 });
             }
         }

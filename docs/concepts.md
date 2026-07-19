@@ -1,4 +1,4 @@
-﻿<!-- topic: concepts, tags: concepts, overview, workflow, agent, tools, memory, empirical, state-machine, distributed, mcp -->
+<!-- topic: concepts, tags: concepts, overview, workflow, agent, tools, memory, empirical, state-machine, distributed, mcp -->
 # Concepts
 
 A high-level tour of Ananke's core building blocks. Each section links to the in-depth guide for further reading.

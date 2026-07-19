@@ -16,9 +16,9 @@ public sealed class TagCoOccurrenceBuilderTests
     [SetUp]
     public void SetUp()
     {
-        _graph   = new InMemoryKnowledgeGraph();
+        _graph = new InMemoryKnowledgeGraph();
         // dedupThreshold>1.0 disables semantic dedup so each CommitAsync stores a fresh entry.
-        _memory  = new InMemoryEmpiricalMemory(new InMemoryEmbedder(), dedupThreshold: 1.1f);
+        _memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder(), dedupThreshold: 1.1f);
         _builder = new TagCoOccurrenceBuilder(_memory);
     }
 
@@ -30,7 +30,7 @@ public sealed class TagCoOccurrenceBuilderTests
         await _builder.BuildAsync(_graph);
 
         var entryNode = await _graph.GetNodeAsync("entry:e1");
-        var tagNode   = await _graph.GetNodeAsync("tag:cause/gc");
+        var tagNode = await _graph.GetNodeAsync("tag:cause/gc");
 
         entryNode.ShouldNotBeNull();
         entryNode!.Kind.ShouldBe("entry");
@@ -59,7 +59,7 @@ public sealed class TagCoOccurrenceBuilderTests
 
         await _builder.BuildAsync(_graph);
 
-        var forward  = await _graph.NeighborsAsync("tag:cause/gc",  relation: "co_occurs");
+        var forward = await _graph.NeighborsAsync("tag:cause/gc", relation: "co_occurs");
         var backward = await _graph.NeighborsAsync("tag:effect/oom", relation: "co_occurs");
 
         forward.ShouldContain(e => e.ToId == "tag:effect/oom");
@@ -115,21 +115,21 @@ public sealed class TagCoOccurrenceBuilderTests
 
     private static EmpiricalEntry MakeEntry(
         string id, string[] tagKeys, float[] weights) => new()
-    {
-        Id               = id,
-        Kind             = EmpiricalKind.Pattern,
-        Tags             = [],
-        Source           = "test",
-        Confidence       = 0.5f,
-        ObservationCount = 1,
-        Evidence         = [],
-        FirstObserved    = DateTimeOffset.UtcNow,
-        LastObserved     = DateTimeOffset.UtcNow,
-        Description      = new SemanticDescription
         {
-            Summary      = id,
-            SemanticTags = tagKeys.Zip(weights)
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Confidence = 0.5f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
+            Description = new SemanticDescription
+            {
+                Summary = id,
+                SemanticTags = tagKeys.Zip(weights)
                 .ToDictionary(t => t.First, t => t.Second),
-        },
-    };
+            },
+        };
 }

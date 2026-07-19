@@ -50,7 +50,7 @@ builder.Configuration.AddJsonFile("secrets.json", optional: true, reloadOnChange
 
 var openAiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? throw new InvalidOperationException("OpenAI:ApiKey not found. Add it to secrets.json or environment variables.");
-var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4.1-mini";
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? Models.OpenAI.Gpt54Mini;
 
 var model = OpenAIChatAgentModel.Create(openAiKey, openAiModel);
 builder.Services.AddSingleton<IStreamingAgentModel>(model);

@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using Shouldly;
 
@@ -21,12 +22,6 @@ public sealed class AzureModelMapperTests
     [TestCase("openai", "o4-mini", "o4-mini")]
     [TestCase("google", "gemini-2.5-pro", "gpt-4.1")]
     [TestCase("google", "gemini-2.5-flash", "gpt-4.1-mini")]
-    [TestCase("google", "gemini-2.0-flash", "gpt-4.1-mini")]
-    [TestCase("google", "gemini-2.0-flash-lite", "gpt-4.1-nano")]
-    [TestCase("anthropic", "claude-opus-4", "gpt-4.1")]
-    [TestCase("anthropic", "claude-sonnet-4", "gpt-4.1")]
-    [TestCase("anthropic", "claude-3-5-sonnet", "gpt-4.1")]
-    [TestCase("anthropic", "claude-3-5-haiku", "gpt-4.1-mini")]
     public void Known_models_map_correctly(string provider, string model, string expected)
     {
         var result = _mapper.Map(new ModelDefinition { Provider = provider, Model = model });
@@ -37,6 +32,17 @@ public sealed class AzureModelMapperTests
     public void Unknown_model_returns_null()
     {
         var result = _mapper.Map(new ModelDefinition { Provider = "unknown", Model = "mystery-v1" });
+        result.ShouldBeNull();
+    }
+
+    [Test]
+    public void Anthropic_model_returns_null_pending_current_gen_mapping()
+    {
+        // Documents a known gap: this mapper has no entries for current-gen Anthropic models
+        // (claude-sonnet-5, claude-opus-4-8, etc.) — it never did, and the retired-model cleanup
+        // that removed the old claude-opus-4/claude-sonnet-4/claude-3-5-* entries didn't add
+        // replacements. See the comment above the Anthropic section in AzureModelMapper.
+        var result = _mapper.Map(new ModelDefinition { Provider = "anthropic", Model = "claude-sonnet-5" });
         result.ShouldBeNull();
     }
 
@@ -57,8 +63,8 @@ public sealed class AzureModelMapperTests
     [Test]
     public void AzureAI_provider_passes_through()
     {
-        var result = _mapper.Map(new ModelDefinition { Provider = "azure-ai", Model = "gpt-4.1-mini" });
-        result.ShouldBe("gpt-4.1-mini");
+        var result = _mapper.Map(new ModelDefinition { Provider = "azure-ai", Model = Models.OpenAI.Gpt54Mini });
+        result.ShouldBe(Models.OpenAI.Gpt54Mini);
     }
 
     [Test]

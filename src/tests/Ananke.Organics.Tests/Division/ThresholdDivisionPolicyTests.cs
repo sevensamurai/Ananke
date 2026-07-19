@@ -12,23 +12,23 @@ public class ThresholdDivisionPolicyTests
         string workflowName = "test-cell",
         int toolCount = 8,
         int tagClusterCount = 2) => new()
-    {
-        WorkflowName = workflowName,
-        ToolCount = toolCount,
-        JobCount = 4,
-        TagClusterCount = tagClusterCount,
-        RoutingEntropy = 0.8f,
-        ResourceSpan = 3,
-        ContextUtilization = 0.4f,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = workflowName,
+            ToolCount = toolCount,
+            JobCount = 4,
+            TagClusterCount = tagClusterCount,
+            RoutingEntropy = 0.8f,
+            ResourceSpan = 3,
+            ContextUtilization = 0.4f,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 
     private static WorkflowManifest MakeManifest(int jobCount = 4) => new()
     {
         Name = "test-workflow",
         Models = new Dictionary<string, ModelDefinition>
         {
-            ["default"] = new() { Provider = "openai", Model = "gpt-4.1-mini" }
+            ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini }
         },
         Jobs = Enumerable.Range(0, jobCount)
             .ToDictionary(i => $"job-{i}", _ => new JobDefinition()),

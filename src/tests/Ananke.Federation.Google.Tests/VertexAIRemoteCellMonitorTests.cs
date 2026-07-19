@@ -20,7 +20,7 @@ public sealed class VertexAIRemoteCellMonitorTests
             IReadOnlyList<TraceRecord>? traces = null,
             ObservabilitySnapshot? snapshot = null)
         {
-            _traces   = traces ?? [];
+            _traces = traces ?? [];
             _snapshot = snapshot;
         }
 
@@ -53,14 +53,14 @@ public sealed class VertexAIRemoteCellMonitorTests
     {
         StartTime = DateTimeOffset.UtcNow,
         LatencyMs = latencyMs,
-        IsError   = false
+        IsError = false
     };
 
     private static TraceRecord ErrorTrace(double latencyMs = 300) => new()
     {
         StartTime = DateTimeOffset.UtcNow,
         LatencyMs = latencyMs,
-        IsError   = true
+        IsError = true
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -194,9 +194,9 @@ public sealed class VertexAIRemoteCellMonitorTests
         var snapshot = new ObservabilitySnapshot
         {
             ExecutionCount = 42,
-            TotalTokens    = 8_500,
-            ToolCallCount  = 17,
-            ErrorRate      = 0.04
+            TotalTokens = 8_500,
+            ToolCallCount = 17,
+            ErrorRate = 0.04
         };
         var monitor = Make(new FakeObservabilityClient(snapshot: snapshot));
 

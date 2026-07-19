@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using A2A;
 using Ananke.A2A.Client;
 using Ananke.Abstractions.Agents;

@@ -165,6 +165,10 @@ public class InProcessWorkflowHostTests
         await _mesh.WhenPausedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
         var countAtPause = Volatile.Read(ref iteration);
 
+        // Drain leftover pre-pause items — otherwise the post-resume read below can be
+        // satisfied by a stale item instead of a genuinely new post-resume iteration.
+        while (gate.Reader.TryRead(out _)) { }
+
         // Resume and wait for at least one new iteration
         await _mesh.ResumeAsync("cell");
         await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));

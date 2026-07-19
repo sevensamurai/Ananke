@@ -1,3 +1,4 @@
+using System.Net;
 using Ananke.Orchestration.Workflows;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
@@ -69,6 +70,39 @@ public class TextAgentJobTests
         exec.State.Output.ShouldBe("The current time is 12:00 PM.");
     }
 
+    // ── Malformed tool-call JSON self-correction (F-4) ────────────
+
+    [Test]
+    public async Task TextAgentJob_MalformedToolCallJson_SelfCorrectsAndCompletes()
+    {
+        var model = SimulatedModel.Sequence(
+            new AgentResponse
+            {
+                Text = "thinking...",
+                ToolCalls = [new AgentToolCall("call_1", "get_time", "{\"a\":")] // malformed JSON
+            },
+            new AgentResponse { Text = "Recovered after invalid JSON." }
+        );
+
+        var tools = new ToolKit("time")
+            .AddTool("get_time", "Gets the current time",
+                () => ToolResult.Ok("12:00 PM"));
+
+        var agent = AgentJobFactory.Create<TextAgentState>("malformed-json", model)
+            .WithPrompt(s => s.Input)
+            .WithTools(tools)
+            .MapResult((s, text) => s with { Output = text })
+            .Build();
+
+        var exec = await new Workflow<TextAgentState>("malformed-json")
+            .Job("malformed-json", agent)
+            .Then("malformed-json", Workflow.End)
+            .RunAsync(new TextAgentState { Input = "What time is it?" });
+
+        exec.Status.ShouldBe(ExecutionStatus.Completed);
+        exec.State.Output.ShouldBe("Recovered after invalid JSON.");
+    }
+
     [Test]
     public void TextAgentJob_MissingPrompt_ThrowsOnBuild()
     {
@@ -109,6 +143,97 @@ public class TextAgentJobTests
             .RunAsync(new TextAgentState { Input = "test" });
 
         captured.ShouldBe("response text");
+    }
+
+    // ── Retry predicate (F-3) ─────────────────────────────────────
+
+    [Test]
+    public async Task ExecuteAsync_GuardrailException_NotRetried()
+    {
+        var model = ThrowingModel.Always(
+            new GuardrailException("no-pii", new AgentResponse { Text = "blocked" }));
+
+        var agent = AgentJobFactory.Create<TextAgentState>("guarded", model)
+            .WithPrompt(s => s.Input)
+            .MapResult((s, text) => s with { Output = text })
+            .WithRetry(maxAttempts: 3, baseDelay: TimeSpan.FromMilliseconds(1))
+            .Build();
+
+        await Should.ThrowAsync<GuardrailException>(
+            () => agent.ExecuteAsync(new TextAgentState { Input = "test" }));
+
+        model.CallCount.ShouldBe(1); // never retried, regardless of maxAttempts
+    }
+
+    [Test]
+    public async Task ExecuteAsync_RateLimitException_IsRetriedUntilSuccess()
+    {
+        var model = ThrowingModel.FailNTimesThenSucceed(
+            failCount: 2,
+            () => new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests),
+            successText: "recovered");
+
+        var agent = AgentJobFactory.Create<TextAgentState>("rate-limited", model)
+            .WithPrompt(s => s.Input)
+            .MapResult((s, text) => s with { Output = text })
+            .WithRetry(maxAttempts: 3, baseDelay: TimeSpan.FromMilliseconds(1))
+            .Build();
+
+        var result = await agent.ExecuteAsync(new TextAgentState { Input = "test" });
+
+        result.Output.ShouldBe("recovered");
+        model.CallCount.ShouldBe(3); // 2 failures + 1 success
+    }
+
+    [Test]
+    public async Task ExecuteAsync_NonRetryableException_ThrowsImmediately()
+    {
+        var model = ThrowingModel.Always(
+            new HttpRequestException("unauthorized", null, HttpStatusCode.Unauthorized));
+
+        var agent = AgentJobFactory.Create<TextAgentState>("unauthorized", model)
+            .WithPrompt(s => s.Input)
+            .MapResult((s, text) => s with { Output = text })
+            .WithRetry(maxAttempts: 3, baseDelay: TimeSpan.FromMilliseconds(1))
+            .Build();
+
+        await Should.ThrowAsync<HttpRequestException>(
+            () => agent.ExecuteAsync(new TextAgentState { Input = "test" }));
+
+        model.CallCount.ShouldBe(1); // non-retryable — no backoff, no attempt burned
+    }
+
+    /// <summary>
+    /// Fake model that throws a queued sequence of exceptions before returning a fixed response.
+    /// </summary>
+    private sealed class ThrowingModel : IAgentModel
+    {
+        private readonly Queue<Exception> _exceptions;
+        private readonly AgentResponse _finalResponse;
+
+        public int CallCount { get; private set; }
+
+        private ThrowingModel(IEnumerable<Exception> exceptions, AgentResponse finalResponse)
+        {
+            _exceptions = new Queue<Exception>(exceptions);
+            _finalResponse = finalResponse;
+        }
+
+        public static ThrowingModel Always(Exception ex) =>
+            new(Enumerable.Repeat(ex, 1_000), new AgentResponse { Text = "unreachable" });
+
+        public static ThrowingModel FailNTimesThenSucceed(
+            int failCount, Func<Exception> exceptionFactory, string successText) =>
+            new(Enumerable.Range(0, failCount).Select(_ => exceptionFactory()),
+                new AgentResponse { Text = successText });
+
+        public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
+        {
+            CallCount++;
+            if (_exceptions.Count > 0)
+                throw _exceptions.Dequeue();
+            return Task.FromResult(_finalResponse);
+        }
     }
 
     private sealed class SimulatedModel : IAgentModel

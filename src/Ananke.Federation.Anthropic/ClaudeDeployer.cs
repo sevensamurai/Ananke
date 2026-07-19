@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using Ananke.Federation.Deployment;
 using Ananke.Federation.Prompts;
@@ -195,7 +196,7 @@ public sealed class ClaudeDeployer(
                     $"Model '{modelDef.Provider}/{modelDef.Model}' has no Claude equivalent.");
         }
 
-        return Models.Anthropic.Sonnet4;
+        return Models.Anthropic.Sonnet5;
     }
 
     /// <summary>

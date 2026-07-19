@@ -1,4 +1,4 @@
-﻿<!-- topic: background, tags: about, history, mythology, ananke, aether, physis, organics -->
+<!-- topic: background, tags: about, history, mythology, ananke, aether, physis, organics -->
 ## Why Ananke?
 
 Ananke is a free, open-source .NET framework for building agentic systems: a typed,

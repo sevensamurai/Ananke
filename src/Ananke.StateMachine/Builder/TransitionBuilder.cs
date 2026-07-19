@@ -3,7 +3,7 @@ namespace Ananke.StateMachine.Builder;
 /// <summary>
 /// Implementation of the fluent transition builder
 /// </summary>
-public class TransitionBuilder<S, T> : 
+public class TransitionBuilder<S, T> :
     IFromStateBuilder<S, T>,
     IToStateBuilder<S, T>,
     ITransitionConfigBuilder<S, T>,
@@ -13,7 +13,7 @@ public class TransitionBuilder<S, T> :
 {
     private readonly Dictionary<string, TransitionConfig<S, T>> _transitions = [];
     private readonly Dictionary<S, StateConfig<S>> _stateConfigs = [];
-    
+
     // Current builder state
     private S[]? _currentFromStates;
     private T? _currentTransition;
@@ -106,12 +106,12 @@ public class TransitionBuilder<S, T> :
     {
         FinalizeCurrentTransition();
         _currentConfigState = state;
-        
+
         if (!_stateConfigs.ContainsKey(state))
         {
             _stateConfigs[state] = new StateConfig<S> { State = state };
         }
-        
+
         return this;
     }
 

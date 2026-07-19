@@ -65,6 +65,19 @@ PackageId
 PackageTags
 TreatWarningsAsErrors
 VersionPrefix
+WarningsNotAsErrors
+
+# --- Removed model constants, documented on purpose as history (docs/reference/model-deprecations.md) ---
+# These identifiers were real Models.cs constants that have since been deleted because the
+# provider retired the underlying model — the doc's "Removed models" table names them
+# deliberately so readers hitting a stale reference can find the replacement. Absence from
+# src/**/*.cs is the point, not drift.
+Opus4
+Sonnet4
+Sonnet35
+Haiku35
+Gemini20Flash
+Gemini20FlashLite
 
 # --- External library / BCL / SDK types named in prose ---
 ActivityListener
@@ -88,6 +101,11 @@ Desktop                 # "Claude Desktop" product name in a Mermaid label
 RedLock
 Dragonfly
 Valkey
+
+# --- Roslyn / analyzer-ecosystem names referenced in prose (not Ananke symbols) ---
+ANNKE00x   # docs/reference/model-deprecations.md prose referring to the ANNKE001/002/003 family collectively
+FixAll     # Roslyn's WellKnownFixAllProviders.BatchFixer / IFixAllProvider concept, referenced in analyzer docs
+Workspaces # Microsoft.CodeAnalysis.Workspaces assembly, referenced in analyzer docs (RS1038 constraint)
 
 # --- Architecture-diagram layer labels (Mermaid subgraph / ASCII box headings) ---
 Foundation

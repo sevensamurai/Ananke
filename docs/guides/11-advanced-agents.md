@@ -270,16 +270,37 @@ var workflow = StreamingChatWorkflow.Create("chat", model)
 
 ### With Model Routing
 
-Wrap each model individually:
+Wrap each model individually, then register it with a profile from the shared
+`Ananke.Orchestration.Agents.Routing.ModelCatalog` — its `ModelProfileTemplate`s carry the stable
+capability/context/tier metadata, so you only supply live pricing via `ToProfile(model, rates)`:
 
 ```csharp
+using Ananke.Orchestration.Agents.Routing;
+
 var miniModel = new CachingAgentModel(
-    ResilientAgentModel.Create(OpenAIChatAgentModel.Create(apiKey, "gpt-4.1-mini")),
+    ResilientAgentModel.Create(OpenAIChatAgentModel.Create(apiKey, "gpt-5.6-terra")),
     redisAdapter, TimeSpan.FromMinutes(10));
 
 var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit)
-    .AddModel(new ModelProfile { Name = "gpt-4.1-mini", Model = miniModel, /* ... */ });
+    .AddModel(ModelCatalog.OpenAI.Gpt56Terra.ToProfile(miniModel, new ModelCostRates(0.0002m, 0.0008m)));
 ```
+
+Every template carries a `Status` (`Current`/`Legacy`/`Deprecated`/`Retired`) and, for anything
+short of `Current`, a `ReplacedBy` pointing at today's recommended model — both flow through into
+the resulting `ModelProfile`. Pass an `ILogger` to `CapabilityModelRouter` and it logs a one-time
+warning (per process, per model) whenever routing selects a `Deprecated` profile, naming the
+replacement — so a router quietly still serving a superseded model doesn't go unnoticed:
+
+```csharp
+var router = new CapabilityModelRouter(RoutingStrategy.CheapestFit, logger)
+    .AddModel(ModelCatalog.OpenAI.Gpt41.ToProfile(model, rates)); // still callable, but Deprecated
+
+// First SelectProfile() call that resolves to Gpt41 logs once:
+//   "Routed to deprecated model 'gpt-4.1' — use 'gpt-5.6-sol' instead."
+```
+
+See [Model Deprecations](../reference/model-deprecations.md) for the full lifecycle policy and
+current per-provider status.
 
 ---
 

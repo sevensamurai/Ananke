@@ -82,12 +82,12 @@ public interface IActionStateMachine<C, S, T, N>
     /// Gets the current state of the state machine
     /// </summary>
     S CurrentState { get; }
-    
+
     /// <summary>
     /// Gets the current operational status (Operative/Faulted)
     /// </summary>
     OperationalStatus OperationalStatus { get; }
-    
+
     /// <summary>
     /// Reason for current status (populated when Faulted)
     /// </summary>
@@ -98,7 +98,7 @@ public interface IActionStateMachine<C, S, T, N>
     /// an interrupt and can later resume to the prior state via a <c>ToResume</c> transition.
     /// </summary>
     bool IsInterrupted { get; }
-    
+
     /// <summary>
     /// Marks the state machine as Faulted. Blocks all transitions until Reset.
     /// </summary>
@@ -106,7 +106,7 @@ public interface IActionStateMachine<C, S, T, N>
     /// <param name="reason">Reason for the fault</param>
     /// <returns>Status change result</returns>
     Task<OperationalStatusChange> FaultAsync(C context, string reason);
-    
+
     /// <summary>
     /// Resets the state machine from Faulted to Operative.
     /// </summary>

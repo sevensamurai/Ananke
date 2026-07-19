@@ -45,7 +45,7 @@ public class ResumeAsyncRouterTests
         resumed.Result!.FinalState.Trail.ShouldBe(new[] { "a", "b", "c" });
     }
 
-    // -- DecideAsync router resume — this path previously deadlocked --
+    // -- DecideAsync router resume â€” this path previously deadlocked --
 
     [Test]
     public async Task ResumeAsync_WithDecideAsyncRouter_ResolvesWithoutBlocking()
@@ -55,7 +55,7 @@ public class ResumeAsyncRouterTests
         var workflow = new Workflow<CounterState>("resume-router")
             .Job("start", (s, _) => Task.FromResult(s with { Value = 10 }))
             .Job("high", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "high"] }))
-            .Job("low",  (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "low"] }))
+            .Job("low", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "low"] }))
             .Job("after-route", (s, _) =>
             {
                 callCount++;
@@ -63,14 +63,14 @@ public class ResumeAsyncRouterTests
                     throw new InvalidOperationException("transient after route");
                 return Task.FromResult(s with { Trail = [.. s.Trail, "done"] });
             })
-            // Router outgoing from "start" — previously .GetAwaiter().GetResult() on resume
+            // Router outgoing from "start" â€” previously .GetAwaiter().GetResult() on resume
             .Then("start", Workflow.DecideAsync<CounterState>(async s =>
             {
                 await Task.Yield(); // Force async continuation, would deadlock under sync
                 return s.Value >= 5 ? "high" : "low";
             }))
             .Then("high", "after-route")
-            .Then("low",  "after-route")
+            .Then("low", "after-route")
             .Then("after-route", Workflow.End)
             .UseCheckpointing(_store);
 
@@ -81,7 +81,7 @@ public class ResumeAsyncRouterTests
         // Checkpoint is on "high" (last successful job before after-route failed)
         _store.Count.ShouldBe(1);
 
-        // Resume — must resolve "after route" target async without blocking
+        // Resume â€” must resolve "after route" target async without blocking
         var resumed = await workflow.ResumeAsync(first.Id);
         resumed.Status.ShouldBe(ExecutionStatus.Completed);
         resumed.Result!.FinalState.Trail.ShouldContain("done");
@@ -95,9 +95,9 @@ public class ResumeAsyncRouterTests
         var callCount = 0;
 
         var workflow = new Workflow<CounterState>("resume-router-state")
-            .Job("start",  (s, _) => Task.FromResult(s with { Value = 1 }))
-            .Job("high",   (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "high"] }))
-            .Job("low",    (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "low"] }))
+            .Job("start", (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Job("high", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "high"] }))
+            .Job("low", (s, _) => Task.FromResult(s with { Trail = [.. s.Trail, "low"] }))
             .Job("finish", (s, _) =>
             {
                 callCount++;
@@ -110,8 +110,8 @@ public class ResumeAsyncRouterTests
                 await Task.Yield();
                 return s.Value >= 5 ? "high" : "low";
             }))
-            .Then("high",  "finish")
-            .Then("low",   "finish")
+            .Then("high", "finish")
+            .Then("low", "finish")
             .Then("finish", Workflow.End)
             .UseCheckpointing(_store);
 
@@ -137,7 +137,7 @@ public class ResumeAsyncRouterTests
         int? valueSeenByFinish = null;
 
         var workflow = new Workflow<CounterState>("resume-transform")
-            .Job("start",  (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Job("start", (s, _) => Task.FromResult(s with { Value = 1 }))
             .Job("middle", (s, _) =>
             {
                 callCount++;
@@ -165,7 +165,7 @@ public class ResumeAsyncRouterTests
         valueSeenByFinish.ShouldBe(99);
     }
 
-    // -- Loop resume (uses separate path — ensure no regression) -----
+    // -- Loop resume (uses separate path â€” ensure no regression) -----
 
     [Test]
     public async Task ResumeAsync_LoopConnection_ResumesCorrectly()

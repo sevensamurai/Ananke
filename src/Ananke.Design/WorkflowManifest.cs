@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Design.Tools;
 
 namespace Ananke.Design;
@@ -792,8 +793,8 @@ public sealed class ModelDefinition
     /// <summary>Provider identifier (e.g. <c>"openai"</c>, <c>"anthropic"</c>).</summary>
     public string Provider { get; set; } = "openai";
 
-    /// <summary>Model name passed to the provider SDK (e.g. <c>"gpt-4.1-mini"</c>).</summary>
-    public string Model { get; set; } = "gpt-4.1-mini";
+    /// <summary>Model name passed to the provider SDK (e.g. <c>"gpt-5.4-mini"</c>).</summary>
+    public string Model { get; set; } = Models.OpenAI.Gpt54Mini;
 
     /// <summary>
     /// Optional custom API endpoint. When set, the provider SDK targets this URL instead of

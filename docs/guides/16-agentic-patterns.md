@@ -1,4 +1,4 @@
-﻿<!-- topic: agentic-patterns, tags: agentic-patterns, review-critique, iterative-refinement, router, handoff, loop -->
+<!-- topic: agentic-patterns, tags: agentic-patterns, review-critique, iterative-refinement, router, handoff, loop -->
 # 16 — Agentic Patterns
 
 Build recognized agentic design patterns with `AgenticPattern` — pre-wired
@@ -182,18 +182,25 @@ var execution = await workflow.RunAsync(initialState);
 // execution.Status == Interrupted — read the question, then resume with the reply:
 var question = await interview.GetQuestion(execution.State, ct);
 var resumed = await workflow.ResumeWithInputAsync(execution.Id, execution.State, reply, interview.FoldAnswer);
+
+// Once the resume above has returned successfully, commit the turn (no-op without WithMemory()):
+await interview.CommitTurnAsync(resumed.State, question, reply, ct);
 ```
 
 `ResumeWithInputAsync` (from [Guide 07 — Human-in-the-Loop](07-human-in-the-loop.md#input-collecting-turns-awaitinput))
 is the channel-agnostic fold-then-resume helper; an adapter just correlates the inbound message to
-`execution.Id` and calls it.
+`execution.Id` and calls it. `GetQuestion` and `FoldAnswer` are pure — they don't touch memory —
+so `CommitTurnAsync` is the only place a turn actually gets persisted, and only once you've
+confirmed the resume succeeded. `CommitTurnAsync` is idempotent (safe to call twice for the same
+turn, e.g. after a host retry), but it isn't a substitute for calling it: skip it and nothing gets
+written.
 
 ### Memory and turn timeouts
 
 ```csharp
 var interview = AgenticPattern.Interview<InterviewState>("screening")
     .WithQuestion(...).WithNavigation(...).Until(...)
-    .WithMemory(conversationMemory, s => s.ConversationId)   // writes each turn to IConversationMemory
+    .WithMemory(conversationMemory, s => s.ConversationId)   // CommitTurnAsync writes each turn here
     .WithTurnTimeout(TimeSpan.FromHours(24))                  // exposed as interview.PauseMessage
     .Build();
 ```
@@ -336,7 +343,7 @@ User message
 SmartToolRouterMiddleware → AgentRequest.Tools
 ```
 
-The biological analogy (from ADR-arch-013): `PinnedToolStage` = autonomic reflex, `HealthFilterStage` = immune exclusion, `SemanticRecallStage` = thalamic gating, `AffinityRerankStage` = synaptic reinforcement, `LlmRouterStage` = prefrontal cortex deliberation.
+The biological analogy: `PinnedToolStage` = autonomic reflex, `HealthFilterStage` = immune exclusion, `SemanticRecallStage` = thalamic gating, `AffinityRerankStage` = synaptic reinforcement, `LlmRouterStage` = prefrontal cortex deliberation.
 
 ### Code-first wiring
 

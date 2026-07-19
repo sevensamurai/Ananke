@@ -56,11 +56,11 @@ internal sealed class AnankeBuilder(IServiceCollection services) : IAnankeBuilde
         {
             var options = new OrganicGrowthOptions
             {
-                Policy         = sp.GetRequiredService<IDivisionPolicy>(),
-                ApprovalGate   = sp.GetRequiredService<IDivisionApprovalGate>(),
-                Monitor        = sp.GetRequiredService<IHealthMonitor>(),
+                Policy = sp.GetRequiredService<IDivisionPolicy>(),
+                ApprovalGate = sp.GetRequiredService<IDivisionApprovalGate>(),
+                Monitor = sp.GetRequiredService<IHealthMonitor>(),
                 MeshAggregator = sp.GetRequiredService<IMeshAggregator>(),
-                Lineage        = sp.GetRequiredService<ILineageStore>()
+                Lineage = sp.GetRequiredService<ILineageStore>()
             };
             configure?.Invoke(options);
             return options;
@@ -68,9 +68,9 @@ internal sealed class AnankeBuilder(IServiceCollection services) : IAnankeBuilde
 
         Services.AddSingleton<OrganicHost>(sp =>
         {
-            var host      = sp.GetRequiredService<IWorkflowHost>();
+            var host = sp.GetRequiredService<IWorkflowHost>();
             var landscape = sp.GetRequiredService<ICapabilityMap>();
-            var options   = sp.GetRequiredService<OrganicGrowthOptions>();
+            var options = sp.GetRequiredService<OrganicGrowthOptions>();
             return new OrganicHost(host, landscape, options);
         });
 

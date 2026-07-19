@@ -24,12 +24,12 @@ public class ColonyGraphBuilderTests
 
     private static WorkflowSignal MakeSignal(
         string name, string domain, params string[] capabilities) => new()
-    {
-        WorkflowName = name,
-        Domain = domain,
-        Capabilities = capabilities.Length > 0 ? capabilities : ["tool-a"],
-        Timestamp = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = name,
+            Domain = domain,
+            Capabilities = capabilities.Length > 0 ? capabilities : ["tool-a"],
+            Timestamp = DateTimeOffset.UtcNow
+        };
 
     // ── Cell nodes ───────────────────────────────────────────────────
 

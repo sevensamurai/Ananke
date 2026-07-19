@@ -21,18 +21,18 @@ public class DomainAffinityMemoryTests
     private static EmpiricalEntry MakeEntry(
         string id = "e1",
         IReadOnlyList<string>? tags = null) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = tags ?? [],
-        Source = "test",
-        Description = SemanticDescription.FromText("test pattern"),
-        Confidence = 0.8f,
-        ObservationCount = 1,
-        Evidence = [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = tags ?? [],
+            Source = "test",
+            Description = SemanticDescription.FromText("test pattern"),
+            Confidence = 0.8f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     // ── CommitAsync ─────────────────────────────────────────────────
 

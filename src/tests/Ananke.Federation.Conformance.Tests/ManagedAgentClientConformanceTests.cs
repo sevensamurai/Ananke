@@ -58,7 +58,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task GetAsync_ExistingId_ReturnsRecord()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
 
         var record = await client.GetAsync(id);
         record.ShouldNotBeNull("GetAsync must return a record for a known deployment ID.");
@@ -69,7 +69,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task GetAsync_ExistingId_RecordPlatformMatchesClient()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
 
         var record = await client.GetAsync(id);
         record.ShouldNotBeNull();
@@ -81,14 +81,14 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task UpdateAsync_ModifiesRecord_VisibleOnSubsequentGet()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
         var before = await client.GetAsync(id);
         before.ShouldNotBeNull();
 
         var updated = before! with
         {
-            Version   = "2.0.0",
-            Status    = DeploymentStatus.Active,
+            Version = "2.0.0",
+            Status = DeploymentStatus.Active,
             UpdatedAt = DateTimeOffset.UtcNow
         };
         await client.UpdateAsync(id, updated);
@@ -102,7 +102,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task DeleteAsync_ExistingId_RecordNoLongerRetrievable()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
 
         await client.DeleteAsync(id);
 
@@ -121,7 +121,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task ListAsync_WhenNoDeployments_ReturnsEmptyList()
     {
         var client = CreateClient();
-        var ids    = await client.ListAsync("workflow-that-was-never-deployed");
+        var ids = await client.ListAsync("workflow-that-was-never-deployed");
 
         ids.ShouldNotBeNull();
         ids.ShouldBeEmpty("List must be empty when no deployments exist for the manifest name.");
@@ -131,7 +131,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task ListAsync_AfterDeploy_ContainsDeploymentId()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
 
         // We need a record with the right WorkflowName — seed via shared-store pair when possible.
         // For abstract subclasses, SeedDeploymentAsync must seed with name "conformance-wf" (default).
@@ -143,7 +143,7 @@ public abstract class ManagedAgentClientConformanceTests
     public async Task ListAsync_AfterDelete_DoesNotContainDeploymentId()
     {
         var client = CreateClient();
-        var id     = await SeedDeploymentAsync(client);
+        var id = await SeedDeploymentAsync(client);
 
         await client.DeleteAsync(id);
 
@@ -196,7 +196,7 @@ internal sealed class FakeAgentClientConformanceTests : ManagedAgentClientConfor
     protected override async Task<string> SeedDeploymentAsync(IManagedAgentClient client)
     {
         var deployer = new FakeConformanceDeployer(_store);
-        var record   = await deployer.DeployAsync(
+        var record = await deployer.DeployAsync(
             FederationConformanceFactory.MakeManifest(),
             FederationConformanceFactory.MakeToolKit(),
             FederationConformanceFactory.MakeOptions());

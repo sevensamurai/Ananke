@@ -41,7 +41,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     private readonly ILogger<AbstractStateMachine<C, S, T, N>> Log = logger ?? NullLogger<AbstractStateMachine<C, S, T, N>>.Instance;
     private readonly List<ITransitionMiddleware<C, S, T>> _middlewares = [];
     private readonly StateMachineOptions _options = options ?? new StateMachineOptions();
-    
+
     private TransitionBuilder<S, T>? _cachedBuilder;
 
     /// <summary>
@@ -190,13 +190,13 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     public virtual async Task<OperationalStatusChange> ResetAsync(C context, string reason)
     {
         var previous = OperationalStatus;
-        
+
         if (previous == OperationalStatus.Operative)
         {
             Log.LogDebug("Already Operative [{Id}]", context.Id);
             return new OperationalStatusChange(false, previous, previous, "Already operative");
         }
-        
+
         OperationalStatus = OperationalStatus.Operative;
         OperationalStatusReason = null;
 
@@ -210,7 +210,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 
         // Persist operative status
         await PersistOperationalStatusAsync(context.Id);
-        
+
         return new OperationalStatusChange(true, previous, OperationalStatus.Operative, reason);
     }
 
@@ -309,7 +309,8 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                     Log.LogWarning("Max interrupt depth ({Depth}) exceeded for context {Id}",
                         _options.MaxInterruptDepth, id);
                     return TransitionResult<S>.Failed(CurrentState,
-                        $"Maximum interrupt depth ({_options.MaxInterruptDepth}) exceeded") with { EventTimestamp = eventTime };
+                        $"Maximum interrupt depth ({_options.MaxInterruptDepth}) exceeded") with
+                    { EventTimestamp = eventTime };
                 }
 
                 persistedContext.InterruptStack.Add(CurrentState);
@@ -321,7 +322,8 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     Log.LogWarning("Resume attempted with empty interrupt stack for context {Id}", id);
                     return TransitionResult<S>.Failed(CurrentState,
-                        "Cannot resume: interrupt stack is empty") with { EventTimestamp = eventTime };
+                        "Cannot resume: interrupt stack is empty") with
+                    { EventTimestamp = eventTime };
                 }
 
                 resolvedFinalState = persistedContext.InterruptStack[^1];
@@ -421,7 +423,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         // Gate: Block transitions if Faulted
         if (OperationalStatus == OperationalStatus.Faulted)
         {
-            Log.LogWarning("Transition BLOCKED [{Id}] - Faulted: {Reason}", 
+            Log.LogWarning("Transition BLOCKED [{Id}] - Faulted: {Reason}",
                 context.Id, OperationalStatusReason);
             return TransitionResult<S>.Failed(CurrentState, $"Faulted: {OperationalStatusReason}") with { EventTimestamp = eventTime };
         }

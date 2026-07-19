@@ -19,10 +19,10 @@ using Anthropic;
 
 // From AnthropicClient
 var client = new AnthropicClient();
-IStreamingAgentModel model = new AnthropicAgentModel(client, "claude-sonnet-4-20250514");
+IStreamingAgentModel model = new AnthropicAgentModel(client, "claude-sonnet-5");
 
 // Or use the convenience factory
-IStreamingAgentModel model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-4-20250514");
+IStreamingAgentModel model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-5");
 ```
 
 ### Use in a workflow agent job

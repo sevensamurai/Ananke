@@ -31,6 +31,9 @@
   <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <!-- Single source of truth for ANNKE002 — the same file Ananke.Abstractions embeds as a
+         resource for ModelLifecycleData's runtime reader (see Ananke.Abstractions.csproj). -->
+    <AdditionalFiles Include="..\Ananke.Abstractions\Agents\model-lifecycle.json" />
   </ItemGroup>
 
-  </Project>
+</Project>

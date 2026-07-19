@@ -520,16 +520,16 @@ public class AdaptiveMeshTests
         DateTimeOffset? lastRequest = null,
         DateTimeOffset? observedSince = null,
         int windowSize = 10) => new()
-    {
-        WorkflowName = name,
-        ErrorRate = 0f,
-        LatencyTrendSlope = 0f,
-        CostTrendSlope = 0f,
-        WindowSize = windowSize,
-        MeasuredAt = DateTimeOffset.UtcNow,
-        LastRequestAt = lastRequest,
-        ObservedSince = observedSince ?? DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = name,
+            ErrorRate = 0f,
+            LatencyTrendSlope = 0f,
+            CostTrendSlope = 0f,
+            WindowSize = windowSize,
+            MeasuredAt = DateTimeOffset.UtcNow,
+            LastRequestAt = lastRequest,
+            ObservedSince = observedSince ?? DateTimeOffset.UtcNow
+        };
 
     /// <summary>Deterministic <see cref="TimeProvider"/> for test isolation.</summary>
     private sealed class FakeClock(DateTimeOffset now) : TimeProvider

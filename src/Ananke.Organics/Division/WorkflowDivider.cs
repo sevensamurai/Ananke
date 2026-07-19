@@ -116,29 +116,29 @@ public sealed class WorkflowDivider(
             }
 
             // ── Step 7: Confirm children started ────────────────────
-                await ConfirmChildrenStarted(spawnedNames, ct);
+            await ConfirmChildrenStarted(spawnedNames, ct);
 
-                // ── Step 7b: Record child births in lineage store ────
-                var parentRecord = await _lineage.GetAsync(plan.ParentWorkflow, ct);
-                var parentGeneration = parentRecord?.Generation ?? 0;
-                foreach (var child in plan.Children)
+            // ── Step 7b: Record child births in lineage store ────
+            var parentRecord = await _lineage.GetAsync(plan.ParentWorkflow, ct);
+            var parentGeneration = parentRecord?.Generation ?? 0;
+            foreach (var child in plan.Children)
+            {
+                await _lineage.RecordBirthAsync(new CellLineage
                 {
-                    await _lineage.RecordBirthAsync(new CellLineage
-                    {
-                        CellId = child.Name,
-                        WorkflowName = child.Name,
-                        ParentCellId = plan.ParentWorkflow,
-                        Generation = parentGeneration + 1,
-                        BornAt = DateTimeOffset.UtcNow,
-                        DivisionReason = plan.Reason,
-                        InheritedDomains = [child.Domain]
-                    }, ct);
-                }
+                    CellId = child.Name,
+                    WorkflowName = child.Name,
+                    ParentCellId = plan.ParentWorkflow,
+                    Generation = parentGeneration + 1,
+                    BornAt = DateTimeOffset.UtcNow,
+                    DivisionReason = plan.Reason,
+                    InheritedDomains = [child.Domain]
+                }, ct);
+            }
 
-                // 5.9: Switchover AFTER children are confirmed so new requests go to children
-                // only once they are actually healthy and ready to accept work.
-                if (transition is not null)
-                    await transition.SwitchoverAsync(plan, spawnedNames, ct).ConfigureAwait(false);
+            // 5.9: Switchover AFTER children are confirmed so new requests go to children
+            // only once they are actually healthy and ready to accept work.
+            if (transition is not null)
+                await transition.SwitchoverAsync(plan, spawnedNames, ct).ConfigureAwait(false);
         }
         catch
         {

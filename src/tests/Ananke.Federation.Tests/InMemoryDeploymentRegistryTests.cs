@@ -15,15 +15,15 @@ public sealed class InMemoryDeploymentRegistryTests
         string id = "dep-1",
         string workflow = "test-workflow",
         DeploymentStatus status = DeploymentStatus.Pending) => new()
-    {
-        DeploymentId = id,
-        WorkflowName = workflow,
-        Platform = "vertex-ai",
-        Version = "1.0.0",
-        Status = status,
-        CreatedAt = DateTimeOffset.UtcNow,
-        UpdatedAt = DateTimeOffset.UtcNow
-    };
+        {
+            DeploymentId = id,
+            WorkflowName = workflow,
+            Platform = "vertex-ai",
+            Version = "1.0.0",
+            Status = status,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
 
     [Test]
     public async Task Register_and_Get_roundtrips()

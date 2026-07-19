@@ -1,5 +1,6 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 
@@ -26,37 +27,37 @@ public class InMemoryEmpiricalMemoryTests
         float confidence = 0.5f,
         IReadOnlyList<string>? tags = null,
         IReadOnlyList<string>? evidence = null) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = tags ?? [],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = evidence ?? [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = tags ?? [],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = evidence ?? [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeSkill(
         string id,
         string description,
         float confidence = 0.5f) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Skill,
-        Tags = [],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow,
-        Goal = "test goal",
-        Steps = ["step 1", "step 2"]
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Skill,
+            Tags = [],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
+            Goal = "test goal",
+            Steps = ["step 1", "step 2"]
+        };
 
     // ── Commit ───────────────────────────────────────────────────
 
@@ -267,6 +268,46 @@ public class InMemoryEmpiricalMemoryTests
 
         var updated = await _memory.GetAsync("p1");
         updated!.LastObserved.ShouldBeGreaterThan(past);
+    }
+
+    // ── TimeProvider injection (no ambient clocks) ────
+
+    [Test]
+    public async Task Reinforce_UsesInjectedTimeProvider_ForLastObserved()
+    {
+        var clock = new FakeTimeProvider();
+        var startTime = clock.GetUtcNow();
+        var memory = new InMemoryEmpiricalMemory(_embedder, timeProvider: clock);
+
+        await memory.CommitAsync(MakePattern("p1", "test") with { LastObserved = startTime });
+
+        clock.Advance(TimeSpan.FromDays(5)); // no real wait
+
+        await memory.ReinforceAsync("p1", new Reinforcement { NewEvidence = [], Source = "test" });
+
+        var updated = await memory.GetAsync("p1");
+        updated!.LastObserved.ShouldBe(startTime + TimeSpan.FromDays(5));
+    }
+
+    [Test]
+    public async Task Recall_StrengthHalfLife_RespondsToInjectedClockAdvance()
+    {
+        var clock = new FakeTimeProvider();
+        var memory = new InMemoryEmpiricalMemory(_embedder,
+            affectOptions: new AffectOptions { StrengthHalfLifeDays = 1f },
+            timeProvider: clock);
+
+        await memory.CommitAsync(MakePattern("p1", "shared unique text") with { LastObserved = clock.GetUtcNow() });
+
+        var freshResults = await memory.RecallAsync("shared unique text");
+        var freshScore = freshResults.Single().Score;
+
+        clock.Advance(TimeSpan.FromDays(30)); // 30 half-lives — no real wait
+
+        var decayedResults = await memory.RecallAsync("shared unique text");
+        var decayedScore = decayedResults.Single().Score;
+
+        decayedScore.ShouldBeLessThan(freshScore);
     }
 
     [Test]
@@ -831,7 +872,7 @@ public class InMemoryEmpiricalMemoryTests
         await withHalfLife.CommitAsync(entry);
         await withoutHalfLife.CommitAsync(entry);
 
-        var decayedResults  = await withHalfLife.RecallAsync("strength decay half life test");
+        var decayedResults = await withHalfLife.RecallAsync("strength decay half life test");
         var baselineResults = await withoutHalfLife.RecallAsync("strength decay half life test");
 
         // 30-day old entry with 1-day half-life → multiplier = 2^-30 ≈ 9.3e-10
@@ -894,7 +935,7 @@ public class InMemoryEmpiricalMemoryTests
         // high overlap: 3 matching tags
         var high = MakePatternWithTags("h1", "high overlap", ["cause:gc", "effect:timeout", "service:api"]);
         // medium overlap: 1 matching tag
-        var med  = MakePatternWithTags("m1", "medium overlap", ["cause:gc"]);
+        var med = MakePatternWithTags("m1", "medium overlap", ["cause:gc"]);
         // no overlap: completely different tags
         var none = MakePatternWithTags("n1", "no overlap", ["cause:cpu", "effect:oom"]);
 
@@ -1006,22 +1047,22 @@ public class InMemoryEmpiricalMemoryTests
 
     private static EmpiricalEntry MakePatternWithTags(
         string id, string summary, IReadOnlyList<string> tags) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = [],
-        Source = "test",
-        Description = new SemanticDescription
         {
-            Summary = summary,
-            SemanticTags = tags.ToDictionary(t => t, _ => 1.0f)
-        },
-        Confidence = 0.8f,
-        ObservationCount = 1,
-        Evidence = [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Description = new SemanticDescription
+            {
+                Summary = summary,
+                SemanticTags = tags.ToDictionary(t => t, _ => 1.0f)
+            },
+            Confidence = 0.8f,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     // ── Test prediction source helpers ──────────────────────────
 

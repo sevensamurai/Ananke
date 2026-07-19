@@ -265,6 +265,55 @@ public class AgentModelMiddlewareTests
         });
     }
 
+    // ── StreamingMode.Buffered (F-2) ───────────────────────────────
+
+    [Test]
+    public async Task Guardrail_Buffered_ViolatingResponse_ThrowsBeforeAnyChunkYielded()
+    {
+        var guardrail = new GuardrailAgentModelMiddleware.Builder()
+            .DenyPattern("forbidden", "FORBIDDEN")
+            .Build();
+
+        var inner = new MultiChunkModel(["Contains ", "FORBIDDEN", " content."]);
+        var model = MiddlewareAgentModel.Wrap(inner, StreamingMode.Buffered, guardrail);
+
+        var observedChunks = 0;
+
+        var ex = await Should.ThrowAsync<GuardrailException>(async () =>
+        {
+            await foreach (var _ in model.GenerateStreamAsync(MakeRequest("test")))
+                observedChunks++;
+        });
+
+        ex.RuleName.ShouldBe("forbidden");
+        observedChunks.ShouldBe(0); // buffered — nothing leaked before the guardrail ran
+    }
+
+    [Test]
+    public async Task Guardrail_Buffered_CleanResponse_ReplaysAllChunks()
+    {
+        var guardrail = new GuardrailAgentModelMiddleware.Builder()
+            .DenyPattern("forbidden", "FORBIDDEN")
+            .Build();
+
+        var inner = new MultiChunkModel(["Hello", " world"]);
+        var model = MiddlewareAgentModel.Wrap(inner, StreamingMode.Buffered, guardrail);
+
+        var deltas = new List<string>();
+        AgentResponse? completed = null;
+
+        await foreach (var chunk in model.GenerateStreamAsync(MakeRequest("test")))
+        {
+            if (chunk.TextDelta is not null)
+                deltas.Add(chunk.TextDelta);
+            if (chunk.CompletedResponse is not null)
+                completed = chunk.CompletedResponse;
+        }
+
+        deltas.ShouldBe(["Hello", " world"]);
+        completed!.Text.ShouldBe("Hello world");
+    }
+
     // ── LoggingAgentModelMiddleware ───────────────────────────────
 
     [Test]

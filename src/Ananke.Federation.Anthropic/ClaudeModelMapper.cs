@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using Ananke.Federation.Validation;
 
@@ -14,30 +15,30 @@ public sealed class ClaudeModelMapper : IModelMapper
     public string Platform => "claude";
 
     // Provider/model → Claude model identifier. Keys are "{provider}/{model}" lowercase.
+    // Deprecated source-model constants are referenced on purpose: manifests written against a
+    // deprecated-but-functional model must keep translating — ANNKE001 is expected here.
+#pragma warning disable ANNKE001
     private static readonly Dictionary<string, string> Mappings = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Anthropic models — pass through
-        [$"anthropic/{Models.Anthropic.Opus4}"] = Models.Anthropic.Opus4,
-        [$"anthropic/{Models.Anthropic.Sonnet4}"] = Models.Anthropic.Sonnet4,
-        [$"anthropic/{Models.Anthropic.Sonnet35}"] = Models.Anthropic.Sonnet35,
-        [$"anthropic/{Models.Anthropic.Haiku35}"] = Models.Anthropic.Haiku35,
+        // Anthropic models — explicit entries are unnecessary (Map() already passes anthropic
+        // models through generically below); the retired Opus4/Sonnet4/Sonnet35/Haiku35 passthrough
+        // entries that used to live here were removed along with the constants.
 
         // OpenAI → nearest Claude equivalent
-        [$"openai/{Models.OpenAI.Gpt41}"] = Models.Anthropic.Sonnet4,
-        [$"openai/{Models.OpenAI.Gpt41Mini}"] = Models.Anthropic.Haiku35,
-        [$"openai/{Models.OpenAI.Gpt41Nano}"] = Models.Anthropic.Haiku35,
-        [$"openai/{Models.OpenAI.Gpt4o}"] = Models.Anthropic.Sonnet4,
-        [$"openai/{Models.OpenAI.Gpt4oMini}"] = Models.Anthropic.Haiku35,
-        [$"openai/{Models.OpenAI.O3}"] = Models.Anthropic.Sonnet4,
-        [$"openai/{Models.OpenAI.O3Mini}"] = Models.Anthropic.Haiku35,
-        [$"openai/{Models.OpenAI.O4Mini}"] = Models.Anthropic.Haiku35,
+        [$"openai/{Models.OpenAI.Gpt41}"] = Models.Anthropic.Sonnet5,
+        [$"openai/{Models.OpenAI.Gpt41Mini}"] = Models.Anthropic.Haiku45,
+        [$"openai/{Models.OpenAI.Gpt41Nano}"] = Models.Anthropic.Haiku45,
+        [$"openai/{Models.OpenAI.Gpt4o}"] = Models.Anthropic.Sonnet5,
+        [$"openai/{Models.OpenAI.Gpt4oMini}"] = Models.Anthropic.Haiku45,
+        [$"openai/{Models.OpenAI.O3}"] = Models.Anthropic.Sonnet5,
+        [$"openai/{Models.OpenAI.O3Mini}"] = Models.Anthropic.Haiku45,
+        [$"openai/{Models.OpenAI.O4Mini}"] = Models.Anthropic.Haiku45,
 
         // Google → nearest Claude equivalent
-        [$"google/{Models.Google.Gemini25Pro}"] = Models.Anthropic.Sonnet4,
-        [$"google/{Models.Google.Gemini25Flash}"] = Models.Anthropic.Haiku35,
-        [$"google/{Models.Google.Gemini20Flash}"] = Models.Anthropic.Haiku35,
-        [$"google/{Models.Google.Gemini20FlashLite}"] = Models.Anthropic.Haiku35,
+        [$"google/{Models.Google.Gemini25Pro}"] = Models.Anthropic.Sonnet5,
+        [$"google/{Models.Google.Gemini25Flash}"] = Models.Anthropic.Haiku45,
     };
+#pragma warning restore ANNKE001
 
     /// <inheritdoc />
     public string? Map(ModelDefinition model)

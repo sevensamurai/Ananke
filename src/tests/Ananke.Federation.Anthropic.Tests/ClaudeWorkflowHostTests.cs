@@ -15,7 +15,7 @@ public sealed class ClaudeWorkflowHostTests
         "models:",
         "  default:",
         "    provider: anthropic",
-        "    model: claude-sonnet-4",
+        "    model: claude-sonnet-5",
         "jobs:",
         "  agent1:",
         "    type: agent",

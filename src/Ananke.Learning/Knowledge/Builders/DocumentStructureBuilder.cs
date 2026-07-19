@@ -37,7 +37,7 @@ namespace Ananke.Learning.Knowledge.Builders;
 public sealed class DocumentStructureBuilder
 {
     private const string EntityMetaPrefix = "entity:";
-    private const string CitesMetaPrefix  = "cites:";
+    private const string CitesMetaPrefix = "cites:";
 
     /// <summary>
     /// Processes a single resolved document and upserts the corresponding
@@ -55,7 +55,7 @@ public sealed class DocumentStructureBuilder
 
         await graph.UpsertNodeAsync(new GraphNode
         {
-            Id   = docNodeId,
+            Id = docNodeId,
             Kind = "document",
         }, ct);
 
@@ -69,9 +69,9 @@ public sealed class DocumentStructureBuilder
                 await graph.UpsertNodeAsync(new GraphNode { Id = entityNodeId, Kind = "entity" }, ct);
                 await graph.UpsertEdgeAsync(new GraphEdge
                 {
-                    FromId     = docNodeId,
-                    ToId       = entityNodeId,
-                    Relation   = "mentions",
+                    FromId = docNodeId,
+                    ToId = entityNodeId,
+                    Relation = "mentions",
                     Provenance = EdgeProvenance.Extracted,
                 }, ct);
             }
@@ -81,9 +81,9 @@ public sealed class DocumentStructureBuilder
                 await graph.UpsertNodeAsync(new GraphNode { Id = citedDocId, Kind = "document" }, ct);
                 await graph.UpsertEdgeAsync(new GraphEdge
                 {
-                    FromId     = docNodeId,
-                    ToId       = citedDocId,
-                    Relation   = "cites",
+                    FromId = docNodeId,
+                    ToId = citedDocId,
+                    Relation = "cites",
                     Provenance = EdgeProvenance.Extracted,
                 }, ct);
             }

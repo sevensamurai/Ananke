@@ -32,6 +32,17 @@ namespace Ananke.Orchestration.Agents.Middleware;
 ///
 /// var model = MiddlewareAgentModel.Wrap(innerModel, guardrail);
 /// </code>
+/// <para>
+/// <b>Streaming:</b> for <see cref="MiddlewareAgentModel.GenerateStreamAsync"/>, this middleware
+/// only runs once the response is fully assembled — under the default
+/// <see cref="StreamingMode.PassThrough"/>, that means a blocked response's content has already
+/// streamed to the consumer chunk-by-chunk by the time the <see cref="GuardrailException"/> is
+/// thrown; the exception stops the final clean result from being delivered, but can't un-send
+/// what already went out. Whenever a deny rule here carries PII or security semantics (like the
+/// <c>pii-ssn</c> example above), wrap with <see cref="StreamingMode.Buffered"/> instead —
+/// <c>MiddlewareAgentModel.Wrap(innerModel, StreamingMode.Buffered, guardrail)</c> — so the
+/// guardrail runs before any chunk reaches the consumer.
+/// </para>
 /// </remarks>
 public sealed class GuardrailAgentModelMiddleware : IAgentModelMiddleware
 {

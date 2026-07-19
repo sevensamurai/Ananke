@@ -29,7 +29,7 @@ public sealed class QuorumApprovalGate(
 
         if (signal.StressRatio >= stressRatioThreshold)
         {
-            var stressPct    = $"{signal.StressRatio * 100:F0}%";
+            var stressPct = $"{signal.StressRatio * 100:F0}%";
             var thresholdPct = $"{stressRatioThreshold * 100:F0}%";
             return Task.FromResult(DivisionApproval.Reject(
                 reason: $"Division blocked by quorum gate: {signal.StressedCells}/{signal.TotalCells} cells stressed " +

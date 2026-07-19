@@ -1,4 +1,4 @@
-﻿# Architecture: Organics & Federation
+# Architecture: Organics & Federation
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers organic colony self-organization and cross-cloud federation.
 

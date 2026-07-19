@@ -1,4 +1,4 @@
-﻿# Build & verify
+# Build & verify
 - Build: `dotnet build --no-restore`
 - Test: `dotnet test --no-build --logger "console;verbosity=normal"`
 
@@ -25,6 +25,13 @@
 - When docs (`docs/`, any `README.md` / `ARCHITECTURE.md`) are touched, run `powershell -File scripts/check-docs.ps1` before opening a PR — it flags stale type/API names. See `scripts/README.md`.
 - Open ADR in internals/design/ before proposing architectural changes
 - Do not modify .csproj files without confirmation
+- Never commit files with a UTF-8 BOM; CI runs `scripts/fix-encoding.ps1 -Check`
+- Provider model lineups (OpenAI/Anthropic/Google) change every few months — check each release
+  whether `Models.cs` and both `ModelCatalog`s need new entries. See "Keeping the model catalog
+  current" in `src/Ananke.Design/README.md`.
+- Referencing a deprecated or retired model id (literal or constant) outside an annotated
+  `#pragma warning disable ANNKE00x` block is a build error, not a warning — see
+  `docs/reference/model-deprecations.md`.
 
 # Code navigation
 - Read `MAP.md` first to find which architecture doc / guide / source dir covers a concept

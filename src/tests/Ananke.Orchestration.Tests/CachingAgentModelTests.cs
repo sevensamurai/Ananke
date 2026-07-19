@@ -5,6 +5,7 @@ using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Agents.Routing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -126,6 +127,81 @@ public class CachingAgentModelTests
         await caching.GenerateAsync(r2);
 
         _inner.GenerateCallCount.ShouldBe(2);
+    }
+
+    // ── TimeProvider injection (no ambient clocks) ────
+
+    [Test]
+    public async Task GenerateAsync_InjectedClockAdvancedPastTtl_TreatsEntryAsExpired()
+    {
+        var clock = new FakeTimeProvider();
+        var caching = new CachingAgentModel(_inner, _cache, TimeSpan.FromMinutes(5), timeProvider: clock);
+        var request = MakeRequest("What?");
+
+        await caching.GenerateAsync(request); // warm cache
+        clock.Advance(TimeSpan.FromMinutes(6)); // past TTL — no real wait
+
+        await caching.GenerateAsync(request);
+
+        _inner.GenerateCallCount.ShouldBe(2); // second call was a miss, not served from cache
+    }
+
+    [Test]
+    public async Task GenerateAsync_InjectedClockWithinTtl_StillServesFromCache()
+    {
+        var clock = new FakeTimeProvider();
+        var caching = new CachingAgentModel(_inner, _cache, TimeSpan.FromMinutes(5), timeProvider: clock);
+        var request = MakeRequest("What?");
+
+        await caching.GenerateAsync(request); // warm cache
+        clock.Advance(TimeSpan.FromMinutes(4)); // still within TTL
+
+        await caching.GenerateAsync(request);
+
+        _inner.GenerateCallCount.ShouldBe(1); // second call was a hit
+    }
+
+    // ── Cache scope prevents cross-model contamination (F-1) ─────
+
+    [Test]
+    public async Task GenerateAsync_TwoModelsSharedCache_DoNotCrossContaminate()
+    {
+        var haiku = new CountingModel("haiku answer");
+        var opus = new CountingModel("opus answer");
+
+        var haikuWrapper = new CachingAgentModel(haiku, _cache, TimeSpan.FromMinutes(5), cacheScope: "haiku");
+        var opusWrapper = new CachingAgentModel(opus, _cache, TimeSpan.FromMinutes(5), cacheScope: "opus");
+
+        var request = MakeRequest("Same prompt to both");
+
+        var haikuResponse = await haikuWrapper.GenerateAsync(request);
+        var opusResponse = await opusWrapper.GenerateAsync(request);
+
+        haikuResponse.Text.ShouldBe("haiku answer");
+        opusResponse.Text.ShouldBe("opus answer");
+        haiku.GenerateCallCount.ShouldBe(1);
+        opus.GenerateCallCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task GenerateAsync_SameInnerTypeNoExplicitScope_SharesCacheAcrossInstances()
+    {
+        // Documents the default-scope limitation called out in the XML doc: inner.GetType().FullName
+        // cannot distinguish two instances of the same provider class configured with different
+        // models — callers in that situation must pass an explicit cacheScope (see the test above).
+        var first = new CountingModel("first answer");
+        var second = new CountingModel("second answer");
+
+        var firstWrapper = new CachingAgentModel(first, _cache, TimeSpan.FromMinutes(5));
+        var secondWrapper = new CachingAgentModel(second, _cache, TimeSpan.FromMinutes(5));
+
+        var request = MakeRequest("Same prompt, same wrapped type, no explicit scope");
+
+        var firstResponse = await firstWrapper.GenerateAsync(request);
+        var secondResponse = await secondWrapper.GenerateAsync(request);
+
+        secondResponse.Text.ShouldBe(firstResponse.Text); // served from firstWrapper's cache entry
+        second.GenerateCallCount.ShouldBe(0); // never actually called — collision confirmed
     }
 
     // ── Validation ───────────────────────────────────────────────

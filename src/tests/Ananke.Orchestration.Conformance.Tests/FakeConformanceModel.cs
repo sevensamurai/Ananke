@@ -20,7 +20,7 @@ namespace Ananke.Orchestration.Conformance.Tests;
 public sealed class FakeConformanceModel : IStreamingAgentModel
 {
     // Deterministic token counts make usage-accounting tests reliable.
-    public const int FakeInputTokens  = 10;
+    public const int FakeInputTokens = 10;
     public const int FakeOutputTokens = 5;
 
     public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
@@ -106,7 +106,7 @@ public sealed class FakeConformanceModel : IStreamingAgentModel
 
     private static TokenUsage MakeUsage() => new()
     {
-        InputTokens  = FakeInputTokens,
+        InputTokens = FakeInputTokens,
         OutputTokens = FakeOutputTokens
     };
 

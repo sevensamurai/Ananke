@@ -255,7 +255,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
     {
         var d = new Dictionary<string, object?>
         {
-            ["id"]   = node.Id,
+            ["id"] = node.Id,
             ["kind"] = node.Kind,
         };
         foreach (var (k, v) in node.Properties)
@@ -285,8 +285,8 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
 
         return new GraphNode
         {
-            Id     = n["id"].As<string>(),
-            Kind   = kind,
+            Id = n["id"].As<string>(),
+            Kind = kind,
             Labels = [kind, .. otherLabels],
             Properties = props,
         };
@@ -311,11 +311,11 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
 
         return new GraphEdge
         {
-            FromId     = r.StartNodeElementId,
-            ToId       = r.EndNodeElementId,
-            Relation   = r.Type,
+            FromId = r.StartNodeElementId,
+            ToId = r.EndNodeElementId,
+            Relation = r.Type,
             Provenance = prov,
-            Weight     = r.Properties.TryGetValue("weight", out var wVal)
+            Weight = r.Properties.TryGetValue("weight", out var wVal)
                              ? (float)wVal.As<double>()
                              : 1f,
             ObservedAt = observedAt,

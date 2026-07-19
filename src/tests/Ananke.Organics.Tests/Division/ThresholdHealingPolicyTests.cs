@@ -23,29 +23,29 @@ public class ThresholdHealingPolicyTests
         string name = "cell-a", float errorRate = 0f,
         float latencySlope = 0f, float costSlope = 0f,
         float workflowErrorRate = 0f, float upstreamErrorRate = 0f) => new()
-    {
-        WorkflowName = name,
-        ErrorRate = errorRate,
-        WorkflowErrorRate = workflowErrorRate,
-        UpstreamErrorRate = upstreamErrorRate,
-        LatencyTrendSlope = latencySlope,
-        CostTrendSlope = costSlope,
-        WindowSize = 10,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = name,
+            ErrorRate = errorRate,
+            WorkflowErrorRate = workflowErrorRate,
+            UpstreamErrorRate = upstreamErrorRate,
+            LatencyTrendSlope = latencySlope,
+            CostTrendSlope = costSlope,
+            WindowSize = 10,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 
     private static ComplexitySnapshot MakeComplexity(
         string name = "cell-a", int toolCount = 4) => new()
-    {
-        WorkflowName = name,
-        ToolCount = toolCount,
-        JobCount = 2,
-        TagClusterCount = 1,
-        RoutingEntropy = 0.5f,
-        ResourceSpan = 2,
-        ContextUtilization = 0.2f,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = name,
+            ToolCount = toolCount,
+            JobCount = 2,
+            TagClusterCount = 1,
+            RoutingEntropy = 0.5f,
+            ResourceSpan = 2,
+            ContextUtilization = 0.2f,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 
     [Test]
     public async Task Healthy_ReturnsNull()

@@ -33,7 +33,7 @@ internal static class PaymentService
 
         var mqttHost = config["Mqtt:Host"];
         var mqttPort = int.TryParse(config["Mqtt:Port"], out var p) ? p : 1883;
-        var mqttNs   = config["Mqtt:Namespace"] ?? "handoff";
+        var mqttNs = config["Mqtt:Namespace"] ?? "handoff";
 
         Console.WriteLine("━━━ Happy Tails — Payment Service ━━━");
 

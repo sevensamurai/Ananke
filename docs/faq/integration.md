@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-integration, tags: faq, human-in-the-loop, mcp, a2a, interop, approval, checkpoint -->
+<!-- topic: faq-integration, tags: faq, human-in-the-loop, mcp, a2a, interop, approval, checkpoint -->
 # FAQ — Integration & Interop
 
 ← [Back to all FAQs](../faq.md)

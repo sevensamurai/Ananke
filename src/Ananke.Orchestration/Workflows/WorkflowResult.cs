@@ -20,13 +20,13 @@ public record WorkflowResult<TState>
         TState finalState,
         TimeSpan duration,
         IReadOnlyList<JobExecution> history) => new()
-    {
-        Success = true,
-        FinalState = finalState,
-        TotalDuration = duration,
-        JobsExecuted = history.Count,
-        History = history
-    };
+        {
+            Success = true,
+            FinalState = finalState,
+            TotalDuration = duration,
+            JobsExecuted = history.Count,
+            History = history
+        };
 
     internal static WorkflowResult<TState> Failed(
         TState currentState,
@@ -34,26 +34,26 @@ public record WorkflowResult<TState>
         IReadOnlyList<JobExecution> history,
         string error,
         Exception? exception = null) => new()
-    {
-        Success = false,
-        FinalState = currentState,
-        TotalDuration = duration,
-        JobsExecuted = history.Count,
-        History = history,
-        Error = error,
-        Exception = exception
-    };
+        {
+            Success = false,
+            FinalState = currentState,
+            TotalDuration = duration,
+            JobsExecuted = history.Count,
+            History = history,
+            Error = error,
+            Exception = exception
+        };
 
     internal static WorkflowResult<TState> Cancelled(
         TState currentState,
         TimeSpan duration,
         IReadOnlyList<JobExecution> history) => new()
-    {
-        Success = false,
-        FinalState = currentState,
-        TotalDuration = duration,
-        JobsExecuted = history.Count,
-        History = history,
-        Error = "Workflow cancelled."
-    };
+        {
+            Success = false,
+            FinalState = currentState,
+            TotalDuration = duration,
+            JobsExecuted = history.Count,
+            History = history,
+            Error = "Workflow cancelled."
+        };
 }

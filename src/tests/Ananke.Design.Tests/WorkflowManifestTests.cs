@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Shouldly;
 
 namespace Ananke.Design.Tests;
@@ -44,7 +45,7 @@ public class WorkflowManifestTests
             "    model: gpt-4.1-mini",
             "  smart:",
             "    provider: anthropic",
-            "    model: claude-sonnet-4",
+            "    model: claude-sonnet-5",
             "jobs:",
             "connections:",
         ]);
@@ -55,7 +56,7 @@ public class WorkflowManifestTests
         manifest.Models["fast"].Model.ShouldBe("gpt-4.1-mini");
 
         manifest.Models["smart"].Provider.ShouldBe("anthropic");
-        manifest.Models["smart"].Model.ShouldBe("claude-sonnet-4");
+        manifest.Models["smart"].Model.ShouldBe("claude-sonnet-5");
     }
 
     [Test]
@@ -87,7 +88,7 @@ public class WorkflowManifestTests
             "connections:",
         ]);
 
-        manifest.Models["minimal"].Model.ShouldBe("gpt-4.1-mini");
+        manifest.Models["minimal"].Model.ShouldBe(Models.OpenAI.Gpt54Mini);
         manifest.Models["minimal"].Endpoint.ShouldBeNull();
     }
 

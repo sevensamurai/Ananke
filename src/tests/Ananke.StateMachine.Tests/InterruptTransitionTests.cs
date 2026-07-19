@@ -1,4 +1,4 @@
-﻿using Ananke.Abstractions.Distributed;
+using Ananke.Abstractions.Distributed;
 using Ananke.StateMachine.Builder;
 using Shouldly;
 

@@ -23,17 +23,17 @@ public class InMemoryEpisodeStoreTests
         float terminalReward = 1.0f,
         int stepCount = 3,
         DateTimeOffset? completedAt = null) => new()
-    {
-        Id = id,
-        Steps = Enumerable.Range(0, stepCount).Select(i => new EpisodeStep
         {
-            StepIndex = i,
-            EntryId = $"{id}_entry_{i}"
-        }).ToList(),
-        TerminalReward = terminalReward,
-        StartedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
-        CompletedAt = completedAt ?? DateTimeOffset.UtcNow
-    };
+            Id = id,
+            Steps = Enumerable.Range(0, stepCount).Select(i => new EpisodeStep
+            {
+                StepIndex = i,
+                EntryId = $"{id}_entry_{i}"
+            }).ToList(),
+            TerminalReward = terminalReward,
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            CompletedAt = completedAt ?? DateTimeOffset.UtcNow
+        };
 
     // ── CommitAndRetrieveEpisode ─────────────────────────────────
 

@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Ananke.Abstractions.Agents;
 using Ananke.Design;
 using Ananke.Federation.Deployment;
 using Ananke.Federation.Prompts;
@@ -167,7 +168,7 @@ public sealed class AzureAgentDeployer(
                     $"Model '{modelDef.Provider}/{modelDef.Model}' has no Azure AI equivalent.");
         }
 
-        return "gpt-4.1-mini"; // sensible default
+        return Models.OpenAI.Gpt54Mini; // sensible default
     }
 
     internal static string BuildAgentRequestBody(string model, string instructions, JsonArray tools)

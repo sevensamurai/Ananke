@@ -30,20 +30,20 @@ public class OfflineLearnerTests
         float confidence = 0.5f,
         float strength = 0.5f,
         float variance = 1.0f) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = [],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow,
-        Strength = strength,
-        Variance = variance
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = [],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow,
+            Strength = strength,
+            Variance = variance
+        };
 
     // ── BrowseAsync ──────────────────────────────────────────────
 
@@ -106,11 +106,11 @@ public class OfflineLearnerTests
     public async Task BrowseOptions_RequiredTags_FiltersEntries()
     {
         await _memory.CommitAsync(MakePattern("p1", "api-gateway deployment to au-prod with connection pool refactor") with
-            { Tags = ["release:v3.1.2", "au-prod"] });
+        { Tags = ["release:v3.1.2", "au-prod"] });
         await _memory.CommitAsync(MakePattern("p2", "background-worker redis client upgrade for memory optimization") with
-            { Tags = ["release:v2.8.1", "nz-prod"] });
+        { Tags = ["release:v2.8.1", "nz-prod"] });
         await _memory.CommitAsync(MakePattern("p3", "iot-ingestion firmware mqtt reconnect backoff logic update") with
-            { Tags = ["release:v3.1.2", "nz-prod"] });
+        { Tags = ["release:v3.1.2", "nz-prod"] });
 
         var results = await _memory.BrowseAsync(new BrowseOptions
         {
@@ -125,9 +125,9 @@ public class OfflineLearnerTests
     public async Task BrowseOptions_MultipleRequiredTags_AppliesAndFilter()
     {
         await _memory.CommitAsync(MakePattern("p1", "api-gateway au-prod deployment") with
-            { Tags = ["release:v3.1.2", "au-prod"] });
+        { Tags = ["release:v3.1.2", "au-prod"] });
         await _memory.CommitAsync(MakePattern("p2", "api-gateway nz-prod deployment") with
-            { Tags = ["release:v3.1.2", "nz-prod"] });
+        { Tags = ["release:v3.1.2", "nz-prod"] });
 
         var results = await _memory.BrowseAsync(new BrowseOptions
         {
@@ -172,7 +172,7 @@ public class OfflineLearnerTests
     public async Task BrowseOptions_CombinesKindAndTags()
     {
         await _memory.CommitAsync(MakePattern("p1", "deployment pattern for api-gateway") with
-            { Tags = ["release:v3.1.2"] });
+        { Tags = ["release:v3.1.2"] });
         await _memory.CommitAsync(new EmpiricalEntry
         {
             Id = "s1",
@@ -201,11 +201,11 @@ public class OfflineLearnerTests
     public async Task BrowseOptions_Pagination_Works()
     {
         await _memory.CommitAsync(MakePattern("p1", "api-gateway v3.1 deployment to au-prod") with
-            { Tags = ["release:v3.1"] });
+        { Tags = ["release:v3.1"] });
         await _memory.CommitAsync(MakePattern("p2", "background-worker v3.1 redis upgrade") with
-            { Tags = ["release:v3.1"] });
+        { Tags = ["release:v3.1"] });
         await _memory.CommitAsync(MakePattern("p3", "iot-ingestion v3.1 mqtt reconnect") with
-            { Tags = ["release:v3.1"] });
+        { Tags = ["release:v3.1"] });
 
         var page1 = await _memory.BrowseAsync(new BrowseOptions
         {
@@ -266,11 +266,11 @@ public class OfflineLearnerTests
     public async Task CountAsync_FilterByTags_ReturnsMatchingCount()
     {
         await _memory.CommitAsync(MakePattern("p1", "api-gateway au-prod deployment event") with
-            { Tags = ["release:v3.1.2", "au-prod"] });
+        { Tags = ["release:v3.1.2", "au-prod"] });
         await _memory.CommitAsync(MakePattern("p2", "background-worker nz-prod redis upgrade") with
-            { Tags = ["release:v2.8.1", "nz-prod"] });
+        { Tags = ["release:v2.8.1", "nz-prod"] });
         await _memory.CommitAsync(MakePattern("p3", "api-gateway nz-prod error timeout") with
-            { Tags = ["release:v3.1.2", "nz-prod"] });
+        { Tags = ["release:v3.1.2", "nz-prod"] });
 
         var v312Count = await _memory.CountAsync(new BrowseOptions
         {
@@ -369,9 +369,11 @@ public class OfflineLearnerTests
     {
         // High-surprise entry should be preferred for exploration
         var curious = MakePattern("curious", "curious high surprise entry",
-            confidence: 0.3f, variance: 0.9f) with { LastPredictionError = 0.8f };
+            confidence: 0.3f, variance: 0.9f) with
+        { LastPredictionError = 0.8f };
         var boring = MakePattern("boring", "boring low surprise entry",
-            confidence: 0.8f, variance: 0.1f) with { LastPredictionError = 0.05f };
+            confidence: 0.8f, variance: 0.1f) with
+        { LastPredictionError = 0.05f };
 
         await _memory.CommitAsync(curious);
         await _memory.CommitAsync(boring);

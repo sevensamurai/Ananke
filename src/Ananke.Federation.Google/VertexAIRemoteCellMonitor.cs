@@ -52,29 +52,29 @@ public sealed class VertexAIRemoteCellMonitor : IRemoteCellMonitor
                 // No recent data — assume healthy (newly deployed or idle)
                 return new RemoteCellHealth
                 {
-                    DeploymentId  = deploymentId,
-                    IsHealthy     = true,
+                    DeploymentId = deploymentId,
+                    IsHealthy = true,
                     LastHeartbeat = DateTimeOffset.UtcNow,
-                    ErrorCount    = 0,
-                    LatencyMs     = 0
+                    ErrorCount = 0,
+                    LatencyMs = 0
                 };
             }
 
-            var errorCount   = traces.Count(t => t.IsError);
-            var errorRate    = (double)errorCount / traces.Count;
+            var errorCount = traces.Count(t => t.IsError);
+            var errorRate = (double)errorCount / traces.Count;
             var avgLatencyMs = traces.Average(t => t.LatencyMs);
             var lastActivity = traces.Max(t => t.StartTime);
 
-            var isHealthy = errorRate    <= _options.ErrorRateThreshold
+            var isHealthy = errorRate <= _options.ErrorRateThreshold
                          && avgLatencyMs <= _options.LatencyThresholdMs;
 
             return new RemoteCellHealth
             {
-                DeploymentId  = deploymentId,
-                IsHealthy     = isHealthy,
+                DeploymentId = deploymentId,
+                IsHealthy = isHealthy,
                 LastHeartbeat = lastActivity,
-                ErrorCount    = errorCount,
-                LatencyMs     = avgLatencyMs
+                ErrorCount = errorCount,
+                LatencyMs = avgLatencyMs
             };
         }
         catch (Exception)
@@ -82,11 +82,11 @@ public sealed class VertexAIRemoteCellMonitor : IRemoteCellMonitor
             // Observability API unavailable — degrade gracefully
             return new RemoteCellHealth
             {
-                DeploymentId  = deploymentId,
-                IsHealthy     = false,
+                DeploymentId = deploymentId,
+                IsHealthy = false,
                 LastHeartbeat = DateTimeOffset.UtcNow,
-                ErrorCount    = 0,
-                LatencyMs     = 0
+                ErrorCount = 0,
+                LatencyMs = 0
             };
         }
     }
@@ -106,35 +106,35 @@ public sealed class VertexAIRemoteCellMonitor : IRemoteCellMonitor
             {
                 return new RemoteCellMetrics
                 {
-                    DeploymentId   = deploymentId,
+                    DeploymentId = deploymentId,
                     ExecutionCount = 0,
-                    TotalTokens    = 0,
-                    ToolCallCount  = 0,
-                    ErrorRate      = 0,
-                    MeasuredAt     = DateTimeOffset.UtcNow
+                    TotalTokens = 0,
+                    ToolCallCount = 0,
+                    ErrorRate = 0,
+                    MeasuredAt = DateTimeOffset.UtcNow
                 };
             }
 
             return new RemoteCellMetrics
             {
-                DeploymentId   = deploymentId,
+                DeploymentId = deploymentId,
                 ExecutionCount = snapshot.ExecutionCount,
-                TotalTokens    = snapshot.TotalTokens,
-                ToolCallCount  = snapshot.ToolCallCount,
-                ErrorRate      = snapshot.ErrorRate,
-                MeasuredAt     = DateTimeOffset.UtcNow
+                TotalTokens = snapshot.TotalTokens,
+                ToolCallCount = snapshot.ToolCallCount,
+                ErrorRate = snapshot.ErrorRate,
+                MeasuredAt = DateTimeOffset.UtcNow
             };
         }
         catch (Exception)
         {
             return new RemoteCellMetrics
             {
-                DeploymentId   = deploymentId,
+                DeploymentId = deploymentId,
                 ExecutionCount = 0,
-                TotalTokens    = 0,
-                ToolCallCount  = 0,
-                ErrorRate      = 0,
-                MeasuredAt     = DateTimeOffset.UtcNow
+                TotalTokens = 0,
+                ToolCallCount = 0,
+                ErrorRate = 0,
+                MeasuredAt = DateTimeOffset.UtcNow
             };
         }
     }

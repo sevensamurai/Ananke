@@ -1,4 +1,4 @@
-﻿# Ananke - Copilot Instructions
+# Ananke - Copilot Instructions
 
 ## Project
 C# .NET 10.0 library for AI agent orchestration. Solution: `src/Ananke.slnx`. Build settings shared via `src/Directory.Build.props`.
@@ -18,7 +18,7 @@ C# .NET 10.0 library for AI agent orchestration. Solution: `src/Ananke.slnx`. Bu
 - **`ConfigureAwait` rule:** add `ConfigureAwait(false)` on `await` calls inside private/internal library helpers and implementations (e.g. store internals, Qdrant helpers, `ToolKit` private methods). Omit it on public pipeline entry points — `IAgentModelMiddleware.OnBeforeGenerateAsync`, `IAgentModelMiddleware.OnAfterGenerateAsync`, `IJob.ExecuteAsync`, and similar — because all supported hosts (ASP.NET Core, hosted services, console) run with no `SynchronizationContext`. Adding it at the public entry-point level is harmless but misleading; it implies callers must propagate it, which they do not.
 
 ## Build Rules
-- `Directory.Build.props` owns `TargetFramework`, `Nullable`, `ImplicitUsings`, `VersionPrefix` â€” never repeat these in individual csproj files
+- `Directory.Build.props` owns `TargetFramework`, `Nullable`, `ImplicitUsings`, `VersionPrefix` — never repeat these in individual csproj files
 - `TreatWarningsAsErrors` is on: zero warnings allowed
 - New packable project: set only `IsPackable`, `PackageId`, `Description`, optionally `PackageTags`; add a `README.md` next to the csproj
 
@@ -28,7 +28,7 @@ C# .NET 10.0 library for AI agent orchestration. Solution: `src/Ananke.slnx`. Bu
 - Test project naming: `Ananke.<Feature>.Tests`; test class naming: `<ClassUnderTest>Tests`
 
 ## Version & Release
-- Version lives in `Directory.Build.props` `<VersionPrefix>` â€” single source of truth
+- Version lives in `Directory.Build.props` `<VersionPrefix>` — single source of truth
 - Add `releases/v{VERSION}.md` before merging (CI enforces this)
 
 ## Architecture Reference

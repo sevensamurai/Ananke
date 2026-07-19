@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Providers;
 using Ananke.Design;
 using Ananke.Federation.Recommendation;
@@ -19,16 +20,16 @@ public sealed class PlatformRecommenderTests
         ManifestGovernance? governance = null,
         ManifestBudget? budget = null,
         ManifestSlo? slo = null) => new()
-    {
-        Name = name,
-        Models = new() { ["default"] = new() { Provider = "openai", Model = "gpt-4.1-mini" } },
-        Jobs = new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
-        Connections = ["agent1"],
-        Intents = intents ?? [],
-        Governance = governance,
-        Budget = budget,
-        Slo = slo
-    };
+        {
+            Name = name,
+            Models = new() { ["default"] = new() { Provider = "openai", Model = Models.OpenAI.Gpt54Mini } },
+            Jobs = new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
+            Connections = ["agent1"],
+            Intents = intents ?? [],
+            Governance = governance,
+            Budget = budget,
+            Slo = slo
+        };
 
     private static ToolKit MakeKit(params (string Name, string Capability)[] nativeTools)
     {
@@ -37,12 +38,12 @@ public sealed class PlatformRecommenderTests
         {
             kit.AddTool(new ToolDefinition
             {
-                Name             = name,
-                Description      = name,
-                Parameters       = [],
-                ExecutionMode    = ToolExecutionMode.PlatformNative,
+                Name = name,
+                Description = name,
+                Parameters = [],
+                ExecutionMode = ToolExecutionMode.PlatformNative,
                 PlatformCapability = cap,
-                Execute          = (_, _) => Task.FromResult(ToolResult.Ok("stub"))
+                Execute = (_, _) => Task.FromResult(ToolResult.Ok("stub"))
             });
         }
         return kit;
@@ -230,7 +231,7 @@ public sealed class PlatformRecommenderTests
             new ToolKit("empty"),
             ["azure-ai", "vertex-ai"]); // azure = medium, vertex = low
 
-        var azure  = report.Scores.First(s => s.Platform == "azure-ai");
+        var azure = report.Scores.First(s => s.Platform == "azure-ai");
         var vertex = report.Scores.First(s => s.Platform == "vertex-ai");
 
         azure.CostLatencyFit.ShouldBeLessThan(vertex.CostLatencyFit);

@@ -189,12 +189,12 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
         // Given 'Limit' is applied at DB level, we might miss recent items if not sorted by time.
         // For now, we apply filters to narrow down the scope.
 
-         var scrollResponse = await _client.ScrollAsync(
-            _collectionName,
-            filter: filter,
-            limit: (uint)options.Limit,
-            payloadSelector: true,
-            cancellationToken: ct);
+        var scrollResponse = await _client.ScrollAsync(
+           _collectionName,
+           filter: filter,
+           limit: (uint)options.Limit,
+           payloadSelector: true,
+           cancellationToken: ct);
 
         return scrollResponse.Result
             .Select(MapRetrievedPoint)

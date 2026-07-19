@@ -25,8 +25,8 @@ public class MqttHandoffChannelReconnectTests
 {
     private static readonly ChannelConfig BadConfig = new()
     {
-        Host      = "127.0.0.1",
-        Port      = 19883,           // nothing listening here
+        Host = "127.0.0.1",
+        Port = 19883,           // nothing listening here
         Namespace = "test"
     };
 

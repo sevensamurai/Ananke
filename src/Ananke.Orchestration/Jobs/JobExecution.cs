@@ -50,13 +50,13 @@ public record JobExecution
     internal static JobExecution FromStopwatch(
         string jobName, Stopwatch sw, bool success,
         string? error = null, JobOutcome? outcome = null) => new()
-    {
-        JobName = jobName,
-        Duration = sw.Elapsed,
-        Success = success,
-        Error = error,
-        StartedAt = DateTimeOffset.UtcNow - sw.Elapsed,
-        CompletedAt = DateTimeOffset.UtcNow,
-        Outcome = outcome ?? (success ? JobOutcome.Success : JobOutcome.Failed)
-    };
+        {
+            JobName = jobName,
+            Duration = sw.Elapsed,
+            Success = success,
+            Error = error,
+            StartedAt = DateTimeOffset.UtcNow - sw.Elapsed,
+            CompletedAt = DateTimeOffset.UtcNow,
+            Outcome = outcome ?? (success ? JobOutcome.Success : JobOutcome.Failed)
+        };
 }

@@ -103,8 +103,10 @@ public sealed class KnowledgeReportExporterTests
         graph.UpsertNodeAsync(new GraphNode { Id = "tag:effect/oom", Kind = "tag" }).GetAwaiter().GetResult();
         graph.UpsertEdgeAsync(new GraphEdge
         {
-            FromId = "tag:cause/gc", ToId = "tag:effect/oom",
-            Relation = "co_occurs", Provenance = EdgeProvenance.Inferred,
+            FromId = "tag:cause/gc",
+            ToId = "tag:effect/oom",
+            Relation = "co_occurs",
+            Provenance = EdgeProvenance.Inferred,
         }).GetAwaiter().GetResult();
 
         return graph;
@@ -116,7 +118,7 @@ public sealed class KnowledgeReportExporterTests
             IKnowledgeGraph graph, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyDictionary<string, int>>(new Dictionary<string, int>
             {
-                ["tag:cause/gc"]  = 0,
+                ["tag:cause/gc"] = 0,
                 ["tag:effect/oom"] = 0,
             });
     }

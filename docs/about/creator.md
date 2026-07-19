@@ -1,4 +1,4 @@
-﻿<!-- topic: about-creator, tags: about, creator, biography, background -->
+<!-- topic: about-creator, tags: about, creator, biography, background -->
 # The Creator
 
 I'm Patricio. I design systems the way an artist lets form emerge — guided by simplicity, precision, and the pursuit of functional beauty.

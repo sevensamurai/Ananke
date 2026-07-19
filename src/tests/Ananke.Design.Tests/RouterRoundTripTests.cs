@@ -311,8 +311,13 @@ public class RouterStageFactoryTests
             Models = [],
             Tools = new Dictionary<string, ToolManifestEntry>
             {
-                ["search"] = new() { Key = "search", Name = "search", Description = "Search",
-                    Binding = new ToolManifestBinding { Reference = "code:search" } }
+                ["search"] = new()
+                {
+                    Key = "search",
+                    Name = "search",
+                    Description = "Search",
+                    Binding = new ToolManifestBinding { Reference = "code:search" }
+                }
             },
             Jobs = new Dictionary<string, JobDefinition>
             {
@@ -330,7 +335,8 @@ public class RouterStageFactoryTests
 
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Search",
+            Name = "search",
+            Description = "Search",
             Parameters = [],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };
@@ -352,8 +358,13 @@ public class RouterStageFactoryTests
             Models = [],
             Tools = new Dictionary<string, ToolManifestEntry>
             {
-                ["search"] = new() { Key = "search", Name = "search", Description = "Search",
-                    Binding = new ToolManifestBinding { Reference = "code:search" } }
+                ["search"] = new()
+                {
+                    Key = "search",
+                    Name = "search",
+                    Description = "Search",
+                    Binding = new ToolManifestBinding { Reference = "code:search" }
+                }
             },
             Jobs = new Dictionary<string, JobDefinition>
             {
@@ -364,7 +375,8 @@ public class RouterStageFactoryTests
 
         var tool = new ToolDefinition
         {
-            Name = "search", Description = "Search",
+            Name = "search",
+            Description = "Search",
             Parameters = [],
             Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
         };

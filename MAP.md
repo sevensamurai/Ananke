@@ -2,7 +2,6 @@
 
 > Read this before opening any other architecture or doc file. It is the index over the
 > doc systems below — it does not duplicate their content, only points into it.
-> Background: `internals/design/20260620-adr-arch-021-llm-documentation-navigation.md` §4.3.
 
 ## Which file answers which question
 

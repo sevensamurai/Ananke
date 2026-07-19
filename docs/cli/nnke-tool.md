@@ -1,4 +1,4 @@
-﻿<!-- topic: nnke, tags: nnke, dotnet-tool, copilot, claude, design-tooling, workflow-dsl, mcp -->
+<!-- topic: nnke, tags: nnke, dotnet-tool, copilot, claude, design-tooling, workflow-dsl, mcp -->
 # nnke Tool Companion
 
 `nnke` is the design-time CLI for Ananke: scaffold projects, validate manifests, inspect topology, browse docs, and expose those capabilities to MCP-enabled editors.

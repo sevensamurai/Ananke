@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-providers, tags: faq, llm, providers, openai, anthropic, google, ollama, azure -->
+<!-- topic: faq-providers, tags: faq, llm, providers, openai, anthropic, google, ollama, azure -->
 # FAQ — LLM Providers
 
 ← [Back to all FAQs](../faq.md)

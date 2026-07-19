@@ -25,7 +25,7 @@ internal sealed class FakeConformanceDeployer : IFederationDeployer
         Dictionary<string, DeploymentRecord> sharedStore,
         string platform = "fake")
     {
-        _store    = sharedStore;
+        _store = sharedStore;
         _platform = platform;
     }
 
@@ -56,15 +56,15 @@ internal sealed class FakeConformanceDeployer : IFederationDeployer
 
         var record = new DeploymentRecord
         {
-            DeploymentId       = $"{_platform}::{manifest.Name}::{Guid.NewGuid():N}",
-            WorkflowName       = manifest.Name,
-            Platform           = _platform,
+            DeploymentId = $"{_platform}::{manifest.Name}::{Guid.NewGuid():N}",
+            WorkflowName = manifest.Name,
+            Platform = _platform,
             PlatformResourceId = $"fake/agents/{manifest.Name}",
-            Version            = "1.0.0",
-            Status             = DeploymentStatus.Active,
-            CreatedAt          = DateTimeOffset.UtcNow,
-            UpdatedAt          = DateTimeOffset.UtcNow,
-            Tags               = options.Tags
+            Version = "1.0.0",
+            Status = DeploymentStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Tags = options.Tags
         };
         _store[record.DeploymentId] = record;
         return Task.FromResult(record);
@@ -81,7 +81,7 @@ internal sealed class FakeConformanceDeployer : IFederationDeployer
         if (_store.TryGetValue(deploymentId, out var existing))
             _store[deploymentId] = existing with
             {
-                Status    = DeploymentStatus.Failed,
+                Status = DeploymentStatus.Failed,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
         return Task.CompletedTask;
@@ -106,7 +106,7 @@ internal sealed class FakeConformanceAgentClient : IManagedAgentClient
         Dictionary<string, DeploymentRecord> store,
         string platform = "fake")
     {
-        _store    = store;
+        _store = store;
         _platform = platform;
     }
 

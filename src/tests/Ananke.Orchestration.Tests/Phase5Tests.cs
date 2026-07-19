@@ -210,7 +210,7 @@ public class McpToolInvokerTests
     {
         var memory = new InMemoryToolMemory();
         await memory.UpsertAsync(new ToolMemoryEntry
-            { KitName = "kit", ToolName = "tool", Description = "t" });
+        { KitName = "kit", ToolName = "tool", Description = "t" });
 
         var observer = new InMemoryToolFaultObserver(memory);
 

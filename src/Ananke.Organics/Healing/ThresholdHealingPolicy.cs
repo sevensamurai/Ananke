@@ -122,9 +122,9 @@ public sealed class ThresholdHealingPolicy : IHealingPolicy
             ? HealingStrategy.Restart
             : HealingStrategy.Rollback;
 
-        var effectivePct   = effectiveErrorRate.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
-        var thresholdPct   = ErrorRateThreshold.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
-        var upstreamPct    = health.UpstreamErrorRate.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
+        var effectivePct = effectiveErrorRate.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
+        var thresholdPct = ErrorRateThreshold.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
+        var upstreamPct = health.UpstreamErrorRate.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
 
         var reason = $"Workflow error rate {Pct(effectiveErrorRate)} exceeded threshold {Pct(ErrorRateThreshold)} " +
                      $"for {count} consecutive evaluation windows" +

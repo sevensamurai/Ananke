@@ -1,4 +1,4 @@
-﻿<!-- topic: nnke-tools, tags: nnke, nnke-platform, dotnet-tool, cli, tooling, design, federation, deployment -->
+<!-- topic: nnke-tools, tags: nnke, nnke-platform, dotnet-tool, cli, tooling, design, federation, deployment -->
 # nnke Tools
 
 Ananke ships two focused .NET global tools. They are intentionally separate: `nnke` stays lean

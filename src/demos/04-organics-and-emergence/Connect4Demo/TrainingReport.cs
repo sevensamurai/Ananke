@@ -257,7 +257,7 @@ internal static class TrainingReport
             >= 4 => "GOOD — clear learning signal",
             >= 2 => "FAIR — some learning, room for improvement",
             >= 0 => "INCONCLUSIVE — no clear signal",
-            _    => "POOR — learning approach needs revision"
+            _ => "POOR — learning approach needs revision"
         };
         Console.WriteLine($"  Score: {score}/7  →  {grade}");
     }

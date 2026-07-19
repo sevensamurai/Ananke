@@ -15,18 +15,16 @@ public sealed class ClaudeModelMapperTests
     [TestCase("anthropic", "claude-sonnet-4", "claude-sonnet-4")]
     [TestCase("anthropic", "claude-3-5-sonnet", "claude-3-5-sonnet")]
     [TestCase("anthropic", "claude-3-5-haiku", "claude-3-5-haiku")]
-    [TestCase("openai", "gpt-4.1", "claude-sonnet-4")]
-    [TestCase("openai", "gpt-4.1-mini", "claude-3-5-haiku")]
-    [TestCase("openai", "gpt-4.1-nano", "claude-3-5-haiku")]
-    [TestCase("openai", "gpt-4o", "claude-sonnet-4")]
-    [TestCase("openai", "gpt-4o-mini", "claude-3-5-haiku")]
-    [TestCase("openai", "o3", "claude-sonnet-4")]
-    [TestCase("openai", "o3-mini", "claude-3-5-haiku")]
-    [TestCase("openai", "o4-mini", "claude-3-5-haiku")]
-    [TestCase("google", "gemini-2.5-pro", "claude-sonnet-4")]
-    [TestCase("google", "gemini-2.5-flash", "claude-3-5-haiku")]
-    [TestCase("google", "gemini-2.0-flash", "claude-3-5-haiku")]
-    [TestCase("google", "gemini-2.0-flash-lite", "claude-3-5-haiku")]
+    [TestCase("openai", "gpt-4.1", "claude-sonnet-5")]
+    [TestCase("openai", "gpt-4.1-mini", "claude-haiku-4-5")]
+    [TestCase("openai", "gpt-4.1-nano", "claude-haiku-4-5")]
+    [TestCase("openai", "gpt-4o", "claude-sonnet-5")]
+    [TestCase("openai", "gpt-4o-mini", "claude-haiku-4-5")]
+    [TestCase("openai", "o3", "claude-sonnet-5")]
+    [TestCase("openai", "o3-mini", "claude-haiku-4-5")]
+    [TestCase("openai", "o4-mini", "claude-haiku-4-5")]
+    [TestCase("google", "gemini-2.5-pro", "claude-sonnet-5")]
+    [TestCase("google", "gemini-2.5-flash", "claude-haiku-4-5")]
     public void Known_models_map_correctly(string provider, string model, string expected)
     {
         var result = _mapper.Map(new ModelDefinition { Provider = provider, Model = model });
@@ -57,7 +55,7 @@ public sealed class ClaudeModelMapperTests
     [Test]
     public void Mapping_is_case_insensitive()
     {
-        var result = _mapper.Map(new ModelDefinition { Provider = "Anthropic", Model = "Claude-Sonnet-4" });
-        result.ShouldBe("claude-sonnet-4");
+        var result = _mapper.Map(new ModelDefinition { Provider = "OpenAI", Model = "GPT-4.1" });
+        result.ShouldBe("claude-sonnet-5");
     }
 }

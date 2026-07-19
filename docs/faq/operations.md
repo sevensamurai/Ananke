@@ -1,4 +1,4 @@
-﻿<!-- topic: faq-operations, tags: faq, testing, observability, opentelemetry, architecture, design, orleans -->
+<!-- topic: faq-operations, tags: faq, testing, observability, opentelemetry, architecture, design, orleans -->
 # FAQ — Testing, Observability & Design
 
 ← [Back to all FAQs](../faq.md)

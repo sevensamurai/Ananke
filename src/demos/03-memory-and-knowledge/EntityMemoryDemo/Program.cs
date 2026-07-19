@@ -46,10 +46,10 @@ var provider = new EntityMemoryProvider(conversations, empirical, knowledge, epi
 var catalog = new Dictionary<string, string[]>
 {
     ["minimalist"] = ["Walnut slab desk", "Floating shelf set", "Linen sofa — oatmeal"],
-    ["baroque"]    = ["Gilt-frame mirror", "Carved mahogany armchair", "Velvet chaise lounge"],
-    ["art-deco"]   = ["Brass arc floor lamp", "Geometric side table", "Emerald velvet chair"],
+    ["baroque"] = ["Gilt-frame mirror", "Carved mahogany armchair", "Velvet chaise lounge"],
+    ["art-deco"] = ["Brass arc floor lamp", "Geometric side table", "Emerald velvet chair"],
     ["sustainable"] = ["Reclaimed oak dining table", "Bamboo bookshelf", "Cork stool set"],
-    ["general"]    = ["Cotton throw blanket", "Ceramic table lamp", "Woven rug — neutral"]
+    ["general"] = ["Cotton throw blanket", "Ceramic table lamp", "Woven rug — neutral"]
 };
 
 // ── Build the shopping workflow ──────────────────────────────────

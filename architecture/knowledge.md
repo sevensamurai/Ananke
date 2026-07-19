@@ -1,4 +1,4 @@
-﻿# Architecture: Knowledge Pipeline
+# Architecture: Knowledge Pipeline
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers vector stores, document processing, catalog, and document linking.
 

@@ -400,53 +400,53 @@ public class EmpiricalMemoryTests
         string? effect = null,
         float confidence = 0.4f,
         IReadOnlyList<string>? tags = null) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Pattern,
-        Tags = tags ?? ["test"],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Condition = condition,
-        Effect = effect,
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [$"test-evidence-{id}"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Pattern,
+            Tags = tags ?? ["test"],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Condition = condition,
+            Effect = effect,
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [$"test-evidence-{id}"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeHeuristic(
         string id,
         string description,
         float confidence = 0.4f,
         IReadOnlyList<string>? tags = null) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Heuristic,
-        Tags = tags ?? ["test"],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [$"test-evidence-{id}"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Heuristic,
+            Tags = tags ?? ["test"],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [$"test-evidence-{id}"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 
     private static EmpiricalEntry MakeSkill(
         string id,
         string description,
         float confidence = 0.4f) => new()
-    {
-        Id = id,
-        Kind = EmpiricalKind.Skill,
-        Tags = ["test"],
-        Source = "test",
-        Description = SemanticDescription.FromText(description),
-        Confidence = confidence,
-        ObservationCount = 1,
-        Evidence = [$"test-evidence-{id}"],
-        FirstObserved = DateTimeOffset.UtcNow,
-        LastObserved = DateTimeOffset.UtcNow
-    };
+        {
+            Id = id,
+            Kind = EmpiricalKind.Skill,
+            Tags = ["test"],
+            Source = "test",
+            Description = SemanticDescription.FromText(description),
+            Confidence = confidence,
+            ObservationCount = 1,
+            Evidence = [$"test-evidence-{id}"],
+            FirstObserved = DateTimeOffset.UtcNow,
+            LastObserved = DateTimeOffset.UtcNow
+        };
 }

@@ -1306,6 +1306,7 @@
                             <a class="btn-secondary" href="#cli/overview.md"><i data-lucide="code-2" style="width:15px;height:15px"></i> CLI</a>
                             <a class="btn-secondary" href="${siteData.repo}" target="_blank"><i data-lucide="github" style="width:15px;height:15px"></i> GitHub</a>
                         </div>
+                        <h2 id="features">Features</h2>
                         <div class="hero-cards">
                             <div class="hero-card">
                                 <div class="card-icon"><i data-lucide="git-merge"></i></div>
@@ -1399,8 +1400,8 @@
 
                 let html = '<div class="toc-title">On this page</div>';
                 headings.forEach(h => {
-                    const level = h.tagName === 'H3' ? ' toc-h3' : '';
-                    html += `<a class="${level}" data-target="${h.id}">${h.textContent}</a>`;
+                    if (h.tagName === 'H3') return;   // show only h2 to keep the list concise
+                    html += `<a href="#${h.id}" data-target="${h.id}">${h.textContent}</a>`;
                 });
                 tocEl.innerHTML = html;
 

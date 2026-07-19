@@ -115,6 +115,12 @@ public class RetryAttributeTests
         }
     }
 
+    // Both fakes throw TimeoutException rather than a plain InvalidOperationException: since the
+    // 4.2 retry-predicate fix (F-3), only rate-limit-shaped and TimeoutException failures are
+    // retried by default — a bare InvalidOperationException is now correctly treated as
+    // non-retryable and rethrown on the first attempt, which would defeat these tests' whole
+    // premise of exercising the retry loop itself.
+
     private sealed class FailThenSucceedModel(int failCount, string successText) : IAgentModel
     {
         private int _calls;
@@ -122,7 +128,7 @@ public class RetryAttributeTests
         public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
         {
             if (_calls++ < failCount)
-                throw new InvalidOperationException("transient failure");
+                throw new TimeoutException("transient failure");
             return Task.FromResult(new AgentResponse { Text = successText });
         }
     }
@@ -130,6 +136,6 @@ public class RetryAttributeTests
     private sealed class AlwaysFailingModel : IAgentModel
     {
         public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
-            throw new InvalidOperationException("always fails");
+            throw new TimeoutException("always fails");
     }
 }

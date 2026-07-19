@@ -57,7 +57,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
         // Upsert episode node.
         await graph.UpsertNodeAsync(new GraphNode
         {
-            Id   = EpisodeId(episode.Id),
+            Id = EpisodeId(episode.Id),
             Kind = "episode",
             Properties = new Dictionary<string, string>
             {
@@ -76,9 +76,9 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
             // entry → episode
             await graph.UpsertEdgeAsync(new GraphEdge
             {
-                FromId     = entryNodeId,
-                ToId       = EpisodeId(episode.Id),
-                Relation   = "step_of",
+                FromId = entryNodeId,
+                ToId = EpisodeId(episode.Id),
+                Relation = "step_of",
                 Provenance = EdgeProvenance.Extracted,
             }, ct);
 
@@ -87,9 +87,9 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
             {
                 await graph.UpsertEdgeAsync(new GraphEdge
                 {
-                    FromId     = previousEntryNodeId,
-                    ToId       = entryNodeId,
-                    Relation   = "follows",
+                    FromId = previousEntryNodeId,
+                    ToId = entryNodeId,
+                    Relation = "follows",
                     Provenance = EdgeProvenance.Extracted,
                 }, ct);
             }
@@ -99,5 +99,5 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
     }
 
     internal static string EpisodeId(string id) => $"episode:{id}";
-    internal static string EntryId(string id)   => $"entry:{id}";
+    internal static string EntryId(string id) => $"entry:{id}";
 }

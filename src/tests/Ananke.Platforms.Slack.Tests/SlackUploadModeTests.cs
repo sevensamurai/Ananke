@@ -161,31 +161,31 @@ public sealed class SlackUploadModeTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new FileAndCommentsResponse());
 
-        #pragma warning disable CS0618
-                public Task<FileResponse> Upload(
-                    string fileContents, string fileType = null!, string fileName = null!,
-                    string title = null!, string initialComment = null!, string threadTs = null!,
-                    IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
-                    Task.FromResult(new FileResponse());
+#pragma warning disable CS0618
+        public Task<FileResponse> Upload(
+            string fileContents, string fileType = null!, string fileName = null!,
+            string title = null!, string initialComment = null!, string threadTs = null!,
+            IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FileResponse());
 
-                public Task<FileResponse> Upload(
-                    byte[] fileContents, string fileType = null!, string fileName = null!,
-                    string title = null!, string initialComment = null!, string threadTs = null!,
-                    IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
-                    Task.FromResult(new FileResponse());
+        public Task<FileResponse> Upload(
+            byte[] fileContents, string fileType = null!, string fileName = null!,
+            string title = null!, string initialComment = null!, string threadTs = null!,
+            IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FileResponse());
 
-                public Task<FileResponse> Upload(
-                    Stream fileContents, string fileType = null!, string fileName = null!,
-                    string title = null!, string initialComment = null!, string threadTs = null!,
-                    IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
-                    Task.FromResult(new FileResponse());
+        public Task<FileResponse> Upload(
+            Stream fileContents, string fileType = null!, string fileName = null!,
+            string title = null!, string initialComment = null!, string threadTs = null!,
+            IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FileResponse());
 
-                public Task<FileResponse> UploadSnippet(
-                    string content, string fileType = null!, string filename = null!,
-                    string title = null!, string initialComment = null!, string threadTs = null!,
-                    IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
-                    Task.FromResult(new FileResponse());
-        #pragma warning restore CS0618
+        public Task<FileResponse> UploadSnippet(
+            string content, string fileType = null!, string filename = null!,
+            string title = null!, string initialComment = null!, string threadTs = null!,
+            IEnumerable<string> channels = null!, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FileResponse());
+#pragma warning restore CS0618
 
         public Task<ExternalFileReference> Upload(FileUpload file,
             string channelId = null!, string threadTs = null!,

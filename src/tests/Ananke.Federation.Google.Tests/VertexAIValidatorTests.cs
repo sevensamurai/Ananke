@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Providers;
 using Ananke.Design;
 using Ananke.Orchestration.Tools;
@@ -10,13 +11,13 @@ public sealed class VertexAIValidatorTests
 {
     private static WorkflowManifest MakeManifest(
         string provider = "openai",
-        string model = "gpt-4.1-mini") => new()
-    {
-        Name = "test",
-        Models = new() { ["default"] = new() { Provider = provider, Model = model } },
-        Jobs = new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
-        Connections = ["agent1"]
-    };
+        string model = Models.OpenAI.Gpt54Mini) => new()
+        {
+            Name = "test",
+            Models = new() { ["default"] = new() { Provider = provider, Model = model } },
+            Jobs = new() { ["agent1"] = new() { Type = "agent", ModelAlias = "default" } },
+            Connections = ["agent1"]
+        };
 
     private static ToolKit MakeToolKit(ToolExecutionMode mode = ToolExecutionMode.Callback)
     {

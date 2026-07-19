@@ -87,9 +87,9 @@ public class LoggingMiddleware<C, S, T> : ITransitionMiddleware<C, S, T>
         Func<Task<TransitionResult<S>>> next)
     {
         _logAction?.Invoke($"[{context.Id}] Attempting transition: {currentState} --({transition})--> ?");
-        
+
         var result = await next();
-        
+
         if (result.Success)
         {
             _logAction?.Invoke($"[{context.Id}] Transition succeeded: {result.PreviousState} --({transition})--> {result.CurrentState}");
@@ -98,7 +98,7 @@ public class LoggingMiddleware<C, S, T> : ITransitionMiddleware<C, S, T>
         {
             _logAction?.Invoke($"[{context.Id}] Transition failed: {result.ErrorMessage}");
         }
-        
+
         return result;
     }
 }

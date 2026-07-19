@@ -48,7 +48,7 @@ public class MultiModelBudgetTests
     {
         var profile = new ModelProfile
         {
-            Name = "gpt-4.1",
+            Name = Models.OpenAI.Gpt55,
             Model = new FakeModel(),
             CostPer1KInputTokens = 0.002m,
             CostPer1KOutputTokens = 0.008m
@@ -64,7 +64,7 @@ public class MultiModelBudgetTests
     {
         var profile = new ModelProfile
         {
-            Name = "gpt-4.1-mini",
+            Name = Models.OpenAI.Gpt54Mini,
             Model = new FakeModel(),
             CostPer1KTokens = 0.15m
         };
@@ -258,7 +258,7 @@ public class MultiModelBudgetTests
         var cloudRouter = new CapabilityModelRouter()
             .AddModel(new ModelProfile
             {
-                Name = "gpt-4.1-mini",
+                Name = Models.OpenAI.Gpt54Mini,
                 Model = cloudModel,
                 Capabilities = ModelCapability.TextGeneration | ModelCapability.StructuredOutput,
                 IntelligenceTier = 3,

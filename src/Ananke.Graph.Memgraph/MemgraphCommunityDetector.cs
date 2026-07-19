@@ -30,10 +30,10 @@ public sealed class MemgraphCommunityDetector(MemgraphSessionFactory factory) : 
             var results = new Dictionary<string, int>(StringComparer.Ordinal);
             while (await cursor.FetchAsync().ConfigureAwait(false))
             {
-                var node        = cursor.Current["node"].As<INode>();
+                var node = cursor.Current["node"].As<INode>();
                 var communityId = cursor.Current["community_id"].As<int>();
-                var id          = node["id"].As<string>();
-                results[id]     = communityId;
+                var id = node["id"].As<string>();
+                results[id] = communityId;
             }
 
             return (IReadOnlyDictionary<string, int>)results;

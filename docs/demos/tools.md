@@ -1,4 +1,4 @@
-﻿<!-- topic: demos-tools, tags: demo, tools, toolkit, function-calling, typed-parameters, async-tools, custom-tool, structured-output -->
+<!-- topic: demos-tools, tags: demo, tools, toolkit, function-calling, typed-parameters, async-tools, custom-tool, structured-output -->
 # Demo — Tools
 
 Register built-in tools and author custom tools that LLMs can call during agent workflows.

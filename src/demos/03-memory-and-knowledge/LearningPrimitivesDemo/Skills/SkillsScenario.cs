@@ -96,7 +96,7 @@ internal static class SkillsScenario
         Console.WriteLine();
 
         IAgentModel model = new OpenAIChatAgentModel(
-            new ChatClient("gpt-4.1-mini", new ApiKeyCredential(apiKey)));
+            new ChatClient(Models.OpenAI.Gpt54Mini, new ApiKeyCredential(apiKey)));
 
         var agent = new AgentJob<DemoState, DemoResult>.Builder("ascii-artist", model)
             .WithSystemPrompt("""

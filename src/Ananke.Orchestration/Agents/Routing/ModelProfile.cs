@@ -82,6 +82,18 @@ public sealed record ModelProfile
     public int SpeedTier { get; init; } = 1;
 
     /// <summary>
+    /// Lifecycle stage of <see cref="Name"/>. Defaults to <see cref="ModelStatus.Current"/> for
+    /// profiles constructed directly — only catalog-sourced profiles
+    /// (<see cref="ModelProfileTemplate.ToProfile(IAgentModel, ModelCostRates)"/>) carry a
+    /// curated value. <see cref="CapabilityModelRouter"/> logs a once-per-process warning when
+    /// it routes to a <see cref="ModelStatus.Deprecated"/> profile.
+    /// </summary>
+    public ModelStatus Status { get; init; } = ModelStatus.Current;
+
+    /// <summary>Recommended replacement model name when <see cref="Status"/> is not <see cref="ModelStatus.Current"/>.</summary>
+    public string? ReplacedBy { get; init; }
+
+    /// <summary>
     /// Resolves the cost rates for this model. Uses <see cref="CostPer1KInputTokens"/> and
     /// <see cref="CostPer1KOutputTokens"/> when set, otherwise falls back to
     /// <see cref="CostPer1KTokens"/> for both. Returns <see cref="ModelCostRates.Zero"/>

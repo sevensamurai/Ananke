@@ -55,35 +55,45 @@ public record Checkpoint<TState>
     /// </summary>
     public IReadOnlyDictionary<string, int> LoopCounters { get; init; } = new Dictionary<string, int>();
 
-    internal static Checkpoint<TState> Create(WorkflowExecution<TState> execution, TimeSpan? ttl = null) => new()
+    internal static Checkpoint<TState> Create(
+        WorkflowExecution<TState> execution, TimeSpan? ttl = null, TimeProvider? timeProvider = null)
     {
-        ExecutionId = execution.Id,
-        WorkflowName = execution.WorkflowName,
-        CurrentJob = execution.CurrentJob ?? string.Empty,
-        State = execution.State,
-        Status = execution.Status,
-        History = [.. execution.History],
-        Metadata = execution.Metadata,
-        LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
-        CreatedAt = DateTimeOffset.UtcNow,
-        ExpiresAt = DateTimeOffset.UtcNow + (ttl ?? TimeSpan.FromDays(7))
-    };
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        return new()
+        {
+            ExecutionId = execution.Id,
+            WorkflowName = execution.WorkflowName,
+            CurrentJob = execution.CurrentJob ?? string.Empty,
+            State = execution.State,
+            Status = execution.Status,
+            History = [.. execution.History],
+            Metadata = execution.Metadata,
+            LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
+            CreatedAt = now,
+            ExpiresAt = now + (ttl ?? TimeSpan.FromDays(7))
+        };
+    }
 
     internal static Checkpoint<TState> CreateInterrupt(
         WorkflowExecution<TState> execution,
         string interruptedBeforeJob,
-        TimeSpan? ttl = null) => new()
+        TimeSpan? ttl = null,
+        TimeProvider? timeProvider = null)
     {
-        ExecutionId = execution.Id,
-        WorkflowName = execution.WorkflowName,
-        CurrentJob = execution.CurrentJob ?? string.Empty,
-        State = execution.State,
-        Status = ExecutionStatus.Interrupted,
-        History = [.. execution.History],
-        Metadata = execution.Metadata,
-        LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
-        InterruptedBeforeJob = interruptedBeforeJob,
-        CreatedAt = DateTimeOffset.UtcNow,
-        ExpiresAt = DateTimeOffset.UtcNow + (ttl ?? TimeSpan.FromDays(7))
-    };
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        return new()
+        {
+            ExecutionId = execution.Id,
+            WorkflowName = execution.WorkflowName,
+            CurrentJob = execution.CurrentJob ?? string.Empty,
+            State = execution.State,
+            Status = ExecutionStatus.Interrupted,
+            History = [.. execution.History],
+            Metadata = execution.Metadata,
+            LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
+            InterruptedBeforeJob = interruptedBeforeJob,
+            CreatedAt = now,
+            ExpiresAt = now + (ttl ?? TimeSpan.FromDays(7))
+        };
+    }
 }

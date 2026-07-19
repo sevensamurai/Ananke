@@ -12,9 +12,9 @@ internal static class FederationConformanceFactory
     /// <summary>Creates a minimal <see cref="WorkflowManifest"/> suitable for deploy/validate calls.</summary>
     internal static WorkflowManifest MakeManifest(string name = "conformance-wf") => new()
     {
-        Name        = name,
-        Models      = [],
-        Jobs        = [],
+        Name = name,
+        Models = [],
+        Jobs = [],
         Connections = []
     };
 
@@ -25,8 +25,8 @@ internal static class FederationConformanceFactory
     internal static DeployOptions MakeOptions(string platform = "fake", bool force = false) => new()
     {
         Platform = platform,
-        Force    = force,
-        Tags     = ["conformance"]
+        Force = force,
+        Tags = ["conformance"]
     };
 
     /// <summary>
@@ -38,8 +38,8 @@ internal static class FederationConformanceFactory
         MakePair(string platform = "fake")
     {
         var sharedStore = new Dictionary<string, DeploymentRecord>();
-        var deployer    = new FakeConformanceDeployer(sharedStore, platform);
-        var client      = new FakeConformanceAgentClient(sharedStore, platform);
+        var deployer = new FakeConformanceDeployer(sharedStore, platform);
+        var client = new FakeConformanceAgentClient(sharedStore, platform);
         return (deployer, client);
     }
 }

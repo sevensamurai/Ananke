@@ -70,7 +70,7 @@ internal static class ColonyReportStep
         await exporter.ExportAsync(graph, godNodes, outDir, ct);
 
         var reportPath = Path.Combine(outDir, "COLONY_REPORT.md");
-        var jsonPath   = Path.Combine(outDir, "colony.json");
+        var jsonPath = Path.Combine(outDir, "colony.json");
 
         Print($"  ✅ Files written to: {outDir}", ConsoleColor.Green);
         Print($"     • {Path.GetFileName(reportPath)}", ConsoleColor.DarkGray);

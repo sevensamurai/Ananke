@@ -1,4 +1,4 @@
-﻿# Ananke.Federation.Azure
+# Ananke.Federation.Azure
 
 Azure AI Agent Service adapter for Ananke Federation. Deploy Ananke workflow manifests
 to [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-services/agents/),

@@ -268,12 +268,19 @@ internal static class ServeCommand
     private static object MapEvent<TState>(WorkflowEvent<TState> evt) => evt switch
     {
         JobStarted<TState> e => new { type = "job_started", job = e.JobName },
-        JobCompleted<TState> e => new { type = "job_completed", job = e.JobName,
-            durationMs = (long)e.Duration.TotalMilliseconds },
+        JobCompleted<TState> e => new
+        {
+            type = "job_completed",
+            job = e.JobName,
+            durationMs = (long)e.Duration.TotalMilliseconds
+        },
         ForkStarted<TState> e => new { type = "fork_started", targets = e.Targets },
         JoinCompleted<TState> e => new { type = "join_completed", target = e.Target },
-        WorkflowCompleted<TState> e => new { type = "completed",
-            durationMs = (long)e.Result.TotalDuration.TotalMilliseconds },
+        WorkflowCompleted<TState> e => new
+        {
+            type = "completed",
+            durationMs = (long)e.Result.TotalDuration.TotalMilliseconds
+        },
         WorkflowFaulted<TState> e => new { type = "faulted", error = e.Exception.Message },
         _ => new { type = "event" }
     };

@@ -20,13 +20,13 @@ public class WorkflowExecutionMonitorTests
     private static StructuralProfile MakeProfile(
         int toolCount = 4, int jobCount = 2, int tagClusters = 1,
         int resourceSpan = 1, float contextUtil = 0.1f) => new()
-    {
-        ToolCount = toolCount,
-        JobCount = jobCount,
-        TagClusterCount = tagClusters,
-        ResourceSpan = resourceSpan,
-        ContextUtilization = contextUtil
-    };
+        {
+            ToolCount = toolCount,
+            JobCount = jobCount,
+            TagClusterCount = tagClusters,
+            ResourceSpan = resourceSpan,
+            ContextUtilization = contextUtil
+        };
 
     private static async Task<WorkflowExecution<string>> RunWorkflow(
         string name, int steps = 2)

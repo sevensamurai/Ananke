@@ -24,17 +24,17 @@ public class DivisionOutcomeTrackerTests
         float entropy = 0.8f,
         float contextUtil = 0.5f,
         float avgLatency = 2000f) => new()
-    {
-        WorkflowName = workflowName,
-        ToolCount = 10,
-        JobCount = 3,
-        TagClusterCount = 3,
-        RoutingEntropy = entropy,
-        ResourceSpan = 3,
-        ContextUtilization = contextUtil,
-        AvgLatencyMs = avgLatency,
-        MeasuredAt = DateTimeOffset.UtcNow
-    };
+        {
+            WorkflowName = workflowName,
+            ToolCount = 10,
+            JobCount = 3,
+            TagClusterCount = 3,
+            RoutingEntropy = entropy,
+            ResourceSpan = 3,
+            ContextUtilization = contextUtil,
+            AvgLatencyMs = avgLatency,
+            MeasuredAt = DateTimeOffset.UtcNow
+        };
 
     private static DivisionPlan MakePlan(params string[] influencingEntries) => new()
     {

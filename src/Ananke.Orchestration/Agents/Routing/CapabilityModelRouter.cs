@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using Ananke.Abstractions.Agents;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Orchestration.Agents.Routing;
 
@@ -19,13 +22,13 @@ public enum RoutingStrategy
 
     /// <summary>
     /// Composite score: <c>−cost × W_cost + speed × W_speed + intelligence × W_intelligence</c>.
-    /// Configure weights via <see cref="CapabilityModelRouter(RoutingWeights)"/>.
+    /// Configure weights via <see cref="CapabilityModelRouter(RoutingWeights, ILogger)"/>.
     /// </summary>
     Weighted,
 
     /// <summary>
     /// Custom scoring delegate. Configure via
-    /// <see cref="CapabilityModelRouter(Func{ModelProfile, decimal})"/>.
+    /// <see cref="CapabilityModelRouter(Func{ModelProfile, decimal}, ILogger)"/>.
     /// </summary>
     Custom
 }
@@ -122,12 +125,25 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
     private readonly RoutingStrategy _strategy;
     private readonly RoutingWeights? _weights;
     private readonly Func<ModelProfile, decimal>? _scorer;
+    private readonly ILogger _logger;
     private ModelProfile? _fallback;
 
+    /// <summary>
+    /// Model names already warned about for this process — avoids re-logging a deprecated
+    /// model warning on every single routed request.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, byte> WarnedDeprecatedModels = new();
+
     /// <summary>Creates a router with a built-in strategy (CheapestFit, FastestFit, or BestFit).</summary>
-    public CapabilityModelRouter(RoutingStrategy strategy = RoutingStrategy.CheapestFit)
+    /// <param name="strategy">The built-in selection strategy.</param>
+    /// <param name="logger">
+    /// Optional logger used to warn once per process when routing selects a
+    /// <see cref="ModelStatus.Deprecated"/> profile. Defaults to a no-op logger.
+    /// </param>
+    public CapabilityModelRouter(RoutingStrategy strategy = RoutingStrategy.CheapestFit, ILogger? logger = null)
     {
         _strategy = strategy;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>
@@ -143,11 +159,12 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
     /// });
     /// </code>
     /// </example>
-    public CapabilityModelRouter(RoutingWeights weights)
+    public CapabilityModelRouter(RoutingWeights weights, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(weights);
         _strategy = RoutingStrategy.Weighted;
         _weights = weights;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>
@@ -161,11 +178,12 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
     ///     p.MaxContextTokens / 100_000m - p.CostPer1KTokens * 2);
     /// </code>
     /// </example>
-    public CapabilityModelRouter(Func<ModelProfile, decimal> scorer)
+    public CapabilityModelRouter(Func<ModelProfile, decimal> scorer, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(scorer);
         _strategy = RoutingStrategy.Custom;
         _scorer = scorer;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>Registers a model profile as a routing candidate.</summary>
@@ -203,36 +221,63 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
         var requirements = TaskRequirements.InferFrom(request);
         var candidates = _profiles.Where(p => p.Satisfies(requirements)).ToList();
 
+        ModelProfile selected;
         if (candidates.Count == 0)
         {
-            return _fallback
+            selected = _fallback
                 ?? throw new InvalidOperationException(
                     $"No model satisfies the inferred requirements ({requirements.RequiredCapabilities}, " +
                     $"tier ≥ {requirements.MinIntelligenceTier}) and no fallback is configured. " +
                     $"Call WithFallback() or add a model with broader capabilities.");
         }
-
-        return _strategy switch
+        else
         {
-            RoutingStrategy.CheapestFit => candidates
-                .OrderBy(p => p.CostPer1KTokens)
-                .ThenByDescending(p => p.SpeedTier)
-                .First(),
-            RoutingStrategy.FastestFit => candidates
-                .OrderByDescending(p => p.SpeedTier)
-                .ThenBy(p => p.CostPer1KTokens)
-                .First(),
-            RoutingStrategy.BestFit => candidates
-                .OrderByDescending(p => p.IntelligenceTier)
-                .ThenBy(p => p.CostPer1KTokens)
-                .First(),
-            RoutingStrategy.Weighted when _weights is not null => candidates
-                .OrderByDescending(p => _weights.Score(p))
-                .First(),
-            RoutingStrategy.Custom when _scorer is not null => candidates
-                .OrderByDescending(_scorer)
-                .First(),
-            _ => candidates[0]
-        };
+            selected = _strategy switch
+            {
+                RoutingStrategy.CheapestFit => candidates
+                    .OrderBy(p => p.CostPer1KTokens)
+                    .ThenByDescending(p => p.SpeedTier)
+                    .First(),
+                RoutingStrategy.FastestFit => candidates
+                    .OrderByDescending(p => p.SpeedTier)
+                    .ThenBy(p => p.CostPer1KTokens)
+                    .First(),
+                RoutingStrategy.BestFit => candidates
+                    .OrderByDescending(p => p.IntelligenceTier)
+                    .ThenBy(p => p.CostPer1KTokens)
+                    .First(),
+                RoutingStrategy.Weighted when _weights is not null => candidates
+                    .OrderByDescending(p => _weights.Score(p))
+                    .First(),
+                RoutingStrategy.Custom when _scorer is not null => candidates
+                    .OrderByDescending(_scorer)
+                    .First(),
+                _ => candidates[0]
+            };
+        }
+
+        WarnIfDeprecated(selected);
+        return selected;
+    }
+
+    /// <summary>
+    /// Logs a warning the first time this process routes to a
+    /// <see cref="ModelStatus.Deprecated"/> profile. Subsequent selections of the same
+    /// model name are silent — this is a one-time nudge, not per-request noise.
+    /// </summary>
+    private void WarnIfDeprecated(ModelProfile profile)
+    {
+        if (profile.Status != ModelStatus.Deprecated)
+            return;
+
+        if (!WarnedDeprecatedModels.TryAdd(profile.Name, 0))
+            return;
+
+        if (profile.ReplacedBy is { } replacement)
+            _logger.LogWarning(
+                "Routed to deprecated model '{Model}' — use '{ReplacedBy}' instead.",
+                profile.Name, replacement);
+        else
+            _logger.LogWarning("Routed to deprecated model '{Model}'.", profile.Name);
     }
 }

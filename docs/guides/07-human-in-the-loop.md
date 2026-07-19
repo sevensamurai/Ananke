@@ -1,4 +1,4 @@
-﻿<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl, ask, awaitinput, conversational -->
+<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl, ask, awaitinput, conversational -->
 # 07 — Human-in-the-Loop
 
 Pause workflow execution at any step for human review, checkpoint the full state,

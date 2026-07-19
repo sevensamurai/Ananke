@@ -1,4 +1,4 @@
-﻿# Architecture: Agents & LLM Providers
+# Architecture: Agents & LLM Providers
 
 > Part of the [Architecture Guide](../ARCHITECTURE.md). Covers the agent model abstraction, provider adapters, middleware pipeline, and model routing.
 
