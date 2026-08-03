@@ -133,7 +133,7 @@ public static class Models
         // constants (even Retired-status ones) would let new code reference an always-failing model.
         // See docs/reference/model-deprecations.md.
 
-        /// <summary>Claude Opus 4.1 — legacy, deprecated 2026-06-05, tentative retirement 2026-08-05.</summary>
+        /// <summary>Claude Opus 4.1 — legacy, deprecated 2026-06-05, retires 2026-08-05 (provider-confirmed).</summary>
         [Obsolete("claude-opus-4-1 is deprecated; use Models.Anthropic.Opus48.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Opus41 = "claude-opus-4-1";
@@ -149,6 +149,9 @@ public static class Models
 
         /// <summary>Claude Sonnet 5 — current generation, balanced performance and speed.</summary>
         public const string Sonnet5 = "claude-sonnet-5";
+
+        /// <summary>Claude Opus 5 — current generation, complex agentic coding and enterprise work.</summary>
+        public const string Opus5 = "claude-opus-5";
 
         /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
         public const string Fable5 = "claude-fable-5";
@@ -166,11 +169,25 @@ public static class Models
         /// <summary>Gemini 3.1 Flash Image — multimodal variant with image generation.</summary>
         public const string Gemini31FlashImage = "gemini-3.1-flash-image";
 
-        /// <summary>Gemini 3.1 Flash-Lite — most cost-effective Gemini 3 model, high-throughput.</summary>
+        /// <summary>Gemini 3.1 Flash-Lite — legacy, superseded by Gemini 3.5 Flash-Lite, still fully supported.</summary>
         public const string Gemini31FlashLite = "gemini-3.1-flash-lite";
 
-        /// <summary>Gemini 3.5 Flash — current generation, frontier-level agentic and coding performance.</summary>
+        /// <summary>Gemini 3.5 Flash — legacy, superseded by Gemini 3.6 Flash, still fully supported.</summary>
         public const string Gemini35Flash = "gemini-3.5-flash";
+
+        /// <summary>
+        /// Gemini 3.5 Flash-Lite — current generation, most cost-effective Gemini model, high-throughput.
+        /// Context window/latency not independently confirmed beyond the models-page listing; carried
+        /// forward from Gemini 3.1 Flash-Lite's spec as the closest known baseline.
+        /// </summary>
+        public const string Gemini35FlashLite = "gemini-3.5-flash-lite";
+
+        /// <summary>
+        /// Gemini 3.6 Flash — current generation, frontier-level agentic and coding performance.
+        /// Context window/latency not independently confirmed beyond the models-page listing; carried
+        /// forward from Gemini 3.5 Flash's spec as the closest known baseline.
+        /// </summary>
+        public const string Gemini36Flash = "gemini-3.6-flash";
 
         /// <summary>Gemma 4 — open-weight model available via Agent Platform / Model Garden.</summary>
         public const string Gemma4 = "gemma-4";

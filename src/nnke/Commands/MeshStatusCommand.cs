@@ -33,19 +33,19 @@ internal static class MeshStatusCommand
         {
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, json);
+            return Execute(file, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, bool json)
+    private static int Execute(FileInfo file, bool json)
     {
         if (!SnapshotLoader.TryLoad(file, out var snapshot, out var loadError))
         {
             if (json) JsonOutput.Write(new { status = "error", message = loadError });
             else Console.Error.WriteLine($"  {loadError}");
-            return;
+            return 1;
         }
 
         if (json)
@@ -69,7 +69,7 @@ internal static class MeshStatusCommand
                 }),
                 routing = snapshot.RoutingTable
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -97,5 +97,7 @@ internal static class MeshStatusCommand
                 Console.WriteLine($"    {domain} → {cell}");
         }
         Console.WriteLine();
+
+        return 0;
     }
 }

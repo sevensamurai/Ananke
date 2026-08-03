@@ -35,8 +35,26 @@
     type is used correctly -- only that the identifier or path exists. It is a fast
     first guard, not a substitute for review or compilation.
 
+    SCOPE NOTE (2026-08-01). Path checking and identifier checking have deliberately
+    DIFFERENT default scopes, because they fail differently:
+
+      * A broken path is ALWAYS wrong -- there is no legitimate reason for a doc to link
+        at a file that does not exist. So paths are checked everywhere in scope,
+        including src/demos/** and PLAN-*.md.
+      * An unknown identifier is often legitimate in tutorial/demo prose (placeholder
+        types, illustrative names). So identifier checking still skips demos and
+        PLAN-*.md unless -IncludeExamples.
+
+    This split exists because the earlier default (roots 'src' + 'docs', demos excluded
+    wholesale) meant the repo-root README.md was never scanned at all -- so 34 broken
+    links in the front-door README, plus 16 more across demo READMEs, reported "clean".
+    The path machinery was working; it was simply never pointed at them.
+
 .PARAMETER Path
-    One or more roots to scan for Markdown. Defaults to 'src' and 'docs'.
+    One or more roots to scan for Markdown. Defaults to 'src', 'docs' and 'releases'.
+    Repo-root Markdown (README.md, ARCHITECTURE.md, MAP.md, ...) is ALWAYS scanned --
+    it is the front door and the most expensive place to have a broken link.
+    internals/ is excluded by default; see -IncludeInternals.
 
 .PARAMETER IgnoreFile
     Path to a newline-delimited allow-list of identifiers to skip (e.g. doc-only or
@@ -46,7 +64,14 @@
     Also scan fenced code blocks (noisier; good for periodic deep audits).
 
 .PARAMETER IncludeExamples
-    Also scan src/demos/** and PLAN-*.md files (skipped by default).
+    Also apply IDENTIFIER checking to src/demos/** and PLAN-*.md. Their path references
+    are checked either way -- see the scope note above.
+
+.PARAMETER IncludeInternals
+    Also scan internals/. Off by default: it is a historical ADR archive, and a plan
+    written in April that references a file since renamed is expected staleness, not
+    drift to fix. Roughly 890 such references exist, which would drown the 66 live ones.
+    Use this for a deliberate archive audit, not in CI.
 
 .PARAMETER ShowContext
     Print the surrounding line for each finding.
@@ -65,6 +90,7 @@ param(
     [string]   $IgnoreFile,
     [switch]   $IncludeCodeBlocks,
     [switch]   $IncludeExamples,
+    [switch]   $IncludeInternals,
     [switch]   $ShowContext
 )
 
@@ -74,7 +100,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $root      = Split-Path -Parent $scriptDir
 
-if (-not $Path) { $Path = @('src', 'docs') }
+if (-not $Path) {
+    $Path = @('src', 'docs', 'releases')
+    if ($IncludeInternals) { $Path += 'internals' }
+}
 $scanRoots = $Path | ForEach-Object {
     if ([System.IO.Path]::IsPathRooted($_)) { $_ } else { Join-Path $root $_ }
 } | Where-Object { Test-Path $_ }
@@ -114,7 +143,19 @@ foreach ($f in $csFiles) {
     $text = $lineComment.Replace($text, ' ')
     foreach ($m in $tokenRegex.Matches($text)) { [void] $known.Add($m.Value) }
 }
-Write-Host ("  {0} C# files, {1} distinct identifiers" -f $csFiles.Count, $known.Count) -ForegroundColor DarkGray
+# Project names are real things a doc may legitimately name (`AgenticWebDemo`,
+# `Ananke.Orchestration`), but they are not necessarily C# identifiers -- a demo using
+# top-level statements declares no namespace, so its name appears in no .cs file. Add
+# every .csproj basename so naming a real project passes, while naming a project that
+# does NOT exist still fails. That distinction is the point: it is what catches a README
+# advertising a demo that was deleted.
+$projFiles = Get-ChildItem -Path $csRoot -Recurse -Filter '*.csproj' -File |
+    Where-Object { $_.FullName -notmatch '[\\/](obj|bin|\.vs)[\\/]' }
+foreach ($p in $projFiles) {
+    [void] $known.Add([System.IO.Path]::GetFileNameWithoutExtension($p.Name))
+}
+
+Write-Host ("  {0} C# files, {1} projects, {2} distinct identifiers" -f $csFiles.Count, $projFiles.Count, $known.Count) -ForegroundColor DarkGray
 
 # --- Load the ignore list ----------------------------------------------------------
 $ignore = [System.Collections.Generic.HashSet[string]]::new()
@@ -128,15 +169,37 @@ if (Test-Path $IgnoreFile) {
 }
 
 # --- Select Markdown files ---------------------------------------------------------
-$excludeDir = if ($IncludeExamples) { '[\\/](obj|bin|\.vs|node_modules)[\\/]' }
-              else                  { '[\\/](obj|bin|\.vs|node_modules|demos)[\\/]' }
+# Build artefacts are never docs. Demos and PLAN-*.md ARE included here so their path
+# references get checked; identifier checking is suppressed for them below.
+$excludeDir = '[\\/](obj|bin|\.vs|node_modules)[\\/]'
 
-$mdFiles = foreach ($r in $scanRoots) {
-    Get-ChildItem -Path $r -Recurse -Filter '*.md' -File |
-        Where-Object {
-            $_.FullName -notmatch $excludeDir -and
-            ($IncludeExamples -or $_.Name -notmatch '^(PLAN|CHANGELOG)')
-        }
+# Repo-root Markdown is always in scope -- README.md is the front door, and it is the
+# single most expensive place in the repo to carry a broken link.
+$mdFiles = @(Get-ChildItem -Path $root -Filter '*.md' -File)
+foreach ($r in $scanRoots) {
+    $mdFiles += Get-ChildItem -Path $r -Recurse -Filter '*.md' -File |
+        Where-Object { $_.FullName -notmatch $excludeDir }
+}
+$mdFiles = @($mdFiles | Sort-Object FullName -Unique)
+
+# Identifier checking is suppressed on three kinds of file; path checking is not
+# suppressed anywhere, because a link that does not resolve is wrong in any file.
+#
+#   demos/, PLAN-*.md : tutorial prose legitimately names placeholder or aspirational
+#                       types that were never meant to exist in source.
+#   releases/*.md     : a shipped release note is a HISTORICAL RECORD of that version.
+#                       If v0.3.0 shipped `InterruptableSession` and it was later
+#                       renamed, the v0.3.0 note is still correct about v0.3.0 --
+#                       "fixing" it would falsify the changelog. Their links are still
+#                       checked, because a broken link is broken whenever it is clicked.
+$exampleFileRegex  = [regex] '[\\/]demos[\\/]'
+$historicalRegex   = [regex] '[\\/]releases[\\/]'
+function Test-ScanIdentifiers($file) {
+    if ($IncludeExamples) { return $true }
+    if ($exampleFileRegex.IsMatch($file.FullName))  { return $false }
+    if ($historicalRegex.IsMatch($file.FullName))   { return $false }
+    if ($file.Name -match '^(PLAN|CHANGELOG)')      { return $false }
+    return $true
 }
 
 # --- Path reference rules ----------------------------------------------------------
@@ -184,6 +247,7 @@ foreach ($f in $mdFiles) {
     # ARCHITECTURE.md fenced blocks ARE the curated type inventory (dependency trees,
     # abstraction maps) -- always scan them. Elsewhere, fenced code is opt-in.
     $scanFenced = $IncludeCodeBlocks -or ($f.Name -ieq 'ARCHITECTURE.md')
+    $scanIdents = Test-ScanIdentifiers $f
     $inFenced   = $false
     $lineNo     = 0
     foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
@@ -199,14 +263,16 @@ foreach ($f in $mdFiles) {
         }
 
         foreach ($span in $spans) {
-            foreach ($m in $tokenRegex.Matches($span)) {
-                $tok = $m.Value
-                if (-not (Test-IsCandidate $tok)) { continue }
-                if ($known.Contains($tok))         { continue }
-                if ($ignore.Contains($tok))        { continue }
-                $findings.Add([pscustomobject]@{
-                    Token = $tok; File = $rel; Line = $lineNo; Text = $line.Trim()
-                })
+            if ($scanIdents) {
+                foreach ($m in $tokenRegex.Matches($span)) {
+                    $tok = $m.Value
+                    if (-not (Test-IsCandidate $tok)) { continue }
+                    if ($known.Contains($tok))         { continue }
+                    if ($ignore.Contains($tok))        { continue }
+                    $findings.Add([pscustomobject]@{
+                        Token = $tok; File = $rel; Line = $lineNo; Text = $line.Trim()
+                    })
+                }
             }
 
             # Path-looking inline code spans, e.g. `src/Foo/Bar.cs`.

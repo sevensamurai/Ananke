@@ -128,12 +128,13 @@ public static class ModelCatalog
         // Anthropic
         Anthropic.ClaudeOpus4_1,
         Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
-        Anthropic.ClaudeSonnet5, Anthropic.ClaudeFable5,
+        Anthropic.ClaudeSonnet5, Anthropic.ClaudeOpus5, Anthropic.ClaudeFable5,
 
         // Google
         Google.Gemini3_1Pro, Google.Gemini3_1Flash,
         Google.Gemini2_5Pro, Google.Gemini2_5Flash,
         Google.Gemini3_5Flash, Google.Gemini3_1FlashLite,
+        Google.Gemini3_6Flash, Google.Gemini3_5FlashLite,
 
         // Meta (open-weight — self-hosted)
         Meta.Llama4Scout, Meta.Llama4Maverick,
@@ -321,6 +322,10 @@ public static class ModelCatalog
         public static ModelProfileTemplate ClaudeSonnet5 { get; } =
             CreateTemplate(Models.Anthropic.Sonnet5, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3);
 
+        /// <summary>Claude Opus 5 — current-generation, complex agentic coding and enterprise work.</summary>
+        public static ModelProfileTemplate ClaudeOpus5 { get; } =
+            CreateTemplate(Models.Anthropic.Opus5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+
         /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
         public static ModelProfileTemplate ClaudeFable5 { get; } =
             CreateTemplate(Models.Anthropic.Fable5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
@@ -362,13 +367,31 @@ public static class ModelCatalog
         // Gemini2_0Flash (gemini-2.0-flash, shutdown 2026-06-01) was removed — already past its
         // shutdown date. See docs/reference/model-deprecations.md.
 
-        /// <summary>Gemini 3.5 Flash — current-gen, frontier-level agentic and coding performance.</summary>
+        /// <summary>Gemini 3.5 Flash — legacy, superseded by Gemini 3.6 Flash, still fully supported.</summary>
         public static ModelProfileTemplate Gemini3_5Flash { get; } =
             CreateTemplate(Models.Google.Gemini35Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4);
 
-        /// <summary>Gemini 3.1 Flash-Lite — most cost-effective Gemini 3 model, high-throughput.</summary>
+        /// <summary>Gemini 3.1 Flash-Lite — legacy, superseded by Gemini 3.5 Flash-Lite, still fully supported.</summary>
         public static ModelProfileTemplate Gemini3_1FlashLite { get; } =
             CreateTemplate(Models.Google.Gemini31FlashLite,
+                FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
+                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5);
+
+        /// <summary>
+        /// Gemini 3.6 Flash — current-gen, frontier-level agentic and coding performance. Context/speed
+        /// carried forward from Gemini 3.5 Flash's spec — not independently confirmed beyond the
+        /// models-page name listing.
+        /// </summary>
+        public static ModelProfileTemplate Gemini3_6Flash { get; } =
+            CreateTemplate(Models.Google.Gemini36Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4);
+
+        /// <summary>
+        /// Gemini 3.5 Flash-Lite — current-gen, most cost-effective Gemini model, high-throughput.
+        /// Context/speed carried forward from Gemini 3.1 Flash-Lite's spec — not independently
+        /// confirmed beyond the models-page name listing.
+        /// </summary>
+        public static ModelProfileTemplate Gemini3_5FlashLite { get; } =
+            CreateTemplate(Models.Google.Gemini35FlashLite,
                 FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
                 intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5);
 

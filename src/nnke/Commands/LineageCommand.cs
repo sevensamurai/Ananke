@@ -38,13 +38,13 @@ internal static class LineageCommand
             var cell = parseResult.GetValue(cellArg)!;
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(cell, file, json);
+            return Execute(cell, file, json);
         });
 
         return command;
     }
 
-    private static void Execute(string cellName, FileInfo file, bool json)
+    private static int Execute(string cellName, FileInfo file, bool json)
     {
         if (!file.Exists)
         {
@@ -52,7 +52,7 @@ internal static class LineageCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         // Build lineage records from snapshot division history
@@ -69,7 +69,7 @@ internal static class LineageCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse file: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse file: {ex.Message}");
-            return;
+            return 1;
         }
 
         var target = records.FirstOrDefault(r =>
@@ -82,7 +82,7 @@ internal static class LineageCommand
                 JsonOutput.Write(new { status = "not_found", cell = cellName, available });
             else
                 Console.Error.WriteLine($"  Cell '{cellName}' not found. Available: {available}");
-            return;
+            return 1;
         }
 
         // Collect ancestors + the cell itself
@@ -118,7 +118,7 @@ internal static class LineageCommand
                     deathReason = r.DeathReason
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -142,6 +142,8 @@ internal static class LineageCommand
         }
 
         Console.WriteLine();
+
+        return 0;
     }
 
     private static IReadOnlyList<CellLineage> LoadLineage(string text, string extension)

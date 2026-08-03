@@ -56,13 +56,13 @@ internal static class MemoryInspectCommand
             var kind = parseResult.GetValue(kindOption);
             var top = parseResult.GetValue(topOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, cell, kind, top, json);
+            return Execute(file, cell, kind, top, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, string? cell, string? kind, int top, bool json)
+    private static int Execute(FileInfo file, string? cell, string? kind, int top, bool json)
     {
         if (!file.Exists)
         {
@@ -70,7 +70,7 @@ internal static class MemoryInspectCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         IReadOnlyList<EmpiricalEntry> entries;
@@ -87,7 +87,7 @@ internal static class MemoryInspectCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse memory file: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse memory file: {ex.Message}");
-            return;
+            return 1;
         }
 
         // Apply filters
@@ -104,7 +104,7 @@ internal static class MemoryInspectCommand
                     JsonOutput.Write(new { status = "error", message = $"Unknown kind '{kind}'. Valid: pattern, skill, heuristic." });
                 else
                     Console.Error.WriteLine($"  Unknown kind '{kind}'. Valid: pattern, skill, heuristic.");
-                return;
+                return 1;
             }
             filtered = filtered.Where(e => e.Kind == parsedKind);
         }
@@ -137,7 +137,7 @@ internal static class MemoryInspectCommand
                     source = e.Source
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -154,5 +154,7 @@ internal static class MemoryInspectCommand
             Console.WriteLine($"    confidence={e.Confidence:F2}  observations={e.ObservationCount}{tags}{entity}");
         }
         Console.WriteLine();
+
+        return 0;
     }
 }

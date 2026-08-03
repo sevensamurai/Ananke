@@ -3,6 +3,8 @@ using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tools.Routing;
 using Ananke.Orchestration.Tools.Gating;
 using Ananke.Orchestration.Workflows;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Orchestration.Tools;
 
@@ -36,6 +38,7 @@ public sealed class ToolKit
     private IHallucinationObserver? _hallucinationObserver;
     private ISmartToolRouter? _router;
     private IToolExecutorStrategy _executorStrategy = NullToolExecutorStrategy.Instance;
+    private readonly ILogger<ToolKit> _logger;
 
     public string Name { get; }
     public IReadOnlyDictionary<string, ToolDefinition> Tools => _tools;
@@ -59,10 +62,11 @@ public sealed class ToolKit
     /// </summary>
     public IReadOnlySet<string> PinnedToolNames => _pinnedToolNames;
 
-    public ToolKit(string name)
+    public ToolKit(string name, ILoggerFactory? loggerFactory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Name = name;
+        _logger = loggerFactory?.CreateLogger<ToolKit>() ?? NullLogger<ToolKit>.Instance;
     }
 
     /// <summary>
@@ -402,7 +406,14 @@ public sealed class ToolKit
     {
         _tools[def.Name] = _faultObserver is not null ? WrapWithFaultObserver(def) : def;
         if (_memory is not null)
-            _ = UpsertToolMemoryAsync(def, CancellationToken.None);
+        {
+            var toolName = def.Name;
+            _ = UpsertToolMemoryAsync(def, CancellationToken.None).ContinueWith(
+                t => _logger.LogWarning(t.Exception, "Failed to sync tool '{ToolName}' into memory for kit '{KitName}'", toolName, Name),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
+        }
     }
 
     private ToolDefinition WrapWithFaultObserver(ToolDefinition tool)

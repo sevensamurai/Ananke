@@ -295,6 +295,9 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 case ImagePart image when image.Uri is not null:
                     parts.Add(new Part { FileData = new FileData { MimeType = image.MimeType, FileUri = image.Uri.ToString() } });
                     break;
+                default:
+                    throw new NotSupportedException(
+                        $"{contentPart.GetType().Name} is not supported by the Gemini adapter's request content mapping.");
             }
         }
 

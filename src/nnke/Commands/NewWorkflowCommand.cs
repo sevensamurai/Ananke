@@ -49,7 +49,7 @@ internal static class NewWorkflowCommand
             var pattern = parseResult.GetValue(patternOption)!;
             var output = parseResult.GetValue(outputOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(name, provider, pattern, output, json);
+            return Execute(name, provider, pattern, output, json);
         });
 
         return command;
@@ -62,9 +62,24 @@ internal static class NewWorkflowCommand
     private static readonly HashSet<string> CodeOnlyPatterns =
         ["review-critique", "iterative-refinement", "router", "human-in-the-loop", "handoff", "organic-host", "streaming-chat"];
 
-    private static void Execute(string name, string provider, string pattern, DirectoryInfo? output, bool json,
+    private static int Execute(string name, string provider, string pattern, DirectoryInfo? output, bool json,
         List<string>? filesOverride = null, List<string>? skippedOverride = null)
     {
+        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            if (filesOverride is not null)
+                throw new ArgumentException($"Invalid project name: '{name}'");
+
+            if (json)
+                JsonOutput.Write(new { status = "error", errors = new[] { new { code = "ANANKE_IO_002", message = $"Invalid project name: '{name}'" } } });
+            else
+            {
+                Console.Error.WriteLine($"  ✗ [ANANKE_IO_002] Invalid project name: '{name}'");
+                Console.Error.WriteLine("    Hint: Use only letters, numbers, hyphens, underscores, and periods.");
+            }
+            return 1;
+        }
+
         // Validate the pattern exists in the catalog
         var catalogEntry = PatternCatalog.Find(pattern);
         if (catalogEntry is null)
@@ -80,7 +95,7 @@ internal static class NewWorkflowCommand
                 Console.Error.WriteLine($"  Known patterns: {known}");
                 Console.Error.WriteLine("  Run 'nnke patterns' for details.");
             }
-            return;
+            return 1;
         }
 
         var projectDir = output?.FullName ?? Path.Combine(Directory.GetCurrentDirectory(), name);
@@ -110,7 +125,7 @@ internal static class NewWorkflowCommand
         // Secrets
         WriteFile(projectDir, "secrets.json", SecretsTemplate.Render(provider), files, skipped);
 
-        if (filesOverride is not null) return; // MCP path — caller reads the lists directly
+        if (filesOverride is not null) return 0; // MCP path — caller reads the lists directly
 
         if (json)
         {
@@ -139,6 +154,8 @@ internal static class NewWorkflowCommand
             Console.WriteLine($"    # Add your API key to secrets.json");
             Console.WriteLine($"    dotnet run");
         }
+
+        return 0;
     }
 
     private static void WriteFile(string dir, string fileName, string content, List<string> created, List<string> skipped)
@@ -170,9 +187,7 @@ internal static class NewWorkflowCommand
     /// Entry point for commands that delegate pattern scaffold to this command
     /// (e.g. <c>nnke new pattern</c>). Passes through to <see cref="Execute"/>.
     /// </summary>
-    internal static void ExecuteForCli(
-        string name, string provider, string pattern, DirectoryInfo? output, bool json)
-    {
+    internal static int ExecuteForCli(
+        string name, string provider, string pattern, DirectoryInfo? output, bool json) =>
         Execute(name, provider, pattern, output, json);
-    }
 }

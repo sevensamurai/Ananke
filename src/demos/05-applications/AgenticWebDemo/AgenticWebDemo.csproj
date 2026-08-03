@@ -12,12 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Microsoft.OpenApi" />
-    <PackageReference Include="Scalar.AspNetCore" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\Ananke.AspNetCore\Ananke.AspNetCore.csproj" />
     <ProjectReference Include="..\..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <ProjectReference Include="..\..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />

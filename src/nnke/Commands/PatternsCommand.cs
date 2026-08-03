@@ -29,16 +29,13 @@ internal static class PatternsCommand
             var pattern = parseResult.GetValue(patternArg);
             var json = parseResult.GetValue<bool>("--json");
 
-            if (pattern is null)
-                ExecuteList(json);
-            else
-                ExecuteDescribe(pattern, json);
+            return pattern is null ? ExecuteList(json) : ExecuteDescribe(pattern, json);
         });
 
         return command;
     }
 
-    private static void ExecuteList(bool json)
+    private static int ExecuteList(bool json)
     {
         var all = PatternCatalog.All();
 
@@ -61,7 +58,7 @@ internal static class PatternsCommand
                     topology = p.Topology,
                 }).ToList(),
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine("  Ananke Pattern Catalog");
@@ -80,9 +77,11 @@ internal static class PatternsCommand
         Console.WriteLine();
         Console.WriteLine("  Use: nnke patterns <pattern>");
         Console.WriteLine("  Scaffold: nnke new workflow <name> --pattern <pattern>");
+
+        return 0;
     }
 
-    private static void ExecuteDescribe(string key, bool json)
+    private static int ExecuteDescribe(string key, bool json)
     {
         var pattern = PatternCatalog.Find(key);
 
@@ -102,7 +101,7 @@ internal static class PatternsCommand
                 Console.Error.WriteLine($"  Unknown pattern: {key}");
                 Console.Error.WriteLine("  Run 'nnke patterns' to list all known patterns.");
             }
-            return;
+            return 1;
         }
 
         if (json)
@@ -122,7 +121,7 @@ internal static class PatternsCommand
                 description = pattern.Description.Trim(),
                 apiExample = pattern.ApiExample.Trim(),
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine($"  {pattern.Key} — {pattern.Title}");
@@ -158,6 +157,8 @@ internal static class PatternsCommand
 
         Console.WriteLine();
         Console.WriteLine($"  Guide: {pattern.DocsRef}");
+
+        return 0;
     }
 
     private static void WriteIndented(string text)

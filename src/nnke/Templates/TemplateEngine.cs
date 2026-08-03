@@ -45,7 +45,7 @@ internal static partial class TemplateEngine
     public static string DefaultModel(string provider) => provider switch
     {
         "anthropic" => Models.Anthropic.Sonnet5,
-        "google" => Models.Google.Gemini35Flash,
+        "google" => Models.Google.Gemini36Flash,
         _ => Models.OpenAI.Gpt56Terra,
     };
 

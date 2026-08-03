@@ -73,6 +73,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private const string LastPredictionErrorKey = "last_prediction_error";
     private const string PredictionKey = "prediction";
 
+    // Episode linkage
+    private const string EpisodeIdKey = "episode_id";
+    private const string StepIndexKey = "step_index";
+
     // Consolidation
     private const string ConsolidatedIntoKey = "consolidated_into";
 
@@ -765,6 +769,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         if (entry.Prediction is not null)
             payload[PredictionKey] = (double)entry.Prediction.Value;
 
+        // Episode linkage
+        if (entry.EpisodeId is not null) payload[EpisodeIdKey] = entry.EpisodeId;
+        if (entry.StepIndex is not null) payload[StepIndexKey] = entry.StepIndex.Value;
+
         // Consolidation
         if (entry.ConsolidatedInto is not null)
             payload[ConsolidatedIntoKey] = entry.ConsolidatedInto;
@@ -907,6 +915,9 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             LastPredictionError = (float)GetDouble(payload, LastPredictionErrorKey),
             Prediction = payload.TryGetValue(PredictionKey, out var pred)
                 ? (float)pred.DoubleValue : null,
+            EpisodeId = GetStringOrNull(payload, EpisodeIdKey),
+            StepIndex = payload.ContainsKey(StepIndexKey)
+                ? (int)GetLong(payload, StepIndexKey) : null,
             ConsolidatedInto = GetStringOrNull(payload, ConsolidatedIntoKey),
             EntityId = GetStringOrNull(payload, EntityIdKey)
         };

@@ -24,12 +24,21 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     }
 
     /// <summary>
-    /// Creates an <see cref="AnthropicAgentModel"/> from an API key and model name.
-    /// Convenience factory for use with <c>ModelResolver</c> or standalone construction.
+    /// Creates an <see cref="AnthropicAgentModel"/> from an API key, model name, and optional
+    /// custom endpoint. Use <paramref name="endpoint"/> for Anthropic-compatible providers such as
+    /// Moonshot/Kimi, DeepSeek, or Zhipu/GLM. Convenience factory for use with <c>ModelResolver</c>
+    /// or standalone construction.
     /// </summary>
-    public static AnthropicAgentModel Create(string apiKey, string model)
+    /// <param name="apiKey">API key for the target endpoint.</param>
+    /// <param name="model">Model name (e.g. <c>"claude-sonnet-4-5"</c>).</param>
+    /// <param name="endpoint">Custom API base URL, or <see langword="null"/> for the default Anthropic endpoint.</param>
+    public static AnthropicAgentModel Create(string apiKey, string model, Uri? endpoint = null)
     {
-        var client = new AnthropicClient(new ClientOptions { ApiKey = apiKey });
+        var options = endpoint is not null
+            ? new ClientOptions { ApiKey = apiKey, BaseUrl = endpoint.ToString() }
+            : new ClientOptions { ApiKey = apiKey };
+
+        var client = new AnthropicClient(options);
         return new AnthropicAgentModel(client, model);
     }
 
@@ -121,12 +130,19 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
                 },
                 t =>
                 {
-                    // Preserve extended-thinking content as a text part
                     if (t.Thinking is { Length: > 0 })
-                        responseParts.Add(new TextPart(t.Thinking));
+                        responseParts.Add(new ReasoningPart(t.Thinking)
+                        {
+                            Signature = t.Signature is { Length: > 0 } ? t.Signature : null
+                        });
                     return null;
                 },
-                _ => null,
+                t =>
+                {
+                    if (t.Data is { Length: > 0 })
+                        responseParts.Add(new ReasoningPart(t.Data) { IsRedacted = true });
+                    return null;
+                },
                 t => { toolCalls.Add(new AgentToolCall(t.ID, t.Name, ToJsonString(t.Input))); return null; },
                 _ => null,
                 _ => null,
@@ -220,6 +236,9 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
                                     contentBlocks.Add(new ImageBlockParam(
                                         new UrlImageSource { Url = image.Uri.ToString() }));
                                     break;
+                                default:
+                                    throw new NotSupportedException(
+                                        $"{part.GetType().Name} is not supported by the Anthropic adapter's request content mapping.");
                             }
                         }
                         messages.Add(new MessageParam

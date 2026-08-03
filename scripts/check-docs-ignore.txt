@@ -150,3 +150,22 @@ Delegate       # "IJob (Agent/Delegate/SubFlow)" Mermaid participant label
 Propagation    # "Monte Carlo Reward Propagation" Mermaid node label
 Save           # "Save checkpoint" Mermaid sequence-diagram message
 Yes            # Mermaid flowchart branch-edge label
+
+# --- 2026-08-01: retired demos, deliberately still named in README's "Retired demos"
+# table so old links and articles referencing them remain explicable. The projects are
+# gone on purpose (demos were consolidated by category); do not "fix" these names.
+SimpleWorkflowDemo
+ExtendedFlowDemo
+DistributedServicesDemo
+
+# --- 2026-08-01: path references that are correct as written and must not resolve ---
+.vscode/mcp.json                    # file the READER creates when following McpServerDemo
+.github/workflows/pages.yml         # historical: existed at v0.7.2, superseded by website.yml
+scripts/check-nnke-deps.ps1         # historical: existed at v0.8.3, since removed
+tools/check-architecture-graph.ps1  # ARCHITECTURE.md names it to record that it is GONE
+Releases/ReleaseEvent.cs            # aspirational file in a PLAN-*.md design note
+Releases/ReleaseKnowledgeSource.cs  # aspirational file in a PLAN-*.md design note
+Releases/SimulatedReleaseHistory.cs # aspirational file in a PLAN-*.md design note
+Interop        # "%% Interop & extensions" Mermaid comment in ARCHITECTURE.md
+Higher         # "%% Higher-order" Mermaid comment in ARCHITECTURE.md
+Styling        # "%% Styling" Mermaid comment in ARCHITECTURE.md

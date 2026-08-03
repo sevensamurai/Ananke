@@ -29,16 +29,13 @@ internal static class ExplainCommand
             var code = parseResult.GetValue(codeArg);
             var json = parseResult.GetValue<bool>("--json");
 
-            if (code is null)
-                ExecuteList(json);
-            else
-                ExecuteExplain(code, json);
+            return code is null ? ExecuteList(json) : ExecuteExplain(code, json);
         });
 
         return command;
     }
 
-    private static void ExecuteList(bool json)
+    private static int ExecuteList(bool json)
     {
         var all = DiagnosticExplanations.All();
 
@@ -55,7 +52,7 @@ internal static class ExplainCommand
                     docsRef = e.DocsRef,
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine("  Diagnostic Codes");
@@ -69,9 +66,11 @@ internal static class ExplainCommand
 
         Console.WriteLine();
         Console.WriteLine("  Usage: nnke explain <code>");
+
+        return 0;
     }
 
-    private static void ExecuteExplain(string code, bool json)
+    private static int ExecuteExplain(string code, bool json)
     {
         var explanation = DiagnosticExplanations.Find(code);
 
@@ -91,7 +90,7 @@ internal static class ExplainCommand
                 Console.Error.WriteLine($"  Unknown diagnostic code: {code}");
                 Console.Error.WriteLine("  Run 'nnke explain' to list all known codes.");
             }
-            return;
+            return 1;
         }
 
         if (json)
@@ -106,7 +105,7 @@ internal static class ExplainCommand
                 fixExample = explanation.FixExample.Trim(),
                 docsRef = explanation.DocsRef,
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine($"  {explanation.Code} — {explanation.Title}");
@@ -123,6 +122,8 @@ internal static class ExplainCommand
         WriteIndented(explanation.FixExample);
         Console.WriteLine();
         Console.WriteLine($"  Reference: {explanation.DocsRef}");
+
+        return 0;
     }
 
     private static void WriteIndented(string text)

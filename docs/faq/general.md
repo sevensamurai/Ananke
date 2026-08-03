@@ -80,13 +80,16 @@ Yes. Ananke is licensed under the [Apache 2.0 License](https://github.com/sevens
 
 ### How do I install Ananke?
 
-Install the meta-package to get everything:
+Install the meta-package for the core — orchestration, the state machine, and the bridge between
+them (it pulls in `Ananke.Orchestration`, `Ananke.StateMachine`, `Ananke.Orchestration.Knowledge`
+and `Ananke.Abstractions`):
 
 ```bash
 dotnet add package Ananke
 ```
 
-Or install only the packages you need:
+**It does not include an LLM provider**, so add at least one of those. Install whatever else you
+need alongside it — or skip the meta-package entirely and reference only these:
 
 ```bash
 dotnet add package Ananke.Orchestration            # core: workflows, agents, tools, knowledge

@@ -43,6 +43,9 @@
     <ProjectReference Include="..\..\Ananke.MQTT\Ananke.MQTT.csproj" />
     <ProjectReference Include="..\..\Ananke.A2A\Ananke.A2A.csproj" />
     <ProjectReference Include="..\Ananke.TestHelpers\Ananke.TestHelpers.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
   </ItemGroup>
 
   <ItemGroup>

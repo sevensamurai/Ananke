@@ -40,7 +40,7 @@ public static class ServiceCollectionExtensions
     /// services.AddWorkflowOrchestration(o => o
     ///     .UseCheckpointing()
     ///     .UseMemoryCleanup(TimeSpan.FromMinutes(5))
-    ///     .StoreCompletions(false)
+    ///     .StoreCompletions(true) // opt in to provider-side completion logs
     ///     .WithCheckpointTtl(TimeSpan.FromDays(14)));
     /// </code>
     /// </example>
@@ -146,7 +146,7 @@ public static class ServiceCollectionExtensions
 public class OrchestrationOptions
 {
     internal bool UseInMemoryCheckpoints { get; private set; }
-    internal bool StoreCompletionsEnabled { get; private set; } = true;
+    internal bool StoreCompletionsEnabled { get; private set; }
     internal TimeSpan CheckpointTtl { get; private set; } = TimeSpan.FromDays(7);
     internal TimeSpan? MemoryCleanupInterval { get; private set; }
 
@@ -158,7 +158,7 @@ public class OrchestrationOptions
 
     /// <summary>
     /// Controls whether LLM completions are stored in the provider's platform logs
-    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>true</c>.
+    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>false</c>.
     /// </summary>
     public OrchestrationOptions StoreCompletions(bool enabled)
     {

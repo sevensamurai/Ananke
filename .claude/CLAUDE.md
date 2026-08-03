@@ -21,11 +21,23 @@
 - Test class naming: `<ClassName>Tests`; method naming: `<Method>_<Scenario>_<Expected>`
 
 # Workflow
+- `internals/STATUS.md` is the entry point: where we are, what's next, links to the in-flight
+  tracker and ADRs, and the open decisions. Read it first when picking work up. Update it when a
+  large piece of work lands or on request (e.g. before going offline) — not continuously, and never
+  with detail that belongs in a tracker or an ADR. Kept under `internals/` (excluded from the public
+  push by `.public-exclude`) rather than the repo root, deliberately — see `push-public.sh`.
+- One iteration ≈ a couple of days to a week, and gets its own tracker in `internals/design/`
+  (`<yyyyMMdd>-plan-<name>.md`). When the iteration turns over, start a new tracker and repoint
+  `internals/STATUS.md`'s "In flight" table.
 - Always `dotnet build` + `dotnet test` after a change set
-- When docs (`docs/`, any `README.md` / `ARCHITECTURE.md`) are touched, run `powershell -File scripts/check-docs.ps1` before opening a PR — it flags stale type/API names. See `scripts/README.md`.
+- When docs (`docs/`, any `README.md` / `ARCHITECTURE.md`) are touched, run `pwsh -File scripts/check-docs.ps1` before opening a PR — it flags stale type/API names. See `scripts/README.md`.
+  (This one also runs under Windows PowerShell 5.1; `pwsh` is used here only so both script
+  invocations are the same.)
 - Open ADR in internals/design/ before proposing architectural changes
 - Do not modify .csproj files without confirmation
-- Never commit files with a UTF-8 BOM; CI runs `scripts/fix-encoding.ps1 -Check`
+- Never commit files with a UTF-8 BOM; CI runs `scripts/fix-encoding.ps1 -Check`. Locally:
+  `pwsh -File scripts/fix-encoding.ps1 -Check`. **`pwsh` is required** — the script uses PowerShell 7
+  ternary syntax and dies with a parser error under Windows PowerShell 5.1
 - Provider model lineups (OpenAI/Anthropic/Google) change every few months — check each release
   whether `Models.cs` and both `ModelCatalog`s need new entries. See "Keeping the model catalog
   current" in `src/Ananke.Design/README.md`.

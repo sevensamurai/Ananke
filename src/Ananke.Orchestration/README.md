@@ -46,7 +46,7 @@ using Ananke.Orchestration.Extensions;
 
 services.AddWorkflowOrchestration(o => o
     .UseCheckpointing()
-    .StoreCompletions(false)
+    .StoreCompletions(true) // opt in to provider-side completion logs; default is false
     .WithCheckpointTtl(TimeSpan.FromDays(14)));
 ```
 

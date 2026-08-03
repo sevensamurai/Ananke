@@ -145,6 +145,25 @@ public class TextAgentJobTests
         captured.ShouldBe("response text");
     }
 
+    // ── StoreCompletions default (v0.8.8) ─────────────────────────
+
+    [Test]
+    public async Task ExecuteAsync_OutsideWorkflowContext_StoreCompletionsDefaultsToFalse()
+    {
+        // No wrapping Workflow<TState>.RunAsync means WorkflowTraceContext.Value is null,
+        // which is exactly the fallback branch the v0.8.8 default flip changed.
+        var model = new RequestCapturingModel(new AgentResponse { Text = "done" });
+
+        var agent = AgentJobFactory.Create<TextAgentState>("standalone", model)
+            .WithPrompt(s => s.Input)
+            .MapResult((s, text) => s with { Output = text })
+            .Build();
+
+        await agent.ExecuteAsync(new TextAgentState { Input = "hi" });
+
+        model.LastRequest!.StoreCompletions.ShouldBeFalse();
+    }
+
     // ── Retry predicate (F-3) ─────────────────────────────────────
 
     [Test]
@@ -251,5 +270,16 @@ public class TextAgentJobTests
 
         public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
             Task.FromResult(_responses.Count > 1 ? _responses.Dequeue() : _responses.Peek());
+    }
+
+    private sealed class RequestCapturingModel(AgentResponse response) : IAgentModel
+    {
+        public AgentRequest? LastRequest { get; private set; }
+
+        public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(response);
+        }
     }
 }

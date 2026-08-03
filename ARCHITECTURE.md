@@ -248,7 +248,7 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 | `Jobs/` | `...Jobs` | `IJob`, `DelegateJob`, `SubFlowJob`, `HandoffJob`, `JobDescriptor` |
 | `Routing/` | `...Routing` | `IRouter`, `AgentRouter`, `DelegateRouter`, `ForkMode`, `JoinDescriptor` |
 | `Execution/` | `...Execution` | `IWorkflowRunner`, `WorkflowRunner` |
-| `Checkpointing/` | `...Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore`, `FileCheckpointStore` |
+| `Checkpointing/` | `...Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore` (the other implementation, `RedisCheckpointStore`, ships in `Ananke.Redis`) |
 | `Streaming/` | `...Streaming` | `WorkflowEvent`, `WorkflowStreamOptions` |
 | `Patterns/` | `...Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder`, `InterviewBuilder`, `Interview<TState>` |
 | `Knowledge/` | `...Knowledge` | `KnowledgeSearchTool`, `KnowledgeCatalogTools` |
@@ -273,7 +273,7 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 |---|---|---|
 | `Colony/` | `...Colony` | `OrganicHost`, `OrganicWorkflow`, `IWorkflowHost`, `IWorkflowReplicator` |
 | `Colony/Snapshots/` | `...Colony.Snapshots` | `HostSnapshot`, `WorkflowSnapshotBuilder`, `PromptWorkflowDesigner`, `WorkflowActivator` |
-| `Division/` | `...Division` | `IDivisionPolicy`, `IWorkflowDivider`, `IComplexityMonitor`, `ThresholdDivisionPolicy` |
+| `Division/` | `...Division` | `IDivisionPolicy`, `IWorkflowDivider`, `WorkflowDivider`, `ThresholdDivisionPolicy` |
 | `Division/Approval/` | `...Division.Approval` | `IDivisionApprovalGate`, `LlmApprovalGate`, `AutoApprovalGate` |
 | `Sensing/` | `...Sensing` | `ICapabilityMap`, `IRequestRouter`, `KeywordRequestRouter` |
 
@@ -373,7 +373,7 @@ flowchart TD
 flowchart TD
     HOST[OrganicHost] --> SENSE[Sensing<br/>ICapabilityMap + IRequestRouter]
     SENSE --> WF[OrganicWorkflow<br/>handle request]
-    WF --> MON[IComplexityMonitor<br/>track load/complexity]
+    WF --> MON[IDivisionPolicy<br/>track load/complexity]
     MON --> DIV{Division<br/>threshold?}
     DIV -->|No| WF
     DIV -->|Yes| APPROVE[IDivisionApprovalGate]
@@ -401,7 +401,7 @@ These are the **interface boundaries** that define the system. Any redesign shou
 | `IKnowledgeCatalog` | Knowledge | Enriched document metadata | `InMemoryKnowledgeCatalog`, Qdrant |
 | `IDocumentExtractor` | Knowledge | Extract text from documents | PDF, Markdown (Documents pkg) |
 | `IDocumentChunker` | Knowledge | Split text into chunks | `SlidingWindowChunker` |
-| `ICheckpointStore` | Orchestration | Workflow state persistence | `InMemoryCheckpointStore`, `FileCheckpointStore` |
+| `ICheckpointStore` | Orchestration | Workflow state persistence | `InMemoryCheckpointStore`, `RedisCheckpointStore` |
 | `IRouter` | Orchestration | Workflow step routing | `DelegateRouter`, `AgentRouter` |
 | `IModelRouter` | Orchestration | Capability-based model selection | `CapabilityModelRouter` |
 | `IJob` | Orchestration | Workflow step execution | `DelegateJob`, `AgentJob`, `SubFlowJob` |
@@ -472,4 +472,7 @@ For deeper architectural detail on each vertical, see:
 
 ---
 
-*Last updated: 2026-06-13 (v0.8.5 — items 1–4 of architecture review). The dependency graph is verified by `tools/check-architecture-graph.ps1` — run it (or let CI run it) after any `.csproj` change.*
+*Last updated: 2026-08-01 (v0.8.8). The dependency graph is **not** currently verified by a script —
+`tools/check-architecture-graph.ps1`, referenced here since v0.8.5, no longer exists in the tree and
+neither CI workflow (`pipeline.yml`, `website.yml`) runs an equivalent. Verify by hand after any
+`.csproj` change until it is restored or replaced.*
