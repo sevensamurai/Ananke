@@ -1,10 +1,8 @@
 using Ananke.OpenTelemetry;
-using Scalar.AspNetCore;
 
 // --- 1. Configure services ---
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("secrets.json", optional: true, reloadOnChange: false);
-builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
@@ -27,8 +25,6 @@ if (tracing is null)
 
 // --- 2. Configure middleware ---
 app.UseStaticFiles();
-app.MapOpenApi();
-app.MapScalarApiReference();
 
 // --- 3. Build the AI agent ---
 var provider = AgentConfig.Configure(app.Configuration);

@@ -12,13 +12,13 @@ cd demos/AgenticWebDemo
 dotnet run
 ```
 
-Open `http://localhost:5000` in a browser. The Scalar API reference is available at `/scalar`.
+Open `http://localhost:5000` in a browser.
 
 ---
 
 ## Secrets
 
-Create `demos/AgenticWebDemo/secrets.json`:
+Create `secrets.json`:
 
 ```json
 {
@@ -87,9 +87,9 @@ Create `demos/AgenticWebDemo/secrets.json`:
 
 ## Related
 
-- Guide: [05 — Streaming Chat](../../docs/guides/05-streaming-chat.md)
-- Guide: [07 — Human-in-the-Loop](../../docs/guides/07-human-in-the-loop.md)
-- Guide: [10 — Observability](../../docs/guides/10-observability.md)
-- Package: [Ananke.Orchestration](../Ananke.Orchestration/README.md)
-- Package: [Ananke.OpenTelemetry](../Ananke.OpenTelemetry/README.md)
-- Category page: [05 — Applications](../../docs/demos/05-applications.md)
+- Guide: [05 — Streaming Chat](../../../../docs/guides/05-streaming-chat.md)
+- Guide: [07 — Human-in-the-Loop](../../../../docs/guides/07-human-in-the-loop.md)
+- Guide: [10 — Observability](../../../../docs/guides/10-observability.md)
+- Package: [Ananke.Orchestration](../../../Ananke.Orchestration/README.md)
+- Package: [Ananke.OpenTelemetry](../../../Ananke.OpenTelemetry/README.md)
+- Category page: [05 — Applications](../../../../docs/demos.md)

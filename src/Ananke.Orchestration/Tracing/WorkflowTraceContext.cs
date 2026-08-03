@@ -24,4 +24,4 @@ public sealed record TraceInfo(
     string? CurrentJob = null,
     ITrace? Trace = null,
     ISpan? CurrentSpan = null,
-    bool StoreCompletions = true);
+    bool StoreCompletions = false);

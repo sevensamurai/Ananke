@@ -31,7 +31,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         ICheckpointStore? checkpointStore = null,
         IEnumerable<IWorkflowJobMiddleware<object>>? middlewares = null,
         IWorkflowTracer? tracer = null,
-        bool storeCompletions = true,
+        bool storeCompletions = false,
         ILoggerFactory? loggerFactory = null,
         TimeSpan? checkpointTtl = null,
         TimeProvider? timeProvider = null)

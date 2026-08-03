@@ -35,13 +35,13 @@ internal static class DiagramCommand
             var file = parseResult.GetValue(fileArg)!;
             var output = parseResult.GetValue(outputOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, output, json);
+            return Execute(file, output, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, FileInfo? output, bool json)
+    private static int Execute(FileInfo file, FileInfo? output, bool json)
     {
         if (!file.Exists)
         {
@@ -53,7 +53,7 @@ internal static class DiagramCommand
             {
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
             }
-            return;
+            return 1;
         }
 
         try
@@ -80,6 +80,8 @@ internal static class DiagramCommand
             {
                 Console.WriteLine(mermaid);
             }
+
+            return 0;
         }
         catch (Exception ex)
         {
@@ -91,6 +93,8 @@ internal static class DiagramCommand
             {
                 Console.Error.WriteLine($"  ✗ Diagram generation failed: {ex.Message}");
             }
+
+            return 2;
         }
     }
 

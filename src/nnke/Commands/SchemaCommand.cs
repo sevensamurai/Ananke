@@ -19,7 +19,7 @@ internal static class SchemaCommand
         return command;
     }
 
-    private static void Execute(RootCommand root)
+    private static int Execute(RootCommand root)
     {
         var commands = new List<object>();
         CollectCommands(root, prefix: "", commands);
@@ -33,6 +33,7 @@ internal static class SchemaCommand
         };
 
         JsonOutput.Write(schema);
+        return 0;
     }
 
     private static void CollectCommands(Command parent, string prefix, List<object> results)

@@ -100,4 +100,4 @@ Manifest loaded: 'local-platform-loop'  (4 jobs)
 
 - [`Ananke.Federation.LocalEmulators` README](../../../Ananke.Federation.LocalEmulators/README.md) — full emulator catalogue
 - [`Ananke.Federation` README](../../../Ananke.Federation/README.md) — local loop architecture overview
-- [Guide 19 — Federation Local Loop](../../../../docs/guides/19-federation-local-loop.md)
+- [Guide 19 — Federation Local Loop](../../../../docs/guides/20-platform-recommendation.md)

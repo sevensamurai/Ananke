@@ -186,7 +186,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                 typeof(TResponse).Name,
                 CachedResponseSchema),
             Metadata = BuildMetadata(),
-            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
+            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false
         };
 
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
@@ -215,7 +215,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             Messages = messages,
             Tools = _tools,
             Metadata = BuildMetadata(),
-            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
+            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false
         };
 
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
@@ -311,7 +311,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                     Messages = messages,
                     Tools = _tools,
                     Metadata = BuildMetadata(),
-                    StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true,
+                    StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false,
                 };
                 var estimated = EstimateTokens(preFlight);
                 if (estimated > _maxContextTokens.Value)

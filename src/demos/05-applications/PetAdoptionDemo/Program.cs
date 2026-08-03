@@ -11,7 +11,6 @@ using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Abstractions.Memory;
 using Ananke.Redis;
 using Microsoft.Extensions.Logging.Console;
-using Scalar.AspNetCore;
 using StackExchange.Redis;
 
 Console.OutputEncoding = Encoding.UTF8;
@@ -28,7 +27,6 @@ if (args.Contains("--payment-service", StringComparer.OrdinalIgnoreCase))
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("secrets.json", optional: true, reloadOnChange: false);
-builder.Services.AddOpenApi();
 
 builder.Logging
     .AddConsoleFormatter<MinimalConsoleFormatter, ConsoleFormatterOptions>()
@@ -74,10 +72,8 @@ if (string.IsNullOrWhiteSpace(mqttHost) || string.IsNullOrWhiteSpace(redisHost))
 
 var app = builder.Build();
 
-// --- Static files & API docs ---
+// --- Static files ---
 app.UseStaticFiles();
-app.MapOpenApi();
-app.MapScalarApiReference();
 
 // --- Knowledge base bootstrap ---
 var dataPath = Path.Combine(app.Environment.ContentRootPath, "data");
@@ -149,7 +145,6 @@ Console.WriteLine($"  Handoff:    MQTT ({mqttHost}:{mqttPort})");
 Console.WriteLine($"  Memory:     Redis ({redisHost}:{redisPort})");
 Console.WriteLine($"  Phases:     Searching → Paperwork → Payment → Done");
 Console.WriteLine($"  Endpoints:  POST /api/chat, POST /api/interrupt, POST /api/payment");
-Console.WriteLine($"  API docs:   /scalar/v1");
 Console.WriteLine(new string('─', 42));
 Console.WriteLine();
 

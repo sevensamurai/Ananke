@@ -60,16 +60,16 @@ public static class ModelCatalog
         },
         ["anthropic"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["opus"] = [Models.Anthropic.Opus41, Models.Anthropic.Opus48],
+            ["opus"] = [Models.Anthropic.Opus41, Models.Anthropic.Opus48, Models.Anthropic.Opus5],
             ["sonnet"] = [Models.Anthropic.Sonnet46, Models.Anthropic.Sonnet5],
             ["haiku"] = [Models.Anthropic.Haiku45],
             ["fable"] = [Models.Anthropic.Fable5],
         },
         ["google"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["gemini"] = [Models.Google.Gemini35Flash, Models.Google.Gemini31Pro, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
+            ["gemini"] = [Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Pro, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
             ["pro"] = [Models.Google.Gemini31Pro, Models.Google.Gemini25Pro],
-            ["flash"] = [Models.Google.Gemini35Flash, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
+            ["flash"] = [Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
         },
     };
 
@@ -90,12 +90,13 @@ public static class ModelCatalog
         {
             Models.Anthropic.Opus41,
             Models.Anthropic.Opus48, Models.Anthropic.Sonnet46, Models.Anthropic.Haiku45,
-            Models.Anthropic.Sonnet5, Models.Anthropic.Fable5,
+            Models.Anthropic.Sonnet5, Models.Anthropic.Opus5, Models.Anthropic.Fable5,
         },
         ["google"] = new(StringComparer.OrdinalIgnoreCase)
         {
             Models.Google.Gemini31Pro, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashImage,
-            Models.Google.Gemini31FlashLite, Models.Google.Gemini35Flash,
+            Models.Google.Gemini31FlashLite, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite,
+            Models.Google.Gemini36Flash,
             Models.Google.Gemma4, Models.Google.Lyria3,
             Models.Google.Gemini25Pro, Models.Google.Gemini25Flash,
         },

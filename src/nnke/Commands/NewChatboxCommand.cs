@@ -45,15 +45,30 @@ internal static class NewChatboxCommand
             var provider = parseResult.GetValue(providerOption)!;
             var output = parseResult.GetValue(outputOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(name, provider, output, json);
+            return Execute(name, provider, output, json);
         });
 
         return command;
     }
 
-    private static void Execute(string name, string provider, DirectoryInfo? output, bool json,
+    private static int Execute(string name, string provider, DirectoryInfo? output, bool json,
         List<string>? filesOverride = null, List<string>? skippedOverride = null)
     {
+        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            if (filesOverride is not null)
+                throw new ArgumentException($"Invalid project name: '{name}'");
+
+            if (json)
+                JsonOutput.Write(new { status = "error", errors = new[] { new { code = "ANANKE_IO_002", message = $"Invalid project name: '{name}'" } } });
+            else
+            {
+                Console.Error.WriteLine($"  ✗ [ANANKE_IO_002] Invalid project name: '{name}'");
+                Console.Error.WriteLine("    Hint: Use only letters, numbers, hyphens, underscores, and periods.");
+            }
+            return 1;
+        }
+
         var projectDir = output?.FullName ?? Path.Combine(Directory.GetCurrentDirectory(), name);
         Directory.CreateDirectory(projectDir);
 
@@ -71,7 +86,7 @@ internal static class NewChatboxCommand
         WriteFile(projectDir, "README.md",
             ChatboxTemplate.RenderReadme(name, provider), files, skipped);
 
-        if (filesOverride is not null) return;
+        if (filesOverride is not null) return 0;
 
         if (json)
         {
@@ -107,6 +122,8 @@ internal static class NewChatboxCommand
             Console.WriteLine("  Read the full guide:");
             Console.WriteLine($"    nnke docs 05-streaming");
         }
+
+        return 0;
     }
 
     private static void WriteFile(string dir, string fileName, string content,

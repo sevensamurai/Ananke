@@ -22,4 +22,12 @@ var rootCommand = new RootCommand("Ananke CLI — scaffold working AI agent proj
 rootCommand.Add(SchemaCommand.Create(rootCommand));
 rootCommand.Add(KernelCommand.Create());
 
-return await rootCommand.Parse(args).InvokeAsync();
+try
+{
+    return await rootCommand.Parse(args).InvokeAsync();
+}
+catch (Exception ex) when (ex is not OperationCanceledException)
+{
+    Console.Error.WriteLine($"  ✗ Unexpected error: {ex.Message}");
+    return 1;
+}

@@ -64,15 +64,14 @@ internal static class NewPatternCommand
 
             if (list)
             {
-                ListPatterns(json);
-                return;
+                return ListPatterns(json);
             }
 
             var name = parseResult.GetValue(nameArg);
             if (string.IsNullOrWhiteSpace(name))
             {
                 Console.Error.WriteLine("  Provide a project name or use --list to see available patterns.");
-                return;
+                return 1;
             }
 
             var pattern = parseResult.GetValue(patternOption)!;
@@ -80,13 +79,13 @@ internal static class NewPatternCommand
             var output = parseResult.GetValue(outputOption);
 
             // Delegate to NewWorkflowCommand which owns the scaffold logic
-            NewWorkflowCommand.ExecuteForCli(name, provider, pattern, output, json);
+            return NewWorkflowCommand.ExecuteForCli(name, provider, pattern, output, json);
         });
 
         return command;
     }
 
-    private static void ListPatterns(bool json)
+    private static int ListPatterns(bool json)
     {
         var all = PatternCatalog.All();
         if (json)
@@ -103,7 +102,7 @@ internal static class NewPatternCommand
                     scaffold = $"nnke new pattern <name> --pattern {p.Key}",
                 })
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine("  Agentic Design Patterns");
@@ -119,5 +118,7 @@ internal static class NewPatternCommand
         Console.WriteLine("  Example:");
         Console.WriteLine("    nnke new pattern my-agent --pattern router");
         Console.WriteLine("    nnke new pattern my-agent --pattern review-critique");
+
+        return 0;
     }
 }

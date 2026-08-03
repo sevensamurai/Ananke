@@ -47,17 +47,16 @@ internal static class DocsCommand
             var json = parseResult.GetValue<bool>("--json");
 
             if (search is not null)
-                ExecuteSearch(search, json);
-            else if (list || topic is null)
-                ExecuteList(json);
-            else
-                ExecuteRead(topic, json);
+                return ExecuteSearch(search, json);
+            if (list || topic is null)
+                return ExecuteList(json);
+            return ExecuteRead(topic, json);
         });
 
         return command;
     }
 
-    private static void ExecuteList(bool json)
+    private static int ExecuteList(bool json)
     {
         var topics = DocsProvider.ListTopics();
 
@@ -67,7 +66,7 @@ internal static class DocsCommand
                 JsonOutput.Write(new { status = "error", message = "Documentation directory not found. Run from inside the Ananke repository." });
             else
                 Console.Error.WriteLine("  Documentation directory not found. Run from inside the Ananke repository.");
-            return;
+            return 1;
         }
 
         if (json)
@@ -84,7 +83,7 @@ internal static class DocsCommand
                     path = t.RelativePath,
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         // Human-formatted grouped list
@@ -105,9 +104,11 @@ internal static class DocsCommand
 
         Console.WriteLine("  Usage: nnke docs <topic>");
         Console.WriteLine("  Search: nnke docs --search \"<query>\"");
+
+        return 0;
     }
 
-    private static void ExecuteRead(string query, bool json)
+    private static int ExecuteRead(string query, bool json)
     {
         var topic = DocsProvider.FindTopic(query);
 
@@ -117,7 +118,7 @@ internal static class DocsCommand
                 JsonOutput.Write(new { status = "not_found", query, hint = "Run 'nnke docs --list' to see available topics." });
             else
                 Console.Error.WriteLine($"  Topic not found: {query}");
-            return;
+            return 1;
         }
 
         var content = DocsProvider.ReadContent(topic);
@@ -140,9 +141,11 @@ internal static class DocsCommand
         {
             Console.WriteLine(content);
         }
+
+        return 0;
     }
 
-    private static void ExecuteSearch(string query, bool json)
+    private static int ExecuteSearch(string query, bool json)
     {
         var results = DocsProvider.Search(query);
 
@@ -161,13 +164,13 @@ internal static class DocsCommand
                     snippet = r.Snippet,
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         if (results.Count == 0)
         {
             Console.WriteLine($"  No results for: {query}");
-            return;
+            return 0;
         }
 
         Console.WriteLine($"  Search results for: {query}");
@@ -182,5 +185,7 @@ internal static class DocsCommand
         }
 
         Console.WriteLine($"  {results.Count} result(s). Read a topic: nnke docs <topic>");
+
+        return 0;
     }
 }

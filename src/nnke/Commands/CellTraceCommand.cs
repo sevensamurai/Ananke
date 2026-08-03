@@ -34,13 +34,13 @@ internal static class CellTraceCommand
             var name = parseResult.GetValue(nameArg)!;
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(name, file, json);
+            return Execute(name, file, json);
         });
 
         return command;
     }
 
-    private static void Execute(string name, FileInfo file, bool json)
+    private static int Execute(string name, FileInfo file, bool json)
     {
         if (!file.Exists)
         {
@@ -48,7 +48,7 @@ internal static class CellTraceCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         HostSnapshot snapshot;
@@ -62,7 +62,7 @@ internal static class CellTraceCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse snapshot: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse snapshot: {ex.Message}");
-            return;
+            return 1;
         }
 
         var cell = snapshot.Cells.FirstOrDefault(c =>
@@ -75,7 +75,7 @@ internal static class CellTraceCommand
                 JsonOutput.Write(new { status = "not_found", name, available });
             else
                 Console.Error.WriteLine($"  Cell '{name}' not found. Available: {available}");
-            return;
+            return 1;
         }
 
         // Division events relevant to this cell (as parent or child)
@@ -106,7 +106,7 @@ internal static class CellTraceCommand
                     approvedBy = d.ApprovedBy
                 }).ToList()
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -135,5 +135,7 @@ internal static class CellTraceCommand
             }
         }
         Console.WriteLine();
+
+        return 0;
     }
 }

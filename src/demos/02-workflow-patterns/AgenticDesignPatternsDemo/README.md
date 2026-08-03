@@ -53,6 +53,6 @@ None — all LLM responses are simulated. No `secrets.json` needed.
 
 ## Related
 
-- Guide: [16 — Agentic Design Patterns](../../docs/guides/16-agentic-design-patterns.md)
-- Package: [Ananke.Orchestration](../Ananke.Orchestration/README.md)
-- Category page: [02 — Workflow Patterns](../../docs/demos/02-workflow-patterns.md)
+- Guide: [16 — Agentic Design Patterns](../../../../docs/guides/16-agentic-patterns.md)
+- Package: [Ananke.Orchestration](../../../Ananke.Orchestration/README.md)
+- Category page: [02 — Workflow Patterns](../../../../docs/demos.md)

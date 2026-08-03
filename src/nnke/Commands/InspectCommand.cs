@@ -31,13 +31,13 @@ internal static partial class InspectCommand
         {
             var dir = parseResult.GetValue(dirArg) ?? new DirectoryInfo(Directory.GetCurrentDirectory());
             var json = parseResult.GetValue<bool>("--json");
-            Execute(dir, json);
+            return Execute(dir, json);
         });
 
         return command;
     }
 
-    private static void Execute(DirectoryInfo dir, bool json)
+    private static int Execute(DirectoryInfo dir, bool json)
     {
         if (!dir.Exists)
         {
@@ -45,7 +45,7 @@ internal static partial class InspectCommand
                 JsonOutput.Write(new { status = "error", message = $"Directory not found: {dir.FullName}" });
             else
                 Console.Error.WriteLine($"  Directory not found: {dir.FullName}");
-            return;
+            return 1;
         }
 
         var report = BuildReport(dir);
@@ -54,6 +54,9 @@ internal static partial class InspectCommand
             WriteJson(report);
         else
             WriteHuman(report);
+
+        var healthy = report.Manifests.All(m => m.IsValid) && report.ManifestFiles.Count > 0;
+        return healthy ? 0 : 2;
     }
 
     // ── Report building ──────────────────────────────────────────────

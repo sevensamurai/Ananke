@@ -169,7 +169,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             SystemPrompt = _systemPrompt,
             Messages = messages,
             Metadata = BuildMetadata(),
-            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
+            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false
         };
 
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);
@@ -196,7 +196,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>
             Messages = messages,
             Tools = _tools,
             Metadata = BuildMetadata(),
-            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? true
+            StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false
         };
 
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct);

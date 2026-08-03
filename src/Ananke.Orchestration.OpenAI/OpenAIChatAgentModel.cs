@@ -182,6 +182,9 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
                                         BinaryData.FromBytes(audio.Data), MapAudioFormat(audio.MimeType)));
                                     break;
 #pragma warning restore OPENAI001
+                                default:
+                                    throw new NotSupportedException(
+                                        $"{part.GetType().Name} is not supported by the OpenAI adapter's request content mapping.");
                             }
                         }
                         messages.Add(ChatMessage.CreateUserMessage(contentParts));

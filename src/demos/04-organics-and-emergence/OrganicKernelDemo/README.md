@@ -69,6 +69,6 @@ None — the demo runs entirely in-process with simulated models.
 
 ## Related
 
-- Package: [Ananke.Organics](../Ananke.Organics/README.md)
-- Package: [Ananke.Learning](../Ananke.Learning/README.md)
-- Category page: [04 — Organics & Emergence](../../docs/demos/04-organics-and-emergence.md)
+- Package: [Ananke.Organics](../../../Ananke.Organics/README.md)
+- Package: [Ananke.Learning](../../../Ananke.Learning/README.md)
+- Category page: [04 — Organics & Emergence](../../../../docs/demos.md)

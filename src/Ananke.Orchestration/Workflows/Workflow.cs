@@ -107,7 +107,7 @@ public sealed class Workflow<TState>
     private IWorkflowRunner? _runner;
     private ICheckpointStore? _checkpointStore;
     private IWorkflowTracer? _tracer;
-    private bool _storeCompletions = true;
+    private bool _storeCompletions;
     private Dictionary<string, string>? _metadata;
     private BudgetConfig? _budget;
     private WorkflowDefinition<TState>? _cachedDefinition;
@@ -537,7 +537,7 @@ public sealed class Workflow<TState>
 
     /// <summary>
     /// Controls whether LLM completions are stored in the provider's platform logs
-    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>true</c>.
+    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>false</c>.
     /// </summary>
     public Workflow<TState> StoreCompletions(bool enabled)
     {

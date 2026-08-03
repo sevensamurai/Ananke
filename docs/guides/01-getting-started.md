@@ -9,21 +9,28 @@ Install Ananke, build your first workflow, and make your first LLM call.
 
 ## Installation
 
-Install the meta-package to get everything:
+Install the meta-package for the core — workflow orchestration, the state machine, and the bridge
+between them:
 
 ```bash
 dotnet add package Ananke
 ```
 
-Or install only the packages you need:
+**You will also need an LLM provider — the meta-package does not include one:**
 
 ```bash
-dotnet add package Ananke.Orchestration            # core: workflows, agents, tools, knowledge
 dotnet add package Ananke.Orchestration.OpenAI       # OpenAI chat + embeddings provider
+# or Ananke.Orchestration.Anthropic / Ananke.Orchestration.Google
 ```
 
-> **Tip:** The `Ananke` meta-package pulls in all sub-packages. For production
-> applications, install individual packages to keep your dependency tree lean.
+> **What `Ananke` actually contains.** It references `Ananke.Orchestration` and
+> `Ananke.StateMachine` (which bring in `Ananke.Orchestration.Knowledge` and
+> `Ananke.Abstractions`), plus its own bridge layer for driving workflows from state-machine
+> transitions. Everything else — providers, `Ananke.Documents`, `Ananke.Redis`, `Ananke.MQTT`,
+> `Ananke.OpenTelemetry`, `Ananke.AspNetCore`, `Ananke.MCP`, and the rest — is a separate package.
+>
+> For production applications, skip the meta-package and reference `Ananke.Orchestration` directly
+> to keep the dependency tree lean.
 
 ---
 

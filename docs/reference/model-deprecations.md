@@ -44,10 +44,11 @@ categorically different from production code drifting onto one.
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
 | `claude-sonnet-5` | `Sonnet5` | Current | — |
+| `claude-opus-5` | `Opus5` | Current | — |
 | `claude-fable-5` | `Fable5` | Current | — |
 | `claude-haiku-4-5` | `Haiku45` | Current | — |
 | `claude-sonnet-4-6` | `Sonnet46` | Legacy | `Sonnet5` |
-| `claude-opus-4-8` | `Opus48` | Legacy | `Fable5` |
+| `claude-opus-4-8` | `Opus48` | Legacy | `Opus5` |
 | `claude-opus-4-1` | `Opus41` | Deprecated | `Opus48` |
 
 ### OpenAI
@@ -78,15 +79,17 @@ categorically different from production code drifting onto one.
 
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
-| `gemini-3.5-flash` | `Gemini35Flash` | Current | — |
-| `gemini-3.1-pro` | `Gemini31Pro` | Current | — (no GA 3.5 Pro successor yet) |
+| `gemini-3.6-flash` | `Gemini36Flash` | Current | — |
+| `gemini-3.5-flash-lite` | `Gemini35FlashLite` | Current | — |
+| `gemini-3.1-pro` | `Gemini31Pro` | Current | — (no GA 3.5+ Pro successor yet) |
 | `gemini-3.1-flash-image` | `Gemini31FlashImage` | Current | — |
-| `gemini-3.1-flash-lite` | `Gemini31FlashLite` | Current | — |
 | `gemma-4` | `Gemma4` | Current | — |
 | `lyria-3` | `Lyria3` | Current | — |
-| `gemini-3.1-flash` | `Gemini31Flash` | Legacy | `Gemini35Flash` |
+| `gemini-3.5-flash` | `Gemini35Flash` | Legacy | `Gemini36Flash` |
+| `gemini-3.1-flash-lite` | `Gemini31FlashLite` | Legacy | `Gemini35FlashLite` |
+| `gemini-3.1-flash` | `Gemini31Flash` | Legacy | `Gemini36Flash` |
 | `gemini-2.5-pro` | `Gemini25Pro` | Deprecated | `Gemini31Pro` |
-| `gemini-2.5-flash` | `Gemini25Flash` | Deprecated | `Gemini35Flash` |
+| `gemini-2.5-flash` | `Gemini25Flash` | Deprecated | `Gemini36Flash` |
 
 ### Removed models (Retired, then deleted)
 

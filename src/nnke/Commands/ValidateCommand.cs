@@ -30,13 +30,13 @@ internal static class ValidateCommand
         {
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, json);
+            return Execute(file, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, bool json)
+    private static int Execute(FileInfo file, bool json)
     {
         if (!file.Exists)
         {
@@ -55,7 +55,7 @@ internal static class ValidateCommand
             {
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
             }
-            return;
+            return 1;
         }
 
         var (manifest, diagnostics, jobCount) = RunValidation(file.FullName);
@@ -69,6 +69,8 @@ internal static class ValidateCommand
         {
             WriteHuman(manifest, diagnostics, jobCount);
         }
+
+        return diagnostics.Count == 0 ? 0 : 2;
     }
 
     /// <summary>Runs validation and returns the result as a serializable dictionary. Used by MCP tools.</summary>

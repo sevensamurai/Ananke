@@ -187,7 +187,7 @@ jobs:
 
 ### `connections`
 
-Topology DSL — same syntax as `WorkflowScaffold.Parse()`. See [docs/workflow-dsl.md](../../docs/workflow-dsl.md).
+Topology DSL — same syntax as `WorkflowScaffold.Parse()`. See [docs/workflow-dsl.md](../../../../docs/reference/workflow-dsl.md).
 
 ```yaml
 connections:

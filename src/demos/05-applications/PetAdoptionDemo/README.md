@@ -174,7 +174,6 @@ Then open **http://localhost:5033** in your browser.
 | `POST` | `/api/chat` | Send a message (text, audio, or image); returns SSE stream |
 | `POST` | `/api/interrupt` | Interrupt a running generation with a new message |
 | `POST` | `/api/payment` | Submit card details to advance through the Payment phase |
-| `GET` | `/scalar/v1` | Interactive API docs (Scalar UI) |
 
 ---
 

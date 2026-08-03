@@ -78,8 +78,8 @@ None — runs entirely in-process. No API keys, no Docker.
 
 ## Related
 
-- Guide: [10 — Observability](../../docs/guides/10-observability.md)
-- Guide: [15 — Learning Primitives](../../docs/guides/15-learning-primitives.md)
-- Package: [Ananke.Learning](../Ananke.Learning/README.md)
-- Package: [Ananke.OpenTelemetry](../Ananke.OpenTelemetry/README.md)
-- Category page: [04 — Organics & Emergence](../../docs/demos/04-organics-and-emergence.md)
+- Guide: [10 — Observability](../../../../docs/guides/10-observability.md)
+- Guide: [15 — Learning Primitives](../../../../docs/guides/15-empirical-memory.md)
+- Package: [Ananke.Learning](../../../Ananke.Learning/README.md)
+- Package: [Ananke.OpenTelemetry](../../../Ananke.OpenTelemetry/README.md)
+- Category page: [04 — Organics & Emergence](../../../../docs/demos.md)

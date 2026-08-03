@@ -26,13 +26,13 @@ internal static class KernelHistoryCommand
         {
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, json);
+            return Execute(file, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, bool json)
+    private static int Execute(FileInfo file, bool json)
     {
         if (!file.Exists)
         {
@@ -40,7 +40,7 @@ internal static class KernelHistoryCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         HostSnapshot snapshot;
@@ -55,7 +55,7 @@ internal static class KernelHistoryCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse snapshot: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse snapshot: {ex.Message}");
-            return;
+            return 1;
         }
 
         if (json)
@@ -74,7 +74,7 @@ internal static class KernelHistoryCommand
                     approvedBy = d.ApprovedBy
                 })
             });
-            return;
+            return 0;
         }
 
         // Human-readable output
@@ -85,7 +85,7 @@ internal static class KernelHistoryCommand
         {
             Console.WriteLine("  No division history — kernel is still in its genesis state.");
             Console.WriteLine();
-            return;
+            return 0;
         }
 
         Console.WriteLine($"  Divisions: {snapshot.DivisionHistory.Count}");
@@ -132,6 +132,8 @@ internal static class KernelHistoryCommand
         }
 
         Console.WriteLine();
+
+        return 0;
     }
 
     private static void PrintLineage(

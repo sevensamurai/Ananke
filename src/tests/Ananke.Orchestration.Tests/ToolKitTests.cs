@@ -1,5 +1,7 @@
 using Ananke.Abstractions.Providers;
+using Ananke.Abstractions.Tools;
 using Ananke.Orchestration.Tools;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using System.Text.Json;
 
@@ -989,5 +991,65 @@ public class ToolKitTests
     {
         var builder = new ToolBuilder();
         Should.Throw<ArgumentException>(() => builder.PlatformNative(""));
+    }
+
+    // ── Memory sync failures (Q7) ────────────────────────────────────
+
+    [Test]
+    public async Task AddTool_MemoryUpsertFails_LogsWarningInsteadOfSwallowing()
+    {
+        var logSink = new CollectingLogger();
+        var kit = new ToolKit("test", new FakeLoggerFactory(logSink))
+            .WithMemory(new ThrowingToolMemory());
+
+        kit.AddTool("ping", "Returns pong", () => "pong");
+
+        await logSink.Logged.WaitAsync(TimeSpan.FromSeconds(5));
+
+        logSink.Messages.ShouldContain(m => m.Contains("ping") && m.Contains("test"));
+    }
+
+    private sealed class ThrowingToolMemory : IToolMemory
+    {
+        public async Task UpsertAsync(ToolMemoryEntry entry, CancellationToken ct = default)
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("simulated memory backend failure");
+        }
+
+        public Task RemoveAsync(string kitName, string toolName, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyList<ToolMemoryEntry>> RecallAsync(
+            string query, int topK = 5, IReadOnlyList<string>? tagFilter = null, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task MarkHealthAsync(string kitName, string toolName, ToolHealth health, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+    }
+
+    private sealed class CollectingLogger : ILogger
+    {
+        private readonly TaskCompletionSource _logged = new();
+
+        public List<string> Messages { get; } = [];
+        public Task Logged => _logged.Task;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+            _logged.TrySetResult();
+        }
+    }
+
+    private sealed class FakeLoggerFactory(ILogger logger) : ILoggerFactory
+    {
+        public void AddProvider(ILoggerProvider provider) { }
+        public ILogger CreateLogger(string categoryName) => logger;
+        public void Dispose() { }
     }
 }

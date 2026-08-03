@@ -29,7 +29,7 @@ public sealed record AgentRequest
 
     /// <summary>
     /// When <c>true</c>, the provider stores the completion so it appears in platform logs
-    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>true</c>.
+    /// (e.g. <see href="https://platform.openai.com/logs"/>). Default is <c>false</c>.
     /// </summary>
-    public bool StoreCompletions { get; init; } = true;
+    public bool StoreCompletions { get; init; }
 }
