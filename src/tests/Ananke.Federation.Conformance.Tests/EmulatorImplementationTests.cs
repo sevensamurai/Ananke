@@ -281,6 +281,34 @@ public class EmulatorImplementationTests
         result.IsRetryable.ShouldBeFalse();
     }
 
+    [Test]
+    public async Task TextEditorExecutor_PathEscapesSandbox_ReturnsFatalAndDoesNotWrite()
+    {
+        var sandbox = Path.Combine(Path.GetTempPath(), $"ananke-test-{Guid.NewGuid():N}");
+        try
+        {
+            var editor = new TextEditorExecutor(sandbox);
+            var escapeTarget = Path.Combine(Path.GetTempPath(), "ananke-escaped.txt");
+            if (File.Exists(escapeTarget)) File.Delete(escapeTarget);
+
+            var result = await editor.ExecuteAsync(new Dictionary<string, object?>
+            {
+                ["command"] = "create",
+                ["path"] = "../ananke-escaped.txt",
+                ["file_text"] = "should never land here"
+            });
+
+            result.IsError.ShouldBeTrue();
+            result.IsRetryable.ShouldBeFalse();
+            File.Exists(escapeTarget).ShouldBeFalse("a relative '../' path must not write outside the sandbox root");
+        }
+        finally
+        {
+            if (Directory.Exists(sandbox))
+                Directory.Delete(sandbox, recursive: true);
+        }
+    }
+
     // ── FileSearchExecutor ────────────────────────────────────────────
 
     [Test]

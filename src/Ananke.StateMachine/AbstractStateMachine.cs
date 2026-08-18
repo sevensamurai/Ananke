@@ -153,8 +153,9 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// </summary>
     /// <param name="context">Context identifying the instance</param>
     /// <param name="reason">Reason for the fault</param>
+    /// <param name="ct">Cancels the underlying persist write.</param>
     /// <returns>Status change result</returns>
-    public virtual async Task<OperationalStatusChange> FaultAsync(C context, string reason)
+    public virtual async Task<OperationalStatusChange> FaultAsync(C context, string reason, CancellationToken ct = default)
     {
         var previous = OperationalStatus;
 
@@ -176,7 +177,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         }));
 
         // Persist faulted status
-        await PersistOperationalStatusAsync(context.Id);
+        await PersistOperationalStatusAsync(context.Id, ct).ConfigureAwait(false);
 
         return new OperationalStatusChange(true, previous, OperationalStatus.Faulted, reason);
     }
@@ -186,8 +187,9 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// </summary>
     /// <param name="context">Context identifying the instance</param>
     /// <param name="reason">Reason for the reset (e.g., "Device replaced")</param>
+    /// <param name="ct">Cancels the underlying persist write.</param>
     /// <returns>Status change result</returns>
-    public virtual async Task<OperationalStatusChange> ResetAsync(C context, string reason)
+    public virtual async Task<OperationalStatusChange> ResetAsync(C context, string reason, CancellationToken ct = default)
     {
         var previous = OperationalStatus;
 
@@ -209,7 +211,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         }));
 
         // Persist operative status
-        await PersistOperationalStatusAsync(context.Id);
+        await PersistOperationalStatusAsync(context.Id, ct).ConfigureAwait(false);
 
         return new OperationalStatusChange(true, previous, OperationalStatus.Operative, reason);
     }
@@ -217,21 +219,21 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// <summary>
     /// Persists operational status to distributed state
     /// </summary>
-    private async Task PersistOperationalStatusAsync(string id)
+    private async Task PersistOperationalStatusAsync(string id, CancellationToken ct = default)
     {
         // Capture values before GetPersistedContextAsync, which restores
         // OperationalStatus from the (stale) persisted state as a side-effect.
         var statusToSave = OperationalStatus;
         var reasonToSave = OperationalStatusReason;
 
-        var persistedContext = await GetPersistedContextAsync(id);
+        var persistedContext = await GetPersistedContextAsync(id).ConfigureAwait(false);
 
         // Re-apply the intended values
         OperationalStatus = statusToSave;
         OperationalStatusReason = reasonToSave;
         persistedContext.OperationalStatus = statusToSave;
         persistedContext.OperationalStatusReason = reasonToSave;
-        await _store.SetValueAsync(id, persistedContext);
+        await _store.SetValueAsync(id, persistedContext, ct).ConfigureAwait(false);
     }
 
     #endregion
@@ -240,7 +242,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 
     internal async Task<PersistedContext<S>> GetPersistedContextAsync(string id)
     {
-        var context = await _store.GetValueAsync<PersistedContext<S>>(id);
+        var context = await _store.GetValueAsync<PersistedContext<S>>(id).ConfigureAwait(false);
 
         if (context != null)
         {
@@ -261,7 +263,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
         var eventTime = payload is ITimestamped ts ? ts.EventTime : DateTimeOffset.UtcNow;
         try
         {
-            var persistedContext = await GetPersistedContextAsync(id);
+            var persistedContext = await GetPersistedContextAsync(id).ConfigureAwait(false);
             var previousState = persistedContext.State;
             CurrentState = previousState;
 
@@ -278,7 +280,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     // Self-transition: state stays the same, just increment step
                     persistedContext.Step += 1;
-                    await _store.SetValueAsync(id, persistedContext);
+                    await _store.SetValueAsync(id, persistedContext).ConfigureAwait(false);
 
                     Log.LogDebug("SELF-TRANSITION: {State} (implicit)", CurrentState);
                     return TransitionResult<S>.Succeeded(previousState, CurrentState) with { EventTimestamp = eventTime };
@@ -291,7 +293,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             // Check guard condition
             if (config.GuardCondition is not null)
             {
-                var guardResult = await config.GuardCondition();
+                var guardResult = await config.GuardCondition().ConfigureAwait(false);
                 if (!guardResult)
                 {
                     Log.LogDebug("Guard condition failed for transition: {Transition}", transition);
@@ -335,7 +337,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             var stateConfigs = Builder.StateConfigs;
             if (stateConfigs.TryGetValue(previousState, out var exitStateConfig) && exitStateConfig.OnExitAction is not null)
             {
-                await exitStateConfig.OnExitAction();
+                await exitStateConfig.OnExitAction().ConfigureAwait(false);
             }
 
             // Perform transition
@@ -344,13 +346,13 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             CurrentState = resolvedFinalState;
             IsInterrupted = persistedContext.InterruptStack.Count > 0;
 
-            await _store.SetValueAsync(id, persistedContext);
+            await _store.SetValueAsync(id, persistedContext).ConfigureAwait(false);
             Log.LogDebug("OK: {PreviousState} --({Transition})--> {NewState}", previousState, transition, resolvedFinalState);
 
             // Execute state entry action
             if (stateConfigs.TryGetValue(resolvedFinalState, out var entryStateConfig) && entryStateConfig.OnEnterAction is not null)
             {
-                await entryStateConfig.OnEnterAction();
+                await entryStateConfig.OnEnterAction().ConfigureAwait(false);
             }
 
             // Resolve interrupt payload for the result
@@ -359,7 +361,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             // Execute after-transition action
             if (config.AfterTransitionAction is not null)
             {
-                var actionResult = await config.AfterTransitionAction();
+                var actionResult = await config.AfterTransitionAction().ConfigureAwait(false);
                 Log.LogDebug("After-action returned state: {State}", actionResult);
 
                 // If action modifies state, update it
@@ -367,7 +369,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
                 {
                     persistedContext.State = actionResult;
                     CurrentState = actionResult;
-                    await _store.SetValueAsync(id, persistedContext);
+                    await _store.SetValueAsync(id, persistedContext).ConfigureAwait(false);
                 }
 
                 return new TransitionResult<S>
@@ -446,7 +448,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             pipeline = () => middleware.InvokeAsync(context, transition, CurrentState, next);
         }
 
-        var result = await pipeline();
+        var result = await pipeline().ConfigureAwait(false);
 
         activity?.SetTag("Ananke.to_state", result.CurrentState.ToString());
         activity?.SetTag("Ananke.success", result.Success);
@@ -476,7 +478,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
             id,
             () => TryExecuteTransitionAsync(id, transition, payload),
             _options.LockRetryCount,
-            _options.LockRetryDelayMs);
+            _options.LockRetryDelayMs).ConfigureAwait(false);
 
         if (!result.LockAcquired)
         {

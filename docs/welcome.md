@@ -82,7 +82,7 @@ record PipelineState(string Topic = "", string Facts = "", string Summary = "");
 | Agents that learn from experience | [Guides 01, 03, 04, 06, 15](learning-path.md) |
 | Distributed multi-service coordination | [Guides 01, 02, 08, 09](learning-path.md) |
 | Use the nnke CLI tools | [nnke Tools overview](cli/nnke-tools.md) |
-| Run a manifest locally without credentials | [`nnke run`](cli/nnke-tool.md) |
+| Serve a manifest locally without credentials | [`nnke serve`](cli/nnke-tool.md) |
 | Agentic patterns (review, refine) | [Guide 16](guides/16-agentic-patterns.md) |
 
 -> [Complete learning path](learning-path.md) | [Browse runnable demos](demos.md)

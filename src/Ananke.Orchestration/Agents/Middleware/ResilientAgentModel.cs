@@ -97,18 +97,18 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
     /// <inheritdoc />
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
         => await _pipeline.ExecuteAsync(
-            async token => await _inner.GenerateAsync(request, token), ct);
+            async token => await _inner.GenerateAsync(request, token).ConfigureAwait(false), ct).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var (enumerator, firstChunk) = await EstablishStreamAsync(request, ct);
+        var (enumerator, firstChunk) = await EstablishStreamAsync(request, ct).ConfigureAwait(false);
 
         if (firstChunk is null)
         {
-            await enumerator.DisposeAsync();
+            await enumerator.DisposeAsync().ConfigureAwait(false);
             yield break;
         }
 
@@ -116,12 +116,12 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
 
         try
         {
-            while (await enumerator.MoveNextAsync())
+            while (await enumerator.MoveNextAsync().ConfigureAwait(false))
                 yield return enumerator.Current;
         }
         finally
         {
-            await enumerator.DisposeAsync();
+            await enumerator.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -138,21 +138,21 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
             try
             {
                 enumerator = _inner.GenerateStreamAsync(request, ct).GetAsyncEnumerator(ct);
-                if (await enumerator.MoveNextAsync())
+                if (await enumerator.MoveNextAsync().ConfigureAwait(false))
                     return (enumerator, enumerator.Current);
                 return (enumerator, null);
             }
             catch (Exception ex) when (attempt <= _maxStreamRetryAttempts && _shouldRetry(ex))
             {
-                if (enumerator is not null) await enumerator.DisposeAsync();
+                if (enumerator is not null) await enumerator.DisposeAsync().ConfigureAwait(false);
 
                 var delay = CalculateBackoff(attempt);
                 RecordRetryOtelEvent(ex, attempt, delay);
-                await Task.Delay(delay, ct);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
             }
             catch
             {
-                if (enumerator is not null) await enumerator.DisposeAsync();
+                if (enumerator is not null) await enumerator.DisposeAsync().ConfigureAwait(false);
                 throw;
             }
         }

@@ -48,6 +48,8 @@ public sealed class VertexAICredentialProvider : IFederationCredentialProvider
         }
         catch (Exception)
         {
+            // Client construction failed (ADC not available, bad project/location) — the documented
+            // contract is null-if-ADC-unavailable, so this is intentionally swallowed rather than thrown.
             return Task.FromResult<object?>(null);
         }
     }

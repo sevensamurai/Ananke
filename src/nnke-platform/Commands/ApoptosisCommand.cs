@@ -52,19 +52,19 @@ internal static class ApoptosisCommand
             var idleMinutes = parseResult.GetValue(idleMinutesOption);
             var maxAgeDays = parseResult.GetValue(maxAgeDaysOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, auto, idleMinutes, maxAgeDays, json);
+            return Execute(file, auto, idleMinutes, maxAgeDays, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, bool auto, int idleMinutes, int maxAgeDays, bool json)
+    private static int Execute(FileInfo file, bool auto, int idleMinutes, int maxAgeDays, bool json)
     {
         if (!file.Exists)
         {
             if (json) JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         HostSnapshot snapshot;
@@ -73,7 +73,7 @@ internal static class ApoptosisCommand
         {
             if (json) JsonOutput.Write(new { status = "error", message = ex.Message });
             else Console.Error.WriteLine($"  Failed to parse snapshot: {ex.Message}");
-            return;
+            return 1;
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -127,7 +127,7 @@ internal static class ApoptosisCommand
                     ? "TeardownAsync requires a live IFederationDeployer (available in v0.9)."
                     : "Pass --auto to execute teardown (requires v0.9 deployer wiring)."
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -152,5 +152,7 @@ internal static class ApoptosisCommand
                 Console.WriteLine("  Pass --auto to execute teardown (requires v0.9 deployer wiring).");
         }
         Console.WriteLine();
+
+        return 0;
     }
 }

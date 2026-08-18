@@ -120,7 +120,7 @@ public sealed class DocumentLinkExtractor
                 TopK = 1000,
                 Filter = new KnowledgeFilter { ["source"] = sourceId }
             },
-            ct);
+            ct).ConfigureAwait(false);
 
         if (sourceChunks.Count == 0)
             return;
@@ -135,7 +135,7 @@ public sealed class DocumentLinkExtractor
                     TopK = _maxCandidates + 1, // +1 to account for self-match
                     ScoreThreshold = _similarityThreshold
                 },
-                ct);
+                ct).ConfigureAwait(false);
 
             foreach (var candidate in candidates)
             {
@@ -149,7 +149,7 @@ public sealed class DocumentLinkExtractor
 
                 // 3. Ask LLM to classify the relationship
                 var classification = await ClassifyRelationshipAsync(
-                    chunk.Text, candidate.Text, ct);
+                    chunk.Text, candidate.Text, ct).ConfigureAwait(false);
 
                 if (classification.Relationship == "none" || classification.Confidence < 0.5f)
                     continue;
@@ -158,7 +158,7 @@ public sealed class DocumentLinkExtractor
                 var weight = classification.Confidence * candidate.Score;
                 await _graph.AddLinkAsync(
                     chunk.Id, candidate.Id, classification.Relationship,
-                    Math.Clamp(weight, 0f, 1f), ct);
+                    Math.Clamp(weight, 0f, 1f), ct).ConfigureAwait(false);
             }
         }
     }
@@ -186,7 +186,7 @@ public sealed class DocumentLinkExtractor
             ResponseFormat = new AgentResponseFormat("link_classification", ResponseSchema)
         };
 
-        var response = await _model.GenerateAsync(request, ct);
+        var response = await _model.GenerateAsync(request, ct).ConfigureAwait(false);
         return ParseResponse(response.Text ?? "{}");
     }
 

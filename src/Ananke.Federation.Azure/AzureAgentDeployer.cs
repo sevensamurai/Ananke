@@ -45,7 +45,7 @@ public sealed class AzureAgentDeployer(
         WorkflowManifest manifest, ToolKit toolKit, CancellationToken ct = default)
     {
         var validator = new AzureAgentValidator(_credentialProvider, _modelMapper);
-        return await validator.ValidateAsync(manifest, toolKit, ct);
+        return await validator.ValidateAsync(manifest, toolKit, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -56,7 +56,7 @@ public sealed class AzureAgentDeployer(
         ArgumentNullException.ThrowIfNull(toolKit);
         ArgumentNullException.ThrowIfNull(options);
 
-        var report = await ValidateAsync(manifest, toolKit, ct);
+        var report = await ValidateAsync(manifest, toolKit, ct).ConfigureAwait(false);
         if (!report.IsDeployable)
         {
             var errors = string.Join("; ", report.Errors.Select(e => $"[{e.Code}] {e.Message}"));
@@ -76,13 +76,13 @@ public sealed class AzureAgentDeployer(
             Tags = options.Tags
         };
 
-        await _deploymentRegistry.RegisterAsync(record, ct);
+        await _deploymentRegistry.RegisterAsync(record, ct).ConfigureAwait(false);
 
         try
         {
-            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Deploying, ct);
+            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Deploying, ct).ConfigureAwait(false);
 
-            var client = await GetClientAsync(ct);
+            var client = await GetClientAsync(ct).ConfigureAwait(false);
             var toolsJson = _toolSchemaTranslator.Translate(toolKit.Tools.Values);
 
             string? lastAgentId = null;
@@ -97,7 +97,7 @@ public sealed class AzureAgentDeployer(
                 var requestBody = BuildAgentRequestBody(modelName, instructions, toolsJson);
                 var content = BinaryContent.Create(BinaryData.FromString(requestBody));
 
-                var response = await client.CreateAgentAsync(content, manifest.Name);
+                var response = await client.CreateAgentAsync(content, manifest.Name).ConfigureAwait(false);
                 var responseJson = response.GetRawResponse().Content.ToString();
                 var responseDoc = JsonDocument.Parse(responseJson);
                 lastAgentId = responseDoc.RootElement.TryGetProperty("id", out var idProp)
@@ -107,7 +107,7 @@ public sealed class AzureAgentDeployer(
 
             var platformResourceId = lastAgentId ?? $"azure-ai/agents/{manifest.Name}";
 
-            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Active, ct);
+            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Active, ct).ConfigureAwait(false);
 
             return record with
             {
@@ -118,12 +118,12 @@ public sealed class AzureAgentDeployer(
         }
         catch (Exception) when (ct.IsCancellationRequested)
         {
-            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Failed, ct);
+            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Failed, ct).ConfigureAwait(false);
             throw;
         }
         catch (Exception)
         {
-            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Failed, CancellationToken.None);
+            await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Failed, CancellationToken.None).ConfigureAwait(false);
             throw;
         }
     }
@@ -133,16 +133,16 @@ public sealed class AzureAgentDeployer(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(deploymentId);
 
-        var record = await _deploymentRegistry.GetAsync(deploymentId, ct)
+        var record = await _deploymentRegistry.GetAsync(deploymentId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Deployment '{deploymentId}' not found.");
 
         if (record.PlatformResourceId is not null)
         {
-            var client = await GetClientAsync(ct);
-            await client.DeleteAgentAsync(record.PlatformResourceId, ct);
+            var client = await GetClientAsync(ct).ConfigureAwait(false);
+            await client.DeleteAgentAsync(record.PlatformResourceId, ct).ConfigureAwait(false);
         }
 
-        await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Stopped, ct);
+        await _deploymentRegistry.UpdateStatusAsync(deploymentId, DeploymentStatus.Stopped, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -154,7 +154,7 @@ public sealed class AzureAgentDeployer(
 
     private async Task<AgentAdministrationClient> GetClientAsync(CancellationToken ct)
     {
-        var credential = await _credentialProvider.GetCredentialAsync(Platform, ct);
+        var credential = await _credentialProvider.GetCredentialAsync(Platform, ct).ConfigureAwait(false);
         return credential as AgentAdministrationClient
             ?? throw new InvalidOperationException("Failed to obtain Azure AI Agent Service client.");
     }

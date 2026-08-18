@@ -35,11 +35,9 @@ public sealed class AzureModelMapper : IModelMapper
         [$"google/{Models.Google.Gemini25Pro}"] = Models.OpenAI.Gpt41,
         [$"google/{Models.Google.Gemini25Flash}"] = Models.OpenAI.Gpt41Mini,
 
-        // Anthropic → nearest Azure-hosted equivalent. Note: the current-gen Anthropic constants
-        // (Opus48/Sonnet46/Haiku45/Sonnet5/Fable5/Opus41) have no entries here yet — this mapper
-        // was never updated when those were added; a manifest referencing them today falls through
-        // to Map()'s null (no equivalent found). Tracked as a follow-up, not fixed as part of the
-        // retired-model cleanup that removed the Opus4/Sonnet4/Sonnet35/Haiku35 entries below.
+        // Anthropic → nearest Azure-hosted equivalent: no entries. The current-gen Anthropic
+        // constants were never added here, so a manifest naming one falls through to Map()'s null.
+        // Open follow-up, same gap as VertexAIModelMapper.
     };
 #pragma warning restore ANNKE001
 

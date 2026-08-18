@@ -24,11 +24,14 @@ public sealed class GeminiModelMapper : IModelMapper
             ["openai/o3-mini"] = Models.Google.Gemini35Flash,
             ["openai/o4-mini"] = Models.Google.Gemini35Flash,
 
-            // Anthropic → Gemini. Note: claude-opus-4/claude-sonnet-4/claude-3-5-sonnet/
-            // claude-3-5-haiku source-model entries were removed here — those Anthropic models
-            // are retired, so no manifest should be requesting them. Current-gen Anthropic source
-            // keys (claude-opus-4-8, claude-sonnet-4-6, etc.) were never added to this mapper;
-            // tracked as a follow-up, not fixed as part of the retired-model cleanup.
+            // Anthropic → Gemini. Haiku is Anthropic's only efficient tier, so it alone maps to
+            // Flash; the rest are tier 4-5 and map to the flagship.
+            ["anthropic/claude-opus-5"] = Models.Google.Gemini31Pro,
+            ["anthropic/claude-sonnet-5"] = Models.Google.Gemini31Pro,
+            ["anthropic/claude-opus-4-8"] = Models.Google.Gemini31Pro,
+            ["anthropic/claude-sonnet-4-6"] = Models.Google.Gemini31Pro,
+            ["anthropic/claude-fable-5"] = Models.Google.Gemini31Pro,
+            ["anthropic/claude-haiku-4-5"] = Models.Google.Gemini35Flash,
 
             // Google → passthrough (identity — must echo the input verbatim, not upgrade it;
             // do not apply the ANNKE002 code fix here — it broke this exact identity mapping once)

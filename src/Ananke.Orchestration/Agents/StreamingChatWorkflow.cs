@@ -9,6 +9,8 @@ using Ananke.Orchestration.Tools;
 
 using Ananke.Abstractions.Agents;
 
+using Ananke.Orchestration.Usage;
+
 namespace Ananke.Orchestration.Agents;
 
 /// <summary>
@@ -233,7 +235,7 @@ public static class StreamingChatWorkflow
 
                     // Capture token usage for budget tracking
                     if (completed is not null)
-                        TokenUsageCapture.Accumulate(completed);
+                        await UsageRecording.ReportAsync(completed, ct);
 
                     return state with
                     {
@@ -418,6 +420,8 @@ public static class StreamingChatWorkflow
                 }
                 catch (Exception ex)
                 {
+                    // Best-effort: if the writer itself is faulted (e.g. already completed), there is
+                    // no channel left to report to, so give up quietly rather than fault this task.
                     try { await writer.WriteAsync(new ErrorEvent(ex.Message), CancellationToken.None); } catch (Exception) { }
                 }
                 finally

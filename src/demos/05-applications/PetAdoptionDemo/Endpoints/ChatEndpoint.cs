@@ -50,7 +50,7 @@ internal static class ChatEndpoint
             }
 
             // Bind SSE output to this request's response
-            session.BindResponse(context.Response.WriteSseAsync);
+            session.BindResponse((eventName, data) => context.Response.WriteSseAsync(eventName, data));
 
             try
             {

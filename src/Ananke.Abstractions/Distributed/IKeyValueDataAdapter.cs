@@ -10,30 +10,30 @@ public interface IKeyValueDataAdapter : IAsyncDisposable
     /// <summary>
     /// Gets a string value by key
     /// </summary>
-    Task<string?> GetValueAsync(string key);
+    Task<string?> GetValueAsync(string key, CancellationToken ct = default);
 
     /// <summary>
     /// Gets a typed value by key, deserializing from JSON
     /// </summary>
-    Task<T?> GetValueAsync<T>(string key);
+    Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default);
 
     /// <summary>
     /// Sets a string value by key
     /// </summary>
-    Task SetValueAsync(string key, string value);
+    Task SetValueAsync(string key, string value, CancellationToken ct = default);
 
     /// <summary>
     /// Sets a typed value by key, serializing to JSON
     /// </summary>
-    Task SetValueAsync<T>(string key, T value);
+    Task SetValueAsync<T>(string key, T value, CancellationToken ct = default);
 
     /// <summary>
     /// Removes a value by key
     /// </summary>
-    Task<bool> RemoveAsync(string key);
+    Task<bool> RemoveAsync(string key, CancellationToken ct = default);
 
     /// <summary>
     /// Checks if a key exists
     /// </summary>
-    Task<bool> ExistsAsync(string key);
+    Task<bool> ExistsAsync(string key, CancellationToken ct = default);
 }

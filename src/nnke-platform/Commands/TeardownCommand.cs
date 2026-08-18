@@ -31,13 +31,13 @@ internal static class TeardownCommand
             var inMemory = parseResult.GetValue<bool>("--in-memory");
 
             using var host = new PlatformHost(inMemory);
-            await ExecuteAsync(host, deploymentId, json);
+            return await ExecuteAsync(host, deploymentId, json);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(PlatformHost host, string deploymentId, bool json)
+    private static async Task<int> ExecuteAsync(PlatformHost host, string deploymentId, bool json)
     {
         // ── 1. Look up record ────────────────────────────────────────────────
         var record = await host.Registry.GetAsync(deploymentId);
@@ -51,7 +51,7 @@ internal static class TeardownCommand
                 Console.Error.WriteLine($"  ✗ No deployment found with ID '{deploymentId}'.");
                 Console.Error.WriteLine();
             }
-            return;
+            return 1;
         }
 
         if (record.Status == DeploymentStatus.Stopped)
@@ -64,7 +64,7 @@ internal static class TeardownCommand
                 Console.WriteLine($"  ⚠ Deployment '{deploymentId}' is already stopped.");
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         // ── 2. Resolve deployer from the record's platform ───────────────────
@@ -81,7 +81,7 @@ internal static class TeardownCommand
                 Console.Error.WriteLine($"    {hint}");
                 Console.Error.WriteLine();
             }
-            return;
+            return 1;
         }
 
         // ── 3. Call platform teardown ────────────────────────────────────────
@@ -99,7 +99,7 @@ internal static class TeardownCommand
                 Console.Error.WriteLine($"  ✗ Teardown failed: {ex.Message}");
                 Console.Error.WriteLine();
             }
-            return;
+            return 2;
         }
 
         // ── 4. Update registry ───────────────────────────────────────────────
@@ -115,5 +115,7 @@ internal static class TeardownCommand
             Console.WriteLine($"    Platform : {record.Platform}");
             Console.WriteLine();
         }
+
+        return 0;
     }
 }

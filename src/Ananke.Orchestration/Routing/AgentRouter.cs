@@ -4,6 +4,8 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Tools;
 
+using Ananke.Orchestration.Usage;
+
 namespace Ananke.Orchestration.Routing;
 
 /// <summary>
@@ -71,7 +73,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         };
 
         var response = await _model.GenerateAsync(request, ct);
-        TokenUsageCapture.Accumulate(response);
+        await UsageRecording.ReportAsync(response, ct);
 
         var round = 0;
         while (response.RequiresAction && _toolExecutors is not null)
@@ -92,7 +94,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
 
             request = request with { Messages = messages };
             response = await _model.GenerateAsync(request, ct);
-            TokenUsageCapture.Accumulate(response);
+            await UsageRecording.ReportAsync(response, ct);
         }
 
         var choice = response.Text?.Trim() ?? string.Empty;
@@ -107,7 +109,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
                 $"'{choice}' is not a valid option. You must respond with exactly one of: {optionsList}. No explanation."));
             request = request with { Messages = messages };
             response = await _model.GenerateAsync(request, ct);
-            TokenUsageCapture.Accumulate(response);
+            await UsageRecording.ReportAsync(response, ct);
             choice = response.Text?.Trim() ?? string.Empty;
             matched = TryMatchOption(choice);
             if (matched is not null)

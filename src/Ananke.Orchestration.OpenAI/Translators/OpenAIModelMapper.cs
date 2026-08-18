@@ -31,10 +31,14 @@ public sealed class OpenAIModelMapper : IModelMapper
             ["google/gemini-2.5-pro"] = Models.OpenAI.Gpt56Sol,
             ["google/gemini-2.5-flash"] = Models.OpenAI.Gpt56Terra,
 
-            // Anthropic → nearest OpenAI equivalent. Note: claude-opus-4/claude-sonnet-4/
-            // claude-3-5-sonnet/claude-3-5-haiku source-model entries were removed here — those
-            // Anthropic models are retired. Current-gen Anthropic source keys were never added to
-            // this mapper; tracked as a follow-up, not fixed as part of the retired-model cleanup.
+            // Anthropic → nearest OpenAI equivalent. Haiku is Anthropic's only efficient tier, so
+            // it alone maps to Terra; the rest are tier 4-5 and map to the flagship.
+            ["anthropic/claude-opus-5"] = Models.OpenAI.Gpt56Sol,
+            ["anthropic/claude-sonnet-5"] = Models.OpenAI.Gpt56Sol,
+            ["anthropic/claude-opus-4-8"] = Models.OpenAI.Gpt56Sol,
+            ["anthropic/claude-sonnet-4-6"] = Models.OpenAI.Gpt56Sol,
+            ["anthropic/claude-fable-5"] = Models.OpenAI.Gpt56Sol,
+            ["anthropic/claude-haiku-4-5"] = Models.OpenAI.Gpt56Terra,
         };
 
     // Deprecated ids stay as Capabilities keys on purpose: passthrough outputs above still

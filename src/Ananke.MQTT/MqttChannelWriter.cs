@@ -43,13 +43,13 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
         {
             _logger.LogWarning("TX Channel disconnected");
             if (!_disposed)
-                await ReconnectAsync();
+                await ReconnectAsync().ConfigureAwait(false);
         };
 
-        return await ConnectAsync(token);
+        return await ConnectAsync(token).ConfigureAwait(false);
     }
 
-    public async Task<ChannelSendResult> SendAsync(object message, A action)
+    public async Task<ChannelSendResult> SendAsync(object message, A action, CancellationToken ct = default)
     {
         if (_client is null)
             return ChannelSendResult.Failed("Client not configured");
@@ -68,7 +68,7 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
                 .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
                 .Build();
 
-            var resp = await _client.PublishAsync(applicationMessage);
+            var resp = await _client.PublishAsync(applicationMessage, ct).ConfigureAwait(false);
             _logger.LogDebug("TX Channel sent to {Topic} ({Size}B) -> {Status}", topic, payload.Length, resp.ReasonCode);
 
             return resp.ReasonCode == MqttClientPublishReasonCode.Success
@@ -82,10 +82,10 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
         }
     }
 
-    public async Task ClearAsync()
+    public async Task ClearAsync(CancellationToken ct = default)
     {
         if (_client is not null)
-            await _client.DisconnectAsync();
+            await _client.DisconnectAsync(cancellationToken: ct).ConfigureAwait(false);
         _linked = false;
     }
 
@@ -99,7 +99,7 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
 
         try
         {
-            var resp = await _client.ConnectAsync(_options, token);
+            var resp = await _client.ConnectAsync(_options, token).ConfigureAwait(false);
             _linked = resp.ResultCode == MqttClientConnectResultCode.Success;
             return _linked;
         }
@@ -122,8 +122,8 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
 
             try
             {
-                await Task.Delay(delay);
-                if (await ConnectAsync(CancellationToken.None))
+                await Task.Delay(delay).ConfigureAwait(false);
+                if (await ConnectAsync(CancellationToken.None).ConfigureAwait(false))
                 {
                     _logger.LogInformation("TX Channel reconnected after {Attempt} attempt(s)", attempt);
                     return;
@@ -148,7 +148,7 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
 
         if (_client is not null)
         {
-            await _client.DisconnectAsync();
+            await _client.DisconnectAsync().ConfigureAwait(false);
             _client.Dispose();
             _client = null;
         }

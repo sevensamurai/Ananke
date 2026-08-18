@@ -70,10 +70,10 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
     public async Task<Episode> CommitAsync(Episode episode, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(episode);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var point = BuildPoint(episode);
-        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct);
+        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct).ConfigureAwait(false);
         return episode;
     }
 
@@ -81,13 +81,13 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
     public async Task<Episode?> GetAsync(string episodeId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(episodeId);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var points = await _client.RetrieveAsync(
             _collectionName,
             [ToPointId(episodeId)],
             withPayload: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var point = points.FirstOrDefault();
         return point is null ? null : MapPayloadToEpisode(episodeId, point.Payload);
@@ -98,7 +98,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
         int offset, int limit, string? entityId = null,
         CancellationToken ct = default)
     {
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         Filter? filter = entityId is not null
             ? new Filter { Must = { Conditions.MatchKeyword(EntityIdKey, entityId) } }
@@ -110,7 +110,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
             filter: filter,
             limit: (uint)(offset + limit),
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return result.Result
             .Select(p => MapPayloadToEpisode(p.Id.Uuid, p.Payload))
@@ -125,7 +125,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
         float minReward, float maxReward, int offset, int limit,
         string? entityId = null, CancellationToken ct = default)
     {
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var filter = new Filter
         {
@@ -148,7 +148,7 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
             filter: filter,
             limit: (uint)(offset + limit),
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return result.Result
             .Select(p => MapPayloadToEpisode(p.Id.Uuid, p.Payload))
@@ -164,12 +164,12 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
     {
         if (_initialized) return;
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_initialized) return;
 
-            var exists = await _client.CollectionExistsAsync(_collectionName, ct);
+            var exists = await _client.CollectionExistsAsync(_collectionName, ct).ConfigureAwait(false);
             if (!exists)
             {
                 // Episodes don't need semantic search — use a minimal
@@ -177,23 +177,23 @@ public sealed class QdrantEpisodeStore : IEpisodeStore
                 await _client.CreateCollectionAsync(
                     _collectionName,
                     new VectorParams { Size = 1, Distance = Distance.Cosine },
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, TerminalRewardKey,
-                    PayloadSchemaType.Float, cancellationToken: ct);
+                    PayloadSchemaType.Float, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, CompletedAtKey,
-                    PayloadSchemaType.Integer, cancellationToken: ct);
+                    PayloadSchemaType.Integer, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, StartedAtKey,
-                    PayloadSchemaType.Integer, cancellationToken: ct);
+                    PayloadSchemaType.Integer, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, EntityIdKey,
-                    PayloadSchemaType.Keyword, cancellationToken: ct);
+                    PayloadSchemaType.Keyword, cancellationToken: ct).ConfigureAwait(false);
             }
 
             _initialized = true;

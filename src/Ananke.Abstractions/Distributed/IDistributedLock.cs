@@ -42,8 +42,12 @@ public interface IDistributedLock
     /// </summary>
     /// <param name="resourceId">unique resource id - could be a correlation id or similar</param>
     /// <param name="action">a quick operation to read and update a state</param>
+    /// <param name="ct">
+    /// Cancels waiting for the lock. Does not reach into <paramref name="action"/> itself —
+    /// once the action starts, it runs to completion.
+    /// </param>
     /// <returns>Result indicating if lock was acquired and action succeeded</returns>
-    Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(string resourceId, Func<Task<R>> action);
+    Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(string resourceId, Func<Task<R>> action, CancellationToken ct = default);
 
     /// <summary>
     /// Executes an action with retry on lock acquisition failure
@@ -52,10 +56,12 @@ public interface IDistributedLock
     /// <param name="action">operation to execute</param>
     /// <param name="maxRetries">maximum retry attempts</param>
     /// <param name="retryDelayMs">delay between retries in milliseconds</param>
+    /// <param name="ct">Cancels waiting for the lock or between retry delays.</param>
     /// <returns>Result indicating if lock was acquired and action succeeded</returns>
     Task<CoordinatedActionResult<R>> RunCoordinatedActionWithRetryAsync<R>(
         string resourceId,
         Func<Task<R>> action,
         int maxRetries = 3,
-        int retryDelayMs = 100);
+        int retryDelayMs = 100,
+        CancellationToken ct = default);
 }

@@ -111,15 +111,15 @@ public sealed class WorkflowDivider(
         {
             foreach (var (name, snapshot, loop) in childLoops)
             {
-                await host.StartAsync(name, loop, ct);
+                await host.StartAsync(name, loop, ct).ConfigureAwait(false);
                 spawnedNames.Add(name);
             }
 
             // ── Step 7: Confirm children started ────────────────────
-            await ConfirmChildrenStarted(spawnedNames, ct);
+            await ConfirmChildrenStarted(spawnedNames, ct).ConfigureAwait(false);
 
             // ── Step 7b: Record child births in lineage store ────
-            var parentRecord = await _lineage.GetAsync(plan.ParentWorkflow, ct);
+            var parentRecord = await _lineage.GetAsync(plan.ParentWorkflow, ct).ConfigureAwait(false);
             var parentGeneration = parentRecord?.Generation ?? 0;
             foreach (var child in plan.Children)
             {
@@ -132,7 +132,7 @@ public sealed class WorkflowDivider(
                     BornAt = DateTimeOffset.UtcNow,
                     DivisionReason = plan.Reason,
                     InheritedDomains = [child.Domain]
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
 
             // 5.9: Switchover AFTER children are confirmed so new requests go to children
@@ -145,7 +145,7 @@ public sealed class WorkflowDivider(
             // Abort: tear down any spawned children, parent survives
             foreach (var name in spawnedNames)
             {
-                try { await host.StopAsync(name); } catch { /* best-effort cleanup */ }
+                try { await host.StopAsync(name).ConfigureAwait(false); } catch { /* best-effort cleanup */ }
                 landscape.Remove(name);
             }
 
@@ -153,7 +153,7 @@ public sealed class WorkflowDivider(
         }
 
         // ── Step 8: Kill parent ─────────────────────────────────────
-        await host.StopAsync(plan.ParentWorkflow);
+        await host.StopAsync(plan.ParentWorkflow).ConfigureAwait(false);
         landscape.Remove(plan.ParentWorkflow);
 
         // 5.9: Complete AFTER parent is fully removed so the transition orchestrator
@@ -357,7 +357,7 @@ public sealed class WorkflowDivider(
                 pending.Remove(name);
 
             if (pending.Count > 0)
-                await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+                await Task.Delay(TimeSpan.FromMilliseconds(50), ct).ConfigureAwait(false);
         }
     }
 }

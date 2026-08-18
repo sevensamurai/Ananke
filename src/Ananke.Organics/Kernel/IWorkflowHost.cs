@@ -35,7 +35,9 @@ public interface IWorkflowHost : IAsyncDisposable
     /// Kill a running workflow. Cancels its token and awaits clean shutdown.
     /// No-op if the cell is not alive.
     /// </summary>
-    Task StopAsync(string name);
+    /// <param name="name">Name of the cell to kill.</param>
+    /// <param name="ct">Cancels waiting for shutdown — does not skip it.</param>
+    Task StopAsync(string name, CancellationToken ct = default);
 
     /// <summary>List names of currently alive workflow cells.</summary>
     IReadOnlyList<string> ListActive();
@@ -50,12 +52,14 @@ public interface IWorkflowHost : IAsyncDisposable
     /// Hosts that support graceful division should override this.
     /// </remarks>
     /// <param name="name">Name of the cell to pause.</param>
-    Task PauseAsync(string name) => Task.CompletedTask;
+    /// <param name="ct">Cancellation token.</param>
+    Task PauseAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 
     /// <summary>
     /// Resume a previously paused cell. If the cell is not paused, this
     /// is a no-op.
     /// </summary>
     /// <param name="name">Name of the cell to resume.</param>
-    Task ResumeAsync(string name) => Task.CompletedTask;
+    /// <param name="ct">Cancellation token.</param>
+    Task ResumeAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 }

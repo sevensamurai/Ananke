@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="nnke.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Ananke.Design\Ananke.Design.csproj" />
     <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <ProjectReference Include="..\Ananke.Organics\Ananke.Organics.csproj" />

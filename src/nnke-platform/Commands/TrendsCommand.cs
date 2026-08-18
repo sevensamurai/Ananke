@@ -28,13 +28,13 @@ internal static class TrendsCommand
         {
             var deploymentId = parseResult.GetValue(deploymentIdOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(deploymentId, json);
+            return Execute(deploymentId, json);
         });
 
         return command;
     }
 
-    private static void Execute(string? deploymentId, bool json)
+    private static int Execute(string? deploymentId, bool json)
     {
         // In a real scenario, this would load from a persistent store or connect to
         // an OTEL backend. For now, demonstrate the shape by connecting to an
@@ -47,7 +47,7 @@ internal static class TrendsCommand
             if (trend is null)
             {
                 EmitNoData(deploymentId, json);
-                return;
+                return 0;
             }
             EmitTrend(trend, json);
         }
@@ -57,7 +57,7 @@ internal static class TrendsCommand
             if (trackable.Count == 0)
             {
                 EmitEmpty(json);
-                return;
+                return 0;
             }
 
             var trends = trackable
@@ -67,6 +67,8 @@ internal static class TrendsCommand
 
             EmitTrends(trends!, json);
         }
+
+        return 0;
     }
 
     private static void EmitTrend(RemoteCellTrend trend, bool json)

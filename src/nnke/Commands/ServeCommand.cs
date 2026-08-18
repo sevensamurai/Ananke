@@ -29,8 +29,9 @@ namespace Ananke.Tool.Commands;
 /// </list>
 /// </para>
 /// <para>
-/// The same platform-native guard as <c>nnke run</c> applies: any tool declaring
-/// <c>execute: platform</c> causes a fail-fast before the server starts (FED061).
+/// A platform-native guard applies: any tool declaring <c>execute: platform</c> causes
+/// a fail-fast before the server starts (FED061), with a hint pointing at
+/// <c>nnke-platform</c>, which owns the platform-emulated dev loop (ADR CLI-7).
 /// </para>
 /// <para>
 /// This is a developer / local-testing endpoint — it binds only to <c>localhost</c>

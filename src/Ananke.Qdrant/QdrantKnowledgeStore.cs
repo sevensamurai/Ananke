@@ -65,10 +65,10 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
         string query, SearchOptions? options = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         options ??= new SearchOptions();
-        var queryEmbedding = await _embedder.EmbedAsync(query, ct);
+        var queryEmbedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
         var filter = BuildFilter(options.Filter);
 
         var results = await _client.SearchAsync(
@@ -78,7 +78,7 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
             limit: (ulong)options.TopK,
             scoreThreshold: options.ScoreThreshold,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return results
             .Select(MapScoredPoint)
@@ -89,7 +89,7 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
     public async Task UpsertAsync(IEnumerable<KnowledgeDocument> documents, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(documents);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var docList = documents.ToList();
         if (docList.Count == 0) return;
@@ -102,7 +102,7 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
         {
             var batch = docList.Skip(i).Take(BatchSize).ToList();
             var texts = batch.Select(d => d.Text).ToList();
-            var embeddings = await _embedder.EmbedBatchAsync(texts, ct);
+            var embeddings = await _embedder.EmbedBatchAsync(texts, ct).ConfigureAwait(false);
 
             var points = new List<PointStruct>(batch.Count);
             for (var j = 0; j < batch.Count; j++)
@@ -124,7 +124,7 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
                 });
             }
 
-            await _client.UpsertAsync(_collectionName, points, cancellationToken: ct);
+            await _client.UpsertAsync(_collectionName, points, cancellationToken: ct).ConfigureAwait(false);
         }
     }
 
@@ -132,37 +132,37 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
     public async Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var qdrantFilter = BuildFilter(filter);
         if (qdrantFilter is null) return;
 
-        await _client.DeleteAsync(_collectionName, qdrantFilter, cancellationToken: ct);
+        await _client.DeleteAsync(_collectionName, qdrantFilter, cancellationToken: ct).ConfigureAwait(false);
     }
 
     private async Task EnsureCollectionAsync(CancellationToken ct)
     {
         if (_initialized) return;
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_initialized) return;
 
-            var exists = await _client.CollectionExistsAsync(_collectionName, ct);
+            var exists = await _client.CollectionExistsAsync(_collectionName, ct).ConfigureAwait(false);
             if (!exists)
             {
                 await _client.CreateCollectionAsync(
                     _collectionName,
                     new VectorParams { Size = _vectorSize, Distance = Distance.Cosine },
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 // Create payload index for source field to speed up deletion/filtering
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     "source", // Assuming 'source' is the key used in metadata
                     PayloadSchemaType.Keyword,
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
             }
 
             _initialized = true;

@@ -54,7 +54,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
             AbortOnConnectFail = false,
             Ssl = false,
         };
-        _redis = await ConnectionMultiplexer.ConnectAsync(configOptions);
+        _redis = await ConnectionMultiplexer.ConnectAsync(configOptions).ConfigureAwait(false);
         _deferredConfig = null;
     }
 
@@ -66,11 +66,11 @@ public class RedisDataAdapter : IKeyValueDataAdapter
     {
         if (_redis is not null || _deferredConfig is null) return;
 
-        await _connectLock.WaitAsync();
+        await _connectLock.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_redis is not null || _deferredConfig is null) return;
-            await ConnectAsync(_deferredConfig);
+            await ConnectAsync(_deferredConfig).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -82,9 +82,10 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         }
     }
 
-    public async Task<string?> GetValueAsync(string key)
+    public async Task<string?> GetValueAsync(string key, CancellationToken ct = default)
     {
-        await EnsureConnectedAsync();
+        ct.ThrowIfCancellationRequested();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         if (_redis is null)
         {
             _logger.LogWarning("Redis GET skipped for key '{Key}': connection not established", key);
@@ -94,7 +95,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         try
         {
             var db = _redis.GetDatabase();
-            return await db.StringGetAsync(key);
+            return await db.StringGetAsync(key).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -103,9 +104,9 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         return default;
     }
 
-    public async Task<T?> GetValueAsync<T>(string key)
+    public async Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default)
     {
-        var value = await GetValueAsync(key);
+        var value = await GetValueAsync(key, ct).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(value)) return default;
 
         try
@@ -119,9 +120,10 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         return default;
     }
 
-    public async Task SetValueAsync(string key, string value)
+    public async Task SetValueAsync(string key, string value, CancellationToken ct = default)
     {
-        await EnsureConnectedAsync();
+        ct.ThrowIfCancellationRequested();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         if (_redis is null)
         {
             _logger.LogWarning("Redis SET skipped for key '{Key}': connection not established", key);
@@ -131,7 +133,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         try
         {
             var db = _redis.GetDatabase();
-            await db.StringSetAsync(key, value);
+            await db.StringSetAsync(key, value).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -139,9 +141,10 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         }
     }
 
-    public async Task SetValueAsync<T>(string key, T value)
+    public async Task SetValueAsync<T>(string key, T value, CancellationToken ct = default)
     {
-        await EnsureConnectedAsync();
+        ct.ThrowIfCancellationRequested();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         if (_redis is null)
         {
             _logger.LogWarning("Redis SET<T> skipped for key '{Key}': connection not established", key);
@@ -152,7 +155,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         {
             var db = _redis.GetDatabase();
             var json = JsonSerializer.Serialize(value);
-            await db.StringSetAsync(key, json);
+            await db.StringSetAsync(key, json).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -160,9 +163,10 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         }
     }
 
-    public async Task<bool> RemoveAsync(string key)
+    public async Task<bool> RemoveAsync(string key, CancellationToken ct = default)
     {
-        await EnsureConnectedAsync();
+        ct.ThrowIfCancellationRequested();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         if (_redis is null)
         {
             _logger.LogWarning("Redis REMOVE skipped for key '{Key}': connection not established", key);
@@ -172,7 +176,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         try
         {
             var db = _redis.GetDatabase();
-            return await db.KeyDeleteAsync(key);
+            return await db.KeyDeleteAsync(key).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -181,9 +185,10 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         return false;
     }
 
-    public async Task<bool> ExistsAsync(string key)
+    public async Task<bool> ExistsAsync(string key, CancellationToken ct = default)
     {
-        await EnsureConnectedAsync();
+        ct.ThrowIfCancellationRequested();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         if (_redis is null)
         {
             _logger.LogWarning("Redis EXISTS skipped for key '{Key}': connection not established", key);
@@ -193,7 +198,7 @@ public class RedisDataAdapter : IKeyValueDataAdapter
         try
         {
             var db = _redis.GetDatabase();
-            return await db.KeyExistsAsync(key);
+            return await db.KeyExistsAsync(key).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -208,8 +213,8 @@ public class RedisDataAdapter : IKeyValueDataAdapter
 
         if (_redis is not null)
         {
-            await _redis.CloseAsync();
-            await _redis.DisposeAsync();
+            await _redis.CloseAsync().ConfigureAwait(false);
+            await _redis.DisposeAsync().ConfigureAwait(false);
             _redis = null;
         }
 

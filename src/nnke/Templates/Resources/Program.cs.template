@@ -42,9 +42,9 @@ Console.WriteLine($"  Output:  {result.State.Output}");
 Console.WriteLine($"  Status:  {result.Status}");
 
 // --- SimulatedModel: replace with a real provider ---
-// OpenAI:    var model = Ananke.Orchestration.OpenAI.OpenAIChatAgentModel.Create(apiKey, "{{model}}");
-// Anthropic: var model = Ananke.Orchestration.Anthropic.AnthropicAgentModel.Create(apiKey, "{{model}}");
-// Google:    var model = Ananke.Orchestration.Google.GeminiAgentModel.Create(apiKey, "{{model}}");
+// OpenAI:    var model = Ananke.Orchestration.OpenAI.OpenAIChatAgentModel.Create(apiKey, "{{model_openai}}");
+// Anthropic: var model = Ananke.Orchestration.Anthropic.AnthropicAgentModel.Create(apiKey, "{{model_anthropic}}");
+// Google:    var model = Ananke.Orchestration.Google.GeminiAgentModel.Create(apiKey, "{{model_google}}");
 
 internal sealed class SimulatedModel(Func<AgentRequest, string> responder) : IAgentModel
 {

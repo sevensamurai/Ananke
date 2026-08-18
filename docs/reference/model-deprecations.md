@@ -49,7 +49,6 @@ categorically different from production code drifting onto one.
 | `claude-haiku-4-5` | `Haiku45` | Current | — |
 | `claude-sonnet-4-6` | `Sonnet46` | Legacy | `Sonnet5` |
 | `claude-opus-4-8` | `Opus48` | Legacy | `Opus5` |
-| `claude-opus-4-1` | `Opus41` | Deprecated | `Opus48` |
 
 ### OpenAI
 
@@ -100,6 +99,7 @@ switch to its replacement.
 
 | Removed model | Was constant | Provider retirement date | Replacement |
 |---|---|---|---|
+| `claude-opus-4-1` | `Opus41` | 2026-08-05 | `Opus5` |
 | `claude-opus-4` | `Opus4` | 2026-06-15 | `Fable5` |
 | `claude-sonnet-4` | `Sonnet4` | 2026-06-15 | `Sonnet5` |
 | `claude-3-5-sonnet` | `Sonnet35` | 2025-10-28 | `Sonnet5` |

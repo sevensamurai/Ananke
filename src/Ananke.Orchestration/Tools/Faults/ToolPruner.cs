@@ -73,12 +73,13 @@ public sealed class ToolPruner : IAsyncDisposable
     }
 
     /// <summary>Stops the background pruning loop.</summary>
-    public async Task StopAsync()
+    /// <param name="ct">Cancels waiting for the loop to finish — does not skip stopping it.</param>
+    public async Task StopAsync(CancellationToken ct = default)
     {
         if (_cts is null) return;
         await _cts.CancelAsync().ConfigureAwait(false);
-        try { await (_loopTask ?? Task.CompletedTask).ConfigureAwait(false); }
-        catch (OperationCanceledException) { }
+        try { await (_loopTask ?? Task.CompletedTask).WaitAsync(ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
     }
 
     /// <inheritdoc />

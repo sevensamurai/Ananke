@@ -291,6 +291,63 @@ public abstract class StreamingAgentModelConformanceTests
         completedChunk.CompletedResponse!.Usage!.TotalTokens.ShouldBeGreaterThan(0);
     }
 
+    // ── 6b. Content-part shape (ADR-arch-029) ────────────────────────────
+
+    /// <summary>
+    /// D1: <c>Parts</c> is required whenever a response carries content that is not a
+    /// <see cref="TextPart"/>, and MAY be <see langword="null"/> for a purely textual one.
+    /// </summary>
+    [Test]
+    public async Task GenerateAsync_WhenPartsPopulated_HoldsSomethingBeyondPlainText()
+    {
+        var model = CreateModel();
+        var response = await model.GenerateAsync(TextRequest("parts shape"));
+
+        if (response.Parts is null)
+            Assert.Pass("Text-only response — Parts may be null under ADR-arch-029 D1");
+
+        response.Parts!.ShouldNotBeEmpty(
+            "An empty Parts list is neither 'text-only' nor 'has structured content' — use null instead");
+    }
+
+    /// <summary>
+    /// D1, the asymmetry the ADR exists to fix: an adapter must not populate <c>Parts</c> on the
+    /// unary path and omit it on the streaming path for the same input, because a caller who
+    /// switches to streaming then silently loses content. This was live in
+    /// <c>AnthropicAgentModel</c> until 2026-08-18.
+    /// </summary>
+    [Test]
+    public async Task UnaryAndStream_AgreeOnWhetherPartsArePopulated()
+    {
+        var model = CreateModel();
+        const string prompt = "parts parity";
+
+        var unary = await model.GenerateAsync(TextRequest(prompt));
+
+        AgentResponse? streamed = null;
+        await foreach (var chunk in model.GenerateStreamAsync(TextRequest(prompt)))
+        {
+            if (chunk.CompletedResponse is not null)
+                streamed = chunk.CompletedResponse;
+        }
+
+        streamed.ShouldNotBeNull("The stream must end with a completed response");
+
+        // Compare presence, not contents: a non-deterministic model may word two replies
+        // differently, but it must not change the *shape* of what it returns between paths.
+        var unaryKinds = PartKinds(unary);
+        var streamKinds = PartKinds(streamed!);
+
+        streamKinds.ShouldBe(unaryKinds, ignoreOrder: true,
+            $"Unary returned [{string.Join(", ", unaryKinds)}] but streaming returned " +
+            $"[{string.Join(", ", streamKinds)}] for the same request — ADR-arch-029 D1 binds both paths");
+    }
+
+    private static string[] PartKinds(AgentResponse response) =>
+        response.Parts is null
+            ? []
+            : [.. response.Parts.Select(p => p.GetType().Name).Distinct().Order()];
+
     // ── 7. System-prompt + JSON schema fusion equivalence ────────────────
 
     [Test]

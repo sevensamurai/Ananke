@@ -22,6 +22,18 @@ namespace Ananke.Abstractions.Agents;
 /// superseded. See <see href="https://github.com/sevensamurai/Ananke/blob/main/docs/reference/model-deprecations.md"/>
 /// for the full lifecycle table and policy.
 /// </para>
+/// <para>
+/// <b>Each provider class carries a <c>Starred</c> constant</b> — the model Ananke suggests when
+/// the caller has expressed no preference (the general-purpose pick, not the flagship and not the
+/// cheapest). Prefer it over naming an id directly. It is deliberately a <see langword="const"/>
+/// aliasing another <see langword="const"/> in the same class, so the day a starred model is marked
+/// <see cref="ObsoleteAttribute"/> the alias stops compiling and a stale star becomes a <b>build
+/// error</b> — stronger than a runtime catalog lookup, which returns a string no analyzer can
+/// inspect. A star moved to a <b>Legacy</b> model does not break the build (Legacy carries no
+/// <see cref="ObsoleteAttribute"/>); <c>StarredModelTests</c> covers that gap. The choice cannot be
+/// derived from <c>ModelCatalog</c>'s tiers — <c>claude-opus-5</c> and <c>claude-fable-5</c> are
+/// identical on both intelligence and speed — so it is recorded here on purpose.
+/// </para>
 /// </remarks>
 public static class Models
 {
@@ -34,6 +46,7 @@ public static class Models
 
     private const string DeprecationDocs =
         "https://github.com/sevensamurai/Ananke/blob/main/docs/reference/model-deprecations.md#{0}";
+
 
     /// <summary>OpenAI model identifiers. Already short — these are the wire names.</summary>
     public static class OpenAI
@@ -118,6 +131,9 @@ public static class Models
 
         /// <summary>GPT-5.6 Luna — current generation, fastest and lowest-cost of the 5.6 line.</summary>
         public const string Gpt56Luna = "gpt-5.6-luna";
+
+        /// <summary>The OpenAI model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
+        public const string Starred = Gpt56Terra;
     }
 
     /// <summary>
@@ -127,16 +143,10 @@ public static class Models
     /// </summary>
     public static class Anthropic
     {
-        // Opus4, Sonnet4 (claude-opus-4-20250514 / claude-sonnet-4-20250514, retired 2026-06-15),
-        // Sonnet35 (claude-3-5-sonnet-*, retired 2025-10-28), and Haiku35 (claude-3-5-haiku-20241022,
-        // retired 2026-02-19) were removed — the provider no longer serves these; keeping them as
-        // constants (even Retired-status ones) would let new code reference an always-failing model.
-        // See docs/reference/model-deprecations.md.
-
-        /// <summary>Claude Opus 4.1 — legacy, deprecated 2026-06-05, retires 2026-08-05 (provider-confirmed).</summary>
-        [Obsolete("claude-opus-4-1 is deprecated; use Models.Anthropic.Opus48.",
-            DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
-        public const string Opus41 = "claude-opus-4-1";
+        // Retired models are removed outright rather than kept as Retired-status constants: a
+        // constant for a model the provider no longer serves only lets new code reference an
+        // always-failing id. Removed so far: Opus4, Sonnet4, Sonnet35, Haiku35, Opus41.
+        // Retirement dates and replacements: docs/reference/model-deprecations.md.
 
         /// <summary>Claude Opus 4.8 — legacy, most capable of its generation, still fully supported.</summary>
         public const string Opus48 = "claude-opus-4-8";
@@ -155,6 +165,9 @@ public static class Models
 
         /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
         public const string Fable5 = "claude-fable-5";
+
+        /// <summary>The Anthropic model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
+        public const string Starred = Sonnet5;
     }
 
     /// <summary>Google Gemini model identifiers. Already short wire names.</summary>
@@ -201,12 +214,15 @@ public static class Models
         public const string Gemini25Pro = "gemini-2.5-pro";
 
         /// <summary>Gemini 2.5 Flash — fast, balanced.</summary>
-        [Obsolete("gemini-2.5-flash is deprecated; use Models.Google.Gemini35Flash.",
+        [Obsolete("gemini-2.5-flash is deprecated; use Models.Google.Gemini36Flash.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Gemini25Flash = "gemini-2.5-flash";
 
         // Gemini20Flash and Gemini20FlashLite (gemini-2.0-flash / -lite, shutdown 2026-06-01) were
         // removed — already past their shutdown date. See docs/reference/model-deprecations.md.
+
+        /// <summary>The Google model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
+        public const string Starred = Gemini36Flash;
     }
 
 #pragma warning restore ANNKE002

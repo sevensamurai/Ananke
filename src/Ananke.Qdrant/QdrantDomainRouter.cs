@@ -63,16 +63,16 @@ public sealed class QdrantDomainRouter : IDomainRouter
     public async Task<string> RouteAsync(string userMessage, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userMessage);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
-        var queryVector = await _embedder.EmbedAsync(userMessage, ct);
+        var queryVector = await _embedder.EmbedAsync(userMessage, ct).ConfigureAwait(false);
 
         var results = await _client.SearchAsync(
             collectionName: _collectionName,
             vector: queryVector,
             limit: 1,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         if (results.Count > 0)
         {
@@ -93,7 +93,7 @@ public sealed class QdrantDomainRouter : IDomainRouter
     {
         ArgumentNullException.ThrowIfNull(children);
         ArgumentNullException.ThrowIfNull(toolDescriptions);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         // Delete existing points (re-index after new division)
         try
@@ -101,7 +101,7 @@ public sealed class QdrantDomainRouter : IDomainRouter
             await _client.DeleteAsync(
                 _collectionName,
                 new Filter { Must = { Conditions.MatchKeyword(CellNamePayloadKey, children[0].Name) } },
-                cancellationToken: ct);
+                cancellationToken: ct).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -121,7 +121,7 @@ public sealed class QdrantDomainRouter : IDomainRouter
                 .Select(t => $"{t}: {toolDescriptions[t]}");
             var cellDescription = $"Domain: {child.Domain}. Tools: {string.Join(". ", toolTexts)}";
 
-            var embedding = await _embedder.EmbedAsync(cellDescription, ct);
+            var embedding = await _embedder.EmbedAsync(cellDescription, ct).ConfigureAwait(false);
 
             points.Add(new PointStruct
             {
@@ -135,7 +135,7 @@ public sealed class QdrantDomainRouter : IDomainRouter
             });
         }
 
-        await _client.UpsertAsync(_collectionName, points, cancellationToken: ct);
+        await _client.UpsertAsync(_collectionName, points, cancellationToken: ct).ConfigureAwait(false);
         _fallbackCell = children[0].Name;
     }
 
@@ -143,18 +143,18 @@ public sealed class QdrantDomainRouter : IDomainRouter
     {
         if (_initialized) return;
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_initialized) return;
 
-            var exists = await _client.CollectionExistsAsync(_collectionName, ct);
+            var exists = await _client.CollectionExistsAsync(_collectionName, ct).ConfigureAwait(false);
             if (!exists)
             {
                 await _client.CreateCollectionAsync(
                     _collectionName,
                     new VectorParams { Size = _vectorSize, Distance = Distance.Cosine },
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
             }
 
             _initialized = true;

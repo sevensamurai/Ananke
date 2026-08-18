@@ -46,6 +46,8 @@ public sealed class AzureAgentCredentialProvider : IFederationCredentialProvider
         }
         catch (Exception)
         {
+            // Client construction failed (bad endpoint, missing credential chain) — the documented
+            // contract is null-on-unreachable, so this is intentionally swallowed rather than thrown.
             return Task.FromResult<object?>(null);
         }
     }

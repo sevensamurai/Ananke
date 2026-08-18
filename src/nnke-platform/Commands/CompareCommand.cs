@@ -35,15 +35,26 @@ internal static class CompareCommand
         command.SetAction(parseResult =>
         {
             var cell = parseResult.GetValue(cellArg)!;
-            var platforms = parseResult.GetValue(acrossOption)!;
+            var platforms = SplitPlatforms(parseResult.GetValue(acrossOption)!);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(cell, platforms, json);
+            return Execute(cell, platforms, json);
         });
 
         return command;
     }
 
-    private static void Execute(string cellName, string[] platforms, bool json)
+    /// <summary>
+    /// Flattens the parsed <c>--across</c> values into individual platform names.
+    /// System.CommandLine splits on whitespace only, so the documented comma-separated
+    /// form (<c>--across azure-ai,claude</c>) arrives as a single token and has to be
+    /// split here — otherwise the comma-joined string is treated as one platform name.
+    /// </summary>
+    private static string[] SplitPlatforms(string[] values) =>
+        [.. values
+            .SelectMany(v => v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    private static int Execute(string cellName, string[] platforms, bool json)
     {
         // Resolve in-memory tracker (in a real host this would be injected).
         var tracker = new RemoteMetricsTracker();
@@ -77,7 +88,7 @@ internal static class CompareCommand
                 bestTrend,
                 note = "Slopes show relative change per sample interval (+/- = rising/falling). Connect to OTEL for persistent history (v0.9)."
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -103,5 +114,7 @@ internal static class CompareCommand
         Console.WriteLine();
         Console.WriteLine("  Note: Connect to an OTEL backend for persistent trend history (v0.9).");
         Console.WriteLine();
+
+        return 0;
     }
 }

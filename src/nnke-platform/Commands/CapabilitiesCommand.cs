@@ -29,13 +29,13 @@ internal static class CapabilitiesCommand
         {
             var platform = parseResult.GetValue(platformOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(platform, json);
+            return Execute(platform, json);
         });
 
         return command;
     }
 
-    private static void Execute(string? platform, bool json)
+    private static int Execute(string? platform, bool json)
     {
         var data = LoadCapabilitiesData();
 
@@ -47,7 +47,7 @@ internal static class CapabilitiesCommand
                     JsonOutput.Write(new { status = "error", message = $"Unknown platform '{platform}'.", available = data.Keys.ToList() });
                 else
                     Console.Error.WriteLine($"  Unknown platform '{platform}'. Available: {string.Join(", ", data.Keys)}");
-                return;
+                return 1;
             }
 
             if (json)
@@ -61,7 +61,7 @@ internal static class CapabilitiesCommand
                     Console.WriteLine($"    {cap}");
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         // List all
@@ -82,6 +82,8 @@ internal static class CapabilitiesCommand
             }
             Console.WriteLine();
         }
+
+        return 0;
     }
 
     private static Dictionary<string, List<string>> LoadCapabilitiesData()

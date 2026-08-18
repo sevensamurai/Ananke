@@ -40,11 +40,11 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var page = await episodeStore.BrowseAsync(offset, pageSize, ct: ct);
+            var page = await episodeStore.BrowseAsync(offset, pageSize, ct: ct).ConfigureAwait(false);
             if (page.Count == 0) break;
 
             foreach (var episode in page)
-                await ProcessEpisodeAsync(graph, episode, ct);
+                await ProcessEpisodeAsync(graph, episode, ct).ConfigureAwait(false);
 
             offset += page.Count;
             if (page.Count < pageSize) break;
@@ -63,7 +63,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
             {
                 ["terminal_reward"] = episode.TerminalReward.ToString("G", System.Globalization.CultureInfo.InvariantCulture),
             },
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         string? previousEntryNodeId = null;
 
@@ -71,7 +71,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
         {
             var entryNodeId = EntryId(step.EntryId);
 
-            await graph.UpsertNodeAsync(new GraphNode { Id = entryNodeId, Kind = "entry" }, ct);
+            await graph.UpsertNodeAsync(new GraphNode { Id = entryNodeId, Kind = "entry" }, ct).ConfigureAwait(false);
 
             // entry → episode
             await graph.UpsertEdgeAsync(new GraphEdge
@@ -80,7 +80,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
                 ToId = EpisodeId(episode.Id),
                 Relation = "step_of",
                 Provenance = EdgeProvenance.Extracted,
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             // entry[n-1] → entry[n]
             if (previousEntryNodeId is not null)
@@ -91,7 +91,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
                     ToId = entryNodeId,
                     Relation = "follows",
                     Provenance = EdgeProvenance.Extracted,
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
 
             previousEntryNodeId = entryNodeId;

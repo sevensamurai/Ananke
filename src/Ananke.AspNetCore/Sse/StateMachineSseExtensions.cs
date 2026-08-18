@@ -21,19 +21,34 @@ public static class StateMachineSseExtensions
     /// <typeparam name="T">Transition enum type.</typeparam>
     /// <param name="machine">The state machine to observe.</param>
     /// <param name="terminalState">The state that signals the loop should stop.</param>
+    /// <param name="ct">
+    /// Abandons the loop when the client disconnects. Pass <c>HttpContext.RequestAborted</c>.
+    /// <para>
+    /// Cancelling this <b>propagates</b>, rather than returning <see langword="false"/>: a
+    /// disconnected client is not the same outcome as "the machine went idle before reaching the
+    /// terminal state", and collapsing the two would report a normal result for an abandoned
+    /// request. The state machine's own work is left running — it owns that lifetime.
+    /// </para>
+    /// </param>
     public static async Task<bool> RunSseLoopAsync<S, T>(
         this StateMachine<S, T> machine,
-        S terminalState)
+        S terminalState,
+        CancellationToken ct = default)
         where S : Enum
         where T : Enum
     {
         while (!EqualityComparer<S>.Default.Equals(machine.CurrentState, terminalState))
         {
+            ct.ThrowIfCancellationRequested();
+
             var work = machine.CurrentWork;
             if (work is null) break;
 
-            try { await work; }
-            catch (OperationCanceledException) { }
+            // The filter is what separates the two cancellations that can land here: the machine
+            // cancelling its own state work on an interrupt (expected — keep looping), versus this
+            // caller's token firing (the request is gone — let it propagate).
+            try { await work.WaitAsync(ct); }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
 
             // The task we just awaited completed (or was cancelled).
             // If a transition started new work, CurrentWork differs — keep looping.

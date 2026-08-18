@@ -40,10 +40,10 @@ internal sealed class AgentRuntimeClient : IAgentRuntimeClient
         var body = BuildCreateBody(definition);
 
         var response = await ExecuteWithRetryAsync(
-            () => BuildRequestAsync(HttpMethod.Post, url, body, ct), ct);
+            () => BuildRequestAsync(HttpMethod.Post, url, body, ct), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(ct);
+        var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
 
         // Agent Runtime returns { "name": "projects/.../agents/<id>", ... }
@@ -62,7 +62,7 @@ internal sealed class AgentRuntimeClient : IAgentRuntimeClient
 
         var url = $"{BaseUrl}/{resourceName}";
         var response = await ExecuteWithRetryAsync(
-            () => BuildRequestAsync(HttpMethod.Delete, url, body: null, ct), ct);
+            () => BuildRequestAsync(HttpMethod.Delete, url, body: null, ct), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
 
@@ -79,15 +79,15 @@ internal sealed class AgentRuntimeClient : IAgentRuntimeClient
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            var request = await buildRequest();
+            var request = await buildRequest().ConfigureAwait(false);
 
             try
             {
-                response = await Http.SendAsync(request, ct);
+                response = await Http.SendAsync(request, ct).ConfigureAwait(false);
             }
             catch (HttpRequestException) when (attempt < MaxRetries)
             {
-                await Task.Delay(delay, ct);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
                 delay = TimeSpan.FromTicks(delay.Ticks * 2);
                 continue;
             }
@@ -97,7 +97,7 @@ internal sealed class AgentRuntimeClient : IAgentRuntimeClient
                  (int)response.StatusCode >= 500))
             {
                 response.Dispose();
-                await Task.Delay(delay, ct);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
                 delay = TimeSpan.FromTicks(delay.Ticks * 2);
                 continue;
             }

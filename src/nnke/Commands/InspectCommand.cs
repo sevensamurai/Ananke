@@ -293,7 +293,7 @@ internal static partial class InspectCommand
         var suggestions = new List<string>();
 
         if (report.ManifestFiles.Count == 0)
-            suggestions.Add("No .ananke.yml manifest found. Run: nnke new manifest <name>");
+            suggestions.Add("No .ananke.yml manifest found. Run: nnke new workflow <name>");
 
         if (report.CsprojFile is null)
             suggestions.Add("No .csproj found. Run: nnke new workflow <name>");

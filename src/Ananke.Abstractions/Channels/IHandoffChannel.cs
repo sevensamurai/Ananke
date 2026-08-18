@@ -56,11 +56,16 @@ public interface IHandoffChannel : IAsyncDisposable
     /// <typeparam name="TMessage">The incoming request message type.</typeparam>
     /// <typeparam name="TResponse">The response type to send back.</typeparam>
     /// <param name="topic">The topic to listen on (e.g. a queue name).</param>
-    /// <param name="handler">Async function that processes the request and returns a response.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="handler">
+    /// Async function that processes the request and returns a response. Receives a
+    /// <see cref="CancellationToken"/> scoped to the individual request (its deadline where the
+    /// implementation enforces one, plus the subscription's own <paramref name="ct"/>) so a
+    /// long-running handler can observe cancellation rather than run unbounded.
+    /// </param>
+    /// <param name="ct">Cancellation token for the subscription itself.</param>
     Task SubscribeAsync<TMessage, TResponse>(
         string topic,
-        Func<TMessage, Task<TResponse>> handler,
+        Func<TMessage, CancellationToken, Task<TResponse>> handler,
         CancellationToken ct = default)
         where TMessage : class
         where TResponse : class;

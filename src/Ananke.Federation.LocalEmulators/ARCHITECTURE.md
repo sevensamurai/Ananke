@@ -6,7 +6,8 @@
 
 Lets a manifest declaring `PlatformNative` tools (e.g. `bing_grounding`,
 `code_interpreter`, `web_search`) run locally without cloud credentials — for
-`nnke run --emulate <platform>`, CI, and the local design loop. Every capability listed
+`nnke-platform up --emulate <platform>` (planned — ADR CLI-7), CI, and the local design
+loop. Every capability listed
 in `platform-capabilities.json` is covered, either by a real emulator (HTTP client,
 local process, or in-memory store) or by a documented stub returning deterministic
 fixture data.

@@ -226,7 +226,7 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     /// <param name="ct">Cancellation token.</param>
     public async Task SubscribeAsync<TMessage, TResponse>(
         string topic,
-        Func<TMessage, Task<TResponse>> handler,
+        Func<TMessage, CancellationToken, Task<TResponse>> handler,
         CancellationToken ct = default)
         where TMessage : class
         where TResponse : class
@@ -251,7 +251,7 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
             _logger.LogDebug("Handoff request received on {Topic} (correlation: {CorrelationId})",
                 fullTopic, correlationId);
 
-            var response = await handler(message);
+            var response = await handler(message, token);
             await CompleteAsync(topic, correlationId, response, token);
         };
 

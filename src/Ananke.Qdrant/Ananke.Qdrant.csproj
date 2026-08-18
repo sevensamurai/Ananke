@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Ananke.Learning\Ananke.Learning.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Qdrant.Tests" />
+  </ItemGroup>
+
 </Project>

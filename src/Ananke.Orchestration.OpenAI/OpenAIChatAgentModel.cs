@@ -182,6 +182,17 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
                                         BinaryData.FromBytes(audio.Data), MapAudioFormat(audio.MimeType)));
                                     break;
 #pragma warning restore OPENAI001
+#pragma warning disable OPENAI001 // ChatMessageContentPart.CreateFilePart is experimental
+                                case DocumentPart doc when doc.Data is not null:
+                                    contentParts.Add(ChatMessageContentPart.CreateFilePart(
+                                        BinaryData.FromBytes(doc.Data), doc.MimeType, doc.Name ?? "document"));
+                                    break;
+#pragma warning restore OPENAI001
+                                case DocumentPart:
+                                    throw new NotSupportedException(
+                                        "DocumentPart with only a Uri is not supported by the OpenAI adapter — " +
+                                        "OpenAI's file content part requires either bytes or a pre-uploaded file ID, " +
+                                        "and this adapter does not upload files on the caller's behalf. Supply Data instead.");
                                 default:
                                     throw new NotSupportedException(
                                         $"{part.GetType().Name} is not supported by the OpenAI adapter's request content mapping.");

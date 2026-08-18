@@ -63,13 +63,13 @@ internal static class DeployCommand
             var inMemory = parseResult.GetValue<bool>("--in-memory");
 
             using var host = new PlatformHost(inMemory);
-            await ExecuteAsync(host, file, platform, profile, force, dryRun, json);
+            return await ExecuteAsync(host, file, platform, profile, force, dryRun, json);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         PlatformHost host,
         FileInfo file,
         string platform,
@@ -92,23 +92,23 @@ internal static class DeployCommand
                 Console.Error.WriteLine($"    {hint}");
                 Console.Error.WriteLine();
             }
-            return;
+            return 1;
         }
 
         // ── 2. Load manifest ─────────────────────────────────────────────────
         if (!file.Exists)
         {
             WriteError(json, $"File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         WorkflowManifest manifest;
         try { manifest = WorkflowManifest.Load(file.FullName); }
-        catch (Exception ex) { WriteError(json, $"Failed to parse manifest: {ex.Message}"); return; }
+        catch (Exception ex) { WriteError(json, $"Failed to parse manifest: {ex.Message}"); return 1; }
 
         // ── 3. Build toolkit stub ─────────────────────────────────────────────
         var toolKit = BuildToolKit(manifest, profileName, out var profileError);
-        if (toolKit is null) { WriteError(json, profileError!); return; }
+        if (toolKit is null) { WriteError(json, profileError!); return 1; }
 
         // ── 4. Structural validation ─────────────────────────────────────────
         var validator = new DeployabilityValidator();
@@ -138,7 +138,7 @@ internal static class DeployCommand
                     Console.Error.WriteLine($"    [{d.Code}] {d.Message}");
                 Console.Error.WriteLine();
             }
-            return;
+            return 2;
         }
 
         // ── 5. Dry-run short-circuit ─────────────────────────────────────────
@@ -154,7 +154,7 @@ internal static class DeployCommand
                 Console.WriteLine("  Manifest is deployable. No resources were created.");
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         // ── 6. Check for existing active deployment ──────────────────────────
@@ -174,7 +174,7 @@ internal static class DeployCommand
                     Console.WriteLine("    Use --force to re-deploy.");
                     Console.WriteLine();
                 }
-                return;
+                return 0;
             }
         }
 
@@ -184,7 +184,7 @@ internal static class DeployCommand
         {
             record = await deployer.DeployAsync(manifest, toolKit, new DeployOptions { Platform = platform, Force = force });
         }
-        catch (Exception ex) { WriteError(json, $"Deployment failed: {ex.Message}"); return; }
+        catch (Exception ex) { WriteError(json, $"Deployment failed: {ex.Message}"); return 2; }
 
         // ── 8. Persist record ────────────────────────────────────────────────
         await host.Registry.RegisterAsync(record);
@@ -208,6 +208,8 @@ internal static class DeployCommand
             Console.WriteLine($"    Status        : {record.Status}");
             Console.WriteLine();
         }
+
+        return 0;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

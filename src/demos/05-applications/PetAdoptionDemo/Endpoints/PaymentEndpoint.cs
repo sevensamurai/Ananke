@@ -38,7 +38,7 @@ internal static class PaymentEndpoint
                 return;
             }
 
-            session.BindResponse(context.Response.WriteSseAsync);
+            session.BindResponse((eventName, data) => context.Response.WriteSseAsync(eventName, data));
 
             try
             {

@@ -18,8 +18,16 @@ public interface IStateMachine<S, T>
     where S : Enum
     where T : Enum
 {
-    /// <summary>Fires a transition, optionally carrying a payload for interrupt transitions.</summary>
-    Task<TransitionResult<S>> FireAsync(T transition, object? payload = null);
+    /// <summary>
+    /// Fires a transition, optionally carrying a payload for interrupt transitions.
+    /// </summary>
+    /// <param name="transition">The transition to fire.</param>
+    /// <param name="payload">Optional payload, used by interrupt transitions.</param>
+    /// <param name="ct">
+    /// Abandons the wait for the serialization gate. Transitions are gate-serialized, so a caller
+    /// can otherwise be blocked indefinitely behind an in-flight transition with no way out.
+    /// </param>
+    Task<TransitionResult<S>> FireAsync(T transition, object? payload = null, CancellationToken ct = default);
 
     /// <summary>The current state of the machine.</summary>
     S CurrentState { get; }
@@ -177,7 +185,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         {
             if (payload is TPayload typed)
             {
-                await sink.InterruptAsync(typed, ct);
+                await sink.InterruptAsync(typed, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -213,7 +221,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         _insightHandlers.Add(async (obj, state) =>
         {
             if (obj is TInsight typed)
-                await handler(typed, state);
+                await handler(typed, state).ConfigureAwait(false);
         });
         return this;
     }
@@ -223,17 +231,19 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     /// <see cref="FireAsync"/> — only one of them runs at a time.
     /// Does not cause a state transition.
     /// </summary>
-    public async Task SignalInsightAsync<TInsight>(TInsight insight)
+    /// <param name="insight">The insight to deliver.</param>
+    /// <param name="ct">Abandons the wait for the serialization gate shared with <see cref="FireAsync"/>.</param>
+    public async Task SignalInsightAsync<TInsight>(TInsight insight, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(insight);
-        await _gate.WaitAsync();
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             foreach (var handler in _insightHandlers)
             {
                 try
                 {
-                    await handler(insight, CurrentState);
+                    await handler(insight, CurrentState).ConfigureAwait(false);
                 }
                 catch
                 {
@@ -250,12 +260,13 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     // ── Core transition ──────────────────────────────────────────
 
     /// <inheritdoc />
-    public async Task<TransitionResult<S>> FireAsync(T transition, object? payload = null)
+    public async Task<TransitionResult<S>> FireAsync(
+        T transition, object? payload = null, CancellationToken ct = default)
     {
-        await _gate.WaitAsync();
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return await ExecuteTransitionAsync(transition, payload);
+            return await ExecuteTransitionAsync(transition, payload).ConfigureAwait(false);
         }
         finally
         {
@@ -282,7 +293,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Check guard condition
         if (config.GuardCondition is not null)
         {
-            if (!await config.GuardCondition())
+            if (!await config.GuardCondition().ConfigureAwait(false))
                 return TransitionResult<S>.GuardFailed(CurrentState);
         }
 
@@ -325,15 +336,15 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Builder-level OnExit (lightweight, synchronous hooks)
         if (_builder.StateConfigs.TryGetValue(previousState, out var exitStateConfig)
             && exitStateConfig.OnExitAction is not null)
-            await exitStateConfig.OnExitAction();
+            await exitStateConfig.OnExitAction().ConfigureAwait(false);
 
         // Machine-level OnExit
         if (_stateExitWork.TryGetValue(previousState, out var exitWork))
-            await exitWork();
+            await exitWork().ConfigureAwait(false);
 
         // ── Deliver interrupt payload ────────────────────────────
         if (config.IsInterrupt && _onInterrupt is not null)
-            await _onInterrupt(payload, default);
+            await _onInterrupt(payload, default).ConfigureAwait(false);
 
         // ── Transition ───────────────────────────────────────────
         CurrentState = resolvedFinalState;
@@ -341,7 +352,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // After-transition action (may modify final state)
         if (config.AfterTransitionAction is not null)
         {
-            var actionResult = await config.AfterTransitionAction();
+            var actionResult = await config.AfterTransitionAction().ConfigureAwait(false);
             if (!EqualityComparer<S>.Default.Equals(actionResult, resolvedFinalState))
                 CurrentState = actionResult;
         }
@@ -351,7 +362,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Builder-level OnEnter (lightweight, synchronous hooks)
         if (_builder.StateConfigs.TryGetValue(CurrentState, out var enterStateConfig)
             && enterStateConfig.OnEnterAction is not null)
-            await enterStateConfig.OnEnterAction();
+            await enterStateConfig.OnEnterAction().ConfigureAwait(false);
 
         // Machine-level OnEnter (background, cancellable work)
         StartStateWork(CurrentState);
@@ -406,6 +417,11 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         if (!_stateWork.TryGetValue(state, out var work))
             return;
 
+        // Deliberately NOT derived from any caller's token (Q31, read 2026-08-18). This CTS scopes
+        // the state's background work to the *state's* lifetime — it is cancelled on state exit,
+        // which is how leaving a state stops whatever that state was doing. A caller's token
+        // answers a different question ("abandon my call"), and linking the two would let a
+        // completed FireAsync tear down work belonging to the state it just entered.
         var cts = new CancellationTokenSource();
         _currentStateCts = cts;
         // Invoke work synchronously up to its first await (which runs any setup code
@@ -415,7 +431,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         {
             var workTask = work(cts.Token);
             _enteredChannel.Writer.TryWrite(state);
-            await workTask;
+            await workTask.ConfigureAwait(false);
         });
     }
 
@@ -430,7 +446,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     /// </summary>
     internal async Task WhenEnteredAsync(S state)
     {
-        await foreach (var entered in _enteredChannel.Reader.ReadAllAsync())
+        await foreach (var entered in _enteredChannel.Reader.ReadAllAsync().ConfigureAwait(false))
             if (EqualityComparer<S>.Default.Equals(entered, state))
                 return;
     }

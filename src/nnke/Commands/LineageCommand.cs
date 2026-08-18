@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace Ananke.Tool.Commands;
 
 /// <summary>
-/// Handles <c>nnke colony lineage &lt;cell&gt; &lt;file&gt;</c> — renders an ASCII tree
+/// Handles <c>nnke mesh lineage &lt;cell&gt; &lt;file&gt;</c> — renders an ASCII tree
 /// showing the founding ancestor, lineage to the named cell, and all descendants.
 /// Supports reading from a <see cref="HostSnapshot"/> YAML file or a lineage store
 /// JSON export.

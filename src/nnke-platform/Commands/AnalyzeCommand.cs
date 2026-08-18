@@ -42,13 +42,13 @@ internal static class AnalyzeCommand
             var file = parseResult.GetValue(fileArg)!;
             var deploymentId = parseResult.GetValue(deploymentIdOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, deploymentId, json);
+            return Execute(file, deploymentId, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, string? deploymentId, bool json)
+    private static int Execute(FileInfo file, string? deploymentId, bool json)
     {
         if (!file.Exists)
         {
@@ -56,7 +56,7 @@ internal static class AnalyzeCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         WorkflowManifest manifest;
@@ -70,11 +70,13 @@ internal static class AnalyzeCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse manifest: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse manifest: {ex.Message}");
-            return;
+            return 1;
         }
 
         var analysis = AnalyzeManifest(manifest, deploymentId);
         Emit(analysis, json);
+
+        return 0;
     }
 
     private static AnalysisResult AnalyzeManifest(WorkflowManifest manifest, string? deploymentId)

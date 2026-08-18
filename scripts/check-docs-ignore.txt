@@ -55,6 +55,9 @@ LongTermMemoryDemo
 # --- Deliberate, documented legacy/preserved naming (explained in-doc) ---
 VertexAI               # Vertex AI -> Gemini Enterprise Agent Platform rebrand; VertexAI* class names kept for back-compat
 GoogleMemoryBankAdapter # explicitly hypothetical/future adapter, not a current type
+ICellDivider            # Ananke.Organics/README.md glossary: pre-rename ADR-era name, now IWorkflowDivider
+ICellReplicator         # Ananke.Organics/README.md glossary: pre-rename ADR-era name, now IWorkflowReplicator
+IColonyAggregator       # Ananke.Organics/README.md glossary: pre-rename ADR-era name, now IMeshAggregator
 
 # --- MSBuild / .csproj property names (live in *.csproj, not *.cs) ---
 IsPackable
@@ -73,6 +76,7 @@ WarningsNotAsErrors
 # deliberately so readers hitting a stale reference can find the replacement. Absence from
 # src/**/*.cs is the point, not drift.
 Opus4
+Opus41
 Sonnet4
 Sonnet35
 Haiku35
@@ -162,7 +166,7 @@ DistributedServicesDemo
 .vscode/mcp.json                    # file the READER creates when following McpServerDemo
 .github/workflows/pages.yml         # historical: existed at v0.7.2, superseded by website.yml
 scripts/check-nnke-deps.ps1         # historical: existed at v0.8.3, since removed
-tools/check-architecture-graph.ps1  # ARCHITECTURE.md names it to record that it is GONE
+tools/check-architecture-graph.ps1  # ARCHITECTURE.md names it to record it NEVER EXISTED (checked full git history 2026-08-06)
 Releases/ReleaseEvent.cs            # aspirational file in a PLAN-*.md design note
 Releases/ReleaseKnowledgeSource.cs  # aspirational file in a PLAN-*.md design note
 Releases/SimulatedReleaseHistory.cs # aspirational file in a PLAN-*.md design note

@@ -22,17 +22,17 @@ public interface IChannelWriter : IAsyncDisposable
     /// <summary>
     /// Configures the channel connection
     /// </summary>
-    Task<bool> ConfigureAsync(ChannelConfig credentials);
+    Task<bool> ConfigureAsync(ChannelConfig credentials, CancellationToken ct = default);
 
     /// <summary>
     /// Clears/disconnects the channel
     /// </summary>
-    Task ClearAsync();
+    Task ClearAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Sends a message to the channel
     /// </summary>
-    Task<ChannelSendResult> SendAsync(object message);
+    Task<ChannelSendResult> SendAsync(object message, CancellationToken ct = default);
 
     /// <summary>
     /// Whether the channel is connected
@@ -54,12 +54,12 @@ public interface IChannelWriter<A> : IAsyncDisposable where A : Enum
     /// <summary>
     /// Clears/disconnects the channel
     /// </summary>
-    Task ClearAsync();
+    Task ClearAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Sends a message with an associated action
     /// </summary>
-    Task<ChannelSendResult> SendAsync(object message, A action);
+    Task<ChannelSendResult> SendAsync(object message, A action, CancellationToken ct = default);
 
     /// <summary>
     /// Whether the channel is connected

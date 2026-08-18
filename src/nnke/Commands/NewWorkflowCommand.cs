@@ -65,7 +65,7 @@ internal static class NewWorkflowCommand
     private static int Execute(string name, string provider, string pattern, DirectoryInfo? output, bool json,
         List<string>? filesOverride = null, List<string>? skippedOverride = null)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (!ProjectNameValidator.IsValid(name))
         {
             if (filesOverride is not null)
                 throw new ArgumentException($"Invalid project name: '{name}'");

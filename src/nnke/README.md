@@ -1,6 +1,6 @@
 # nnke
 
-A .NET global tool for scaffolding Ananke workflow projects and manifest files.
+A .NET global tool for scaffolding Ananke agent projects, and for validating and inspecting them offline.
 
 ## Install
 
@@ -11,6 +11,12 @@ dotnet tool install -g nnke
 ## Usage
 
 ```bash
+# Scaffold a beginner project that runs immediately — no API key required
+nnke new quickstart MyFirstAgent
+
+# Scaffold a streaming chatbox (Minimal API + SSE) — also runs without a key
+nnke new chatbox MyChat
+
 # Scaffold a complete workflow project (default: etl pattern, openai provider)
 nnke new workflow MyPipeline
 
@@ -23,8 +29,8 @@ nnke new workflow MyChat --pattern streaming-chat
 # Scaffold an organic-host project
 nnke new workflow MyMesh --pattern organic-host
 
-# Generate a standalone .ananke.yml manifest
-nnke new manifest my-etl --pattern etl
+# Scaffold a project from an agentic design pattern (--list to see them all)
+nnke new pattern router MyRouter
 
 # Validate a manifest file
 nnke validate my-etl.ananke.yml
@@ -32,8 +38,8 @@ nnke validate my-etl.ananke.yml
 # Export a Mermaid diagram from a manifest
 nnke diagram my-etl.ananke.yml
 
-# Run a manifest workflow locally (topology trace, no LLM calls)
-nnke run my-etl.ananke.yml
+# Serve a manifest workflow as a local HTTP endpoint (topology trace, no LLM calls)
+nnke serve my-etl.ananke.yml
 
 # Inspect mesh state from a snapshot file
 nnke mesh status mesh.snapshot.yml
@@ -46,12 +52,15 @@ nnke mesh inspect memory.json
 
 | Command | Description |
 |---|---|
+| `nnke new quickstart <name>` | Scaffold a beginner project that runs immediately — no API key required |
 | `nnke new workflow <name>` | Scaffold a runnable workflow project (`.csproj`, `Program.cs`, `.ananke.yml`, state record, secrets template) |
-| `nnke new manifest <name>` | Generate a standalone `.ananke.yml` starter file |
+| `nnke new chatbox <name>` | Scaffold a streaming conversational agent (Minimal API + SSE) — no API key required |
+| `nnke new pattern <name>` | Scaffold a project from an agentic design pattern (`--list` to see all) |
 | `nnke validate <file>` | Parse and validate manifest topology |
 | `nnke diagram <file>` | Export Mermaid flowchart from manifest connections |
-| `nnke run <file>` | Run a manifest workflow locally (topology trace, no LLM calls) |
-| `nnke serve <file>` | Serve a manifest workflow as a local HTTP endpoint |
+| `nnke manifest validate <file>` | Validate manifest topology (same checks as `nnke validate`) |
+| `nnke manifest diagram <file>` | Export Mermaid flowchart from a manifest |
+| `nnke serve <file>` | Serve a manifest workflow as a local HTTP endpoint (topology trace, no LLM calls) |
 | `nnke inspect [dir]` | Full project health report |
 | `nnke explain [code]` | Explain a diagnostic error code |
 | `nnke patterns [pattern]` | List or describe workflow patterns |
@@ -84,7 +93,7 @@ Pass `--pattern <name>` to `nnke new workflow`. Run `nnke patterns` for full des
 
 ## Providers
 
-Pass `--provider <name>` to `nnke new workflow` or `nnke new manifest`.
+Pass `--provider <name>` to any `nnke new` scaffold command.
 
 | Provider | Package scaffolded |
 |---|---|

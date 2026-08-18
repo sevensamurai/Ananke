@@ -158,7 +158,7 @@ public sealed class A2AHandoffChannel : IHandoffChannel
     /// <exception cref="NotSupportedException">Always thrown.</exception>
     public Task SubscribeAsync<TMessage, TResponse>(
         string topic,
-        Func<TMessage, Task<TResponse>> handler,
+        Func<TMessage, CancellationToken, Task<TResponse>> handler,
         CancellationToken ct = default)
         where TMessage : class
         where TResponse : class

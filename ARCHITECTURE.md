@@ -472,7 +472,9 @@ For deeper architectural detail on each vertical, see:
 
 ---
 
-*Last updated: 2026-08-01 (v0.8.8). The dependency graph is **not** currently verified by a script —
-`tools/check-architecture-graph.ps1`, referenced here since v0.8.5, no longer exists in the tree and
-neither CI workflow (`pipeline.yml`, `website.yml`) runs an equivalent. Verify by hand after any
-`.csproj` change until it is restored or replaced.*
+*Last updated: 2026-08-06 (v0.8.8+). The dependency graph is **not** currently verified by a script.
+`tools/check-architecture-graph.ps1`, referenced here since v0.8.5, was never actually built —
+checked `git log --all --full-history` and every release tag from v0.8.0 through v0.8.8: it never
+existed in this repository. The reference traced to a same-day architecture review's planned backlog
+item that this footer described as already done. Neither CI workflow (`pipeline.yml`, `website.yml`)
+runs an equivalent check. Verify by hand after any `.csproj` change.*

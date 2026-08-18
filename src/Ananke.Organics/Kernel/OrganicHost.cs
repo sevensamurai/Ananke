@@ -226,17 +226,17 @@ public sealed class OrganicHost : IAsyncDisposable
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(interval, ct);
+                await Task.Delay(interval, ct).ConfigureAwait(false);
 
                 try
                 {
-                    var remoteNames = await source.GetRemoteCellNamesAsync(ct);
+                    var remoteNames = await source.GetRemoteCellNamesAsync(ct).ConfigureAwait(false);
 
                     foreach (var name in remoteNames)
                     {
                         try
                         {
-                            await EvaluateAndSignalAsync(name, ct);
+                            await EvaluateAndSignalAsync(name, ct).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException) when (ct.IsCancellationRequested)
                         {
@@ -268,7 +268,7 @@ public sealed class OrganicHost : IAsyncDisposable
     {
         try
         {
-            await foreach (var entry in _queue.Reader.ReadAllAsync(ct))
+            await foreach (var entry in _queue.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
@@ -280,7 +280,7 @@ public sealed class OrganicHost : IAsyncDisposable
                         entry.WorkflowName, 1, (_, c) => c + 1);
 
                     if (count % _options.EvaluationInterval == 0)
-                        await EvaluateAndSignalAsync(entry.WorkflowName, ct);
+                        await EvaluateAndSignalAsync(entry.WorkflowName, ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -311,7 +311,7 @@ public sealed class OrganicHost : IAsyncDisposable
     {
         try
         {
-            var snapshot = await _options.Monitor.GetSnapshotAsync(workflowName, ct);
+            var snapshot = await _options.Monitor.GetSnapshotAsync(workflowName, ct).ConfigureAwait(false);
 
             // L3: classify metabolism and stamp snapshot
             var metabolism = _options.MetabolicThresholds.Classify(snapshot);
@@ -323,7 +323,7 @@ public sealed class OrganicHost : IAsyncDisposable
             var manifest = _options.ManifestFactory?.Invoke(workflowName)
                 ?? CreateMinimalManifest(workflowName);
 
-            var plan = await _options.Policy.EvaluateAsync(snapshot, manifest, ct);
+            var plan = await _options.Policy.EvaluateAsync(snapshot, manifest, ct).ConfigureAwait(false);
             if (plan is null)
                 return;
 
@@ -337,17 +337,17 @@ public sealed class OrganicHost : IAsyncDisposable
             };
 
             if (OnDivisionProposed is not null)
-                await OnDivisionProposed(proposedSignal);
+                await OnDivisionProposed(proposedSignal).ConfigureAwait(false);
 
             // Governance checkpoint: always go through the gate
-            var approval = await _options.ApprovalGate.ReviewAsync(plan, snapshot, ct);
+            var approval = await _options.ApprovalGate.ReviewAsync(plan, snapshot, ct).ConfigureAwait(false);
 
             var resultSignal = proposedSignal with { Approval = approval };
 
             if (approval.IsApproved)
             {
                 if (OnDivisionApproved is not null)
-                    await OnDivisionApproved(resultSignal);
+                    await OnDivisionApproved(resultSignal).ConfigureAwait(false);
 
                 // Record baseline for outcome tracking
                 var divisionId = Guid.NewGuid().ToString("N");
@@ -376,7 +376,7 @@ public sealed class OrganicHost : IAsyncDisposable
                             try
                             {
                                 result = await _options.Divider.DivideAsync(
-                                    finalPlan, manifest, _options.SharedMemory!, ct);
+                                    finalPlan, manifest, _options.SharedMemory!, ct).ConfigureAwait(false);
                             }
                             catch
                             {
@@ -397,13 +397,13 @@ public sealed class OrganicHost : IAsyncDisposable
 
                             // L1: record parent death in lineage store.
                             await _options.Lineage.RecordDeathAsync(
-                                workflowName, DateTimeOffset.UtcNow, "division", ct);
+                                workflowName, DateTimeOffset.UtcNow, "division", ct).ConfigureAwait(false);
 
                             // L5: remove parent from mesh aggregator.
                             _options.MeshAggregator.Forget(workflowName);
 
                             // L1: record child births.
-                            var parentRecord = await _options.Lineage.GetAsync(workflowName, ct);
+                            var parentRecord = await _options.Lineage.GetAsync(workflowName, ct).ConfigureAwait(false);
                             var parentGeneration = parentRecord?.Generation ?? 0;
 
                             // Register each new child cell's capabilities.
@@ -422,7 +422,7 @@ public sealed class OrganicHost : IAsyncDisposable
                                 });
 
                                 // Only write lineage if the divider hasn't already written it.
-                                if (await _options.Lineage.GetAsync(newManifest.Name, ct) is null)
+                                if (await _options.Lineage.GetAsync(newManifest.Name, ct).ConfigureAwait(false) is null)
                                 {
                                     await _options.Lineage.RecordBirthAsync(new CellLineage
                                     {
@@ -435,7 +435,7 @@ public sealed class OrganicHost : IAsyncDisposable
                                         InheritedDomains = matchingChild is not null
                                             ? [matchingChild.Domain]
                                             : []
-                                    }, ct);
+                                    }, ct).ConfigureAwait(false);
                                 }
                             }
 
@@ -448,7 +448,7 @@ public sealed class OrganicHost : IAsyncDisposable
                                     .ToDictionary(t => t, t => t);
 
                                 await _options.DomainRouter.IndexAsync(
-                                    finalPlan.Children, toolDescriptions, ct);
+                                    finalPlan.Children, toolDescriptions, ct).ConfigureAwait(false);
                             }
 
                             // Item 1 (C-1): close the learning loop.
@@ -458,23 +458,23 @@ public sealed class OrganicHost : IAsyncDisposable
                                 && result.NewManifests.Count > 0)
                             {
                                 if (_options.StabilizationWindowMs > 0)
-                                    await Task.Delay(_options.StabilizationWindowMs, ct);
+                                    await Task.Delay(_options.StabilizationWindowMs, ct).ConfigureAwait(false);
 
                                 // Child cells may not have executed yet, so GetSnapshotAsync
                                 // may throw for unregistered names — skip those silently.
                                 var childSnapshots = new List<ComplexitySnapshot>();
                                 foreach (var m in result.NewManifests)
                                 {
-                                    try { childSnapshots.Add(await _options.Monitor.GetSnapshotAsync(m.Name, ct)); }
+                                    try { childSnapshots.Add(await _options.Monitor.GetSnapshotAsync(m.Name, ct).ConfigureAwait(false)); }
                                     catch (InvalidOperationException) { }
                                 }
 
                                 await _options.OutcomeTracker.RewardAsync(
-                                    divisionId, childSnapshots, finalPlan, ct);
+                                    divisionId, childSnapshots, finalPlan, ct).ConfigureAwait(false);
                             }
 
                             if (OnDivisionCompleted is not null)
-                                await OnDivisionCompleted(resultSignal);
+                                await OnDivisionCompleted(resultSignal).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException)
                         {
@@ -483,7 +483,7 @@ public sealed class OrganicHost : IAsyncDisposable
                         catch (Exception)
                         {
                             if (OnDivisionFailed is not null)
-                                await OnDivisionFailed(resultSignal);
+                                await OnDivisionFailed(resultSignal).ConfigureAwait(false);
                         }
                     }, CancellationToken.None);
 
@@ -493,7 +493,7 @@ public sealed class OrganicHost : IAsyncDisposable
             else
             {
                 if (OnDivisionRejected is not null)
-                    await OnDivisionRejected(resultSignal);
+                    await OnDivisionRejected(resultSignal).ConfigureAwait(false);
             }
         } // end try
         finally
@@ -526,13 +526,13 @@ public sealed class OrganicHost : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        await _loopCts.CancelAsync();
+        await _loopCts.CancelAsync().ConfigureAwait(false);
 
         _queue.Writer.TryComplete();
 
         try
         {
-            await _loopTask;
+            await _loopTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -543,7 +543,7 @@ public sealed class OrganicHost : IAsyncDisposable
         {
             try
             {
-                await _pollingTask;
+                await _pollingTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -559,7 +559,7 @@ public sealed class OrganicHost : IAsyncDisposable
                 TimeSpan.FromMilliseconds(_options.DivisionShutdownTimeoutMs));
             try
             {
-                await Task.WhenAll(allDivisions).WaitAsync(timeoutCts.Token);
+                await Task.WhenAll(allDivisions).WaitAsync(timeoutCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -573,7 +573,7 @@ public sealed class OrganicHost : IAsyncDisposable
 
         _loopCts.Dispose();
 
-        await _cellHost.DisposeAsync();
+        await _cellHost.DisposeAsync().ConfigureAwait(false);
     }
 
     // ── Internal types ───────────────────────────────────────────────

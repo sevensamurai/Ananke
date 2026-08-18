@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Jobs;
+using Ananke.Orchestration.Routing;
 
 namespace Ananke.Orchestration.Workflows;
 
@@ -37,9 +38,21 @@ public sealed class WorkflowExecution<TState>
 
     private readonly List<JobExecution> _history = [];
     private readonly Dictionary<string, int> _loopCounters = [];
+    private readonly List<BranchOutcome> _branchOutcomes = [];
 
     /// <summary>Ordered record of every job that has been executed in this run.</summary>
     public IReadOnlyList<JobExecution> History => _history;
+
+    /// <summary>
+    /// Outcomes for forked branches that did <b>not</b> succeed. Empty for workflows with no fork,
+    /// and for forks where every branch succeeded — so a non-empty collection always means
+    /// something was dropped from a merge.
+    /// </summary>
+    /// <remarks>
+    /// Not carried in checkpoints: a resumed execution starts with none and re-records them when
+    /// it replays the fork.
+    /// </remarks>
+    public IReadOnlyList<BranchOutcome> BranchOutcomes => _branchOutcomes;
 
     /// <summary>Current iteration counts for active loops, keyed by the loop source job name.</summary>
     internal IReadOnlyDictionary<string, int> LoopCounters => _loopCounters;
@@ -76,6 +89,7 @@ public sealed class WorkflowExecution<TState>
             TotalDuration = TimeSpan.Zero,
             JobsExecuted = _history.Count,
             History = _history,
+            BranchOutcomes = _branchOutcomes,
             Error = Status switch
             {
                 ExecutionStatus.Running => "Workflow is still running.",
@@ -133,4 +147,11 @@ public sealed class WorkflowExecution<TState>
 
     internal void RecordJobExecution(JobExecution execution) =>
         _history.Add(execution);
+
+    /// <summary>
+    /// Records a forked branch that did not succeed. Callers pass only non-success outcomes —
+    /// see <see cref="BranchOutcomes"/>.
+    /// </summary>
+    internal void RecordBranchOutcome(BranchOutcome outcome) =>
+        _branchOutcomes.Add(outcome);
 }

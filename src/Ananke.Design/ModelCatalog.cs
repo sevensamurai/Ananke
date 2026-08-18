@@ -60,7 +60,7 @@ public static class ModelCatalog
         },
         ["anthropic"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["opus"] = [Models.Anthropic.Opus41, Models.Anthropic.Opus48, Models.Anthropic.Opus5],
+            ["opus"] = [Models.Anthropic.Opus48, Models.Anthropic.Opus5],
             ["sonnet"] = [Models.Anthropic.Sonnet46, Models.Anthropic.Sonnet5],
             ["haiku"] = [Models.Anthropic.Haiku45],
             ["fable"] = [Models.Anthropic.Fable5],
@@ -88,7 +88,6 @@ public static class ModelCatalog
         },
         ["anthropic"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            Models.Anthropic.Opus41,
             Models.Anthropic.Opus48, Models.Anthropic.Sonnet46, Models.Anthropic.Haiku45,
             Models.Anthropic.Sonnet5, Models.Anthropic.Opus5, Models.Anthropic.Fable5,
         },

@@ -23,7 +23,7 @@ namespace Ananke.Orchestration.Jobs;
 public sealed class InMemoryHandoffChannel : IHandoffChannel
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<object>> _pending = new();
-    private readonly ConcurrentDictionary<string, Func<object, Task<object>>> _handlers = new();
+    private readonly ConcurrentDictionary<string, Func<object, CancellationToken, Task<object>>> _handlers = new();
 
     /// <summary>
     /// Registers a synchronous auto-response handler for a given topic.
@@ -39,24 +39,26 @@ public sealed class InMemoryHandoffChannel : IHandoffChannel
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _handlers[topic] = msg => Task.FromResult<object>(handler((TMessage)msg)!);
+        _handlers[topic] = (msg, _) => Task.FromResult<object>(handler((TMessage)msg)!);
     }
 
     /// <summary>
-    /// Registers an asynchronous auto-response handler for a given topic.
+    /// Registers an asynchronous auto-response handler for a given topic. The handler receives
+    /// a <see cref="CancellationToken"/> bound to <see cref="SendAsync{TMessage, TResponse}"/>'s
+    /// own <c>timeout</c>/<c>ct</c>, so it can abort in-flight work instead of running unbounded.
     /// </summary>
     public void RegisterHandler<TMessage, TResponse>(
         string topic,
-        Func<TMessage, Task<TResponse>> handler)
+        Func<TMessage, CancellationToken, Task<TResponse>> handler)
         where TMessage : class
         where TResponse : class
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _handlers[topic] = async msg =>
+        _handlers[topic] = async (msg, ct) =>
         {
-            var result = await handler((TMessage)msg);
+            var result = await handler((TMessage)msg, ct);
             return result!;
         };
     }
@@ -73,7 +75,16 @@ public sealed class InMemoryHandoffChannel : IHandoffChannel
     {
         if (_handlers.TryGetValue(topic, out var handler))
         {
-            var result = await handler(message);
+            using var handlerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            handlerCts.CancelAfter(timeout);
+
+            var handlerTask = handler(message, handlerCts.Token);
+            var delayTask = Task.Delay(Timeout.InfiniteTimeSpan, handlerCts.Token);
+            var completed = await Task.WhenAny(handlerTask, delayTask);
+            if (completed == delayTask)
+                await delayTask;
+
+            var result = await handlerTask;
             return (TResponse)result;
         }
 
@@ -118,7 +129,7 @@ public sealed class InMemoryHandoffChannel : IHandoffChannel
     /// <inheritdoc />
     public Task SubscribeAsync<TMessage, TResponse>(
         string topic,
-        Func<TMessage, Task<TResponse>> handler,
+        Func<TMessage, CancellationToken, Task<TResponse>> handler,
         CancellationToken ct = default)
         where TMessage : class
         where TResponse : class

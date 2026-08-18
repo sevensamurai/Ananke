@@ -34,13 +34,13 @@ internal static class ProfilesCommand
             var file = parseResult.GetValue(fileArg)!;
             var profile = parseResult.GetValue(profileArg);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, profile, json);
+            return Execute(file, profile, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, string? profileName, bool json)
+    private static int Execute(FileInfo file, string? profileName, bool json)
     {
         if (!file.Exists)
         {
@@ -48,7 +48,7 @@ internal static class ProfilesCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         WorkflowManifest manifest;
@@ -62,7 +62,7 @@ internal static class ProfilesCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse manifest: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse manifest: {ex.Message}");
-            return;
+            return 1;
         }
 
         if (manifest.Profiles.Count == 0)
@@ -76,7 +76,7 @@ internal static class ProfilesCommand
                 Console.WriteLine("  Add a profiles: section to the manifest to define platform-specific tool bindings.");
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         if (profileName is null)
@@ -107,7 +107,7 @@ internal static class ProfilesCommand
                 }
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         // Show specific profile
@@ -117,7 +117,7 @@ internal static class ProfilesCommand
                 JsonOutput.Write(new { status = "error", message = $"Profile '{profileName}' not found.", available = manifest.Profiles.Keys.ToList() });
             else
                 Console.Error.WriteLine($"  Profile '{profileName}' not found. Available: {string.Join(", ", manifest.Profiles.Keys)}");
-            return;
+            return 1;
         }
 
         if (json)
@@ -152,5 +152,7 @@ internal static class ProfilesCommand
             }
             Console.WriteLine();
         }
+
+        return 0;
     }
 }

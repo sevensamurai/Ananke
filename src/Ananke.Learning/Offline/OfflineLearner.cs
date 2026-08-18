@@ -73,9 +73,9 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
     {
         _logger.LogDebug("Offline learning cycle starting");
 
-        var decayed = await DecayAsync(ct);
-        var (explored, reinforced, contradicted, discoveries) = await ExploreAsync(ct);
-        var consolidated = await ConsolidateAsync(ct);
+        var decayed = await DecayAsync(ct).ConfigureAwait(false);
+        var (explored, reinforced, contradicted, discoveries) = await ExploreAsync(ct).ConfigureAwait(false);
+        var consolidated = await ConsolidateAsync(ct).ConfigureAwait(false);
 
         _logger.LogDebug(
             "Offline learning cycle complete: {Decayed} decayed, {Explored} explored, {Reinforced} reinforced, {Contradicted} contradicted, {Consolidated} consolidated, {Discoveries} discoveries",
@@ -103,7 +103,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         {
             ct.ThrowIfCancellationRequested();
 
-            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct);
+            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct).ConfigureAwait(false);
             if (page.Count == 0) break;
 
             foreach (var entry in page)
@@ -119,7 +119,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
                     // Remove weak entry via contradiction
                     await _memory.ContradictAsync(entry.Id,
                         $"offline-learner decay: strength {entry.Strength:F3} → {newStrength:F3} below threshold {affect.DeletionThreshold:F3}",
-                        ct);
+                        ct).ConfigureAwait(false);
                     decayed++;
                     _logger.LogDebug("Decay removed: '{Id}' (strength {Strength:F3})", entry.Id, entry.Strength);
                 }
@@ -133,7 +133,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
                         ConfidenceAdjustment = 0f, // don't change confidence via flat path
                         StrengthAdjustment = delta,
                         Source = "offline-learner-decay"
-                    }, ct);
+                    }, ct).ConfigureAwait(false);
                 }
             }
 
@@ -157,7 +157,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         var offset = 0;
         while (true)
         {
-            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct);
+            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct).ConfigureAwait(false);
             if (page.Count == 0) break;
             allEntries.AddRange(page);
             offset += page.Count;
@@ -207,7 +207,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
             ct.ThrowIfCancellationRequested();
             explored++;
 
-            var (reward, summary) = await ExploreEntryAsync(entry, ct);
+            var (reward, summary) = await ExploreEntryAsync(entry, ct).ConfigureAwait(false);
 
             if (reward > 0)
             {
@@ -216,13 +216,13 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
                     NewEvidence = [$"offline-learner exploration: {summary}"],
                     Source = "offline-learner-curiosity",
                     Reward = reward
-                }, ct);
+                }, ct).ConfigureAwait(false);
                 reinforced++;
             }
             else if (reward < _options.ExplorationContradictionThreshold)
             {
                 await _memory.ContradictAsync(entry.Id,
-                    $"offline-learner exploration: {summary}", ct);
+                    $"offline-learner exploration: {summary}", ct).ConfigureAwait(false);
                 contradicted++;
             }
 
@@ -249,7 +249,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         {
             ct.ThrowIfCancellationRequested();
 
-            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct);
+            var page = await _memory.BrowseAsync(offset, BrowsePageSize, ct: ct).ConfigureAwait(false);
             if (page.Count == 0) break;
 
             foreach (var entry in page)
@@ -258,9 +258,9 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
 
                 if (!ShouldConsolidate(entry)) continue;
 
-                var doc = await _summarizer.SummarizeAsync(entry, ct);
-                await _knowledgeStore.UpsertAsync([doc], ct);
-                await _memory.MarkConsolidatedAsync(entry.Id, doc.Id, ct);
+                var doc = await _summarizer.SummarizeAsync(entry, ct).ConfigureAwait(false);
+                await _knowledgeStore.UpsertAsync([doc], ct).ConfigureAwait(false);
+                await _memory.MarkConsolidatedAsync(entry.Id, doc.Id, ct).ConfigureAwait(false);
 
                 consolidated++;
                 _logger.LogInformation(
@@ -289,17 +289,17 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         EmpiricalEntry entry, CancellationToken ct)
     {
         // Step 1: Form prediction vector
-        var entryEmbedding = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct);
+        var entryEmbedding = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
 
         // Recall similar entries for context
         var neighbors = await _memory.RecallAsync(entry.Description.ToString(),
-            new RecallOptions { TopK = 3, MinConfidence = 0.1f }, ct);
+            new RecallOptions { TopK = 3, MinConfidence = 0.1f }, ct).ConfigureAwait(false);
 
         ReadOnlyMemory<float> predictedVector;
         if (neighbors.Count > 0)
         {
             // Weighted average of neighbor embeddings by confidence
-            predictedVector = await FormPredictionVectorAsync(entry, neighbors, ct);
+            predictedVector = await FormPredictionVectorAsync(entry, neighbors, ct).ConfigureAwait(false);
         }
         else
         {
@@ -317,7 +317,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         {
             var query = entry.Condition ?? entry.Goal ?? entry.Situation ?? entry.Description.ToString();
             var evidence = await _knowledgeStore.SearchAsync(query,
-                new SearchOptions { TopK = 3 }, ct);
+                new SearchOptions { TopK = 3 }, ct).ConfigureAwait(false);
 
             if (evidence.Count > 0)
             {
@@ -325,7 +325,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
                 var evidenceEmbeddings = new List<ReadOnlyMemory<float>>();
                 foreach (var doc in evidence)
                 {
-                    var emb = await _embedder.EmbedAsync(doc.Text, ct);
+                    var emb = await _embedder.EmbedAsync(doc.Text, ct).ConfigureAwait(false);
                     evidenceEmbeddings.Add(emb);
                 }
 
@@ -347,7 +347,7 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         if (_simulator is not null && entry.Confidence >= _options.SimulationMinConfidence)
         {
             var outcome = await _simulator.SimulateAsync(
-                entry, neighbors, _options.MaxSimulationEpisodes, ct);
+                entry, neighbors, _options.MaxSimulationEpisodes, ct).ConfigureAwait(false);
 
             simulationReward = outcome.Reward;
             hasSimulation = true;
@@ -394,14 +394,14 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         var embeddings = new List<(ReadOnlyMemory<float> Embedding, float Weight)>();
 
         // Include entry's own embedding weighted by its confidence
-        var selfEmb = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct);
+        var selfEmb = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
         embeddings.Add((selfEmb, entry.Confidence));
 
         // Include neighbor embeddings weighted by their confidence
         foreach (var neighbor in neighbors)
         {
             if (neighbor.Entry.Id == entry.Id) continue;
-            var emb = await _embedder.EmbedAsync(neighbor.Entry.Description.ToEmbeddingText(), ct);
+            var emb = await _embedder.EmbedAsync(neighbor.Entry.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
             embeddings.Add((emb, neighbor.Entry.Confidence));
         }
 

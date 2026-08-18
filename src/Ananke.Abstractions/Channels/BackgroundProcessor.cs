@@ -98,11 +98,11 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
     {
         try
         {
-            await foreach (var item in _queue.Reader.ReadAllAsync(ct))
+            await foreach (var item in _queue.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
-                    await _worker.HandleAsync(item, ct);
+                    await _worker.HandleAsync(item, ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -130,8 +130,8 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
 
         if (_cts is not null)
         {
-            await _cts.CancelAsync();
-            try { await _processingTask; }
+            await _cts.CancelAsync().ConfigureAwait(false);
+            try { await _processingTask.ConfigureAwait(false); }
             catch { /* ProcessAsync handles its own errors */ }
             _cts.Dispose();
         }
@@ -227,11 +227,11 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
     {
         try
         {
-            await foreach (var (item, action) in _queue.Reader.ReadAllAsync(ct))
+            await foreach (var (item, action) in _queue.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
-                    await _worker.HandleAsync(item, action, ct);
+                    await _worker.HandleAsync(item, action, ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -259,8 +259,8 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
 
         if (_cts is not null)
         {
-            await _cts.CancelAsync();
-            try { await _processingTask; }
+            await _cts.CancelAsync().ConfigureAwait(false);
+            try { await _processingTask.ConfigureAwait(false); }
             catch { /* ProcessAsync handles its own errors */ }
             _cts.Dispose();
         }

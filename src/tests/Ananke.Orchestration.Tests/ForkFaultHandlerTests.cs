@@ -88,6 +88,37 @@ public class ForkFaultHandlerTests
         handlerInvoked.ShouldBeTrue();
     }
 
+    [Test]
+    public async Task Fork_FailFast_SingleBranchFaults_PreservesOriginalStackTrace()
+    {
+        // R5: the FailFast rethrow at WorkflowRunner.cs used to do `throw ex`, which overwrites
+        // StackTrace with the rethrow site and discards the frames inside the branch that
+        // actually faulted. ExceptionDispatchInfo.Capture(...).Throw() preserves them —
+        // ExecuteBranchAsync is the frame that would otherwise be lost.
+        var exec = await new Workflow<CounterState>("fork-failfast-stacktrace")
+            .Job("start", (s, _) => Task.FromResult(s))
+            .Job("ok-branch", async (s, ct) =>
+            {
+                await WorkflowLoops.Park(ct); // cancelled by FailFast
+                return s with { Trail = [.. s.Trail, "ok"] };
+            })
+            .Job("bad-branch", (CounterState _, CancellationToken _) =>
+                throw new InvalidOperationException("stacktrace-boom"))
+            .Job("merge", (s, _) => Task.FromResult(s))
+            .Then("start", Workflow.Fork(ForkMode.FailFast, "ok-branch", "bad-branch"))
+            .Join(["ok-branch", "bad-branch"], "merge", states => states[0])
+            .Then("merge", Workflow.End)
+            .RunAsync(new CounterState());
+
+        exec.Status.ShouldBe(ExecutionStatus.Faulted);
+        var ex = exec.Result!.Exception;
+        ex.ShouldNotBeNull();
+        ex!.ShouldBeOfType<InvalidOperationException>();
+        ex.Message.ShouldBe("stacktrace-boom");
+        ex.StackTrace.ShouldNotBeNull();
+        ex.StackTrace!.ShouldContain("ExecuteBranchAsync");
+    }
+
     // -- OnError (workflow-level) -------------------------------------
 
     [Test]

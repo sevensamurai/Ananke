@@ -13,38 +13,38 @@ public sealed class InMemoryDistributedLock : IDistributedLock, IKeyValueDataAda
     private readonly ConcurrentDictionary<string, string> _store = new();
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public Task<string?> GetValueAsync(string key) =>
+    public Task<string?> GetValueAsync(string key, CancellationToken ct = default) =>
         Task.FromResult(_store.GetValueOrDefault(key));
 
-    public Task<T?> GetValueAsync<T>(string key)
+    public Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default)
     {
         if (!_store.TryGetValue(key, out var json))
             return Task.FromResult<T?>(default);
         return Task.FromResult(JsonSerializer.Deserialize<T>(json));
     }
 
-    public Task SetValueAsync(string key, string value)
+    public Task SetValueAsync(string key, string value, CancellationToken ct = default)
     {
         _store[key] = value;
         return Task.CompletedTask;
     }
 
-    public Task SetValueAsync<T>(string key, T value)
+    public Task SetValueAsync<T>(string key, T value, CancellationToken ct = default)
     {
         _store[key] = JsonSerializer.Serialize(value);
         return Task.CompletedTask;
     }
 
-    public Task<bool> RemoveAsync(string key) =>
+    public Task<bool> RemoveAsync(string key, CancellationToken ct = default) =>
         Task.FromResult(_store.TryRemove(key, out _));
 
-    public Task<bool> ExistsAsync(string key) =>
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default) =>
         Task.FromResult(_store.ContainsKey(key));
 
     public async Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(
-        string resourceId, Func<Task<R>> action)
+        string resourceId, Func<Task<R>> action, CancellationToken ct = default)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync(ct);
         try
         {
             var result = await action();
@@ -61,13 +61,13 @@ public sealed class InMemoryDistributedLock : IDistributedLock, IKeyValueDataAda
     }
 
     public async Task<CoordinatedActionResult<R>> RunCoordinatedActionWithRetryAsync<R>(
-        string resourceId, Func<Task<R>> action, int maxRetries = 3, int retryDelayMs = 100)
+        string resourceId, Func<Task<R>> action, int maxRetries = 3, int retryDelayMs = 100, CancellationToken ct = default)
     {
         for (var attempt = 0; attempt <= maxRetries; attempt++)
         {
-            var result = await RunCoordinatedActionAsync(resourceId, action);
+            var result = await RunCoordinatedActionAsync(resourceId, action, ct);
             if (result.Success) return result;
-            if (attempt < maxRetries) await Task.Delay(retryDelayMs);
+            if (attempt < maxRetries) await Task.Delay(retryDelayMs, ct);
         }
         return CoordinatedActionResult<R>.Failed("All retry attempts exhausted");
     }

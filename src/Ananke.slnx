@@ -55,7 +55,9 @@
     <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
     <Project Path="tests/Ananke.OpenTelemetry.Tests/Ananke.OpenTelemetry.Tests.csproj" />
+    <Project Path="tests/Ananke.Qdrant.Tests/Ananke.Qdrant.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
+    <Project Path="tests/Ananke.Orchestration.Knowledge.Tests/Ananke.Orchestration.Knowledge.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Tests/Ananke.Orchestration.Tests.csproj" />
     <Project Path="tests/Ananke.Organics.Tests/Ananke.Organics.Tests.csproj" />
     <Project Path="tests/Ananke.Platforms.Slack.Tests/Ananke.Platforms.Slack.Tests.csproj" />
@@ -65,6 +67,9 @@
     <Project Path="tests/Ananke.Skills.Tests/Ananke.Skills.Tests.csproj" />
     <Project Path="tests/Ananke.StateMachine.Tests/Ananke.StateMachine.Tests.csproj" />
     <Project Path="tests/Ananke.TestHelpers/Ananke.TestHelpers.csproj" />
+    <Project Path="tests/nnke-platform-adapters.Tests/nnke-platform-adapters.Tests.csproj" />
+    <Project Path="tests/nnke-platform.Tests/nnke-platform.Tests.csproj" />
+    <Project Path="tests/nnke.Tests/nnke.Tests.csproj" />
   </Folder>
 
   <!-- Pipeline / build configuration -->

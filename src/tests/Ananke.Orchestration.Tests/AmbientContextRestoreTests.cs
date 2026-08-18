@@ -8,10 +8,15 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// Tests for H-7: ambient AsyncLocal context (<see cref="WorkflowTraceContext"/> and
-/// <see cref="TokenUsageCapture"/>) must be captured before each job and restored in a
-/// <c>finally</c> block so stale values cannot leak into continuations outside the job's
-/// execution scope.
+/// Tests for H-7: <see cref="WorkflowTraceContext"/> must be captured before each job and
+/// restored in a <c>finally</c> block so stale values cannot leak into continuations outside
+/// the job's execution scope.
+/// <para>
+/// Token usage no longer works that way. It used to share the per-job capture-and-restore
+/// dance, which is what made fork branches and sub-workflows lose their tokens; the recorder
+/// is now scoped once per execution instead (ADR-arch-028 Part B). The usage tests below still
+/// pin the totals, which is the behaviour that must not change.
+/// </para>
 /// </summary>
 [TestFixture]
 public class AmbientContextRestoreTests
@@ -162,8 +167,8 @@ public class AmbientContextRestoreTests
     [Test]
     public async Task TokenUsage_NoTokensFromFaultingJob_NotCounted()
     {
-        // A plain (non-agent) job that faults contributes 0 tokens.
-        // The accumulator created for it must not carry over into the next iteration.
+        // A plain (non-agent) job that faults contributes 0 tokens, and the run must not
+        // report tokens from a job that never executed.
         var modelA = new FixedUsageModel(inputTokens: 10, outputTokens: 5);
         var callCount = 0;
 

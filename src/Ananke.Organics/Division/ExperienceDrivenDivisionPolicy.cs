@@ -69,11 +69,11 @@ public sealed class ExperienceDrivenDivisionPolicy(
             TopK = MaxRecall,
             RequiredTags = [DivisionTag],
             MinConfidence = 0.1f
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         // Cold start: no division memories → delegate to fallback
         if (recalled.Count == 0)
-            return await fallback.EvaluateAsync(snapshot, manifest, ct);
+            return await fallback.EvaluateAsync(snapshot, manifest, ct).ConfigureAwait(false);
 
         // Build action candidates from recalled entries + a "do not divide" option
         var candidates = BuildCandidates(recalled);
@@ -87,7 +87,7 @@ public sealed class ExperienceDrivenDivisionPolicy(
         // Division selected — generate the plan
         var children = clusterStrategy is not null
             ? clusterStrategy(snapshot.WorkflowName, manifest)
-            : await GenerateChildrenFromFallback(snapshot, manifest, ct);
+            : await GenerateChildrenFromFallback(snapshot, manifest, ct).ConfigureAwait(false);
 
         if (children.Count < 2)
             return null;
@@ -149,7 +149,7 @@ public sealed class ExperienceDrivenDivisionPolicy(
         WorkflowManifest manifest,
         CancellationToken ct)
     {
-        var fallbackPlan = await fallback.EvaluateAsync(snapshot, manifest, ct);
+        var fallbackPlan = await fallback.EvaluateAsync(snapshot, manifest, ct).ConfigureAwait(false);
         return fallbackPlan?.Children ?? (IReadOnlyList<ChildSpec>)[];
     }
 }

@@ -45,9 +45,9 @@ public sealed class ColonyGraphBuilder(
     {
         ArgumentNullException.ThrowIfNull(graph);
 
-        await AddCapabilityNodesAsync(graph, ct);
-        await AddLineageEdgesAsync(graph, ct);
-        await AddRoutingEdgesAsync(graph, ct);
+        await AddCapabilityNodesAsync(graph, ct).ConfigureAwait(false);
+        await AddLineageEdgesAsync(graph, ct).ConfigureAwait(false);
+        await AddRoutingEdgesAsync(graph, ct).ConfigureAwait(false);
     }
 
     // ── Private helpers ──────────────────────────────────────────────
@@ -69,7 +69,7 @@ public sealed class ColonyGraphBuilder(
                     ["alive"] = cap.Alive.ToString(),
                     ["lastSensed"] = cap.LastSensed.ToString("O")
                 }
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             // Domain node + serves edge
             await graph.UpsertNodeAsync(new GraphNode
@@ -77,7 +77,7 @@ public sealed class ColonyGraphBuilder(
                 Id = DomainId(cap.Domain),
                 Kind = "domain",
                 Properties = new Dictionary<string, string> { ["name"] = cap.Domain }
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             await graph.UpsertEdgeAsync(new GraphEdge
             {
@@ -86,7 +86,7 @@ public sealed class ColonyGraphBuilder(
                 Relation = "serves",
                 Provenance = EdgeProvenance.Extracted,
                 Properties = new Dictionary<string, string> { ["source"] = "capability_map" }
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             // Tool nodes + serves edges from tool to cell
             foreach (var toolName in cap.Capabilities)
@@ -104,7 +104,7 @@ public sealed class ColonyGraphBuilder(
                         ["kit"] = kit,
                         ["name"] = name
                     }
-                }, ct);
+                }, ct).ConfigureAwait(false);
 
                 await graph.UpsertEdgeAsync(new GraphEdge
                 {
@@ -113,7 +113,7 @@ public sealed class ColonyGraphBuilder(
                     Relation = "uses",
                     Provenance = EdgeProvenance.Extracted,
                     Properties = new Dictionary<string, string> { ["source"] = "capability_map" }
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
         }
     }
@@ -127,7 +127,7 @@ public sealed class ColonyGraphBuilder(
 
         while (true)
         {
-            var batch = await lineageStore.GetByGenerationAsync(generation, ct);
+            var batch = await lineageStore.GetByGenerationAsync(generation, ct).ConfigureAwait(false);
             if (batch.Count == 0) break;
 
             foreach (var lineage in batch)
@@ -146,7 +146,7 @@ public sealed class ColonyGraphBuilder(
                         ["alive"] = (lineage.DiedAt == null).ToString(),
                         ["bornAt"] = lineage.BornAt.ToString("O")
                     }
-                }, ct);
+                }, ct).ConfigureAwait(false);
 
                 // Parent → child lineage edge
                 if (lineage.ParentCellId != null)
@@ -162,7 +162,7 @@ public sealed class ColonyGraphBuilder(
                             ["source"] = "lineage_store",
                             ["divisionReason"] = lineage.DivisionReason ?? string.Empty
                         }
-                    }, ct);
+                    }, ct).ConfigureAwait(false);
                 }
             }
 
@@ -191,7 +191,7 @@ public sealed class ColonyGraphBuilder(
                 Id = routingNodeId,
                 Kind = "routing",
                 Properties = new Dictionary<string, string> { ["note"] = "observed routing outcomes" }
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             await graph.UpsertEdgeAsync(new GraphEdge
             {
@@ -206,7 +206,7 @@ public sealed class ColonyGraphBuilder(
                     ["selections"] = selections.ToString(),
                     ["meanReward"] = meanReward.ToString("F4")
                 }
-            }, ct);
+            }, ct).ConfigureAwait(false);
         }
     }
 

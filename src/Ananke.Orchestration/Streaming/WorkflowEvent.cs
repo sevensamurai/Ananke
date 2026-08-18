@@ -19,6 +19,18 @@ public abstract record WorkflowEvent<TState>
 
     /// <summary>UTC timestamp when the event was created.</summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// The fork branch this event came from, identified by the branch's start-job name.
+    /// <c>null</c> for events on the main path.
+    /// </summary>
+    /// <remarks>
+    /// A discriminator on the existing event types rather than a parallel branch-specific
+    /// hierarchy: consumers already switch on <see cref="JobStarted{TState}"/> and
+    /// <see cref="JobCompleted{TState}"/>, and doubling that would double their handling.
+    /// The start-job name is what fork spans already use, so it is not a new concept.
+    /// </remarks>
+    public string? Branch { get; init; }
 }
 
 /// <summary>Emitted when a job is about to execute.</summary>
@@ -65,6 +77,19 @@ public sealed record ForkStarted<TState> : WorkflowEvent<TState>
     public required IReadOnlyList<string> Targets { get; init; }
 }
 
+/// <summary>
+/// Emitted for each forked branch that did not succeed, before the join is evaluated.
+/// </summary>
+/// <remarks>
+/// Under <see cref="Routing.ForkMode.BestEffort"/> the workflow continues after this event —
+/// it reports a branch that was dropped from the merge, not a terminal failure.
+/// </remarks>
+public sealed record BranchFaulted<TState> : WorkflowEvent<TState>
+{
+    /// <summary>The outcome of the branch that did not succeed.</summary>
+    public required Routing.BranchOutcome Outcome { get; init; }
+}
+
 /// <summary>Emitted when parallel branches have been merged back together.</summary>
 public sealed record JoinCompleted<TState> : WorkflowEvent<TState>
 {
@@ -108,7 +133,26 @@ public sealed record LoopExited<TState> : WorkflowEvent<TState>
     public required Routing.LoopExitReason Reason { get; init; }
 }
 
-/// <summary>Emitted when the workflow terminates due to cost budget exhaustion.</summary>
+/// <summary>
+/// Emitted once per execution when estimated cost first crosses
+/// <see cref="Budget.BudgetConfig.WarnAtCost"/>. The run continues.
+/// </summary>
+public sealed record BudgetWarning<TState> : WorkflowEvent<TState>
+{
+    /// <summary>Estimated cost at the time the warning threshold was crossed.</summary>
+    public required decimal EstimatedCost { get; init; }
+
+    /// <summary>The configured warning threshold.</summary>
+    public required decimal WarnAtCost { get; init; }
+
+    /// <summary>The configured hard limit the run is still heading toward.</summary>
+    public required decimal Budget { get; init; }
+
+    /// <summary>Cumulative token usage across all LLM calls in this execution.</summary>
+    public required TokenUsage CumulativeUsage { get; init; }
+}
+
+/// <summary>Emitted when the workflow reached its cost budget and was stopped.</summary>
 public sealed record BudgetExceeded<TState> : WorkflowEvent<TState>
 {
     /// <summary>Estimated cost at the time the budget was exceeded.</summary>

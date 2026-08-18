@@ -40,13 +40,32 @@ internal static partial class TemplateEngine
     public static string Load(string resourceName) => LoadResource(resourceName);
 
     /// <summary>
-    /// Returns the default model name for a given provider.
+    /// Returns the model a scaffold should use for a given provider — the provider's starred
+    /// model, never an id named here.
     /// </summary>
     public static string DefaultModel(string provider) => provider switch
     {
-        "anthropic" => Models.Anthropic.Sonnet5,
-        "google" => Models.Google.Gemini36Flash,
-        _ => Models.OpenAI.Gpt56Terra,
+        "anthropic" => Models.Anthropic.Starred,
+        "google" => Models.Google.Starred,
+        _ => Models.OpenAI.Starred,
+    };
+
+    /// <summary>
+    /// Per-provider starred models, for templates whose "swap in a real provider" comment lists all
+    /// three providers at once.
+    /// </summary>
+    /// <remarks>
+    /// These exist because <c>{{model}}</c> resolves to the *selected* provider's model, so using it
+    /// on every line of a three-provider list emitted e.g.
+    /// <c>AnthropicAgentModel.Create(apiKey, "gpt-5.6-terra")</c> — an OpenAI id passed to the
+    /// Anthropic factory. That compiles and fails only at the API call, so building the scaffolded
+    /// project could never catch it.
+    /// </remarks>
+    private static readonly Dictionary<string, string> ProviderModels = new()
+    {
+        ["model_openai"] = Models.OpenAI.Starred,
+        ["model_anthropic"] = Models.Anthropic.Starred,
+        ["model_google"] = Models.Google.Starred,
     };
 
     /// <summary>
@@ -83,17 +102,25 @@ internal static partial class TemplateEngine
     /// <summary>
     /// Builds the standard variable dictionary used by most scaffold templates.
     /// </summary>
-    public static Dictionary<string, string> StandardVariables(string name, string provider) => new()
+    public static Dictionary<string, string> StandardVariables(string name, string provider)
     {
-        ["name"] = name,
-        ["provider"] = provider,
-        ["model"] = DefaultModel(provider),
-        ["provider_package"] = ProviderPackage(provider),
-        ["provider_class"] = ProviderClass(provider),
-        ["provider_section"] = ProviderSection(provider),
-        ["ananke_version"] = AnankeVersion,
-        ["ms_extensions_version"] = MsExtensionsVersion,
-    };
+        var variables = new Dictionary<string, string>
+        {
+            ["name"] = name,
+            ["provider"] = provider,
+            ["model"] = DefaultModel(provider),
+            ["provider_package"] = ProviderPackage(provider),
+            ["provider_class"] = ProviderClass(provider),
+            ["provider_section"] = ProviderSection(provider),
+            ["ananke_version"] = AnankeVersion,
+            ["ms_extensions_version"] = MsExtensionsVersion,
+        };
+
+        foreach (var (key, value) in ProviderModels)
+            variables[key] = value;
+
+        return variables;
+    }
 
     private static string LoadResource(string resourceName)
     {

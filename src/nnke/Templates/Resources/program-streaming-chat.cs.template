@@ -69,9 +69,9 @@ Console.WriteLine();
 Console.WriteLine($"  Conversation ended after {state.History.Count / 2} turn(s).");
 
 // --- SimulatedStreamingModel: replace with a real provider ---
-// OpenAI:    var model = OpenAIChatAgentModel.Create(apiKey, "{{model}}");
-// Anthropic: var model = AnthropicAgentModel.Create(apiKey, "{{model}}");
-// Google:    var model = GeminiAgentModel.Create(apiKey, "{{model}}");
+// OpenAI:    var model = OpenAIChatAgentModel.Create(apiKey, "{{model_openai}}");
+// Anthropic: var model = AnthropicAgentModel.Create(apiKey, "{{model_anthropic}}");
+// Google:    var model = GeminiAgentModel.Create(apiKey, "{{model_google}}");
 
 internal sealed class SimulatedStreamingModel : IStreamingAgentModel
 {

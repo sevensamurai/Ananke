@@ -31,13 +31,13 @@ internal static class LoginCommand
         {
             var platform = parseResult.GetValue(platformOption)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(platform, json);
+            return Execute(platform, json);
         });
 
         return command;
     }
 
-    private static void Execute(string platform, bool json)
+    private static int Execute(string platform, bool json)
     {
         string? credential;
 
@@ -55,14 +55,14 @@ internal static class LoginCommand
         {
             if (json) JsonOutput.Write(new { status = "error", platform, message = ex.Message });
             else Console.Error.WriteLine($"  Error during login: {ex.Message}");
-            return;
+            return 1;
         }
 
         if (credential is null)
         {
             if (json) JsonOutput.Write(new { status = "error", message = $"Unknown platform '{platform}'. Valid: azure, google, anthropic." });
             else Console.Error.WriteLine($"  Unknown platform '{platform}'. Valid: azure, google, anthropic.");
-            return;
+            return 1;
         }
 
         PersistCredential(platform, credential);
@@ -76,6 +76,8 @@ internal static class LoginCommand
             Console.WriteLine($"    Path: {CredentialsPath}");
             Console.WriteLine();
         }
+
+        return 0;
     }
 
     // ── Platform-specific flows ──────────────────────────────────────

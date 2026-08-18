@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using Ananke.Abstractions.Agents;
 
+using Ananke.Orchestration.Usage;
+
 namespace Ananke.Orchestration.Agents.Routing;
 
 public sealed class ModelRouter : IModelRouter
@@ -63,8 +65,8 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
 
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
-        var response = await _router.Select(request).GenerateAsync(request, ct);
-        AccumulateCostIfAvailable(request, response);
+        var response = await _router.Select(request).GenerateAsync(request, ct).ConfigureAwait(false);
+        await ReportCostIfAvailableAsync(request, response, ct).ConfigureAwait(false);
         return response;
     }
 
@@ -81,10 +83,10 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        await foreach (var chunk in model.GenerateStreamAsync(request, ct))
+        await foreach (var chunk in model.GenerateStreamAsync(request, ct).ConfigureAwait(false))
         {
             if (chunk.CompletedResponse is not null)
-                AccumulateCostIfAvailable(request, chunk.CompletedResponse);
+                await ReportCostIfAvailableAsync(request, chunk.CompletedResponse, ct).ConfigureAwait(false);
             yield return chunk;
         }
     }
@@ -94,19 +96,22 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var response = await model.GenerateAsync(request, ct);
+        var response = await model.GenerateAsync(request, ct).ConfigureAwait(false);
         if (response.Text is not null)
             yield return new AgentStreamChunk { TextDelta = response.Text };
         yield return new AgentStreamChunk { CompletedResponse = response };
     }
 
-    private void AccumulateCostIfAvailable(AgentRequest request, AgentResponse response)
+    private Task ReportCostIfAvailableAsync(
+        AgentRequest request, AgentResponse response, CancellationToken ct)
     {
-        if (_costResolver is null || response.Usage is null || TokenUsageCapture.Current.Value is null)
-            return;
+        // The recorder check stays here rather than being left to ReportCostAsync so a run
+        // without one does not pay for ResolveCostRates.
+        if (_costResolver is null || response.Usage is null || UsageRecording.Current is null)
+            return Task.CompletedTask;
 
         var rates = _costResolver.ResolveCostRates(request);
-        TokenUsageCapture.Current.Value.AddCost(rates.EstimateCost(response.Usage));
+        return UsageRecording.ReportCostAsync(rates.EstimateCost(response.Usage), ct);
     }
 }
 

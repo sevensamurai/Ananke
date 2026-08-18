@@ -5,6 +5,8 @@ using Ananke.Abstractions.Tools;
 using Ananke.Abstractions.Tools.Routing;
 using Ananke.Orchestration.Agents;
 
+using Ananke.Orchestration.Usage;
+
 namespace Ananke.Orchestration.Tools.Routing;
 
 /// <summary>
@@ -80,7 +82,7 @@ public sealed class LlmRouterStage : ISmartToolRouter
         };
 
         var response = await _cheapModel.GenerateAsync(agentRequest, ct).ConfigureAwait(false);
-        TokenUsageCapture.Accumulate(response);
+        await UsageRecording.ReportAsync(response, ct).ConfigureAwait(false);
         var rawText = response.Text ?? string.Empty;
 
         if (TryParse(rawText, request, out var decision))
@@ -93,7 +95,7 @@ public sealed class LlmRouterStage : ISmartToolRouter
             var retryRequest = agentRequest with { SystemPrompt = retrySystemPrompt };
 
             response = await _cheapModel.GenerateAsync(retryRequest, ct).ConfigureAwait(false);
-            TokenUsageCapture.Accumulate(response);
+            await UsageRecording.ReportAsync(response, ct).ConfigureAwait(false);
             rawText = response.Text ?? string.Empty;
 
             if (TryParse(rawText, request, out decision))

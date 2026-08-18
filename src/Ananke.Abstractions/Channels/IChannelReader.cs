@@ -17,7 +17,7 @@ public interface IChannelReader<M> : IAsyncDisposable
     /// <summary>
     /// Unsubscribes and disconnects the channel.
     /// </summary>
-    Task ClearAsync();
+    Task ClearAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -55,5 +55,5 @@ public interface IChannelReader<M, A> : IAsyncDisposable
     /// <summary>
     /// Unsubscribes and disconnects the channel.
     /// </summary>
-    Task ClearAsync();
+    Task ClearAsync(CancellationToken ct = default);
 }

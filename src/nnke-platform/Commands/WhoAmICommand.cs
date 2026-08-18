@@ -21,13 +21,13 @@ internal static class WhoAmICommand
         command.SetAction(parseResult =>
         {
             var json = parseResult.GetValue<bool>("--json");
-            Execute(json);
+            return Execute(json);
         });
 
         return command;
     }
 
-    private static void Execute(bool json)
+    private static int Execute(bool json)
     {
         if (!File.Exists(CredentialsPath))
         {
@@ -40,7 +40,7 @@ internal static class WhoAmICommand
                 Console.WriteLine("  Run: nnke-platform login --platform <azure|google|anthropic>");
                 Console.WriteLine();
             }
-            return;
+            return 0;
         }
 
         Dictionary<string, string> store;
@@ -53,7 +53,7 @@ internal static class WhoAmICommand
         {
             if (json) JsonOutput.Write(new { status = "error", message = $"Failed to read credentials: {ex.Message}" });
             else Console.Error.WriteLine($"  Failed to read credentials: {ex.Message}");
-            return;
+            return 1;
         }
 
         var identities = store.Select(kv =>
@@ -82,7 +82,7 @@ internal static class WhoAmICommand
         if (json)
         {
             JsonOutput.Write(new { status = "ok", credentialsPath = CredentialsPath, platforms = identities });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -94,5 +94,7 @@ internal static class WhoAmICommand
         Console.WriteLine();
         Console.WriteLine("  Note: Use 'nnke-platform login --platform <p>' to update credentials.");
         Console.WriteLine();
+
+        return 0;
     }
 }

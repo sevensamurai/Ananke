@@ -51,15 +51,15 @@ Console.WriteLine("    nnke new workflow {{name}}-v2 --pattern sequential");
 // --- SimulatedModel: replace with a real provider when ready ---
 // OpenAI:
 //   dotnet add package Ananke.Orchestration.OpenAI
-//   var model = new OpenAIChatAgentModel(new ChatClient("gpt-4.1-mini", new ApiKeyCredential(apiKey)));
+//   var model = OpenAIChatAgentModel.Create(apiKey, "{{model_openai}}");
 //
 // Anthropic:
 //   dotnet add package Ananke.Orchestration.Anthropic
-//   var model = AnthropicAgentModel.Create(apiKey, "claude-sonnet-5");
+//   var model = AnthropicAgentModel.Create(apiKey, "{{model_anthropic}}");
 //
 // Google:
 //   dotnet add package Ananke.Orchestration.Google
-//   var model = GoogleAgentModel.Create(apiKey, "gemini-2.5-flash");
+//   var model = GeminiAgentModel.Create(apiKey, "{{model_google}}");
 
 internal sealed class SimulatedModel : IAgentModel
 {

@@ -69,9 +69,14 @@ public class ChatSession<TState, TAction>
     /// Consumes a <see cref="ChatSessionEvent"/> stream and emits corresponding SSE events.
     /// Shared by all phases that run a <see cref="StreamingChatWorkflow"/>.
     /// </summary>
-    public async Task StreamAsync(IAsyncEnumerable<ChatSessionEvent> events)
+    /// <param name="events">The stream of session events to relay.</param>
+    /// <param name="ct">
+    /// Stops relaying when the client disconnects. Pass <c>HttpContext.RequestAborted</c>.
+    /// </param>
+    public async Task StreamAsync(IAsyncEnumerable<ChatSessionEvent> events, CancellationToken ct = default)
     {
         await events.WriteSseAsync(_writeSse,
-            onError: message => Logger.LogError("❌ Error: {Message}", message));
+            onError: message => Logger.LogError("❌ Error: {Message}", message),
+            ct: ct);
     }
 }
