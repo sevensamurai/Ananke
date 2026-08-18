@@ -41,8 +41,8 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
 
     private Task<ToolResult> View(IReadOnlyDictionary<string, object?> args)
     {
-        var path = ResolvePath(args, "path");
-        if (path is null) return Task.FromResult(ToolResult.Fatal("Missing required argument: path"));
+        if (!TryResolvePath(args, "path", out var path, out var error))
+            return Task.FromResult(ToolResult.Fatal(error!));
 
         if (!File.Exists(path))
             return Task.FromResult(ToolResult.Error($"File not found: {path}"));
@@ -53,8 +53,8 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
 
     private Task<ToolResult> Create(IReadOnlyDictionary<string, object?> args)
     {
-        var path = ResolvePath(args, "path");
-        if (path is null) return Task.FromResult(ToolResult.Fatal("Missing required argument: path"));
+        if (!TryResolvePath(args, "path", out var path, out var error))
+            return Task.FromResult(ToolResult.Fatal(error!));
 
         var fileText = args.TryGetValue("file_text", out var ft) ? ft?.ToString() ?? string.Empty : string.Empty;
 
@@ -65,8 +65,8 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
 
     private Task<ToolResult> StrReplace(IReadOnlyDictionary<string, object?> args)
     {
-        var path = ResolvePath(args, "path");
-        if (path is null) return Task.FromResult(ToolResult.Fatal("Missing required argument: path"));
+        if (!TryResolvePath(args, "path", out var path, out var error))
+            return Task.FromResult(ToolResult.Fatal(error!));
 
         if (!File.Exists(path))
             return Task.FromResult(ToolResult.Error($"File not found: {path}"));
@@ -87,8 +87,8 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
 
     private Task<ToolResult> Insert(IReadOnlyDictionary<string, object?> args)
     {
-        var path = ResolvePath(args, "path");
-        if (path is null) return Task.FromResult(ToolResult.Fatal("Missing required argument: path"));
+        if (!TryResolvePath(args, "path", out var path, out var error))
+            return Task.FromResult(ToolResult.Fatal(error!));
 
         if (!File.Exists(path))
             return Task.FromResult(ToolResult.Error($"File not found: {path}"));
@@ -107,10 +107,38 @@ internal sealed class TextEditorExecutor : IPlatformNativeExecutor
         return Task.FromResult(ToolResult.Ok($"Inserted at line {insertAt} in {path}"));
     }
 
-    private string? ResolvePath(IReadOnlyDictionary<string, object?> args, string key)
+    /// <summary>
+    /// Resolves <paramref name="key"/> to an absolute path under <see cref="_sandboxRoot"/>,
+    /// rejecting any relative path (e.g. <c>../../etc/passwd</c>) that would normalise outside it.
+    /// </summary>
+    private bool TryResolvePath(
+        IReadOnlyDictionary<string, object?> args,
+        string key,
+        out string path,
+        out string? error)
     {
-        if (!args.TryGetValue(key, out var val) || val is null) return null;
+        path = string.Empty;
+
+        if (!args.TryGetValue(key, out var val) || val is null)
+        {
+            error = $"Missing required argument: {key}";
+            return false;
+        }
+
         var relative = val.ToString()!.TrimStart('/', '\\');
-        return Path.GetFullPath(Path.Combine(_sandboxRoot, relative));
+        var resolved = Path.GetFullPath(Path.Combine(_sandboxRoot, relative));
+        var root = Path.GetFullPath(_sandboxRoot);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (!resolved.Equals(root, comparison) &&
+            !resolved.StartsWith(root + Path.DirectorySeparatorChar, comparison))
+        {
+            error = $"Path '{val}' escapes the sandbox root";
+            return false;
+        }
+
+        path = resolved;
+        error = null;
+        return true;
     }
 }

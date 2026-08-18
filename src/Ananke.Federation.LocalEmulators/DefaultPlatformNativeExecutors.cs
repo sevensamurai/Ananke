@@ -10,7 +10,8 @@ namespace Ananke.Federation.LocalEmulators;
 /// <remarks>
 /// <para>
 /// Calling <see cref="Register"/> gives you a fully wired registry suitable
-/// for <c>nnke run --emulate &lt;platform&gt;</c>, CI local-design-loop testing,
+/// for <c>nnke-platform up --emulate &lt;platform&gt;</c> (planned — ADR CLI-7),
+/// CI local-design-loop testing,
 /// and developer workflows. All capabilities listed in
 /// <c>platform-capabilities.json</c> are covered — either by a real emulator
 /// (backed by an HTTP client, process, or in-memory store) or by a documented

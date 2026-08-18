@@ -36,13 +36,13 @@ internal static class StatusCommand
             var inMemory = parseResult.GetValue<bool>("--in-memory");
 
             using var host = new PlatformHost(inMemory);
-            await ExecuteAsync(host, deploymentId, workflow, json);
+            return await ExecuteAsync(host, deploymentId, workflow, json);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(PlatformHost host, string? deploymentId, string? workflow, bool json)
+    private static async Task<int> ExecuteAsync(PlatformHost host, string? deploymentId, string? workflow, bool json)
     {
         if (deploymentId is not null)
         {
@@ -57,14 +57,14 @@ internal static class StatusCommand
                     Console.WriteLine($"  No deployment found with ID '{deploymentId}'.");
                     Console.WriteLine();
                 }
-                return;
+                return 1;
             }
 
             if (json)
                 JsonOutput.Write(new { status = "ok", deployment = ToDto(record) });
             else
                 PrintRecord(record);
-            return;
+            return 0;
         }
 
         var records = await host.Registry.ListAsync(workflow);
@@ -91,6 +91,8 @@ internal static class StatusCommand
             }
             Console.WriteLine();
         }
+
+        return 0;
     }
 
     private static void PrintRecord(DeploymentRecord r)

@@ -30,10 +30,9 @@ public sealed class VertexAIModelMapper : IModelMapper
         [$"openai/{Models.OpenAI.O3Mini}"] = Models.Google.Gemini31Flash,
         [$"openai/{Models.OpenAI.O4Mini}"] = Models.Google.Gemini31Flash,
 
-        // Anthropic → Gemini (3.1-class defaults). Note: the current-gen Anthropic constants
-        // (Opus48/Sonnet46/Haiku45/Sonnet5/Fable5/Opus41) have no entries here — this mapper was
-        // never updated when those were added; tracked as a follow-up, not fixed as part of the
-        // retired-model cleanup that removed the Opus4/Sonnet4/Sonnet35/Haiku35 entries below.
+        // Anthropic → Gemini: no entries. The current-gen Anthropic constants were never added
+        // here, so a manifest naming one falls through to Map()'s null. Open follow-up, same gap
+        // as AzureModelMapper.
 
         // Google passthrough — all known model strings map to themselves
         [$"google/{Models.Google.Gemini31Pro}"] = Models.Google.Gemini31Pro,

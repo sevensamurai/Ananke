@@ -40,8 +40,10 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
         _factory = RedLockFactory.Create(redlockEndPoints);
     }
 
-    public async Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(string resourceId, Func<Task<R>> action)
+    public async Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(string resourceId, Func<Task<R>> action, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (_factory is null)
             return CoordinatedActionResult<R>.Failed("Lock factory not initialized. Register via AddRedis() in DI.");
 
@@ -70,8 +72,11 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
         string resourceId,
         Func<Task<R>> action,
         int maxRetries = 3,
-        int retryDelayMs = 100)
+        int retryDelayMs = 100,
+        CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (_factory is null)
             return CoordinatedActionResult<R>.Failed("Lock factory not initialized. Register via AddRedis() in DI.");
 
@@ -95,7 +100,7 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
                 _logger.LogDebug("Lock attempt {Attempt}/{MaxRetries} failed for resource: {ResourceId}",
                     attempt + 1, maxRetries, resourceId);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Error during lock attempt {Attempt}/{MaxRetries} for resource: {ResourceId}",
                     attempt + 1, maxRetries, resourceId);
@@ -106,7 +111,7 @@ public sealed class RedisDistributedLock : RedisDataAdapter, IDistributedLock
             if (attempt <= maxRetries)
             {
                 var delay = retryDelayMs * (int)Math.Pow(2, attempt - 1);
-                await Task.Delay(delay);
+                await Task.Delay(delay, ct);
             }
         }
 

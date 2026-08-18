@@ -127,6 +127,7 @@ public sealed class VertexAIRemoteCellMonitor : IRemoteCellMonitor
         }
         catch (Exception)
         {
+            // Observability API unavailable — degrade gracefully, same as GetHealthAsync above.
             return new RemoteCellMetrics
             {
                 DeploymentId = deploymentId,

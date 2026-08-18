@@ -108,7 +108,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(string name)
+    public async Task StopAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -117,11 +117,13 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
 
         if (entry.DeploymentId is not null)
         {
-            try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None); }
+            // Teardown always runs to completion regardless of the caller's ct —
+            // best-effort, and abandoning it would leak the remote deployment.
+            try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None).ConfigureAwait(false); }
             catch (Exception ex) { _logger.LogDebug(ex, "Best-effort teardown failed for deployment '{Id}'", entry.DeploymentId); }
         }
 
-        await CancelAndDispose(entry);
+        await CancelAndDispose(entry, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -137,11 +139,11 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         {
             if (entry.DeploymentId is not null)
             {
-                try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None); }
+                try { await TeardownCoreAsync(entry.DeploymentId, CancellationToken.None).ConfigureAwait(false); }
                 catch (Exception ex) { _logger.LogDebug(ex, "Best-effort teardown failed for deployment '{Id}' during dispose", entry.DeploymentId); }
             }
 
-            await CancelAndDispose(entry);
+            await CancelAndDispose(entry).ConfigureAwait(false);
         }
     }
 
@@ -150,13 +152,13 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         try
         {
             var options = new DeployOptions { Platform = Platform };
-            var record = await DeployCoreAsync(_manifest, _toolKit, options, ct);
+            var record = await DeployCoreAsync(_manifest, _toolKit, options, ct).ConfigureAwait(false);
 
             if (_cells.TryGetValue(name, out var existing))
                 _cells.TryUpdate(name, existing with { DeploymentId = record.DeploymentId }, existing);
 
             // Keep the cell "alive" until cancelled — the agent runs remotely.
-            await Task.Delay(Timeout.Infinite, ct);
+            await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -168,7 +170,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
 
             if (_cells.TryGetValue(name, out var failing) && failing.DeploymentId is not null)
             {
-                try { await MarkDeploymentFailedAsync(failing.DeploymentId, CancellationToken.None); }
+                try { await MarkDeploymentFailedAsync(failing.DeploymentId, CancellationToken.None).ConfigureAwait(false); }
                 catch (Exception inner)
                 {
                     _logger.LogWarning(inner, "Could not mark deployment '{Id}' as failed", failing.DeploymentId);
@@ -177,15 +179,17 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         }
     }
 
-    private static async Task CancelAndDispose(CellEntry entry)
+    private static async Task CancelAndDispose(CellEntry entry, CancellationToken ct = default)
     {
         try
         {
-            await entry.Cts.CancelAsync();
-            await entry.Loop;
+            await entry.Cts.CancelAsync().ConfigureAwait(false);
+            await entry.Loop.WaitAsync(ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { }
-        catch (Exception) { }
+        // Best-effort teardown: the loop may fault or throw while being cancelled, but this
+        // helper runs during Stop/Dispose, so there is nothing left to report the failure to.
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
+        catch (Exception) when (!ct.IsCancellationRequested) { }
         finally { entry.Cts.Dispose(); }
     }
 

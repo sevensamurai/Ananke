@@ -5,7 +5,7 @@ using System.CommandLine;
 namespace Ananke.Tool.Commands;
 
 /// <summary>
-/// Handles <c>nnke colony cell trace &lt;name&gt; &lt;file&gt;</c> — shows the
+/// Handles <c>nnke mesh trace &lt;name&gt; &lt;file&gt;</c> — shows the
 /// signal timeline for a specific cell: tools, domain, model, and division history.
 /// </summary>
 internal static class CellTraceCommand

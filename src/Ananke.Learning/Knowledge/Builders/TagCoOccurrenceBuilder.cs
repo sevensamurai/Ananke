@@ -39,11 +39,11 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var page = await memory.BrowseAsync(offset, pageSize, ct: ct);
+            var page = await memory.BrowseAsync(offset, pageSize, ct: ct).ConfigureAwait(false);
             if (page.Count == 0) break;
 
             foreach (var entry in page)
-                await ProcessEntryAsync(graph, entry, ct);
+                await ProcessEntryAsync(graph, entry, ct).ConfigureAwait(false);
 
             offset += page.Count;
             if (page.Count < pageSize) break;
@@ -63,7 +63,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                 ["source"] = entry.Source,
                 ["kind"] = entry.Kind.ToString().ToLowerInvariant(),
             },
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         var tags = entry.Description.SemanticTags;
         if (tags.Count == 0) return;
@@ -74,7 +74,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
         foreach (var (key, weight) in tags)
         {
             var tagNodeId = TagId(key);
-            await graph.UpsertNodeAsync(new GraphNode { Id = tagNodeId, Kind = "tag" }, ct);
+            await graph.UpsertNodeAsync(new GraphNode { Id = tagNodeId, Kind = "tag" }, ct).ConfigureAwait(false);
 
             await graph.UpsertEdgeAsync(new GraphEdge
             {
@@ -83,7 +83,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                 Relation = "tagged",
                 Provenance = EdgeProvenance.Extracted,
                 Weight = weight,
-            }, ct);
+            }, ct).ConfigureAwait(false);
         }
 
         // Upsert co_occurs edges between every tag pair on this entry (both directions).
@@ -107,8 +107,8 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                     Weight = coWeight,
                 };
 
-                await graph.UpsertEdgeAsync(edge, ct);
-                await graph.UpsertEdgeAsync(edge with { FromId = toId, ToId = fromId }, ct);
+                await graph.UpsertEdgeAsync(edge, ct).ConfigureAwait(false);
+                await graph.UpsertEdgeAsync(edge with { FromId = toId, ToId = fromId }, ct).ConfigureAwait(false);
             }
         }
     }

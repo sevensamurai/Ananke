@@ -132,7 +132,7 @@ Workload Identity in GCP).
 
 > **Beta:** `nnke-platform-anthropic` depends on the Anthropic managed-agents API, which is currently
 > in Beta. Expect API surface changes. Check the
-> [Anthropic adapter README](src/nnke-platform-anthropic/README.md) for Beta access requirements.
+> [Anthropic adapter README](../../src/nnke-platform-anthropic/README.md) for Beta access requirements.
 
 | Variable | Description |
 |---|---|
@@ -158,6 +158,7 @@ nnke-platform whoami
 |---|---|
 | `nnke-platform validate <file> --platform <p>` | Validate a manifest's deployability to a target platform |
 | `nnke-platform capabilities [--platform <p>]` | List known platform-native tool capabilities |
+| `nnke-platform eval <file>` | Score a manifest against candidate platforms and recommend the best fit |
 | `nnke-platform profiles <file> [profile]` | List or inspect deployment profiles in a manifest |
 | `nnke-platform deploy <file> --platform <p>` | Deploy a workflow to a target platform |
 | `nnke-platform status [--deployment-id <id>]` | Show deployment status |
@@ -205,7 +206,7 @@ Existing manifests using `azure-ai` or `vertex-ai` continue to work unchanged.
 
 > **Planned — not yet available.** The `nnke-platform up --emulate <platform>` verb and
 > `Ananke.Federation.LocalEmulators` package are scoped to the next release.
-> For now, use `nnke run` or `nnke serve` for federation-free local execution.
+> For now, use `nnke serve` for federation-free local execution.
 > Manifests that declare platform-native capabilities will fail fast with diagnostic `FED061`
 > and a hint pointing here.
 

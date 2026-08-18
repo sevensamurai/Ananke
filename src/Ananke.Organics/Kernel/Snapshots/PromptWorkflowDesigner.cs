@@ -94,7 +94,7 @@ public sealed class PromptWorkflowDesigner(IAgentModel model)
 
         var toolList = string.Join("\n", availableTools.Select(t => $"  - {t}"));
 
-        return await DesignCoreAsync(prompt, toolList, ct);
+        return await DesignCoreAsync(prompt, toolList, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -119,7 +119,7 @@ public sealed class PromptWorkflowDesigner(IAgentModel model)
         var toolList = string.Join("\n", toolKit.Tools.Values.Select(t =>
             $"  - {t.Name}: {t.Description}"));
 
-        return await DesignCoreAsync(prompt, toolList, ct);
+        return await DesignCoreAsync(prompt, toolList, ct).ConfigureAwait(false);
     }
 
     private async Task<WorkflowSnapshot> DesignCoreAsync(
@@ -139,7 +139,7 @@ public sealed class PromptWorkflowDesigner(IAgentModel model)
             Messages = [AgentMessage.User(userMessage)]
         };
 
-        var response = await model.GenerateAsync(request, ct);
+        var response = await model.GenerateAsync(request, ct).ConfigureAwait(false);
 
         var yaml = response.Text
             ?? throw new InvalidOperationException(

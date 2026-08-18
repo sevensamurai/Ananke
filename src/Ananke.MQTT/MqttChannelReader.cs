@@ -65,7 +65,7 @@ public sealed class MqttChannelReader<M, A>(
 
         return await SetupClient(config, topic, processor,
             onMessage: (message, _) => processor.EnqueueAsync(message),
-            setCommandOnMessage: true, token: token);
+            setCommandOnMessage: true, token: token).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -85,7 +85,7 @@ public sealed class MqttChannelReader<M, A>(
 
         return await SetupClient(config, topic, processor,
             onMessage: (message, _) => processor.EnqueueAsync(message),
-            setCommandOnMessage: false, token: token);
+            setCommandOnMessage: false, token: token).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -105,7 +105,7 @@ public sealed class MqttChannelReader<M, A>(
 
         return await SetupClient(config, topic, processor,
             onMessage: (message, action) => processor.EnqueueAsync(message, action),
-            setCommandOnMessage: false, token: token);
+            setCommandOnMessage: false, token: token).ConfigureAwait(false);
     }
 
     private async Task<bool> SetupClient(
@@ -120,7 +120,7 @@ public sealed class MqttChannelReader<M, A>(
 
         // Dispose previous processor if ConfigureAsync is called again
         if (_processor is not null)
-            await _processor.DisposeAsync();
+            await _processor.DisposeAsync().ConfigureAwait(false);
 
         _processor = processor;
 
@@ -169,7 +169,7 @@ public sealed class MqttChannelReader<M, A>(
 
             try
             {
-                await onMessage(message, action);
+                await onMessage(message, action).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -181,17 +181,17 @@ public sealed class MqttChannelReader<M, A>(
         {
             _logger.LogDebug("RX Channel connected");
             if (_client is not null && !string.IsNullOrEmpty(_topic))
-                await _client.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(_topic).Build());
+                await _client.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(_topic).Build()).ConfigureAwait(false);
         };
 
         _client.DisconnectedAsync += async _ =>
         {
             _logger.LogWarning("RX Channel disconnected");
             if (!_disposed)
-                await ReconnectAsync();
+                await ReconnectAsync().ConfigureAwait(false);
         };
 
-        return await ConnectAsync(token);
+        return await ConnectAsync(token).ConfigureAwait(false);
     }
 
     private async Task<bool> ConnectAsync(CancellationToken token)
@@ -204,7 +204,7 @@ public sealed class MqttChannelReader<M, A>(
 
         try
         {
-            var resp = await _client.ConnectAsync(_options, token);
+            var resp = await _client.ConnectAsync(_options, token).ConfigureAwait(false);
             _linked = resp.ResultCode == MqttClientConnectResultCode.Success;
             return _linked;
         }
@@ -227,8 +227,8 @@ public sealed class MqttChannelReader<M, A>(
 
             try
             {
-                await Task.Delay(delay);
-                if (await ConnectAsync(CancellationToken.None))
+                await Task.Delay(delay).ConfigureAwait(false);
+                if (await ConnectAsync(CancellationToken.None).ConfigureAwait(false))
                 {
                     _logger.LogInformation("RX Channel reconnected after {Attempt} attempt(s)", attempt);
                     return;
@@ -247,13 +247,13 @@ public sealed class MqttChannelReader<M, A>(
     }
 
     /// <inheritdoc />
-    public async Task ClearAsync()
+    public async Task ClearAsync(CancellationToken ct = default)
     {
         if (_client is not null && _client.IsConnected)
         {
             if (!string.IsNullOrEmpty(_topic))
-                await _client.UnsubscribeAsync(_topic);
-            await _client.DisconnectAsync();
+                await _client.UnsubscribeAsync(_topic, cancellationToken: ct).ConfigureAwait(false);
+            await _client.DisconnectAsync(cancellationToken: ct).ConfigureAwait(false);
         }
         _linked = false;
     }
@@ -265,9 +265,9 @@ public sealed class MqttChannelReader<M, A>(
         _disposed = true;
 
         if (_processor is not null)
-            await _processor.DisposeAsync();
+            await _processor.DisposeAsync().ConfigureAwait(false);
 
-        await ClearAsync();
+        await ClearAsync().ConfigureAwait(false);
 
         if (_client is not null)
         {

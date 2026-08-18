@@ -21,6 +21,24 @@ public sealed record ModelCostRates(decimal CostPer1KInputTokens, decimal CostPe
     public static ModelCostRates Uniform(decimal costPer1KTokens) => new(costPer1KTokens, costPer1KTokens);
 
     /// <summary>
+    /// Rates quoted the way providers publish them — per <b>million</b> tokens.
+    /// </summary>
+    /// <param name="input">Cost per 1,000,000 input tokens, e.g. <c>0.15m</c>.</param>
+    /// <param name="output">Cost per 1,000,000 output tokens, e.g. <c>0.60m</c>.</param>
+    /// <remarks>
+    /// Prefer this over the per-1K constructor. Pricing pages quote per-million, so copying a
+    /// published figure straight into <see cref="CostPer1KInputTokens"/> makes a budget 1000x
+    /// too loose — a mistake that is invisible until the bill arrives. Conversion is exact:
+    /// these are decimals, not floats.
+    /// <para>
+    /// Output tokens usually cost several times input, which is why a single token ceiling is a
+    /// poor proxy for spend and the two rates are declared separately.
+    /// </para>
+    /// </remarks>
+    public static ModelCostRates PerMillion(decimal input, decimal output) =>
+        new(input / 1000m, output / 1000m);
+
+    /// <summary>
     /// Calculates the estimated cost for the given <paramref name="usage"/>.
     /// Returns <c>0</c> for zero-cost models.
     /// </summary>

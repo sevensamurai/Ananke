@@ -81,21 +81,21 @@ public sealed class FederatedWorkflowHost : IWorkflowHost
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(string name)
+    public async Task StopAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (_cellPlatformMap.TryRemove(name, out var platform))
         {
             var host = ResolveHost(platform);
-            await host.StopAsync(name);
+            await host.StopAsync(name, ct);
         }
         else
         {
             // Unknown cell — try all hosts
-            await _localHost.StopAsync(name);
+            await _localHost.StopAsync(name, ct);
             foreach (var host in _platformHosts.Values)
-                await host.StopAsync(name);
+                await host.StopAsync(name, ct);
         }
     }
 

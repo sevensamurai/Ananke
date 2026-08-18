@@ -53,10 +53,14 @@ public static class SseResponseExtensions
     /// <param name="response">The HTTP response to write to.</param>
     /// <param name="eventName">The SSE event name (appears in <c>event:</c> field).</param>
     /// <param name="data">The data object, serialized as JSON in the <c>data:</c> field.</param>
-    public static async Task WriteSseAsync(this HttpResponse response, string eventName, object data)
+    /// <param name="ct">
+    /// Typically <see cref="HttpContext.RequestAborted"/> — cancels the write/flush if the
+    /// client disconnects mid-stream.
+    /// </param>
+    public static async Task WriteSseAsync(this HttpResponse response, string eventName, object data, CancellationToken ct = default)
     {
         var json = JsonSerializer.Serialize(data, SseJsonOptions);
-        await response.WriteAsync($"event: {eventName}{TerminateField}data: {json}{TerminateEvent}");
-        await response.Body.FlushAsync();
+        await response.WriteAsync($"event: {eventName}{TerminateField}data: {json}{TerminateEvent}", ct);
+        await response.Body.FlushAsync(ct);
     }
 }

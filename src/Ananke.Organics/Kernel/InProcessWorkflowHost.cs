@@ -32,14 +32,14 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(string name)
+    public async Task StopAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!_cells.TryRemove(name, out var entry))
             return;
 
-        await CancelAndDispose(entry).ConfigureAwait(false);
+        await CancelAndDispose(entry, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -51,7 +51,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
     /// remains in <see cref="ListActive"/> but stops executing. Call
     /// <see cref="ResumeAsync"/> to restart it with a fresh token.
     /// </summary>
-    public async Task PauseAsync(string name)
+    public async Task PauseAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -63,11 +63,13 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         if (!_cells.TryUpdate(name, pausedEntry, entry))
             return;
 
-        // Cancel the current loop and wait for it to fully unwind
+        // Cancel the current loop and wait for it to fully unwind. Only the loop's own
+        // cancellation is swallowed here — if the caller's ct fires first, propagate it
+        // rather than falsely reporting the pause as fully settled below.
         await entry.Cts.CancelAsync().ConfigureAwait(false);
-        try { await entry.Loop.ConfigureAwait(false); }
-        catch (OperationCanceledException) { /* expected */ }
-        catch (Exception) { /* swallow crash during pause */ }
+        try { await entry.Loop.WaitAsync(ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* expected */ }
+        catch (Exception) when (!ct.IsCancellationRequested) { /* swallow crash during pause */ }
         entry.Cts.Dispose();
 
         // Signal that the pause has fully taken effect
@@ -78,7 +80,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
     /// Resumes a previously paused cell. Restarts the loop with a fresh
     /// cancellation token. No-op if the cell is not paused.
     /// </summary>
-    public Task ResumeAsync(string name)
+    public Task ResumeAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -161,18 +163,18 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         }
     }
 
-    private static async Task CancelAndDispose(CellEntry entry)
+    private static async Task CancelAndDispose(CellEntry entry, CancellationToken ct = default)
     {
         try
         {
             await entry.Cts.CancelAsync().ConfigureAwait(false);
-            await entry.Loop.ConfigureAwait(false);
+            await entry.Loop.WaitAsync(ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Expected.
         }
-        catch
+        catch (Exception) when (!ct.IsCancellationRequested)
         {
             // Cell threw during shutdown — swallow.
         }

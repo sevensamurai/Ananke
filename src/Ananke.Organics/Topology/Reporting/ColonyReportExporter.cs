@@ -44,10 +44,10 @@ public sealed class ColonyReportExporter
 
         Directory.CreateDirectory(outputDirectory);
 
-        var snapshot = await BuildSnapshotAsync(graph, godNodes, ct);
+        var snapshot = await BuildSnapshotAsync(graph, godNodes, ct).ConfigureAwait(false);
 
-        await WriteJsonAsync(snapshot, outputDirectory, ct);
-        await WriteMarkdownAsync(snapshot, outputDirectory, ct);
+        await WriteJsonAsync(snapshot, outputDirectory, ct).ConfigureAwait(false);
+        await WriteMarkdownAsync(snapshot, outputDirectory, ct).ConfigureAwait(false);
     }
 
     // ── Snapshot builder ─────────────────────────────────────────────
@@ -57,8 +57,8 @@ public sealed class ColonyReportExporter
         IReadOnlyList<GodNode> godNodes,
         CancellationToken ct)
     {
-        var nodeCount = await graph.NodeCountAsync(ct);
-        var edgeCount = await graph.EdgeCountAsync(ct);
+        var nodeCount = await graph.NodeCountAsync(ct).ConfigureAwait(false);
+        var edgeCount = await graph.EdgeCountAsync(ct).ConfigureAwait(false);
 
         // Collect cell nodes to compute lineage depth
         // We approximate tree depth by scanning descended_from edges
@@ -72,7 +72,7 @@ public sealed class ColonyReportExporter
         var maxDepth = 0;
         foreach (var god in godNodes)
         {
-            var depth = await ComputeDepthAsync(graph, god.NodeId, ct);
+            var depth = await ComputeDepthAsync(graph, god.NodeId, ct).ConfigureAwait(false);
             if (depth > maxDepth) maxDepth = depth;
 
             cells.Add(new ColonyCellEntry
@@ -86,7 +86,7 @@ public sealed class ColonyReportExporter
         }
 
         // Routing edge provenance breakdown
-        var routingEdges = await graph.NeighborsAsync("routing:observed", "routed_to", ct);
+        var routingEdges = await graph.NeighborsAsync("routing:observed", "routed_to", ct).ConfigureAwait(false);
         var provenanceCounts = routingEdges
             .GroupBy(e => e.Provenance.ToString())
             .ToDictionary(g => g.Key, g => g.Count());
@@ -124,7 +124,7 @@ public sealed class ColonyReportExporter
             for (int i = 0; i < levelSize; i++)
             {
                 var current = frontier.Dequeue();
-                var edges = await graph.NeighborsAsync(current, "descended_from", ct);
+                var edges = await graph.NeighborsAsync(current, "descended_from", ct).ConfigureAwait(false);
                 foreach (var edge in edges)
                 {
                     var next = edge.FromId == current ? edge.ToId : edge.FromId;
@@ -148,7 +148,7 @@ public sealed class ColonyReportExporter
     {
         var path = Path.Combine(outputDirectory, "colony.json");
         await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, snapshot, _jsonOptions, ct);
+        await JsonSerializer.SerializeAsync(stream, snapshot, _jsonOptions, ct).ConfigureAwait(false);
     }
 
     private static async Task WriteMarkdownAsync(
@@ -202,7 +202,7 @@ public sealed class ColonyReportExporter
         }
 
         var path = Path.Combine(outputDirectory, "COLONY_REPORT.md");
-        await File.WriteAllTextAsync(path, sb.ToString(), ct);
+        await File.WriteAllTextAsync(path, sb.ToString(), ct).ConfigureAwait(false);
     }
 
     // ── Internal snapshot types ──────────────────────────────────────

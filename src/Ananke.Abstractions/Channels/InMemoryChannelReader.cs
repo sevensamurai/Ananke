@@ -60,7 +60,7 @@ public sealed class InMemoryChannelReader<M, A> : IChannelReader<M, A>
     }
 
     /// <inheritdoc />
-    public Task ClearAsync()
+    public Task ClearAsync(CancellationToken ct = default)
     {
         if (_processor is not null)
             return _processor.DisposeAsync().AsTask();

@@ -104,16 +104,18 @@ public interface IActionStateMachine<C, S, T, N>
     /// </summary>
     /// <param name="context">Context identifying the instance</param>
     /// <param name="reason">Reason for the fault</param>
+    /// <param name="ct">Cancels the underlying persist write.</param>
     /// <returns>Status change result</returns>
-    Task<OperationalStatusChange> FaultAsync(C context, string reason);
+    Task<OperationalStatusChange> FaultAsync(C context, string reason, CancellationToken ct = default);
 
     /// <summary>
     /// Resets the state machine from Faulted to Operative.
     /// </summary>
     /// <param name="context">Context identifying the instance</param>
     /// <param name="reason">Reason for the reset (e.g., "Device replaced")</param>
+    /// <param name="ct">Cancels the underlying persist write.</param>
     /// <returns>Status change result</returns>
-    Task<OperationalStatusChange> ResetAsync(C context, string reason);
+    Task<OperationalStatusChange> ResetAsync(C context, string reason, CancellationToken ct = default);
 }
 
 /// <summary>

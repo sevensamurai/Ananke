@@ -13,10 +13,9 @@ public sealed class AnthropicModelMapper : IModelMapper
     private static readonly Dictionary<string, string> Mappings =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            // Anthropic → passthrough (already native). Note: claude-opus-4/claude-sonnet-4/
-            // claude-3-5-sonnet/claude-3-5-haiku entries were removed — those models are retired.
-            // Current-gen Anthropic passthrough keys were never added here; tracked as a
-            // follow-up, not fixed as part of the retired-model cleanup.
+            // No Anthropic → Anthropic rows on purpose: MapModelId's fallback already strips the
+            // prefix and echoes any native id, so a passthrough row would be dead weight and would
+            // wrongly imply every new Claude model must be registered here.
 
             // OpenAI → nearest Claude equivalent
             ["openai/gpt-4.1"] = "claude-sonnet-5",
@@ -38,6 +37,13 @@ public sealed class AnthropicModelMapper : IModelMapper
         {
             ["claude-sonnet-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
             ["claude-haiku-4-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+
+            // Reached via MapModelId's passthrough fallback, not the Mappings table. Required
+            // because GetCapabilities must recognize every id MapModelId can return (IModelMapper).
+            ["claude-opus-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+            ["claude-opus-4-8"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+            ["claude-sonnet-4-6"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
+            ["claude-fable-5"] = ModelCapabilityFlags.ToolCalling | ModelCapabilityFlags.StructuredOutput | ModelCapabilityFlags.Vision | ModelCapabilityFlags.Streaming,
         };
 
     /// <inheritdoc />

@@ -88,14 +88,14 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
         var cacheKey = BuildCacheKey(request);
-        var cached = await TryGetCachedAsync(cacheKey, ct);
+        var cached = await TryGetCachedAsync(cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
             return cached;
 
-        var response = await _inner.GenerateAsync(request, ct);
+        var response = await _inner.GenerateAsync(request, ct).ConfigureAwait(false);
 
         if (!response.RequiresAction)
-            await CacheResponseAsync(cacheKey, response, ct);
+            await CacheResponseAsync(cacheKey, response, ct).ConfigureAwait(false);
 
         return response;
     }
@@ -106,7 +106,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var cacheKey = BuildCacheKey(request);
-        var cached = await TryGetCachedAsync(cacheKey, ct);
+        var cached = await TryGetCachedAsync(cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
         {
             if (cached.Text is not null)
@@ -117,7 +117,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         }
 
         AgentResponse? completed = null;
-        await foreach (var chunk in _inner.GenerateStreamAsync(request, ct))
+        await foreach (var chunk in _inner.GenerateStreamAsync(request, ct).ConfigureAwait(false))
         {
             if (chunk.CompletedResponse is not null)
                 completed = chunk.CompletedResponse;
@@ -126,7 +126,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         }
 
         if (completed is not null && !completed.RequiresAction)
-            await CacheResponseAsync(cacheKey, completed, ct);
+            await CacheResponseAsync(cacheKey, completed, ct).ConfigureAwait(false);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -153,14 +153,14 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     {
         ct.ThrowIfCancellationRequested();
 
-        var json = await _cache.GetValueAsync(cacheKey);
+        var json = await _cache.GetValueAsync(cacheKey, ct).ConfigureAwait(false);
         if (json is null)
             return null;
 
         var entry = JsonSerializer.Deserialize<CacheEntry>(json, JsonOptions);
         if (entry is null || _timeProvider.GetUtcNow() >= entry.ExpiresAt)
         {
-            try { await _cache.RemoveAsync(cacheKey); }
+            try { await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false); }
             catch (Exception) { /* best-effort cleanup — errors logged by the adapter */ }
             return null;
         }
@@ -179,7 +179,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         };
 
         var json = JsonSerializer.Serialize(entry, JsonOptions);
-        await _cache.SetValueAsync(cacheKey, json);
+        await _cache.SetValueAsync(cacheKey, json, ct).ConfigureAwait(false);
     }
 
     private sealed record CacheEntry

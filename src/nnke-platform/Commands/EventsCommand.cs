@@ -30,13 +30,13 @@ internal static class EventsCommand
         {
             var follow = parseResult.GetValue(followOption);
             var json = parseResult.GetValue<bool>("--json");
-            await ExecuteAsync(follow, json);
+            return await ExecuteAsync(follow, json);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(bool follow, bool json)
+    private static async Task<int> ExecuteAsync(bool follow, bool json)
     {
         var tracker = new RemoteMetricsTracker();
         var cts = new CancellationTokenSource();
@@ -98,5 +98,7 @@ internal static class EventsCommand
             Console.WriteLine("  Note: Live SSE streaming and DivisionSignal events require v0.9.");
             Console.WriteLine();
         }
+
+        return 0;
     }
 }

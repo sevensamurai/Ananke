@@ -35,8 +35,8 @@ public sealed class KnowledgeReportExporter(
 
         Directory.CreateDirectory(outputDirectory);
 
-        await WriteGraphJsonAsync(outputDirectory, ct);
-        await WriteMarkdownReportAsync(outputDirectory, ct);
+        await WriteGraphJsonAsync(outputDirectory, ct).ConfigureAwait(false);
+        await WriteMarkdownReportAsync(outputDirectory, ct).ConfigureAwait(false);
     }
 
     // ── JSON dump ────────────────────────────────────────────────────────────
@@ -44,23 +44,23 @@ public sealed class KnowledgeReportExporter(
     private async Task WriteGraphJsonAsync(string dir, CancellationToken ct)
     {
         // Collect all nodes and edges reachable via the graph interface.
-        var nodes = await CollectAllNodesAsync(ct);
-        var edges = await CollectAllEdgesAsync(nodes, ct);
+        var nodes = await CollectAllNodesAsync(ct).ConfigureAwait(false);
+        var edges = await CollectAllEdgesAsync(nodes, ct).ConfigureAwait(false);
 
         var dump = new { nodes, edges };
         var json = JsonSerializer.Serialize(dump, JsonOptions);
-        await File.WriteAllTextAsync(Path.Combine(dir, "memory-graph.json"), json, ct);
+        await File.WriteAllTextAsync(Path.Combine(dir, "memory-graph.json"), json, ct).ConfigureAwait(false);
     }
 
     // ── Markdown report ──────────────────────────────────────────────────────
 
     private async Task WriteMarkdownReportAsync(string dir, CancellationToken ct)
     {
-        var nodeCount = await graph.NodeCountAsync(ct);
-        var edgeCount = await graph.EdgeCountAsync(ct);
+        var nodeCount = await graph.NodeCountAsync(ct).ConfigureAwait(false);
+        var edgeCount = await graph.EdgeCountAsync(ct).ConfigureAwait(false);
 
         var scorer = new PageRankCentralityScorer();
-        var scores = await scorer.ScoreAsync(graph, nodeKindFilter: "tag", ct);
+        var scores = await scorer.ScoreAsync(graph, nodeKindFilter: "tag", ct).ConfigureAwait(false);
 
         var topTags = scores
             .OrderByDescending(kv => kv.Value)
@@ -69,7 +69,7 @@ public sealed class KnowledgeReportExporter(
 
         IReadOnlyDictionary<string, int>? communities = null;
         if (communityDetector is not null)
-            communities = await communityDetector.DetectAsync(graph, ct);
+            communities = await communityDetector.DetectAsync(graph, ct).ConfigureAwait(false);
 
         var sb = new StringBuilder();
         sb.AppendLine("# Memory Graph Report");
@@ -122,7 +122,7 @@ public sealed class KnowledgeReportExporter(
         }
 
         await File.WriteAllTextAsync(
-            Path.Combine(dir, "MEMORY_REPORT.md"), sb.ToString(), ct);
+            Path.Combine(dir, "MEMORY_REPORT.md"), sb.ToString(), ct).ConfigureAwait(false);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ public sealed class KnowledgeReportExporter(
             foreach (var id in inMemory.AllNodeIds)
             {
                 ct.ThrowIfCancellationRequested();
-                var node = await graph.GetNodeAsync(id, ct);
+                var node = await graph.GetNodeAsync(id, ct).ConfigureAwait(false);
                 if (node is not null) nodes.Add(node);
             }
             return nodes;
@@ -154,7 +154,7 @@ public sealed class KnowledgeReportExporter(
         foreach (var node in nodes)
         {
             ct.ThrowIfCancellationRequested();
-            var neighbors = await graph.NeighborsAsync(node.Id, ct: ct);
+            var neighbors = await graph.NeighborsAsync(node.Id, ct: ct).ConfigureAwait(false);
             foreach (var edge in neighbors)
             {
                 var key = $"{edge.FromId}\0{edge.ToId}\0{edge.Relation}";

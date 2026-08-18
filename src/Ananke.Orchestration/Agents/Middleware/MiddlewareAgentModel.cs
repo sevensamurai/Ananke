@@ -47,7 +47,7 @@ namespace Ananke.Orchestration.Agents.Middleware;
 ///     new LoggingAgentModelMiddleware(loggerFactory),
 ///     new GuardrailAgentModelMiddleware(denyPatterns));
 ///
-/// var response = await model.GenerateAsync(request, ct);
+/// var response = await model.GenerateAsync(request, ct).ConfigureAwait(false);
 /// </code>
 /// </example>
 public sealed class MiddlewareAgentModel : IStreamingAgentModel
@@ -121,9 +121,9 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
     /// <inheritdoc />
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
-        var transformed = await RunBeforePipelineAsync(request, ct);
-        var response = await _inner.GenerateAsync(transformed, ct);
-        return await RunAfterPipelineAsync(response, transformed, ct);
+        var transformed = await RunBeforePipelineAsync(request, ct).ConfigureAwait(false);
+        var response = await _inner.GenerateAsync(transformed, ct).ConfigureAwait(false);
+        return await RunAfterPipelineAsync(response, transformed, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -131,17 +131,17 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var transformed = await RunBeforePipelineAsync(request, ct);
+        var transformed = await RunBeforePipelineAsync(request, ct).ConfigureAwait(false);
 
         if (_streamingMode == StreamingMode.PassThrough)
         {
-            await foreach (var chunk in _inner.GenerateStreamAsync(transformed, ct))
+            await foreach (var chunk in _inner.GenerateStreamAsync(transformed, ct).ConfigureAwait(false))
             {
                 if (chunk.CompletedResponse is not null)
                 {
                     // Run the after-pipeline on the final assembled response
                     var transformedResponse = await RunAfterPipelineAsync(
-                        chunk.CompletedResponse, transformed, ct);
+                        chunk.CompletedResponse, transformed, ct).ConfigureAwait(false);
                     yield return chunk with { CompletedResponse = transformedResponse };
                 }
                 else
@@ -158,7 +158,7 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
         var buffered = new List<AgentStreamChunk>();
         AgentResponse? completed = null;
 
-        await foreach (var chunk in _inner.GenerateStreamAsync(transformed, ct))
+        await foreach (var chunk in _inner.GenerateStreamAsync(transformed, ct).ConfigureAwait(false))
         {
             if (chunk.CompletedResponse is not null)
                 completed = chunk.CompletedResponse;
@@ -173,7 +173,7 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
             yield break;
         }
 
-        var finalResponse = await RunAfterPipelineAsync(completed, transformed, ct);
+        var finalResponse = await RunAfterPipelineAsync(completed, transformed, ct).ConfigureAwait(false);
 
         foreach (var chunk in buffered)
         {
@@ -187,7 +187,7 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
     {
         var current = request;
         for (var i = 0; i < _middlewares.Count; i++)
-            current = await _middlewares[i].OnBeforeGenerateAsync(current, ct);
+            current = await _middlewares[i].OnBeforeGenerateAsync(current, ct).ConfigureAwait(false);
         return current;
     }
 
@@ -197,7 +197,7 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
         var current = response;
         // Reverse order (onion model)
         for (var i = _middlewares.Count - 1; i >= 0; i--)
-            current = await _middlewares[i].OnAfterGenerateAsync(current, request, ct);
+            current = await _middlewares[i].OnAfterGenerateAsync(current, request, ct).ConfigureAwait(false);
         return current;
     }
 
@@ -213,7 +213,7 @@ public sealed class MiddlewareAgentModel : IStreamingAgentModel
             AgentRequest request,
             [EnumeratorCancellation] CancellationToken ct = default)
         {
-            var response = await inner.GenerateAsync(request, ct);
+            var response = await inner.GenerateAsync(request, ct).ConfigureAwait(false);
             if (response.Text is not null)
                 yield return new AgentStreamChunk { TextDelta = response.Text };
             yield return new AgentStreamChunk { CompletedResponse = response };

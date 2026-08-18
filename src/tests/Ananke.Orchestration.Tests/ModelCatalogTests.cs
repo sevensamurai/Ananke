@@ -21,7 +21,6 @@ public class ModelCatalogTests
     [TestCase("o3")]
     [TestCase("o3-mini")]
     [TestCase("o4-mini")]
-    [TestCase("claude-opus-4-1")]
     [TestCase("claude-opus-4-8")]
     [TestCase("claude-sonnet-4-6")]
     [TestCase("claude-haiku-4-5")]

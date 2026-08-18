@@ -67,8 +67,8 @@ public sealed class RedisConversationMemory : IConversationMemory
         try
         {
             var db = _redis.GetDatabase();
-            await db.ListRightPushAsync(key, values);
-            await RefreshTtlAsync(db, key);
+            await db.ListRightPushAsync(key, values).ConfigureAwait(false);
+            await RefreshTtlAsync(db, key).ConfigureAwait(false);
             _logger.LogDebug("Added {Count} message(s) to session {SessionId}", values.Length, sessionId);
         }
         catch (Exception ex)
@@ -88,8 +88,8 @@ public sealed class RedisConversationMemory : IConversationMemory
         try
         {
             var db = _redis.GetDatabase();
-            await db.ListRightPushAsync(key, JsonSerializer.Serialize(message, JsonOptions));
-            await RefreshTtlAsync(db, key);
+            await db.ListRightPushAsync(key, JsonSerializer.Serialize(message, JsonOptions)).ConfigureAwait(false);
+            await RefreshTtlAsync(db, key).ConfigureAwait(false);
             _logger.LogDebug("Added message to session {SessionId}", sessionId);
         }
         catch (Exception ex)
@@ -109,7 +109,7 @@ public sealed class RedisConversationMemory : IConversationMemory
         try
         {
             var db = _redis.GetDatabase();
-            values = await db.ListRangeAsync(key);
+            values = await db.ListRangeAsync(key).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -140,7 +140,7 @@ public sealed class RedisConversationMemory : IConversationMemory
         try
         {
             var db = _redis.GetDatabase();
-            await db.KeyDeleteAsync(key);
+            await db.KeyDeleteAsync(key).ConfigureAwait(false);
             _logger.LogDebug("Cleared session {SessionId}", sessionId);
         }
         catch (Exception ex)
@@ -161,6 +161,6 @@ public sealed class RedisConversationMemory : IConversationMemory
     private async Task RefreshTtlAsync(IDatabase db, string key)
     {
         if (_ttl.HasValue)
-            await db.KeyExpireAsync(key, _ttl.Value);
+            await db.KeyExpireAsync(key, _ttl.Value).ConfigureAwait(false);
     }
 }

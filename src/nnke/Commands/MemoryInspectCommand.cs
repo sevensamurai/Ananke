@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Ananke.Tool.Commands;
 
 /// <summary>
-/// Handles <c>nnke colony memory inspect [--cell &lt;name&gt;] &lt;file&gt;</c> — browses
+/// Handles <c>nnke mesh inspect [--cell &lt;name&gt;] &lt;file&gt;</c> — browses
 /// entries from an exported empirical memory JSON file. Supports filtering by
 /// cell (entity) and <c>--json</c> for agent pipelines.
 /// </summary>

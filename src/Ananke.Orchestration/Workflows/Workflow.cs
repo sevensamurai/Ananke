@@ -105,6 +105,7 @@ public sealed class Workflow<TState>
     private Func<TState, string, Exception, Task>? _onError;
     private string? _entryJob;
     private IWorkflowRunner? _runner;
+    private Usage.IUsageRecorder? _usageRecorder;
     private ICheckpointStore? _checkpointStore;
     private IWorkflowTracer? _tracer;
     private bool _storeCompletions;
@@ -319,6 +320,37 @@ public sealed class Workflow<TState>
         Join(sources.Select(s => s.Name).ToArray(), target.Name, merge);
 
     /// <summary>
+    /// Defines a fan-in point whose <paramref name="merge"/> callback also receives the outcome of
+    /// every branch — including any that failed — so it can decide what a partial fork result means.
+    /// </summary>
+    /// <remarks>
+    /// Use this overload with <see cref="ForkMode.BestEffort"/>, where a branch can be dropped from
+    /// the merge: <see cref="JoinContext{TState}.HasFailures"/> tells the callback whether
+    /// <see cref="JoinContext{TState}.States"/> is complete, letting it substitute a default,
+    /// accept the partial result, or throw. The <see cref="Func{T, TResult}"/> overload cannot see
+    /// this and treats a short state list as normal.
+    /// </remarks>
+    public Workflow<TState> Join(string[] sources, string target, Func<JoinContext<TState>, TState> merge)
+    {
+        ThrowIfFrozen();
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentException.ThrowIfNullOrWhiteSpace(target);
+        ArgumentNullException.ThrowIfNull(merge);
+
+        if (sources.Length < 2)
+            throw new ArgumentException("Join requires at least two sources.", nameof(sources));
+
+        _joins.Add(new JoinDescriptor<TState>(sources, target, merge));
+        return this;
+    }
+
+    /// <summary>
+    /// Defines an outcome-aware fan-in point using type-safe <see cref="JobRef"/> references.
+    /// </summary>
+    public Workflow<TState> Join(JobRef[] sources, JobRef target, Func<JoinContext<TState>, TState> merge) =>
+        Join(sources.Select(s => s.Name).ToArray(), target.Name, merge);
+
+    /// <summary>
     /// Registers a nested workflow as a job. The <paramref name="mapIn"/> function
     /// transforms the parent state into the child workflow's state, and <paramref name="mapOut"/>
     /// merges the child result back into the parent state.
@@ -527,6 +559,24 @@ public sealed class Workflow<TState>
         return this;
     }
 
+    /// <summary>
+    /// Supplies the recorder that usage and spend accumulate into. Required when
+    /// <see cref="BudgetConfig.PeriodCostLimit"/> is set.
+    /// </summary>
+    /// <remarks>
+    /// Without one, an execution uses an in-memory recorder scoped to that run — correct for
+    /// <see cref="BudgetConfig.MaxCost"/>, and wrong for a period ceiling, which must outlive the
+    /// process. Use <see cref="Budget.FileUsageRecorder"/> for the in-box durable option.
+    /// </remarks>
+    public Workflow<TState> UseUsageRecorder(Usage.IUsageRecorder recorder)
+    {
+        ThrowIfFrozen();
+        ArgumentNullException.ThrowIfNull(recorder);
+
+        _usageRecorder = recorder;
+        return this;
+    }
+
     public Workflow<TState> UseTracing(IWorkflowTracer tracer)
     {
         ThrowIfFrozen();
@@ -595,6 +645,59 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
+    /// Sets a cost budget with fallback rates declared the way providers publish them —
+    /// per <b>million</b> tokens.
+    /// </summary>
+    /// <param name="maxCost">Spend ceiling, in the same currency as the rates.</param>
+    /// <param name="inputPerMillion">Cost per 1,000,000 input tokens, e.g. <c>0.15m</c>.</param>
+    /// <param name="outputPerMillion">Cost per 1,000,000 output tokens, e.g. <c>0.60m</c>.</param>
+    /// <example>
+    /// <code>
+    /// workflow.WithBudgetPerMillion(maxCost: 25m, inputPerMillion: 0.15m, outputPerMillion: 0.60m);
+    /// </code>
+    /// </example>
+    public Workflow<TState> WithBudgetPerMillion(
+        decimal maxCost, decimal inputPerMillion, decimal outputPerMillion)
+    {
+        ThrowIfFrozen();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxCost, 0);
+        ArgumentOutOfRangeException.ThrowIfNegative(inputPerMillion);
+        ArgumentOutOfRangeException.ThrowIfNegative(outputPerMillion);
+
+        _budget = BudgetConfig.FromPerMillion(maxCost, inputPerMillion, outputPerMillion);
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a fully-specified cost budget — the only overload that can reach
+    /// <see cref="BudgetConfig.WarnAtCost"/> and <see cref="BudgetConfig.Mode"/>.
+    /// </summary>
+    /// <param name="budget">The budget configuration.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <see cref="BudgetConfig.MaxCost"/> is not positive, or
+    /// <see cref="BudgetConfig.WarnAtCost"/> is not below it — a warning threshold at or above
+    /// the limit could never fire before the run stopped, so it is a configuration mistake
+    /// rather than a no-op.
+    /// </exception>
+    public Workflow<TState> WithBudget(BudgetConfig budget)
+    {
+        ThrowIfFrozen();
+        ArgumentNullException.ThrowIfNull(budget);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget.MaxCost, 0);
+        ArgumentOutOfRangeException.ThrowIfNegative(budget.CostPer1KInputTokens);
+        ArgumentOutOfRangeException.ThrowIfNegative(budget.CostPer1KOutputTokens);
+
+        if (budget.WarnAtCost is { } warnAt)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(warnAt);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(warnAt, budget.MaxCost);
+        }
+
+        _budget = budget;
+        return this;
+    }
+
+    /// <summary>
     /// Sets a cost budget for the workflow with flat fallback cost rates.
     /// These rates are used when model-specific rates are not available
     /// (e.g. direct <c>IAgentModel</c> usage without
@@ -654,9 +757,20 @@ public sealed class Workflow<TState>
             if (!hasProfileAware)
                 throw new InvalidOperationException(
                     $"Workflow '{_name}' has a budget but no cost rates are configured. " +
-                    "Either supply fallback rates via WithBudget(maxCost, costPer1KInputTokens, costPer1KOutputTokens), " +
-                    "or route model calls through a CapabilityModelRouter so per-call rates are available.");
+                    "Either supply fallback rates via WithBudgetPerMillion(maxCost, inputPerMillion, outputPerMillion) " +
+                    "— the unit providers publish — or route model calls through a CapabilityModelRouter " +
+                    "so per-call rates are available.");
         }
+
+        // D15: fail closed. A period ceiling backed by the default in-memory recorder would
+        // reset on every process start, so a crash-loop would re-spend the month indefinitely
+        // with nothing reporting a problem. Refuse the configuration instead.
+        if (_budget?.PeriodCostLimit is not null && _usageRecorder is null)
+            throw new InvalidOperationException(
+                $"Workflow '{_name}' sets a period cost limit but has no usage recorder. " +
+                "A period ceiling accumulates across runs, so it needs storage that outlives the " +
+                "process — call UseUsageRecorder(new FileUsageRecorder(...)) on the workflow builder. " +
+                "Without one the limit would silently reset on every restart.");
 
         ApplyLifecycleActions();
 
@@ -670,7 +784,7 @@ public sealed class Workflow<TState>
         CancellationToken ct = default)
     {
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
         return await runner.RunAsync(definition, initialState, ct);
     }
 
@@ -697,7 +811,7 @@ public sealed class Workflow<TState>
         CancellationToken ct = default)
     {
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
         return runner.StreamAsync(definition, initialState, options, ct);
     }
 
@@ -712,7 +826,7 @@ public sealed class Workflow<TState>
             ?? throw new InvalidOperationException($"No checkpoint found for execution '{executionId}'.");
 
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
         return await runner.ResumeAsync(definition, checkpoint, ct);
     }
 
@@ -735,7 +849,7 @@ public sealed class Workflow<TState>
             ?? throw new InvalidOperationException($"No checkpoint found for execution '{executionId}'.");
 
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
         return await runner.ResumeAsync(definition, checkpoint, stateTransform, ct);
     }
 

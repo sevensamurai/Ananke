@@ -14,6 +14,7 @@ dotnet tool install -g nnke-platform
 |---|---|
 | `nnke-platform validate <file> --platform <p>` | Validate a manifest's deployability to a target platform |
 | `nnke-platform capabilities [--platform <p>]` | List known platform-native tool capabilities |
+| `nnke-platform eval <file>` | Score a manifest against candidate platforms and recommend the best fit |
 | `nnke-platform profiles <file> [profile]` | List or inspect deployment profiles in a manifest |
 | `nnke-platform deploy <file> --platform <p>` | Deploy a workflow to a target platform |
 | `nnke-platform status [--deployment-id <id>]` | Show deployment status |
@@ -27,8 +28,13 @@ dotnet tool install -g nnke-platform
 | `nnke-platform events [--follow]` | Stream mesh and deployment events |
 | `nnke-platform login --platform <p>` | Configure credentials for a platform |
 | `nnke-platform whoami` | Show configured platform identities |
+| `nnke-platform adapters list` | List adapters found in the probe directory and their load status |
+| `nnke-platform adapters doctor` | Report adapter health — version mismatches, missing manifests, load failures |
 
 All commands support `--json` for machine-readable output.
+
+Exit codes: `0` success, `1` usage or I/O error (missing file, unknown platform or profile),
+`2` the command ran but the answer is negative (manifest not deployable, adapter unhealthy).
 
 ## Quick Start
 

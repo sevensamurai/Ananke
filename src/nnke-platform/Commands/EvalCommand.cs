@@ -100,13 +100,13 @@ internal static class EvalCommand
                 GovernanceWeight = govW ?? 1.5
             };
 
-            await ExecuteAsync(file, candidates, weights, json ? "json" : format, live, emitRules);
+            return await ExecuteAsync(file, candidates, weights, json ? "json" : format, live, emitRules);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         FileInfo? file,
         string[]? candidates,
         RecommendationWeights weights,
@@ -125,7 +125,7 @@ internal static class EvalCommand
                 JsonOutput.Write(new { status = "error", message = msg });
             else
                 Console.Error.WriteLine($"  {msg}");
-            return;
+            return 1;
         }
 
         WorkflowManifest manifest;
@@ -139,7 +139,7 @@ internal static class EvalCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse manifest: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse manifest: {ex.Message}");
-            return;
+            return 1;
         }
 
         // Build a stub toolkit reflecting PlatformNative tools declared in the manifest
@@ -192,6 +192,9 @@ internal static class EvalCommand
 
         if (emitRulesFile is not null)
             EmitRules(report, manifest.Name, emitRulesFile, format);
+
+        // No unblocked candidate means the manifest cannot be placed anywhere.
+        return report.Recommended is null ? 2 : 0;
     }
 
     // ── Emit routing rules ────────────────────────────────────────────

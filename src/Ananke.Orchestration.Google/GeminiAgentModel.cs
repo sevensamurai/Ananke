@@ -35,8 +35,15 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// </summary>
     /// <param name="apiKey">Google AI API key.</param>
     /// <param name="model">Model name (e.g. <c>"gemini-2.5-flash"</c>).</param>
-    public static GeminiAgentModel Create(string apiKey, string model) =>
-        new(new Client(apiKey: apiKey), model);
+    /// <param name="endpoint">
+    /// Custom API base URL for Gemini-compatible endpoints, or <see langword="null"/> for the
+    /// default Gemini Developer API endpoint.
+    /// </param>
+    public static GeminiAgentModel Create(string apiKey, string model, Uri? endpoint = null)
+    {
+        var httpOptions = endpoint is not null ? new HttpOptions { BaseUrl = endpoint.ToString() } : null;
+        return new(new Client(apiKey: apiKey, httpOptions: httpOptions), model);
+    }
 
     /// <summary>
     /// Creates a <see cref="GeminiAgentModel"/> for Gemini Enterprise Agent Platform using
@@ -294,6 +301,12 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                     break;
                 case ImagePart image when image.Uri is not null:
                     parts.Add(new Part { FileData = new FileData { MimeType = image.MimeType, FileUri = image.Uri.ToString() } });
+                    break;
+                case DocumentPart doc when doc.Data is not null:
+                    parts.Add(new Part { InlineData = new Blob { MimeType = doc.MimeType, Data = doc.Data } });
+                    break;
+                case DocumentPart doc when doc.Uri is not null:
+                    parts.Add(new Part { FileData = new FileData { MimeType = doc.MimeType, FileUri = doc.Uri.ToString() } });
                     break;
                 default:
                     throw new NotSupportedException(

@@ -39,8 +39,8 @@ public interface IWorkflowRunner
     /// Starts a new workflow execution and streams orchestration progress events
     /// as an <see cref="IAsyncEnumerable{T}"/>. Events include <see cref="JobStarted{TState}"/>,
     /// <see cref="JobCompleted{TState}"/>, <see cref="ForkStarted{TState}"/>,
-    /// <see cref="JoinCompleted{TState}"/>, and terminal events
-    /// (<see cref="WorkflowCompleted{TState}"/> or <see cref="WorkflowFaulted{TState}"/>).
+    /// <see cref="BranchFaulted{TState}"/>, <see cref="JoinCompleted{TState}"/>, and terminal
+    /// events (<see cref="WorkflowCompleted{TState}"/> or <see cref="WorkflowFaulted{TState}"/>).
     /// </summary>
     /// <remarks>
     /// The internal channel provides back-pressure: when the buffer is full, the runner

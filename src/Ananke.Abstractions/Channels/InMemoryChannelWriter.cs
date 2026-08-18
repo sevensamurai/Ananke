@@ -39,8 +39,10 @@ public sealed class InMemoryChannelWriter<A> : IChannelWriter<A>
     }
 
     /// <inheritdoc />
-    public async Task<ChannelSendResult> SendAsync(object message, A action)
+    public async Task<ChannelSendResult> SendAsync(object message, A action, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (!_configured)
             return ChannelSendResult.Failed("Writer not configured. Call ConfigureAsync first.");
 
@@ -59,7 +61,7 @@ public sealed class InMemoryChannelWriter<A> : IChannelWriter<A>
     }
 
     /// <inheritdoc />
-    public Task ClearAsync()
+    public Task ClearAsync(CancellationToken ct = default)
     {
         _configured = false;
         return Task.CompletedTask;

@@ -1,6 +1,8 @@
 # Canonical encoding/EOL policy
-# UTF-8 WITHOUT BOM everywhere. LF everywhere, except Windows-native scripts
-# and VS-owned solution/project XML which are CRLF.
+# UTF-8 WITHOUT BOM everywhere. LF everywhere, except PowerShell/batch scripts
+# and VS-owned solution/project XML which are CRLF. The CRLF exceptions are kept
+# after the move to WSL Ubuntu — nothing on Linux cares, and dropping them would
+# rewrite ~50 files for no gain. Mirrors .gitattributes.
 root = true
 
 [*]

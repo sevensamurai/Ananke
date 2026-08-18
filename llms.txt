@@ -35,7 +35,7 @@
 
 ## CLI Tooling (`nnke`)
 
-The `nnke` .NET global tool (`src/dotnet-ananke`) provides scaffolding, validation, and self-diagnosis:
+The `nnke` .NET global tool (`src/nnke`) provides scaffolding, validation, and self-diagnosis:
 
 - `nnke new workflow <name> --pattern <pattern>` — scaffold a complete runnable project
 - `nnke validate <file> --json` — validate an `.ananke.yml` manifest with structured error codes

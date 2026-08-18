@@ -178,7 +178,7 @@ public sealed class PlatformRecommender : IPlatformRecommender
         if (extra.Count == 0)
             return score;
 
-        var reasons = score.Reasons.Concat(extra).ToList();
+        List<FitReason> reasons = [.. score.Reasons, .. extra];
         var blocked = reasons.Any(r => r.Kind == FitReasonKind.Block);
 
         return score with

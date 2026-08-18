@@ -49,7 +49,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private const string ConditionKey = "condition";
     private const string EffectKey = "effect";
     private const string MechanismKey = "mechanism";
-    private const string LatencyMinutesKey = "latency_minutes";
+    private const string LatencySecondsKey = "latency_seconds";
 
     // Skill-specific
     private const string GoalKey = "goal";
@@ -176,13 +176,13 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     public async Task<EmpiricalEntry> CommitAsync(EmpiricalEntry entry, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         using var span = ActivitySrc.StartActivity("EmpiricalMemory.Commit");
         span?.SetTag("empirical.entry_id", entry.Id);
         span?.SetTag("empirical.kind", entry.Kind.ToString());
 
-        var embedding = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct);
+        var embedding = await _embedder.EmbedAsync(entry.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
 
         // Semantic dedup: search for a similar existing entry of the same kind and entity
         var kindFilter = new Filter
@@ -205,7 +205,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             limit: 1,
             scoreThreshold: _dedupThreshold,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         if (similar is [var existing])
         {
@@ -233,7 +233,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
                 _collectionName,
                 updatedPayload,
                 Guid.Parse(existing.Id.Uuid),
-                cancellationToken: ct);
+                cancellationToken: ct).ConfigureAwait(false);
 
             DedupCounter.Add(1);
             _logger.LogDebug("Empirical dedup: merged '{NewId}' into '{ExistingId}'",
@@ -249,7 +249,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
         // No duplicate — upsert new point
         var point = BuildPoint(entry, embedding);
-        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct);
+        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct).ConfigureAwait(false);
 
         CommitCounter.Add(1);
         _logger.LogDebug("Empirical commit: new {Kind} '{Id}' (confidence: {Confidence:F2})",
@@ -262,12 +262,12 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         string situation, RecallOptions? options = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(situation);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         using var span = ActivitySrc.StartActivity("EmpiricalMemory.Recall");
 
         options ??= new RecallOptions();
-        var queryEmbedding = await _embedder.EmbedAsync(situation, ct);
+        var queryEmbedding = await _embedder.EmbedAsync(situation, ct).ConfigureAwait(false);
         var filter = BuildRecallFilter(options);
 
         var results = await _client.SearchAsync(
@@ -276,7 +276,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             filter: filter,
             limit: (ulong)options.TopK,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         // Client-side composite scoring: vectorScore × confidence × recencyWeight
         var now = _timeProvider.GetUtcNow();
@@ -315,14 +315,14 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
         ArgumentNullException.ThrowIfNull(reinforcement);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var pointId = ToPointId(entryId);
         var points = await _client.RetrieveAsync(
             _collectionName,
             [pointId],
             withPayload: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var point = points.FirstOrDefault()
             ?? throw new KeyNotFoundException($"Empirical entry '{entryId}' not found.");
@@ -343,7 +343,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             if (_predictionSource is not null)
             {
                 var entry = MapPayloadToEntry(pointId.Uuid, point.Payload);
-                var fresh = await _predictionSource.PredictAsync(entry, this, ct);
+                var fresh = await _predictionSource.PredictAsync(entry, this, ct).ConfigureAwait(false);
                 predicted = fresh ?? currentPrediction ?? (float)currentConfidence;
             }
             else
@@ -420,7 +420,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             _collectionName,
             updatedPayload,
             ToGuid(entryId),
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         ReinforceCounter.Add(1);
     }
@@ -430,14 +430,14 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var pointId = ToPointId(entryId);
         var points = await _client.RetrieveAsync(
             _collectionName,
             [pointId],
             withPayload: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var point = points.FirstOrDefault()
             ?? throw new KeyNotFoundException($"Empirical entry '{entryId}' not found.");
@@ -491,7 +491,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             _collectionName,
             updatedPayload,
             ToGuid(entryId),
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         ContradictCounter.Add(1);
         _logger.LogDebug("Empirical contradict: '{Id}' confidence {Old:F2} → {New:F2} — {Reason}",
@@ -502,13 +502,13 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     public async Task<EmpiricalEntry?> GetAsync(string entryId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var points = await _client.RetrieveAsync(
             _collectionName,
             [ToPointId(entryId)],
             withPayload: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var point = points.FirstOrDefault();
         return point is null ? null : MapPayloadToEntry(entryId, point.Payload);
@@ -519,7 +519,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         int offset, int limit, EmpiricalKind? kind = null,
         string? entityId = null, CancellationToken ct = default)
     {
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         Filter? filter = null;
         if (kind is not null || entityId is not null)
@@ -537,7 +537,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             limit: (uint)limit,
             offset: offset > 0 ? new PointId { Num = (ulong)offset } : null,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return result.Result.Select(p => MapPayloadToEntry(p.Id.Uuid, p.Payload)).ToList();
     }
@@ -547,7 +547,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         BrowseOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var filter = BuildBrowseFilter(options);
 
@@ -557,7 +557,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             limit: (uint)options.Limit,
             offset: options.Offset > 0 ? new PointId { Num = (ulong)options.Offset } : null,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return result.Result.Select(p => MapPayloadToEntry(p.Id.Uuid, p.Payload)).ToList();
     }
@@ -565,7 +565,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     /// <inheritdoc />
     public async Task<int> CountAsync(BrowseOptions? options = null, CancellationToken ct = default)
     {
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var filter = options is not null ? BuildBrowseFilter(options) : null;
 
@@ -573,7 +573,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             _collectionName,
             filter: filter,
             exact: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return (int)result;
     }
@@ -583,14 +583,14 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
         ArgumentException.ThrowIfNullOrWhiteSpace(knowledgeDocId);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var pointId = ToPointId(entryId);
         var points = await _client.RetrieveAsync(
             _collectionName,
             [pointId],
             withPayload: false,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         if (points.Count == 0)
             throw new KeyNotFoundException($"Empirical entry '{entryId}' not found.");
@@ -602,7 +602,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
                 [ConsolidatedIntoKey] = knowledgeDocId
             },
             ToGuid(entryId),
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         _logger.LogDebug("Empirical consolidated: '{Id}' → '{DocId}'", entryId, knowledgeDocId);
     }
@@ -614,7 +614,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reference);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         options ??= new PairRecallOptions();
         var scorer = options.Scorer ?? EmpiricalPairScorers.TagOverlap;
@@ -624,14 +624,14 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         // the pair scorer client-side for precise ranking.
         var preFilterK = Math.Max(options.MaxResults * 5, 100);
         var referenceEmbedding = await _embedder.EmbedAsync(
-            reference.Description.ToEmbeddingText(), ct);
+            reference.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
 
         var results = await _client.SearchAsync(
             collectionName: _collectionName,
             vector: referenceEmbedding,
             limit: (ulong)preFilterK,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var matches = new List<EmpiricalMatch>();
 
@@ -666,47 +666,47 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     {
         if (_initialized) return;
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_initialized) return;
 
-            var exists = await _client.CollectionExistsAsync(_collectionName, ct);
+            var exists = await _client.CollectionExistsAsync(_collectionName, ct).ConfigureAwait(false);
             if (!exists)
             {
                 await _client.CreateCollectionAsync(
                     _collectionName,
                     new VectorParams { Size = _vectorSize, Distance = Distance.Cosine },
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, KindKey,
-                    PayloadSchemaType.Keyword, cancellationToken: ct);
+                    PayloadSchemaType.Keyword, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, ConfidenceKey,
-                    PayloadSchemaType.Float, cancellationToken: ct);
+                    PayloadSchemaType.Float, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, LastObservedKey,
-                    PayloadSchemaType.Integer, cancellationToken: ct);
+                    PayloadSchemaType.Integer, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, SourceKey,
-                    PayloadSchemaType.Keyword, cancellationToken: ct);
+                    PayloadSchemaType.Keyword, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, TagsKey,
-                    PayloadSchemaType.Keyword, cancellationToken: ct);
+                    PayloadSchemaType.Keyword, cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, EntityIdKey,
-                    PayloadSchemaType.Keyword, cancellationToken: ct);
+                    PayloadSchemaType.Keyword, cancellationToken: ct).ConfigureAwait(false);
 
                 // Affective signals — strength indexed for decay filtering
                 await _client.CreatePayloadIndexAsync(
                     _collectionName, StrengthKey,
-                    PayloadSchemaType.Float, cancellationToken: ct);
+                    PayloadSchemaType.Float, cancellationToken: ct).ConfigureAwait(false);
             }
 
             _initialized = true;
@@ -719,7 +719,13 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
     // ── Point building ───────────────────────────────────────────
 
-    private PointStruct BuildPoint(EmpiricalEntry entry, ReadOnlyMemory<float> embedding)
+    /// <remarks>
+    /// <c>internal static</c> (rather than the original private instance method) so
+    /// <c>Ananke.Qdrant.Tests</c> can round-trip payload construction against
+    /// <see cref="MapPayloadToEntry"/> without a live Qdrant connection — it never touched
+    /// instance state to begin with.
+    /// </remarks>
+    internal static PointStruct BuildPoint(EmpiricalEntry entry, ReadOnlyMemory<float> embedding)
     {
         var payload = new Dictionary<string, Value>
         {
@@ -742,7 +748,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         if (entry.Condition is not null) payload[ConditionKey] = entry.Condition;
         if (entry.Effect is not null) payload[EffectKey] = entry.Effect;
         if (entry.Mechanism is not null) payload[MechanismKey] = entry.Mechanism;
-        if (entry.Latency is not null) payload[LatencyMinutesKey] = (long)entry.Latency.Value.TotalMinutes;
+        if (entry.Latency is not null) payload[LatencySecondsKey] = (long)entry.Latency.Value.TotalSeconds;
 
         // Skill-specific fields
         if (entry.Goal is not null) payload[GoalKey] = entry.Goal;
@@ -870,7 +876,11 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
     private EmpiricalEntry MapScoredPointToEntry(ScoredPoint point) =>
         MapPayloadToEntry(point.Id.Uuid, point.Payload);
 
-    private static EmpiricalEntry MapPayloadToEntry(
+    /// <remarks>
+    /// <c>internal</c> (rather than <c>private</c>) so <c>Ananke.Qdrant.Tests</c> can pin the
+    /// <see cref="BuildPoint"/> round-trip directly — see its remarks.
+    /// </remarks>
+    internal static EmpiricalEntry MapPayloadToEntry(
         string id, IReadOnlyDictionary<string, Value> payload)
     {
         var kindStr = GetString(payload, KindKey, "pattern");
@@ -893,8 +903,8 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             Condition = GetStringOrNull(payload, ConditionKey),
             Effect = GetStringOrNull(payload, EffectKey),
             Mechanism = GetStringOrNull(payload, MechanismKey),
-            Latency = payload.TryGetValue(LatencyMinutesKey, out var lat)
-                ? TimeSpan.FromMinutes(lat.IntegerValue)
+            Latency = payload.TryGetValue(LatencySecondsKey, out var lat)
+                ? TimeSpan.FromSeconds(lat.IntegerValue)
                 : null,
             Goal = GetStringOrNull(payload, GoalKey),
             Applicability = GetStringOrNull(payload, ApplicabilityKey),

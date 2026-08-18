@@ -33,19 +33,19 @@ internal static class LineageCommand
             var cell = parseResult.GetValue(cellArg)!;
             var file = parseResult.GetValue(fileArg)!;
             var json = parseResult.GetValue<bool>("--json");
-            Execute(cell, file, json);
+            return Execute(cell, file, json);
         });
 
         return command;
     }
 
-    private static void Execute(string cellName, FileInfo file, bool json)
+    private static int Execute(string cellName, FileInfo file, bool json)
     {
         if (!SnapshotLoader.TryLoad(file, out var snapshot, out var loadError))
         {
             if (json) JsonOutput.Write(new { status = "error", message = loadError });
             else Console.Error.WriteLine($"  {loadError}");
-            return;
+            return 1;
         }
 
         var lineageMap = snapshot.Cells.ToDictionary(c => c.Name, c => c.SplitFrom, StringComparer.OrdinalIgnoreCase);
@@ -54,7 +54,7 @@ internal static class LineageCommand
         {
             if (json) JsonOutput.Write(new { status = "not_found", cellName, available = lineageMap.Keys.ToList() });
             else Console.Error.WriteLine($"  Cell '{cellName}' not found in snapshot.");
-            return;
+            return 1;
         }
 
         List<string> Ancestors(string id)
@@ -92,7 +92,7 @@ internal static class LineageCommand
                 descendants,
                 note = "Platform and deploymentId annotations require a live IDeploymentRegistry connection (v0.9)."
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine();
@@ -115,5 +115,7 @@ internal static class LineageCommand
         Console.WriteLine();
         Console.WriteLine("  Note: platform/deploymentId annotations require nnke-platform connected to a registry (v0.9).");
         Console.WriteLine();
+
+        return 0;
     }
 }

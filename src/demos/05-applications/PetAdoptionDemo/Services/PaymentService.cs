@@ -117,7 +117,7 @@ internal static class PaymentService
 
         await channel.SubscribeAsync<PaymentHandoff, PaymentResult>(
             PaymentConstants.QueueName,
-            async payment =>
+            async (payment, ct) =>
             {
                 Console.WriteLine($"  💳 Payment received — session {payment.SessionId} (card ending {payment.Last4})");
 
@@ -125,7 +125,7 @@ internal static class PaymentService
                 {
                     SessionId = payment.SessionId,
                     Last4 = payment.Last4
-                });
+                }, ct);
 
                 var final = execution.State;
 

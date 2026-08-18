@@ -81,13 +81,13 @@ public sealed class FederatedComplexityMonitor : IHealthMonitor, IRemoteCellSour
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workflowName);
 
-        var deployments = await _registry.ListAsync(workflowName, ct);
+        var deployments = await _registry.ListAsync(workflowName, ct).ConfigureAwait(false);
         var activeDeployment = deployments.FirstOrDefault(d => d.Status == DeploymentStatus.Active);
 
         if (activeDeployment is null)
-            return await _localMonitor.GetSnapshotAsync(workflowName, ct);
+            return await _localMonitor.GetSnapshotAsync(workflowName, ct).ConfigureAwait(false);
 
-        return await BuildRemoteSnapshotAsync(workflowName, activeDeployment, ct);
+        return await BuildRemoteSnapshotAsync(workflowName, activeDeployment, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -97,7 +97,7 @@ public sealed class FederatedComplexityMonitor : IHealthMonitor, IRemoteCellSour
     /// <inheritdoc />
     public async Task<IReadOnlyList<string>> GetRemoteCellNamesAsync(CancellationToken ct = default)
     {
-        var all = await _registry.ListAsync(ct: ct);
+        var all = await _registry.ListAsync(ct: ct).ConfigureAwait(false);
         return all
             .Where(d => d.Status == DeploymentStatus.Active)
             .Select(d => d.WorkflowName)
@@ -120,8 +120,8 @@ public sealed class FederatedComplexityMonitor : IHealthMonitor, IRemoteCellSour
         {
             try
             {
-                var metrics = await monitor.GetMetricsAsync(deployment.DeploymentId, ct);
-                var health = await monitor.GetHealthAsync(deployment.DeploymentId, ct);
+                var metrics = await monitor.GetMetricsAsync(deployment.DeploymentId, ct).ConfigureAwait(false);
+                var health = await monitor.GetHealthAsync(deployment.DeploymentId, ct).ConfigureAwait(false);
 
                 avgLatencyMs = (float)health.LatencyMs;
                 if (metrics.ExecutionCount > 0)

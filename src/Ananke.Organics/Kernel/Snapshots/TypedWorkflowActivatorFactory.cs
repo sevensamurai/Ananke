@@ -159,9 +159,10 @@ public sealed class TypedWorkflowActivatorFactory<TState> : IWorkflowActivatorFa
         // that wraps the memory for this child's domain
         if (_sharedMemory is not null && memoryProfile is not null)
         {
+            List<string> combinedDomains = [.. memoryProfile.Domains, .. memoryProfile.LineageTags];
             var domainMemory = new DomainAffinityMemory(
                 _sharedMemory,
-                memoryProfile.Domains.Concat(memoryProfile.LineageTags).Distinct().ToList());
+                combinedDomains.Distinct().ToList());
 
             var memoryToolKit = EmpiricalMemoryTools.Create(domainMemory, snapshot.Name);
             activator.WithTools(memoryToolKit);

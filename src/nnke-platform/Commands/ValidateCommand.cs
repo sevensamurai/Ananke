@@ -45,13 +45,13 @@ internal static class ValidateCommand
             var platform = parseResult.GetValue(platformOption)!;
             var profile = parseResult.GetValue(profileOption);
             var json = parseResult.GetValue<bool>("--json");
-            Execute(file, platform, profile, json);
+            return Execute(file, platform, profile, json);
         });
 
         return command;
     }
 
-    private static void Execute(FileInfo file, string platform, string? profileName, bool json)
+    private static int Execute(FileInfo file, string platform, string? profileName, bool json)
     {
         if (!file.Exists)
         {
@@ -59,7 +59,7 @@ internal static class ValidateCommand
                 JsonOutput.Write(new { status = "error", message = $"File not found: {file.FullName}" });
             else
                 Console.Error.WriteLine($"  File not found: {file.FullName}");
-            return;
+            return 1;
         }
 
         WorkflowManifest manifest;
@@ -73,7 +73,7 @@ internal static class ValidateCommand
                 JsonOutput.Write(new { status = "error", message = $"Failed to parse manifest: {ex.Message}" });
             else
                 Console.Error.WriteLine($"  Failed to parse manifest: {ex.Message}");
-            return;
+            return 1;
         }
 
         // Build a toolkit stub — structural validation doesn't execute tools,
@@ -91,7 +91,7 @@ internal static class ValidateCommand
                     JsonOutput.Write(new { status = "error", message = $"Profile '{profileName}' not found in manifest. Available: {string.Join(", ", manifest.Profiles.Keys)}" });
                 else
                     Console.Error.WriteLine($"  Profile '{profileName}' not found. Available: {string.Join(", ", manifest.Profiles.Keys)}");
-                return;
+                return 1;
             }
 
             // Apply the profile's tool bindings to the stub kit
@@ -127,6 +127,9 @@ internal static class ValidateCommand
             WriteJson(manifest, report, platform, profileName);
         else
             WriteHuman(manifest, report, platform, profileName);
+
+        // A manifest that cannot be deployed is a failed check, not a successful report.
+        return report.IsDeployable ? 0 : 2;
     }
 
     private static void WriteJson(WorkflowManifest manifest, DeployabilityReport report, string platform, string? profile)

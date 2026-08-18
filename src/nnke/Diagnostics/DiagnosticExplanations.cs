@@ -47,7 +47,7 @@ internal static class DiagnosticExplanations
                     models:
                       default:        # ← correct 2-space indent
                         provider: openai
-                        model: gpt-4.1-mini
+                        model: gpt-5.6-terra
                     """,
                 DocsRef = "nnke docs workflow-dsl",
             },
@@ -218,7 +218,7 @@ internal static class DiagnosticExplanations
                     models:
                       default:
                         provider: openai
-                        model: gpt-4.1-mini
+                        model: gpt-5.6-terra
                     jobs:
                       analyze:
                         type: agent
@@ -228,10 +228,10 @@ internal static class DiagnosticExplanations
                     models:
                       default:
                         provider: openai
-                        model: gpt-4.1-mini
+                        model: gpt-5.6-terra
                       analyst:              # add the missing alias
                         provider: openai
-                        model: gpt-4.1-mini
+                        model: gpt-5.6-terra
                     jobs:
                       analyze:
                         type: agent

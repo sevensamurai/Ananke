@@ -37,8 +37,8 @@ public sealed class QuorumWorkReviewGate(
             }
         }
 
-        var relevantReviewerIds = quorum.AllOf
-            .Concat(quorum.AnyOf)
+        string[] combinedReviewerIds = [.. quorum.AllOf, .. quorum.AnyOf];
+        var relevantReviewerIds = combinedReviewerIds
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 

@@ -30,12 +30,13 @@ internal static class AdaptersCommand
         command.SetAction(parseResult =>
         {
             var json = parseResult.GetValue<bool>("--json");
-            ExecuteList(json);
+            using (ProbeAdapters())
+                return ExecuteList(json);
         });
         return command;
     }
 
-    private static void ExecuteList(bool json)
+    private static int ExecuteList(bool json)
     {
         var results = AdapterDiagnostics.Results;
 
@@ -55,7 +56,7 @@ internal static class AdaptersCommand
                     error = r.ErrorMessage,
                 }),
             });
-            return;
+            return 0;
         }
 
         Console.WriteLine($"  Adapters directory: {PlatformHost.AdaptersDirectory}");
@@ -65,7 +66,7 @@ internal static class AdaptersCommand
         {
             Console.WriteLine("  No adapters found.");
             Console.WriteLine($"  Install one with: dotnet tool install nnke-platform-azure");
-            return;
+            return 0;
         }
 
         foreach (var r in results)
@@ -78,6 +79,10 @@ internal static class AdaptersCommand
             if (r.ErrorMessage is not null)
                 Console.WriteLine($"      {r.ErrorMessage}");
         }
+
+        // 'list' reports what was found and succeeds whenever it could report it; the
+        // health verdict (and the non-zero exit that goes with it) belongs to 'doctor'.
+        return 0;
     }
 
     // ── adapters doctor ───────────────────────────────────────────────────────
@@ -89,10 +94,23 @@ internal static class AdaptersCommand
         command.SetAction(parseResult =>
         {
             var json = parseResult.GetValue<bool>("--json");
-            return ExecuteDoctor(json);
+            using (ProbeAdapters())
+                return ExecuteDoctor(json);
         });
         return command;
     }
+
+    /// <summary>
+    /// Constructs a <see cref="PlatformHost"/> purely for its side effect: the constructor
+    /// probes the adapters directory and populates <see cref="AdapterDiagnostics"/>, which
+    /// both subcommands read. Without this the diagnostics set is always empty and every
+    /// installed adapter is reported as missing.
+    /// </summary>
+    /// <remarks>
+    /// An in-memory registry is used unconditionally — inspecting adapters is a read-only
+    /// diagnostic and must not create or open the on-disk deployment registry.
+    /// </remarks>
+    private static PlatformHost ProbeAdapters() => new(inMemory: true);
 
     private static int ExecuteDoctor(bool json)
     {

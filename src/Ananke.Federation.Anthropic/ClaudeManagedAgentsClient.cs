@@ -70,7 +70,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var body = new JsonObject { ["name"] = name };
-        var response = await PostAsync("/v1/environments", body, ct);
+        var response = await PostAsync("/v1/environments", body, ct).ConfigureAwait(false);
         return ExtractId(response, "environment");
     }
 
@@ -81,7 +81,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
     public async Task DeleteEnvironmentAsync(string environmentId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(environmentId);
-        await DeleteAsync($"/v1/environments/{Uri.EscapeDataString(environmentId)}", ct);
+        await DeleteAsync($"/v1/environments/{Uri.EscapeDataString(environmentId)}", ct).ConfigureAwait(false);
     }
 
     // ── Agents ────────────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
         if (environmentId is not null)
             body["environment_id"] = environmentId;
 
-        var response = await PostAsync("/v1/agents", body, ct);
+        var response = await PostAsync("/v1/agents", body, ct).ConfigureAwait(false);
         return ExtractId(response, "agent");
     }
 
@@ -132,7 +132,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
     public async Task DeleteAgentAsync(string agentId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentId);
-        await DeleteAsync($"/v1/agents/{Uri.EscapeDataString(agentId)}", ct);
+        await DeleteAsync($"/v1/agents/{Uri.EscapeDataString(agentId)}", ct).ConfigureAwait(false);
     }
 
     // ── Validation round-trip ─────────────────────────────────────────────────
@@ -145,7 +145,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
     {
         try
         {
-            var response = await _http.GetAsync("/v1/models", ct);
+            var response = await _http.GetAsync("/v1/models", ct).ConfigureAwait(false);
             return response.StatusCode == HttpStatusCode.OK;
         }
         catch (Exception)
@@ -167,20 +167,20 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
     {
         var json = body.ToJsonString(JsonOptions);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _http.PostAsync(path, content, ct);
-        return await ReadResponseAsync(response, ct);
+        var response = await _http.PostAsync(path, content, ct).ConfigureAwait(false);
+        return await ReadResponseAsync(response, ct).ConfigureAwait(false);
     }
 
     private async Task DeleteAsync(string path, CancellationToken ct)
     {
-        var response = await _http.DeleteAsync(path, ct);
+        var response = await _http.DeleteAsync(path, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
-            await ThrowApiExceptionAsync(response, ct);
+            await ThrowApiExceptionAsync(response, ct).ConfigureAwait(false);
     }
 
     private static async Task<JsonObject> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
     {
-        var body = await response.Content.ReadAsStringAsync(ct);
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -207,7 +207,7 @@ public sealed class ClaudeManagedAgentsClient : IDisposable
 
     private static async Task ThrowApiExceptionAsync(HttpResponseMessage response, CancellationToken ct)
     {
-        var body = await response.Content.ReadAsStringAsync(ct);
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         throw new HttpRequestException(
             $"Anthropic API error {(int)response.StatusCode}: {body}",
             inner: null,

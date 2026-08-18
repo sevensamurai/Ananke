@@ -79,7 +79,7 @@ Expose any workflow or tool kit as an [MCP](https://modelcontextprotocol.io/) se
 Plain-text DSL for workflow topology · runtime binding · Mermaid diagram export
 
 ### 🛠️ nnke Design CLI
-Scaffold new workflow projects · validate `.ananke.yml` topology files · export Mermaid diagrams · inspect project health · browse docs from the terminal · `nnke mcp` exposes all capabilities as MCP tools for AI coding assistants (GitHub Copilot, Claude, etc.)
+Scaffold new workflow projects · validate `.ananke.yml` topology files · export Mermaid diagrams · inspect project health · browse docs from the terminal · `nnke mcp-server` exposes all capabilities as MCP tools for AI coding assistants (GitHub Copilot, Claude, etc.)
 
 ### 🗄️ Infrastructure
 Checkpointing (InMemory / Redis) · distributed locking (Redis) · MQTT pub/sub · OpenTelemetry tracing
@@ -293,7 +293,7 @@ Common questions are answered in the **[FAQ](docs/faq.md)**. Quick answers:
 - **Does it support the A2A agent protocol?** Yes — call remote A2A agents as drop-in `IAgentModel` implementations and expose Ananke workflows as A2A endpoints.
 - **Can learned knowledge be transferred between agents?** Yes — `ISkillPackager` exports empirical entries and linked episodes as a portable JSON package (quality gates: min confidence, min strength, min observations). Import into any other agent with configurable trust scaling. Tag importance weights are bundled so the receiving agent inherits feature correlations too.
 - **What is the OpenClaw skill catalog?** `Ananke.Skills` connects to the [OpenClaw/ClawHub](https://clawhub.io) registry of CLI-based tools. One call to `toolkit.AddFromCatalogAsync("airbnb search lodging")` discovers, caches, and resolves matching tools as `ToolDefinition` entries that any agent can call.
-- **What is nnke?** A .NET CLI tool (`dotnet tool install -g nnke`) for design-time workflow tasks: scaffold projects, validate topology files, export Mermaid diagrams, inspect project health, and browse docs. `nnke mcp` runs as an MCP server so AI coding tools (GitHub Copilot, Claude) can call these capabilities directly.
+- **What is nnke?** A .NET CLI tool (`dotnet tool install -g nnke`) for design-time workflow tasks: scaffold projects, validate topology files, export Mermaid diagrams, inspect project health, and browse docs. `nnke mcp-server` runs as an MCP server so AI coding tools (GitHub Copilot, Claude) can call these capabilities directly.
 - **What is nnke-platform?** A companion CLI tool (`dotnet tool install -g nnke-platform`) for federation — deploy, monitor, and manage workflow deployments across cloud platforms (Azure AI, Vertex AI, Claude). Platform adapters are installed as separate companion tools (`nnke-platform-azure`, `nnke-platform-google`, `nnke-platform-anthropic`) or all at once via `nnke-platform-all`. Each adapter is an independently published .NET tool that registers itself with `nnke-platform` via module initializers at runtime.
 - **What is the difference between a Workflow and a State Machine?** A workflow runs a directed pipeline end to end (best for task pipelines, document processing, batch jobs). A state machine models long-lived entities with stable states and event-driven transitions (best for conversation sessions, order lifecycle, device management). Both compose: state machines can invoke workflows, and workflows can interact with state machines.
 

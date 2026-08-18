@@ -161,7 +161,7 @@ var workflow = AgenticPattern.Handoff<HandoffState>("triage")
 
 ## CLI Tooling — `nnke`
 
-Install: `dotnet tool install -g dotnet-ananke`
+Install: `dotnet tool install -g nnke`
 
 ### Commands
 

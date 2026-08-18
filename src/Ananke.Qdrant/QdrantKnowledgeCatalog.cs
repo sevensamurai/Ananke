@@ -70,10 +70,10 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
     public async Task IndexAsync(CatalogEntry entry, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var embeddingText = BuildEmbeddingText(entry);
-        var embedding = await _embedder.EmbedAsync(embeddingText, ct);
+        var embedding = await _embedder.EmbedAsync(embeddingText, ct).ConfigureAwait(false);
 
         var payload = new Dictionary<string, Value>
         {
@@ -95,32 +95,32 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             Payload = { payload }
         };
 
-        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct);
+        await _client.UpsertAsync(_collectionName, [point], cancellationToken: ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task RemoveAsync(string source, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         await _client.DeleteAsync(
             _collectionName,
             [ToPointId(source)],
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<CatalogEntry?> GetAsync(string source, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
         var points = await _client.RetrieveAsync(
             _collectionName,
             [ToPointId(source)],
             withPayload: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         var point = points.FirstOrDefault();
         return point is null ? null : MapRetrievedPoint(point);
@@ -131,9 +131,9 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
         string query, int topK = 5, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
 
-        var queryEmbedding = await _embedder.EmbedAsync(query, ct);
+        var queryEmbedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
 
         // Filter out superseded entries (where 'superseded_by' is null)
         var filter = new Filter
@@ -147,7 +147,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             filter: filter,
             limit: (ulong)topK,
             payloadSelector: true,
-            cancellationToken: ct);
+            cancellationToken: ct).ConfigureAwait(false);
 
         return results
             .Select(MapScoredPoint)
@@ -158,7 +158,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
     public async Task<IReadOnlyList<CatalogEntry>> BrowseAsync(
         CatalogBrowseOptions? options = null, CancellationToken ct = default)
     {
-        await EnsureCollectionAsync(ct);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
         options ??= new CatalogBrowseOptions();
 
         var filter = new Filter();
@@ -194,7 +194,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
            filter: filter,
            limit: (uint)options.Limit,
            payloadSelector: true,
-           cancellationToken: ct);
+           cancellationToken: ct).ConfigureAwait(false);
 
         return scrollResponse.Result
             .Select(MapRetrievedPoint)
@@ -206,50 +206,50 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
     {
         if (_initialized) return;
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_initialized) return;
 
-            var exists = await _client.CollectionExistsAsync(_collectionName, ct);
+            var exists = await _client.CollectionExistsAsync(_collectionName, ct).ConfigureAwait(false);
             if (!exists)
             {
                 await _client.CreateCollectionAsync(
                     _collectionName,
                     new VectorParams { Size = _vectorSize, Distance = Distance.Cosine },
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 // Create payload indexes for efficient filtering
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     SourcePayloadKey,
                     PayloadSchemaType.Keyword,
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     KeywordsPayloadKey,
                     PayloadSchemaType.Keyword,
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     CategoryPayloadKey,
                     PayloadSchemaType.Keyword,
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     IndexedAtPayloadKey,
                     PayloadSchemaType.Integer, // Unix timestamp range support
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
 
                 // SupersededBy needs fast IsNull check
                 await _client.CreatePayloadIndexAsync(
                     _collectionName,
                     SupersededByPayloadKey,
                     PayloadSchemaType.Keyword,
-                    cancellationToken: ct);
+                    cancellationToken: ct).ConfigureAwait(false);
             }
 
             _initialized = true;

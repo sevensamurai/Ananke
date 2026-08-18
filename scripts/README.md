@@ -4,8 +4,13 @@ Local developer scripts. Run these before opening a pull request.
 
 | Script | Shell |
 |---|---|
-| [`check-docs.ps1`](#check-docsps1--documentation-drift-check) | Windows PowerShell 5.1 or `pwsh` |
-| [`fix-encoding.ps1`](#fix-encodingps1--utf-8-bom-check) | **`pwsh` only** |
+| [`check-docs.ps1`](#check-docsps1--documentation-drift-check) | `pwsh` |
+| [`fix-encoding.ps1`](#fix-encodingps1--utf-8-bom-check) | `pwsh` |
+
+Both are PowerShell 7 and run cross-platform. The dev environment is **WSL Ubuntu 26.04**, so
+install `pwsh` there: `sudo snap install powershell --classic` — there is no `powershell` package
+in the 26.04 archive, so `apt install` will not find it. CI runs them on `ubuntu-latest`, where
+`pwsh` is preinstalled.
 
 ## `check-docs.ps1` — documentation drift check
 
@@ -30,11 +35,7 @@ complements `dotnet build` / `dotnet test`; it does not replace them.
 ### Run it
 
 ```powershell
-# Windows PowerShell 5.1
-powershell -File scripts/check-docs.ps1
-
-# pwsh (cross-platform)
-pwsh scripts/check-docs.ps1
+pwsh -File scripts/check-docs.ps1
 ```
 
 Exit code `0` = clean, `1` = drift found. Useful flags:
@@ -70,8 +71,23 @@ The same script drops into CI unchanged (it already returns a non-zero exit code
 
 ## `fix-encoding.ps1` — UTF-8 BOM check
 
-Strips UTF-8 byte-order marks from tracked text files. A BOM breaks tooling that expects plain
-UTF-8, so **CI runs this in `-Check` mode and fails the build on any finding**.
+Strips UTF-8 byte-order marks from text files. A BOM breaks tooling that expects plain UTF-8, so
+**CI runs this in `-Check` mode and fails the build on any finding**.
+
+> **Why this still exists after the move off Windows.** It reads as a Windows-era patch, and it is
+> not: **`dotnet new` emits BOMs on Linux too.** Measured on Ubuntu 26.04 / SDK 10.0.110 —
+> `console`, `classlib` and `nunit` templates produced a BOM in **6 of 6** files (`Program.cs`,
+> `Class1.cs`, `UnitTest1.cs` and all three `.csproj`). The reintroduction vector is the SDK's own
+> templates, not the editor or the shell, so it did not leave with Windows.
+>
+> `dotnet format` also enforces `charset = utf-8` and *is* the better tool where it reaches — but it
+> only sees compiled `.cs`. Verified: it fixes `Program.cs`, leaves the `.csproj` BOM in place, and
+> does not see `.md`/`.json` at all. Against this repo's original cleanup (173 files: 11 `.cs`,
+> 147 `.md`, 7 `.yml`, 3 `.json`, 5 `.csproj`) it would have caught 11. Markdown was 85% of it.
+>
+> The *other* half of the original complaint — mojibake — is gone and is not what this script does.
+> A scan of every tracked file for the usual signatures (`Ã©`, `â€™`, `Â `, literal `ï»¿`) returns
+> zero hits.
 
 ### Run it
 
@@ -80,13 +96,34 @@ pwsh -File scripts/fix-encoding.ps1 -Check   # report only, exit 1 on findings
 pwsh -File scripts/fix-encoding.ps1          # strip the BOMs in place
 ```
 
-> **`pwsh` is required.** The script uses a PowerShell 7 ternary (`$Check ? … : …`) and fails with a
-> parser error under Windows PowerShell 5.1 — a confusing failure, because it looks like the script
-> is broken rather than the shell being wrong.
+> **`pwsh` is required** — the script uses a PowerShell 7 ternary (`$Check ? … : …`).
 
-Covers `.cs`, `.csx`, `.md`, `.json`, `.yml`/`.yaml`, `.xml`, `.config`, `.txt`, `.csproj`, `.props`,
-`.targets`, `.slnx`, `.nuspec`, `.resx`, `.sh` and `.editorconfig`, skipping `.git`, `obj`, `bin`,
-`node_modules` and `.codegraph`. Exit code `0` = clean, `1` = BOMs found (in `-Check` mode).
+### What it looks at
 
-Without `-Check` it **rewrites files in place** — run it on a clean working tree so the diff is
-reviewable.
+The file list comes from **git**, not a directory walk:
+
+```
+git ls-files -z --cached --others --exclude-standard
+```
+
+Tracked files, plus new files not yet added, minus anything `.gitignore` covers — exactly the set a
+commit could contain. **Every text file type is in scope**; there is no extension allowlist. Files
+that open with the BOM bytes but contain a NUL are reported as binary and left alone.
+
+Exit code `0` = clean, `1` = BOMs found (in `-Check` mode). Without `-Check` it **rewrites files in
+place** — run it on a clean working tree so the diff is reviewable.
+
+> **Rewritten 2026-08-10, and it found four files the old version could not see.** The previous
+> version walked directories with an extension allowlist and a skip-list regex, which failed twice:
+>
+> - **The skip-list was Windows-only.** It matched `\obj\`-style separators, so on Linux it excluded
+>   nothing — after a build it reported **170 false positives** from NuGet-generated
+>   `obj/*.nuget.g.props`/`.targets`, and without `-Check` it would have rewritten them. CI never
+>   saw this because it runs the check *before* `dotnet restore`, when no `obj/` exists.
+> - **The allowlist had holes.** `.html` was never in it and dotfiles have no extension, so
+>   `docs/index.html` (the published docs landing page), two presentation slides, and
+>   `.codegraph/.gitignore` all carried BOMs through every green run of the old gate. All four are
+>   now fixed.
+>
+> Sourcing from `git` removes both failure modes structurally: gitignored build output cannot be
+> enumerated, so there is no skip-list to get wrong, and nothing is filtered by extension.

@@ -126,7 +126,6 @@ public static class ModelCatalog
         OpenAI.Gpt56Sol, OpenAI.Gpt56Terra, OpenAI.Gpt56Luna,
 
         // Anthropic
-        Anthropic.ClaudeOpus4_1,
         Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
         Anthropic.ClaudeSonnet5, Anthropic.ClaudeOpus5, Anthropic.ClaudeFable5,
 
@@ -297,14 +296,6 @@ public static class ModelCatalog
         // This catalog must keep resolving deprecated model constants for its own Name
         // assignments below — ANNKE001 is expected and intentional here, not a call site to fix.
 #pragma warning disable ANNKE001
-
-        /// <summary>
-        /// Claude Opus 4.1 — deprecated 2026-06-05, tentative retirement 2026-08-05.
-        /// Context window not independently confirmed (predates Anthropic's current-docs 1M-context
-        /// generation) — set to the standard 200K tier all earlier Claude models shipped with.
-        /// </summary>
-        public static ModelProfileTemplate ClaudeOpus4_1 { get; } =
-            CreateTemplate(Models.Anthropic.Opus41, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 2);
 
         /// <summary>Claude Opus 4.8 — prior-generation frontier reasoning model.</summary>
         public static ModelProfileTemplate ClaudeOpus4_8 { get; } =

@@ -29,10 +29,16 @@ public static class ChatSessionEventSseExtensions
     /// </summary>
     /// <param name="events">The async stream of chat session events.</param>
     /// <param name="response">The HTTP response to write SSE events to.</param>
+    /// <param name="ct">
+    /// Stops consuming <paramref name="events"/> when the client disconnects. Pass
+    /// <see cref="HttpContext.RequestAborted"/>.
+    /// </param>
     public static Task WriteSseAsync(
         this IAsyncEnumerable<ChatSessionEvent> events,
-        HttpResponse response) =>
-        events.WriteSseAsync(response.WriteSseAsync);
+        HttpResponse response,
+        CancellationToken ct = default) =>
+        events.WriteSseAsync(
+            (eventName, data) => response.WriteSseAsync(eventName, data, ct), ct: ct);
 
     /// <summary>
     /// Consumes a <see cref="ChatSessionEvent"/> stream and writes corresponding SSE events
@@ -42,12 +48,24 @@ public static class ChatSessionEventSseExtensions
     /// <param name="events">The async stream of chat session events.</param>
     /// <param name="writeSse">Delegate that writes a named SSE event with data.</param>
     /// <param name="onError">Optional callback invoked with the error message before writing the SSE error event.</param>
+    /// <param name="ct">
+    /// Stops consuming <paramref name="events"/> when the client disconnects. Pass
+    /// <see cref="HttpContext.RequestAborted"/>.
+    /// <para>
+    /// This cancels the <i>consumption</i> of the event stream, which is what stops the model
+    /// generating into a dead connection. It is deliberately not threaded into
+    /// <paramref name="writeSse"/>: that delegate is caller-supplied and already closes over
+    /// whatever response it writes to, so widening its signature would break every binding site
+    /// to cancel a write that fails on its own against a disconnected client anyway.
+    /// </para>
+    /// </param>
     public static async Task WriteSseAsync(
         this IAsyncEnumerable<ChatSessionEvent> events,
         Func<string, object, Task> writeSse,
-        Action<string>? onError = null)
+        Action<string>? onError = null,
+        CancellationToken ct = default)
     {
-        await foreach (var evt in events)
+        await foreach (var evt in events.WithCancellation(ct))
         {
             switch (evt)
             {
