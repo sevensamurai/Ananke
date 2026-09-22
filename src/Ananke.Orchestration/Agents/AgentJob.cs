@@ -50,6 +50,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private Action<TState, TResponse>? _onResponse;
         private ToolKit? _toolKit;
         private int _maxToolRounds = 3;
+        private double? _temperature;
         private int _maxRetryAttempts = 3;
         private TimeSpan _retryBaseDelay = TimeSpan.FromSeconds(1);
         private Func<Exception, bool>? _shouldRetry;
@@ -58,6 +59,8 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private IConversationMemory? _memory;
         private Func<TState, string>? _sessionIdBuilder;
         private IContextStrategy? _contextStrategy;
+        private ToolOutputPolicy? _toolOutputPolicy;
+        private AgentContract? _contract;
         private ILoggerFactory? _loggerFactory;
         private ITrajectoryObserver? _trajectoryObserver;
 
@@ -95,6 +98,22 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
             _maxToolRounds = max;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the sampling temperature for this job. Leave unset to let the provider apply its
+        /// own default.
+        /// </summary>
+        /// <remarks>
+        /// <b>Not accepted by every model.</b> Anthropic deprecated temperature for models after
+        /// Claude Opus 4.6 — they accept only <c>1.0</c> and reject anything else with a 400. The
+        /// value is passed through rather than clamped, so the provider's refusal is visible.
+        /// </remarks>
+        /// <param name="temperature">Sampling temperature; provider ranges differ.</param>
+        public Builder WithTemperature(double temperature)
+        {
+            _temperature = temperature;
             return this;
         }
 
@@ -168,6 +187,54 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return this;
         }
 
+        /// <summary>
+        /// Bounds tool results so one oversized return cannot fill the window.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Opt-in. Without it a tool result is carried into every subsequent request whole, however
+        /// large it is — there is no cap anywhere else.
+        /// </para>
+        /// <para>
+        /// The cap on <em>arriving</em> results applies on its own. Pruning of results already in
+        /// the transcript runs as part of compaction, so it needs <see cref="WithContextStrategy"/>
+        /// as well; without one there is no assembly step for it to run before.
+        /// </para>
+        /// </remarks>
+        public Builder WithToolOutputPolicy(ToolOutputPolicy policy)
+        {
+            ArgumentNullException.ThrowIfNull(policy);
+            policy.Validate();
+            _toolOutputPolicy = policy;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the contract this job is working under: its goal, what counts as done, and the
+        /// constraints that hold throughout.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A contract is carried by <b>every</b> request the job makes, so a constraint stated once
+        /// is still in force long after compaction has evicted the turn that stated it. Both shipped
+        /// context strategies preserve content <em>positionally</em> — the last N messages — so a
+        /// goal stated at turn one is dropped by a sliding window and paraphrased by a summarizing
+        /// one. Nothing else here can pin content across compaction.
+        /// </para>
+        /// <para>
+        /// Distinct from <see cref="WithSystemPrompt"/> on purpose: the system prompt is who the
+        /// agent is, the contract is what this work item is for, and they usually have different
+        /// authors.
+        /// </para>
+        /// </remarks>
+        public Builder WithContract(AgentContract contract)
+        {
+            ArgumentNullException.ThrowIfNull(contract);
+            contract.Validate();
+            _contract = contract;
+            return this;
+        }
+
         /// <summary>Registers an <see cref="ITrajectoryObserver"/> to receive a snapshot after each run.</summary>
         public Builder WithTrajectoryObserver(ITrajectoryObserver observer)
         {
@@ -210,7 +277,7 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             ILogger logger = _loggerFactory?.CreateLogger($"Ananke.Orchestration.AgentJob.{_name}")
                 ?? NullLogger.Instance;
 
-            var responseFormat = new AgentResponseFormat(typeof(TResponse).Name, CachedResponseSchema);
+            var responseFormat = new AgentResponseFormat(SchemaName(typeof(TResponse)), CachedResponseSchema);
 
             var engine = new AgentJobEngine<TState, TResponse>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
@@ -223,10 +290,25 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                     ?? throw new InvalidOperationException(
                         $"[{_name}] Failed to deserialize response to {typeof(TResponse).Name}."),
                 finalCallSpanSuffix: "structured",
-                coercionPrompt: $"Based on everything above, provide your final response as JSON matching the {typeof(TResponse).Name} schema.");
+                coercionPrompt: $"Based on everything above, provide your final response as JSON matching the {typeof(TResponse).Name} schema.",
+                temperature: _temperature,
+                toolOutputPolicy: _toolOutputPolicy,
+                contract: _contract);
 
             return new AgentJob<TState, TResponse>(engine);
         }
+
+        /// <summary>What to call the answer's schema, in the characters a provider accepts.</summary>
+        /// <remarks>
+        /// A generic type's runtime name carries its arity — <c>Draft`1</c> — and a provider takes only
+        /// letters, digits, underscores and hyphens, so the arity gives way to the arguments' own names.
+        /// </remarks>
+        private static string SchemaName(Type type) =>
+            type.IsGenericType
+                ? string.Join(
+                    "-",
+                    (string[])[type.Name.Split('`')[0], .. type.GetGenericArguments().Select(SchemaName)])
+                : type.Name;
     }
 }
 

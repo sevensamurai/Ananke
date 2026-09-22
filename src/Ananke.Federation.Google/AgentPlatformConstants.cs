@@ -1,3 +1,5 @@
+using Ananke.Federation.Validation;
+
 namespace Ananke.Federation.Google;
 
 /// <summary>
@@ -25,6 +27,6 @@ internal static class AgentPlatformConstants
     /// (<c>"gemini-agent-platform"</c>).
     /// </summary>
     internal static bool IsAcceptedPlatform(string? platform) =>
-        string.Equals(platform, Platform, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(platform, PlatformAlias, StringComparison.OrdinalIgnoreCase);
+        platform is not null &&
+        string.Equals(PlatformIdentifiers.Resolve(platform), Platform, StringComparison.OrdinalIgnoreCase);
 }

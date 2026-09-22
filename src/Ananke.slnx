@@ -9,8 +9,7 @@
   </Folder>
   <Folder Name="/demos/02-workflow-patterns/">
     <Project Path="demos/02-workflow-patterns/AgenticDesignPatternsDemo/AgenticDesignPatternsDemo.csproj" />
-    <Project Path="demos/02-workflow-patterns/DesignPipelineDemo/DesignPipelineDemo.csproj" />
-    <Project Path="demos/02-workflow-patterns/SelfImprovingWorkflowDemo/SelfImprovingWorkflowDemo.csproj" />
+    <Project Path="demos/02-workflow-patterns/ItineraryDemo/ItineraryDemo.csproj" />
   </Folder>
 
   <Folder Name="/demos/03-memory-and-knowledge/">
@@ -56,6 +55,7 @@
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
     <Project Path="tests/Ananke.OpenTelemetry.Tests/Ananke.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/Ananke.Qdrant.Tests/Ananke.Qdrant.Tests.csproj" />
+    <Project Path="tests/Ananke.Orchestration.Bedrock.Tests/Ananke.Orchestration.Bedrock.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Knowledge.Tests/Ananke.Orchestration.Knowledge.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Tests/Ananke.Orchestration.Tests.csproj" />
@@ -98,6 +98,11 @@
   <Project Path="Ananke.MQTT/Ananke.MQTT.csproj" />
   <Project Path="Ananke.OpenTelemetry/Ananke.OpenTelemetry.csproj" />
   <Project Path="Ananke.Orchestration.Anthropic/Ananke.Orchestration.Anthropic.csproj" />
+  <Project Path="Ananke.Orchestration.Bedrock/Ananke.Orchestration.Bedrock.csproj" />
+  <Project Path="Ananke.Orchestration.Conformance/Ananke.Orchestration.Conformance.csproj" />
+  <Project Path="Ananke.Orchestration.Conformance.NUnit/Ananke.Orchestration.Conformance.NUnit.csproj" />
+  <Project Path="Ananke.Orchestration.Planning.Conformance/Ananke.Orchestration.Planning.Conformance.csproj" />
+  <Project Path="Ananke.Orchestration.Planning.Conformance.NUnit/Ananke.Orchestration.Planning.Conformance.NUnit.csproj" />
   <Project Path="Ananke.Orchestration.Google/Ananke.Orchestration.Google.csproj" />
   <Project Path="Ananke.Orchestration.Knowledge/Ananke.Orchestration.Knowledge.csproj" Id="42cc6757-2cac-4197-80dd-f37cc31d2a7b" />
   <Project Path="Ananke.Orchestration.OpenAI/Ananke.Orchestration.OpenAI.csproj" />

@@ -32,11 +32,17 @@ internal static class ValidateCommand
             Description = "Deployment profile name from the manifest's profiles: section. When set, tools are rebound before validation."
         };
 
+        var catalogOption = new Option<FileInfo?>("--catalog")
+        {
+            Description = "Manifest whose models: section resolves `ref:` model aliases (e.g. roles.ananke.yml)."
+        };
+
         var command = new Command("validate", "Validate a manifest's deployability to a target platform.")
         {
             fileArg,
             platformOption,
-            profileOption
+            profileOption,
+            catalogOption
         };
 
         command.SetAction(parseResult =>
@@ -45,13 +51,25 @@ internal static class ValidateCommand
             var platform = parseResult.GetValue(platformOption)!;
             var profile = parseResult.GetValue(profileOption);
             var json = parseResult.GetValue<bool>("--json");
-            return Execute(file, platform, profile, json);
+            var catalog = parseResult.GetValue(catalogOption);
+            try
+            {
+                return Execute(file, platform, profile, json, catalog);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // A bad --catalog is a user error, not a crash. Reported as a diagnostic with a
+                // non-zero exit, like every other input problem this command handles.
+                if (json) JsonOutput.Write(new { status = "error", message = ex.Message });
+                else Console.Error.WriteLine($"  ✗ {ex.Message}");
+                return 1;
+            }
         });
 
         return command;
     }
 
-    private static int Execute(FileInfo file, string platform, string? profileName, bool json)
+    private static int Execute(FileInfo file, string platform, string? profileName, bool json, FileInfo? catalog)
     {
         if (!file.Exists)
         {
@@ -121,7 +139,7 @@ internal static class ValidateCommand
         }
 
         var validator = new DeployabilityValidator();
-        var report = validator.Validate(manifest, toolKit, platform);
+        var report = validator.Validate(manifest, toolKit, platform, ModelCatalogue.Load(catalog));
 
         if (json)
             WriteJson(manifest, report, platform, profileName);

@@ -62,6 +62,93 @@ public sealed class PlatformCommandsIntegrationTests
         resolved.ShouldBeNull();
     }
 
+    // ── Built-in deployers (L1) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>local</c> is a built-in substrate, not an adapter. Before L1 it shipped in
+    /// <c>Ananke.Federation</c>, was documented <i>Stable</i>, and was constructed nowhere — so
+    /// <c>deploy --platform local</c> answered "Install the adapter for 'local'".
+    /// </summary>
+    [Test]
+    public void PlatformHost_registers_the_built_in_local_deployer()
+    {
+        using var host = new PlatformHost(inMemory: true);
+
+        var resolved = host.ResolveDeployer("local");
+
+        resolved.ShouldNotBeNull();
+        resolved.Platform.ShouldBe("local");
+    }
+
+    /// <summary>
+    /// The built-in must be bound to the host's own registry, or a deployment would be written
+    /// somewhere the CLI never reads back.
+    /// </summary>
+    [Test]
+    public async Task Built_in_local_deployer_writes_to_the_hosts_registryAsync()
+    {
+        using var host = new PlatformHost(inMemory: true);
+        var deployer = host.ResolveDeployer("local")!;
+
+        var record = await deployer.DeployAsync(
+            MinimalManifest("local-smoke"),
+            new ToolKit("test"),
+            new DeployOptions { Platform = "local" },
+            TestContext.CurrentContext.CancellationToken);
+
+        var stored = await host.Registry.GetAsync(record.DeploymentId);
+        stored.ShouldNotBeNull();
+        stored.Platform.ShouldBe("local");
+    }
+
+    /// <summary>
+    /// <see cref="FederationDeployerRegistry"/> is static and process-wide while a
+    /// <see cref="PlatformHost"/> is per-invocation. A second host must not throw
+    /// "already registered" — which is what an unguarded <c>Register</c> would do.
+    /// </summary>
+    [Test]
+    public void Constructing_a_second_host_does_not_throw_on_the_built_in()
+    {
+        using var first = new PlatformHost(inMemory: true);
+
+        Should.NotThrow(() =>
+        {
+            using var second = new PlatformHost(inMemory: true);
+            second.ResolveDeployer("local").ShouldNotBeNull();
+        });
+    }
+
+    /// <summary>
+    /// Regression guard for the double-registration found while verifying L1/L2: every shipped
+    /// deployer registers the record itself, and <c>DeployCommand</c> registered it a second time,
+    /// throwing "already exists" as an unhandled exception. It was unreachable until <c>local</c>
+    /// became resolvable, and the fixture's <see cref="FakeDeployer"/> hid it by not self-registering
+    /// — the same shape as the probe defect, where the tests exercised a path the product does not use.
+    /// </summary>
+    [Test]
+    public async Task Deploy_through_a_self_registering_deployer_does_not_double_registerAsync()
+    {
+        using var host = new PlatformHost(inMemory: true);
+        var deployer = host.ResolveDeployer("local")!;
+
+        // The deployer stores the record...
+        var record = await deployer.DeployAsync(
+            MinimalManifest("double-register"),
+            new ToolKit("test"),
+            new DeployOptions { Platform = "local" },
+            TestContext.CurrentContext.CancellationToken);
+
+        // ...so persisting the final copy must be an update, not a registration.
+        await Should.NotThrowAsync(() => host.Registry.UpdateAsync(record with
+        {
+            PlatformResourceId = "local/double-register"
+        }));
+
+        var stored = await host.Registry.GetAsync(record.DeploymentId);
+        stored!.PlatformResourceId.ShouldBe("local/double-register");
+        (await host.Registry.ListAsync("double-register")).Count.ShouldBe(1);
+    }
+
     // ── DeployCommand helpers ────────────────────────────────────────────────
 
     [Test]

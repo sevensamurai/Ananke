@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Workflows;
@@ -11,10 +12,9 @@ internal static class P12_BudgetTracking
     {
         PatternRunner.PrintHeader("12. Budget / Cost Tracking");
 
-        var model = SimulatedModel.Json(
+        var model = SimulatedAgentModel.Json(
             new { Result = "analysis complete" },
-            inputTokens: 500,
-            outputTokens: 200);
+            new SimulatedModelOptions { InputTokens = 500, OutputTokens = 200 });
 
         var agentA = AgentJobFactory.Create<BudgetState, BudgetResponse>("agent-a", model)
             .WithPrompt(s => "Analyze data set A")

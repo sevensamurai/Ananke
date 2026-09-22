@@ -29,9 +29,9 @@ map, so "colony" and "cell" in prose are never a dead end when you go looking fo
 | **Lineage** | Which cells were split from which parents | `ILineageStore` |
 | **Apoptosis / cell death** | A cell stopping (crash, prune, or graceful stop) | `IWorkflowHost.StopAsync`, `IHealingPolicy` |
 
-Older ADRs (pre-rename) use `ICellDivider`, `ICellReplicator`, `IColonyAggregator`, and `nnke
-colony *` — that vocabulary is gone from the tree; the full mapping lives in the banner of
-[`20260418-adr-arch-010-organics-incomplete-tier3-analysis.md`](../../internals/foundation/release-0.X.X/organics/20260418-adr-arch-010-organics-incomplete-tier3-analysis.md).
+An older vocabulary — `ICellDivider`, `ICellReplicator`, `IColonyAggregator`, and `nnke colony *` —
+is gone from the tree. If you meet it in an old branch or issue, the current names are the ones in
+the table above.
 
 One exception: `Topology/ColonyGraphBuilder` and `ColonyReportExporter` (below) kept "Colony" in
 their names.

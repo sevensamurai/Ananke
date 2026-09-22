@@ -9,7 +9,7 @@ namespace Ananke.Orchestration.Usage;
 /// <remarks>
 /// The lock lives here rather than in the runner: recording happens once per model
 /// response from concurrent fork branches, so serialisation belongs at the one place
-/// every path funnels through. See ADR-arch-028 D9.
+/// every path funnels through. SeeD9.
 /// </remarks>
 public sealed class InMemoryUsageRecorder : IUsageRecorder
 {

@@ -1,4 +1,5 @@
 {
+  "autoMemoryEnabled": false,
   "mcpServers": {
     "codegraph": {
       "command": "codegraph",

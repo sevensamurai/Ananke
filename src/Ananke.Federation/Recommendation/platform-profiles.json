@@ -1,8 +1,8 @@
 {
   "platforms": {
-    "azure-ai": {
+    "azure": {
       "displayName": "Microsoft Foundry Agent Service",
-      "aliases": [ "foundry" ],
+      "aliases": [ "azure-ai", "foundry" ],
       "strengths": [ "enterprise_data", "governance", "browser", "deep_research" ],
       "weaknesses": [ "bash", "shell" ],
       "governance": {
@@ -19,7 +19,7 @@
     },
     "vertex-ai": {
       "displayName": "Gemini Enterprise Agent Platform",
-      "aliases": [ "gemini-enterprise" ],
+      "aliases": [ "gemini-enterprise", "gemini-agent-platform" ],
       "strengths": [ "google_data", "memory_bank", "a2a", "model_variety" ],
       "weaknesses": [ "devops_overhead" ],
       "governance": {
@@ -31,7 +31,7 @@
       "latencyBand": "low",
       "memoryMaturity": "ga",
       "regions": [ "us-central1", "europe-west4" ],
-      "linksTo": "https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/overview"
+      "linksTo": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/overview"
     },
     "claude": {
       "displayName": "Claude Managed Agents",
@@ -46,6 +46,18 @@
       "memoryMaturity": "ga",
       "regions": [ "global" ],
       "linksTo": "https://docs.anthropic.com/en/docs/claude-code/overview"
+    },
+    "local": {
+      "displayName": "Local in-process substrate",
+      "aliases": [],
+      "strengths": [ "bash", "shell" ],
+      "weaknesses": [ "governance", "enterprise_data", "managed_harness" ],
+      "governance": {},
+      "costBand": "low",
+      "latencyBand": "low",
+      "memoryMaturity": "n/a",
+      "regions": [ "local" ],
+      "linksTo": "https://github.com/abbacca/Ananke"
     }
   }
 }

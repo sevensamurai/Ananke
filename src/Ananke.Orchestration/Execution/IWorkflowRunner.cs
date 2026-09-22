@@ -46,7 +46,7 @@ public interface IWorkflowRunner
     /// The internal channel provides back-pressure: when the buffer is full, the runner
     /// blocks until the consumer reads. Configure via <paramref name="options"/>.
     /// </remarks>
-    IAsyncEnumerable<WorkflowEvent<TState>> StreamAsync<TState>(
+    IAsyncEnumerable<WorkflowEvent> StreamAsync<TState>(
         WorkflowDefinition<TState> definition,
         TState initialState,
         WorkflowStreamOptions? options = null,

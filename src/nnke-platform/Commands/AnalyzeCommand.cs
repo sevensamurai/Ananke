@@ -7,7 +7,7 @@ namespace Ananke.Tool.Platform.Commands;
 
 /// <summary>
 /// Handles <c>nnke-platform analyze &lt;file&gt; [--deployment-id &lt;id&gt;]</c> —
-/// compares manifest structure against runtime trends and recommends division
+/// examines manifest structure and recommends division
 /// or platform placement changes.
 /// </summary>
 /// <remarks>
@@ -26,29 +26,27 @@ internal static class AnalyzeCommand
             Description = "Path to the .ananke.yml manifest file."
         };
 
-        var deploymentIdOption = new Option<string?>("--deployment-id")
+        // --deployment-id and the runtime-trend correlation are withdrawn for 1.0.
+        // RemoteMetricsTracker keeps samples in memory and ResolveTracker() built a fresh, empty one
+        // on every invocation, so the correlation could never fire — it silently degraded to
+        // "no trend data" regardless of what a deployment had actually done. Restoring it needs a
+        // metrics store that survives a process; doing so is additive.
+        var command = new Command("analyze", "Analyze a manifest's structural complexity.")
         {
-            Description = "Active deployment ID to correlate with runtime metrics trends."
-        };
-
-        var command = new Command("analyze", "Analyze a manifest's structural complexity and correlate with runtime metrics.")
-        {
-            fileArg,
-            deploymentIdOption
+            fileArg
         };
 
         command.SetAction(parseResult =>
         {
             var file = parseResult.GetValue(fileArg)!;
-            var deploymentId = parseResult.GetValue(deploymentIdOption);
             var json = parseResult.GetValue<bool>("--json");
-            return Execute(file, deploymentId, json);
+            return Execute(file, json);
         });
 
         return command;
     }
 
-    private static int Execute(FileInfo file, string? deploymentId, bool json)
+    private static int Execute(FileInfo file, bool json)
     {
         if (!file.Exists)
         {
@@ -73,13 +71,13 @@ internal static class AnalyzeCommand
             return 1;
         }
 
-        var analysis = AnalyzeManifest(manifest, deploymentId);
+        var analysis = AnalyzeManifest(manifest);
         Emit(analysis, json);
 
         return 0;
     }
 
-    private static AnalysisResult AnalyzeManifest(WorkflowManifest manifest, string? deploymentId)
+    private static AnalysisResult AnalyzeManifest(WorkflowManifest manifest)
     {
         var jobCount = manifest.Jobs.Count;
 
@@ -104,19 +102,6 @@ internal static class AnalyzeCommand
         if (jobCount == 1 && estimatedToolCount >= 8)
             recommendations.Add("Single-job workflow with many tools. A multi-job topology or division would reduce routing entropy.");
 
-        // Check for trend correlation
-        RemoteCellTrend? trend = null;
-        if (deploymentId is not null)
-        {
-            var tracker = ResolveTracker();
-            trend = tracker.GetTrend(deploymentId);
-
-            if (trend?.IsStrugglingGeneralist == true)
-                recommendations.Add($"⚠ Runtime metrics confirm struggling generalist pattern (tokens/exec slope: {trend.TokensPerExecutionSlope:+0.000}, tool-calls/exec slope: {trend.ToolCallsPerExecutionSlope:+0.000}). Division is strongly recommended.");
-            else if (trend?.IsStable == true)
-                recommendations.Add("Runtime metrics are stable — no immediate division pressure from execution patterns.");
-        }
-
         if (recommendations.Count == 0)
             recommendations.Add("Workflow structure looks healthy. No division recommended at this time.");
 
@@ -125,7 +110,6 @@ internal static class AnalyzeCommand
             jobCount,
             estimatedToolCount,
             estimatedContextUtil,
-            trend,
             recommendations);
     }
 
@@ -139,13 +123,6 @@ internal static class AnalyzeCommand
                 jobCount = result.JobCount,
                 estimatedToolCount = result.EstimatedToolCount,
                 estimatedContextUtilization = Math.Round(result.EstimatedContextUtil, 3),
-                hasTrendData = result.Trend is not null,
-                trend = result.Trend is not null ? new
-                {
-                    tokensPerExecutionSlope = Math.Round(result.Trend.TokensPerExecutionSlope, 4),
-                    toolCallsPerExecutionSlope = Math.Round(result.Trend.ToolCallsPerExecutionSlope, 4),
-                    isStrugglingGeneralist = result.Trend.IsStrugglingGeneralist
-                } : null,
                 recommendations = result.Recommendations
             });
         }
@@ -157,11 +134,6 @@ internal static class AnalyzeCommand
             Console.WriteLine($"  Tools:   ~{result.EstimatedToolCount} (estimated from manifest)");
             Console.WriteLine($"  Context: ~{result.EstimatedContextUtil:P0} utilization");
 
-            if (result.Trend is not null)
-            {
-                Console.WriteLine($"  Trend:   tokens/exec {result.Trend.TokensPerExecutionSlope:+0.000;-0.000}  calls/exec {result.Trend.ToolCallsPerExecutionSlope:+0.000;-0.000}");
-            }
-
             Console.WriteLine();
             Console.WriteLine("  Recommendations:");
             foreach (var rec in result.Recommendations)
@@ -170,17 +142,10 @@ internal static class AnalyzeCommand
         }
     }
 
-    private static RemoteMetricsTracker ResolveTracker()
-    {
-        // TODO: Connect to persistent metrics source (OTEL backend query).
-        return new RemoteMetricsTracker();
-    }
-
     private sealed record AnalysisResult(
         string WorkflowName,
         int JobCount,
         int EstimatedToolCount,
         double EstimatedContextUtil,
-        RemoteCellTrend? Trend,
         List<string> Recommendations);
 }

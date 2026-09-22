@@ -19,7 +19,7 @@ public sealed record ChildSpec
     public string? SystemPromptOverride { get; init; }
 
     /// <summary>
-    /// Optional target platform for this child (e.g. <c>"azure-ai"</c>, <c>"vertex-ai"</c>).
+    /// Optional target platform for this child (e.g. <c>"azure"</c>, <c>"vertex-ai"</c>).
     /// When <see langword="null"/>, the child runs on the local host.
     /// </summary>
     public string? TargetPlatform { get; init; }

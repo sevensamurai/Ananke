@@ -25,7 +25,7 @@ namespace Ananke.Orchestration.Agents.Context;
 ///     maxTokens: 4096,
 ///     tokenCounter: ApproximateTokenCounter.Instance);
 ///
-/// var compacted = await strategy.ApplyAsync(messages, systemPrompt, ct);
+/// var projection = await strategy.ApplyAsync(messages, systemPrompt, ContextBudget.Unspecified, ct);
 /// </code>
 /// </example>
 public sealed class SlidingWindowContextStrategy : IContextStrategy
@@ -49,22 +49,24 @@ public sealed class SlidingWindowContextStrategy : IContextStrategy
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<AgentMessage>> ApplyAsync(
+    public Task<ContextProjection> ApplyAsync(
         IReadOnlyList<AgentMessage> messages,
         string? systemPrompt,
+        ContextBudget budget,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(budget);
+
+        // The caller's allocation wins over the configured one, and the model's real window caps
+        // both — so this instance can serve a router whose candidates have different windows.
+        var applied = budget.Resolve(_maxTokens);
+
         if (messages.Count == 0)
-            return Task.FromResult(messages);
+            return Task.FromResult(ContextProjection.Unchanged(messages, applied));
 
         var systemTokens = systemPrompt is not null ? _tokenCounter.EstimateTokens(systemPrompt) : 0;
-        var budget = _maxTokens - systemTokens;
+        var remaining = applied - systemTokens;
 
-        if (budget <= 0)
-            // System prompt alone exceeds budget — keep only the last message
-            return Task.FromResult<IReadOnlyList<AgentMessage>>([messages[^1]]);
-
-        // Calculate total tokens and find how many messages to keep
         var messageCosts = new int[messages.Count];
         var total = 0;
         for (var i = 0; i < messages.Count; i++)
@@ -73,14 +75,33 @@ public sealed class SlidingWindowContextStrategy : IContextStrategy
             total += messageCosts[i];
         }
 
-        if (total <= budget)
-            return Task.FromResult(messages);
+        if (remaining <= 0)
+        {
+            // System prompt alone exceeds the budget — keep only the last message.
+            var shadowed = 0;
+            for (var i = 0; i < messages.Count - 1; i++)
+                shadowed += messageCosts[i];
+
+            return Task.FromResult(new ContextProjection
+            {
+                Messages = [messages[^1]],
+                ShadowedCount = messages.Count - 1,
+                ShadowedTokens = shadowed,
+                Reason = messages.Count > 1 ? ContextShadowReason.Dropped : ContextShadowReason.None,
+                AppliedBudget = applied
+            });
+        }
+
+        if (total <= remaining)
+            return Task.FromResult(ContextProjection.Unchanged(messages, applied));
 
         // Drop from the front until we fit. Always keep the last message.
         var dropIndex = 0;
-        while (total > budget && dropIndex < messages.Count - 1)
+        var droppedTokens = 0;
+        while (total > remaining && dropIndex < messages.Count - 1)
         {
             total -= messageCosts[dropIndex];
+            droppedTokens += messageCosts[dropIndex];
             dropIndex++;
         }
 
@@ -88,6 +109,13 @@ public sealed class SlidingWindowContextStrategy : IContextStrategy
         for (var i = dropIndex; i < messages.Count; i++)
             result.Add(messages[i]);
 
-        return Task.FromResult<IReadOnlyList<AgentMessage>>(result);
+        return Task.FromResult(new ContextProjection
+        {
+            Messages = result,
+            ShadowedCount = dropIndex,
+            ShadowedTokens = droppedTokens,
+            Reason = dropIndex > 0 ? ContextShadowReason.Dropped : ContextShadowReason.None,
+            AppliedBudget = applied
+        });
     }
 }

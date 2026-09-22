@@ -801,4 +801,23 @@ public class WorkflowScaffoldTests
         public Task<ScaffoldState> ExecuteAsync(ScaffoldState state, CancellationToken ct) =>
             Task.FromResult(state with { Value = state.Value + 1 });
     }
+
+    [Test]
+    public void Scaffold_AConditionalPauseDirective_IsRefusedRatherThanBuiltAsAGate()
+    {
+        // Building it unconditionally would be the worst available outcome: a run that was meant to
+        // ask only when it could not go on would stop at every arrival, and nothing would say so.
+        var dsl = """
+            work -> review
+            review -> __end__
+            interrupt(review, when)
+            """;
+
+        var build = () => WorkflowScaffold.Parse<ScaffoldState>("test", dsl);
+
+        var error = build.ShouldThrow<InvalidOperationException>();
+
+        error.Message.ShouldContain("review");
+        error.Message.ShouldContain("InterruptWhen");
+    }
 }

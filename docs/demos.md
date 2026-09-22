@@ -41,11 +41,20 @@ The tables below map the guide set to the demo projects in the main repository, 
 | # | Guide | What you'll learn | Demo |
 |---|---|---|---|
 | 11 | [Advanced Agent Features](guides/11-advanced-agents.md) | Response caching, resilient retries, decorator composition, local/custom LLM endpoints | — |
-| 12 | [MCP & Interop](guides/12-mcp-and-interop.md) | Expose tools/workflows as MCP server, consume external MCP tools, A2A protocol | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
-| 13 | [Design Tooling](guides/13-design-tooling.md) | Text DSL, YAML manifests, `Bind()` at runtime, Mermaid diagram export | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
+| 12 | [MCP & Interop](guides/12-mcp-and-interop.md) | Expose tools/workflows as MCP server, consume external MCP tools, A2A protocol | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) · [AgentToAgentProtocolDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/AgentToAgentProtocolDemo) |
+| 13 | [Design Tooling](guides/13-design-tooling.md) | Text DSL, YAML manifests, `Bind()` at runtime, Mermaid diagram export | [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
 | 14 | [Testing](guides/14-testing.md) | In-memory implementations for every contract, zero-config integration tests, test patterns | — |
 | 15 | [Empirical Memory](guides/15-empirical-memory.md) | `IEmpiricalMemory`, `EmpiricalMemoryTools` (`recall_empirical`, `commit_insight`, `reinforce_empirical`), `EmpiricalKind` (Pattern / Skill / Heuristic), confidence tracking, dedup, `InMemoryEmpiricalMemory` and `QdrantEmpiricalMemory` | [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) |
 | 16 | [Agentic Patterns](guides/16-agentic-patterns.md) | `AgenticPattern` builder, Review & Critique, Iterative Refinement — pre-wired validated topologies on top of `Workflow<TState>` primitives | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+| 17 | [Local Models](guides/17-local-models.md) | Ollama, llama.cpp, vLLM; model classification (size, weights, licence), the effective-context-window hazard, zero-cost routing | — |
+| 18 | [Plans and Contracts](guides/18-plans-and-contracts.md) | `PlanTree` and versions, pinned `AgentContract`s, executable criteria, verification and abstention, the supervisor / Planner seats, re-ruling rather than cancelling | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+
+### Providers & Deployment
+
+| # | Guide | What you'll learn | Demo |
+|---|---|---|---|
+| 20 | [Platform Recommendation](guides/20-platform-recommendation.md) | `nnke-platform eval`, platform-fit scoring, the hybrid router, local substrate for credential-free testing | [LocalPlatformLoopDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/LocalPlatformLoopDemo) |
+| 21 | [Enterprise Clouds](guides/21-enterprise-clouds.md) | Amazon Bedrock and Microsoft Foundry: SigV4 and Entra auth, endpoint choice, bring-your-own model ids, orchestrating agents over A2A | — |
 
 ---
 

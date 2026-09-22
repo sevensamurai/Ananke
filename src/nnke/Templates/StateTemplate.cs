@@ -20,6 +20,7 @@ internal static class StateTemplate
             "handoff" => ("state-handoff.cs.template", "HandoffState.cs"),
             "organic-host" => ("state-organic-host.cs.template", "MeshState.cs"),
             "streaming-chat" => ("state-streaming-chat.cs.template", "ChatState.cs"),
+            "supervised-plan" => ("state-supervised-plan.cs.template", "DeliveryState.cs"),
             _ => ("PipelineState.cs.template", "PipelineState.cs"),
         };
 

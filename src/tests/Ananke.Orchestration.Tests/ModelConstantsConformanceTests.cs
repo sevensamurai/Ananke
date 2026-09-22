@@ -23,10 +23,13 @@ public class ModelConstantsConformanceTests
     /// </summary>
     private static readonly HashSet<string> NoOrchestrationTemplateExpected = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Non-chat / specialty Google models with no ModelProfileTemplate — Orchestration's
-        // catalog is scoped to text/agent chat models, not image-gen, open-weight, or audio models.
+        // Non-chat Google models with no ModelProfileTemplate — the Orchestration catalog is
+        // scoped to text and agent chat models, not image generation or audio.
+        //
+        // "open-weight" used to appear in that list of exclusions and was never true: Meta, Mistral
+        // and DeepSeek templates have always been open-weight, and Microsoft, Alibaba and Gemma
+        // entries have since joined them. Gemma left this allowlist with them.
         Models.Google.Gemini31FlashImage,
-        Models.Google.Gemma4,
         Models.Google.Lyria3,
     };
 

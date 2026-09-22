@@ -22,9 +22,10 @@ public sealed class ApproximateTokenCounter : ITokenCounter
     {
         var total = 0;
 
-        if (message.Content is not null)
-            total += EstimateTokens(message.Content);
-
+        // Parts and Content are two views of the same text, not two payloads:
+        // AgentMessage.Content is *computed* by concatenating TextPart entries whenever Parts is
+        // set. Counting both therefore charged every multimodal message twice for its text, which
+        // made strategies compact earlier than the real prompt size warranted.
         if (message.Parts is { Count: > 0 })
         {
             foreach (var part in message.Parts)
@@ -32,6 +33,10 @@ public sealed class ApproximateTokenCounter : ITokenCounter
                 if (part is TextPart tp)
                     total += EstimateTokens(tp.Text);
             }
+        }
+        else if (message.Content is not null)
+        {
+            total += EstimateTokens(message.Content);
         }
 
         if (message.ToolCalls is { Count: > 0 })

@@ -5,7 +5,7 @@ namespace Ananke.Orchestration.Google.Credentials;
 /// <summary>
 /// Resolves Google Cloud / Gemini API credentials.
 /// For the Gemini Developer API use <see cref="GeminiApiKeyCredentialProvider"/>.
-/// For Vertex AI (ADC), see <see cref="VertexAICredentialProvider"/>.
+/// For Vertex AI (ADC), see <see cref="AgentPlatformCredentialProvider"/>.
 /// </summary>
 public sealed class GeminiApiKeyCredentialProvider : ICredentialProvider
 {
@@ -50,7 +50,7 @@ public sealed class GeminiApiKeyCredentialProvider : ICredentialProvider
 /// Resolves Google Cloud credentials for Vertex AI using Application Default Credentials (ADC).
 /// Returns a tuple of (project, location) so the caller can construct a <c>Client</c>.
 /// </summary>
-public sealed class VertexAICredentialProvider : ICredentialProvider
+public sealed class AgentPlatformCredentialProvider : ICredentialProvider
 {
     private readonly string _project;
     private readonly string _location;
@@ -66,7 +66,7 @@ public sealed class VertexAICredentialProvider : ICredentialProvider
     /// </summary>
     /// <param name="project">Google Cloud project ID.</param>
     /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
-    public VertexAICredentialProvider(string project, string location)
+    public AgentPlatformCredentialProvider(string project, string location)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(project);
         ArgumentException.ThrowIfNullOrWhiteSpace(location);

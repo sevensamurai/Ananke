@@ -53,50 +53,111 @@ public async Task Pipeline_produces_expected_output()
 
 ## Testing Agent Workflows Without LLMs
 
-Create a test model that returns predictable responses:
+Use `SimulatedAgentModel`. It is an `IStreamingAgentModel` that answers from a script instead of a
+provider, so a workflow, a job or a whole demo runs with no key and no network.
 
 ```csharp
-public class FakeAgentModel : IStreamingAgentModel
+[Test]
+public async Task Agent_workflow_processes_a_scripted_response()
 {
-    private readonly string _response;
+    var model = SimulatedAgentModel.Json(new GatherResult { Summary = "Test summary" });
 
-    public FakeAgentModel(string response) => _response = response;
-
-    public Task<AgentResponse> GenerateAsync(AgentRequest request,
-        CancellationToken ct = default)
-    {
-        return Task.FromResult(new AgentResponse { Text = _response });
-    }
-
-    public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
-        AgentRequest request, [EnumeratorCancellation] CancellationToken ct = default)
-    {
-        yield return new AgentStreamChunk { TextDelta = _response };
-    }
-}
-```
-
-```csharp
-[Fact]
-public async Task Agent_workflow_processes_fake_response()
-{
-    var fakeModel = new FakeAgentModel("{\"Summary\": \"Test summary\"}");
-
-    var job = new AgentJob<ResearchState, GatherResult>
-        .Builder("gather", fakeModel)
-        .WithSystemPrompt("Test")
+    var job = AgentJobFactory.Create<ResearchState, GatherResult>("gather", model)
         .WithPrompt(s => s.Query)
         .MapResult((s, r) => s with { Facts = r.Summary })
         .Build();
 
-    var workflow = new Workflow<ResearchState>("test")
-        .Job("gather", job);
+    var result = await new Workflow<ResearchState>("test")
+        .Job("gather", job)
+        .RunAsync(new ResearchState { Query = "test" });
 
-    var result = await workflow.RunAsync(new ResearchState { Query = "test" });
-
-    Assert.Equal("Test summary", result.State.Facts);
+    result.State.Facts.ShouldBe("Test summary");
 }
 ```
+
+There are four ways to say what it should answer:
+
+| | |
+|---|---|
+| `SimulatedAgentModel.Fixed(text)` | the same reply to everything |
+| `SimulatedAgentModel.Json(value)` | an object, serialized |
+| `SimulatedAgentModel.Sequence([...])` | one reply per call, the last repeating |
+| `new SimulatedAgentModel(request => ...)` | anything, computed from the request |
+
+### Asserting on what the model was sent
+
+Every request is recorded, which is usually the point of using a fake at all — that a contract
+reached the model, that a tool result came back, that the second call saw the first one's output:
+
+```csharp
+var model = SimulatedAgentModel.Fixed("ok");
+await job.ExecuteAsync(state);
+
+model.Calls.ShouldBe(1);
+model.Requests[0].SystemPrompt.ShouldContain("the contract");
+```
+
+### Scripts in a file
+
+For anything longer than a couple of replies, put the script in a JSON file. A scripted run in a file
+is a reviewable artifact; the same run written as a class is a code change that happens to alter what
+a model says — which is the one thing a reviewer of a scripted run needs to see.
+
+```json
+{
+  "responses": [
+    {
+      "when": "Parse the input",
+      "whenIn": "systemPrompt",
+      "replies": [
+        { "summary": "the parser does not round-trip yet", "met": false },
+        { "summary": "it round-trips", "met": true }
+      ]
+    },
+    { "replies": ["anything else"] }
+  ]
+}
+```
+
+```csharp
+var model = SimulatedAgentModel.FromFile("script.json");
+```
+
+Four things that matter about the matching:
+
+- **Entries are tried in order and the first match wins**, so put specific ones first and a catch-all
+  (no `When`) last.
+- **`When` is matched against what the model was *sent*** — never against a label passed alongside
+  the request. A real model gets a prompt and nothing else, so a script keyed on anything else is
+  testing a channel that does not exist.
+- **`WhenIn` narrows where to look** — `systemPrompt`, `messages`, or anywhere. Worth setting when the
+  same text can appear in both: a job that pins a contract puts the goal in the system prompt and may
+  render surrounding context, naming other work items, into the user turn.
+- **Successive calls matching one entry get successive replies**, which is how you script work that
+  fails, is fixed, and then passes.
+
+A reply may be written as a JSON object rather than an escaped string — it is handed to the job
+verbatim. And a request no entry describes is **refused**, with what was sent quoted in the message:
+answering anyway would turn an unscripted request into a passing test that proves nothing.
+
+### Declaring a context window
+
+Set one whenever the run is being measured:
+
+```csharp
+var model = SimulatedAgentModel.Fixed("ok", new SimulatedModelOptions
+{
+    ModelName = "scripted",
+    ContextWindowTokens = 8_000,
+    InputTokens = 500,
+    OutputTokens = 200
+});
+```
+
+Context instruments report fill and truncation against a known window. A model that declares none
+degrades every one of those figures to "no call knew its window", which reads like an instrument
+fault rather than a missing declaration. `InputTokens` and `OutputTokens` do the same for anything
+measuring cost or budget.
 
 ---
 
@@ -231,7 +292,7 @@ public async Task Handoff_round_trip()
 | What you're testing | Key technique |
 |---|---|
 | Workflow logic | Pure state transitions — no mocks needed |
-| Agent responses | Fake `IStreamingAgentModel` with canned responses |
+| Agent responses | `SimulatedAgentModel` — fixed, JSON, sequenced, or a script in a file |
 | State machine | `InMemoryDistributedLock` — no Redis |
 | Knowledge pipeline | `InMemoryKnowledgeStore` — no Qdrant |
 | Checkpointing | `InMemoryCheckpointStore` — no files |

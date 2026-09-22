@@ -99,6 +99,7 @@ var models = new ModelResolver()
 | SubFlow | `subflow(name)` | `.SubFlow("name", inner, mapIn, mapOut)` |
 | Interrupt | `interrupt(name)` | `.InterruptBefore("name")` |
 | Ask (input turn) | `ask(name)` | `.AwaitInput("name")` |
+| Conditional pause | `interrupt(name, when)` · `ask(name, when)` | `.InterruptWhen("name", when)` · `.AwaitInputWhen("name", when)` — **exported and parsed, never built**: the condition is code |
 
 Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/Ananke/blob/main/docs/workflow-dsl.md)**
 
@@ -108,6 +109,10 @@ Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/
 |---|---|
 | `WorkflowScaffold<TState>` | Parse DSL topology, bind jobs/merges/routers, build a `Workflow<TState>` |
 | `WorkflowManifest` | Parse `.ananke.yml` files — models, jobs, connections |
+| `PlanManifest` | Parse a plan written as YAML — decomposition, contracts, and `revisions:` recording what changed and why; builds a `PlanTree` |
+| `PlanNarrator` | Turn a supervised run's events into lines as they arrive — `Describe(evt)`, or `.Narrate()` over the stream |
+| `SessionTrace` | One readable account of a whole run: the plan's decisions joined with the jobs, model calls and tool calls beneath them, live and as a transcript |
+| `PlanReportExporter` | Render a `PlanTree` for a person — `ToOutline()` for the version in force, `ToLineage()` for what each version changed, added and dropped, `ToReport()` for both |
 | `ModelResolver` | Resolve manifest model aliases to live `IAgentModel` instances via registered provider factories |
 | `WorkflowDiagramExtensions` | `.ToMermaid()` export for any validated workflow graph |
 | `AgentTextResponse` | Default structured response type for agent jobs that return plain text |

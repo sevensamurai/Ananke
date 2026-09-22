@@ -45,5 +45,5 @@ implementation details reached only through `DefaultPlatformNativeExecutors.Regi
 
 | Category | Capabilities | Behaviour |
 |---|---|---|
-| **Real emulators** (local tooling / network) | `web_search`, `web_fetch`, `bash`, `text_editor`, `code_execution`, `code_interpreter`, `vertex_extension:code_interpreter`, `file_search`, `memory`, `memory_bank`, `memory_profiles`, `memory_search` | Backed by an HTTP client, local process, or in-memory store — real behaviour, no cloud account needed |
+| **Real emulators** (local tooling / network) | `web_search`, `web_fetch`, `bash`, `text_editor`, `code_execution`, `code_interpreter`, `file_search`, `memory`, `memory_bank`, `memory_profiles`, `memory_search` | Backed by an HTTP client, local process, or in-memory store — real behaviour, no cloud account needed |
 | **Stubs** (deterministic, no network/credentials needed) | `bing_search`, `bing_grounding`, `bing_custom_search`, `azure_ai_search`, `sharepoint`, `sharepoint_grounding`, `microsoft_fabric`, `google_search`, `google_search_retrieval`, `url_context`, `computer_use`, `browser_automation`, `image_generation`, `deep_research`, `bigquery`, `spanner`, `bigtable`, `pubsub`, `maps`, `artifact_service`, `capture_structured_outputs` | Returns fixed fixture data — exercises the tool-calling path without requiring the real platform |

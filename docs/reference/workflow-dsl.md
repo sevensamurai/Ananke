@@ -113,6 +113,20 @@ interrupt(publish)
 
 Pauses execution before the named job runs. The workflow returns with `ExecutionStatus.Interrupted` and can be resumed via `ResumeAsync`. Requires `UseCheckpointing` to be configured on the built workflow.
 
+### Conditional pause (read-only)
+
+```
+interrupt(publish, when)
+ask(publish, when)
+```
+
+A pause that happens only on the arrivals a predicate names — an escalation rather than a gate. The
+predicate is a `Func<TState, bool>` written in code, so **this form is exported and parsed but never
+built**: `WorkflowScaffold` refuses it and points you at `InterruptWhen(job, when)` /
+`AwaitInputWhen(job, when)` on the built workflow. The marker exists so a topology export does not
+show an escalation as though it stopped every time. See
+[Guide 07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md#pausing-only-when-it-matters-interruptwhen-awaitinputwhen).
+
 ## Usage
 
 ### Basic: linear workflow

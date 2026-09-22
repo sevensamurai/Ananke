@@ -8,8 +8,9 @@ namespace Ananke.Federation.Conformance.Tests;
 /// Phase C conformance tests for the real-emulator implementations.
 /// Verifies that all capabilities in the emulation matrix are covered and that
 /// real emulators return well-formed <see cref="Ananke.Orchestration.Tools.ToolResult"/>
-/// values. Network-dependent tests (web_search, web_fetch) are marked as
-/// <c>[Explicit]</c> and skipped in standard CI.
+/// values. Every executor here is fixture-backed and reaches no network, so all of these run in
+/// standard CI. (An earlier version of this comment claimed the <c>web_search</c> / <c>web_fetch</c>
+/// tests were <c>[Explicit]</c>; they are not, because they do not call out.)
 /// </summary>
 [TestFixture]
 public class EmulatorImplementationTests
@@ -26,7 +27,7 @@ public class EmulatorImplementationTests
         {
             "web_search", "web_fetch",
             "bash", "text_editor",
-            "code_execution", "code_interpreter", "vertex_extension:code_interpreter",
+            "code_execution", "code_interpreter",
             "file_search",
             "memory", "memory_bank", "memory_profiles", "memory_search",
             "bing_search", "bing_grounding", "bing_custom_search",
@@ -78,7 +79,7 @@ public class EmulatorImplementationTests
         var real = new[]
         {
             "web_search", "web_fetch", "bash", "text_editor",
-            "code_execution", "code_interpreter", "vertex_extension:code_interpreter",
+            "code_execution", "code_interpreter",
             "file_search", "memory", "memory_bank", "memory_profiles", "memory_search"
         };
 

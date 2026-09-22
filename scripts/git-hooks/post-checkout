@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Switching branches is the largest single source of index drift.
+#
+# post-checkout also fires for `git checkout -- <file>`, which is far too noisy
+# to sync on. Git passes a flag as $3: 1 for a branch checkout, 0 for a file
+# one. Only the former is worth re-indexing.
+[ "${3:-0}" = "1" ] || exit 0
+exec "$(dirname "$0")/_codegraph-sync" post-checkout

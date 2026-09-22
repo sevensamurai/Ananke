@@ -57,6 +57,33 @@ public class ToolKitTests
     }
 
     [Test]
+    public async Task AddTool_AnOptionalParam_ReadsBackWhetherItWasSuppliedOrNot()
+    {
+        // A parameter declared `required: false` needs a reader that tolerates its absence. Get()
+        // throws on exactly the case the declaration exists to allow, so a tool with an optional
+        // argument failed with a message about a missing *required* one the moment a model left it
+        // out — which is the normal case, not the exceptional one.
+        var kit = new ToolKit("test")
+            .AddTool("carry", "Carries a thing", b => b
+                .Param("what", "The thing")
+                .Param("how", "Optionally, which way", required: false)
+                .OnExecute(args => ToolResult.Ok(
+                    $"{args.Get("what")}/{args.GetOrDefault("how") ?? "unspecified"}")));
+
+        var tool = kit.Tools["carry"];
+        tool.Parameters.Single(p => p.Name == "how").IsRequired.ShouldBeFalse();
+
+        (await tool.ExecuteAsync(new Dictionary<string, object?> { ["what"] = "hakone" }))
+            .Value.ShouldBe("hakone/unspecified");
+
+        (await tool.ExecuteAsync(new Dictionary<string, object?>
+        {
+            ["what"] = "hakone",
+            ["how"] = "the 6th"
+        })).Value.ShouldBe("hakone/the 6th");
+    }
+
+    [Test]
     public void AddTool_MissingArg_Throws()
     {
         var kit = new ToolKit("test")
@@ -427,6 +454,74 @@ public class ToolKitTests
         schema.ShouldContain("\"examples\"");
         schema.ShouldContain("distributed consensus");
         schema.ShouldContain("Raft vs Paxos");
+    }
+
+    private record Stay
+    {
+        [System.ComponentModel.Description("Where the stay is.")]
+        public string Place { get; init; } = string.Empty;
+
+        public DateOnly CheckIn { get; init; }
+    }
+
+    [Test]
+    public void ParamList_IsAnArrayOfTheRecordsOwnFields()
+    {
+        var kit = new ToolKit("test")
+            .AddTool("check_plan", "Checks a whole plan", tool => tool
+                .ParamList<Stay>("stays", "Every stay in the plan, in date order.")
+                .OnExecute(_ => ToolResult.Ok("ok")));
+
+        var parameter = kit.Tools["check_plan"].Parameters[0];
+        parameter.JsonType.ShouldBe("array");
+
+        var schema = kit.Tools["check_plan"].ParametersJsonSchema;
+        schema.ShouldContain("\"items\"");
+        schema.ShouldContain("\"Place\"");
+        schema.ShouldContain("\"CheckIn\"");
+
+        // What B4 put in the schema reaches a tool's parameters too: what a field means, and that a
+        // day is a date rather than an instant.
+        schema.ShouldContain("Where the stay is.");
+        schema.ShouldContain("\"date\"");
+    }
+
+    [Test]
+    public async Task ParamList_IsReadBackAsRecordsRatherThanAString()
+    {
+        IReadOnlyList<Stay>? seen = null;
+
+        var kit = new ToolKit("test")
+            .AddTool("check_plan", "Checks a whole plan", tool => tool
+                .ParamList<Stay>("stays", "Every stay in the plan, in date order.")
+                .OnExecute(args =>
+                {
+                    seen = args.Get<IReadOnlyList<Stay>>("stays");
+                    return ToolResult.Ok("ok");
+                }));
+
+        await kit.Tools["check_plan"].ExecuteAsync(new Dictionary<string, object?>
+        {
+            ["stays"] = JsonDocument.Parse(
+                """[{"Place":"hakone","CheckIn":"2027-04-04"}]""").RootElement
+        });
+
+        seen.ShouldNotBeNull().ShouldHaveSingleItem().Place.ShouldBe("hakone");
+        seen[0].CheckIn.ShouldBe(new DateOnly(2027, 4, 4));
+    }
+
+    [Test]
+    public void ParametersJsonSchema_AScalarParameter_HasNoItems()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "search",
+            Description = "Searches",
+            Parameters = [new ToolParameter("query", "Search query")],
+            Execute = (_, _) => Task.FromResult(ToolResult.Ok("ok"))
+        };
+
+        tool.ParametersJsonSchema.ShouldNotContain("\"items\"");
     }
 
     [Test]

@@ -42,7 +42,7 @@ public sealed class UndefinedJobNameAnalyzer : DiagnosticAnalyzer
 
     // Methods on Workflow<T> that register a job name (first string argument).
     private static readonly ImmutableHashSet<string> JobRegistrationMethods =
-        ["Job", "SubFlow"];
+        ["Job", "SubFlow", "Supervise"];
 
     // Methods whose string arguments reference job names.
     private static readonly ImmutableHashSet<string> JobReferenceMethods =
@@ -90,7 +90,7 @@ public sealed class UndefinedJobNameAnalyzer : DiagnosticAnalyzer
 
     /// <summary>
     /// Walks the fluent invocation chain and collects all first-argument string
-    /// literals from <c>.Job()</c> and <c>.SubFlow()</c> calls.
+    /// literals from <c>.Job()</c>, <c>.SubFlow()</c> and <c>.Supervise()</c> calls.
     /// </summary>
     private static HashSet<string> CollectDefinedJobNames(
         InvocationExpressionSyntax startNode,
@@ -126,7 +126,7 @@ public sealed class UndefinedJobNameAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// Recursively descends the fluent chain from the root, collecting .Job()/.SubFlow() names.
+    /// Recursively descends the fluent chain from the root, collecting .Job()/.SubFlow()/.Supervise() names.
     /// </summary>
     private static void CollectJobNamesForward(
         InvocationExpressionSyntax root,

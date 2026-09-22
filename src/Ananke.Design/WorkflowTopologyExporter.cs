@@ -48,6 +48,15 @@ namespace Ananke.Design;
 ///     <description>Lossless — exported as <c>ask(name)</c>, distinguished from a plain
 ///     <c>interrupt(name)</c> via <see cref="WorkflowDefinition{TState}.InputJobs"/>.</description>
 ///   </item>
+///   <item>
+///     <term>Conditional pause</term>
+///     <description><b>Lossy, and says so</b> — exported as <c>interrupt(name, when)</c> or
+///     <c>ask(name, when)</c>. That a pause is conditional survives; <em>what</em> the condition is
+///     does not, because it is a predicate over state written in code. The marker exists so a reader
+///     is never shown an escalation as though it were a gate that stops every time, and so a
+///     round-trip through <c>WorkflowScaffold</c> refuses rather than quietly building the
+///     gate.</description>
+///   </item>
 /// </list>
 /// <para>
 /// The manifest export does not include system prompts, model definitions, or tool
@@ -202,8 +211,11 @@ public static class WorkflowTopologyExporter
                     break;
 
                 case LoopConnection<TState> lc:
-                    // Loop predicates are opaque — emit structural annotation
-                    lines.Add($"{lc.From} -> {lc.ExitTarget}  # loop({lc.From} -> {lc.LoopTarget}, max: {lc.MaxIterations})");
+                    // Loop predicates are opaque — emit structural annotation. A loop bounded only by
+                    // its exit condition says so: printing int.MaxValue would show a reader a ceiling
+                    // of 2,147,483,647 where the honest statement is that nobody set one.
+                    var cap = lc.MaxIterations == int.MaxValue ? "none" : lc.MaxIterations.ToString();
+                    lines.Add($"{lc.From} -> {lc.ExitTarget}  # loop({lc.From} -> {lc.LoopTarget}, max: {cap})");
                     break;
 
                 case RouterConnection<TState> rc:
@@ -221,13 +233,15 @@ public static class WorkflowTopologyExporter
 
         // Interrupt / ask annotations — ask(name) is an input-collecting turn, a subset of
         // InterruptMode.Before jobs (see WorkflowDefinition.InputJobs); plain interrupts get
-        // interrupt(name).
+        // interrupt(name). A conditional pause is marked ", when": the predicate is code and cannot
+        // be exported, but a reader must not be shown an escalation as though it stopped every time.
         foreach (var (name, descriptor) in definition.Jobs)
         {
             if (descriptor.Interrupt != Ananke.Orchestration.Jobs.InterruptMode.Before)
                 continue;
 
-            lines.Add(definition.InputJobs.Contains(name) ? $"ask({name})" : $"interrupt({name})");
+            var when = descriptor.InterruptWhen is null ? "" : ", when";
+            lines.Add(definition.InputJobs.Contains(name) ? $"ask({name}{when})" : $"interrupt({name}{when})");
         }
 
         return lines;

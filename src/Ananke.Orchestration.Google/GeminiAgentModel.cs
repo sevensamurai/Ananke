@@ -52,8 +52,21 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// <param name="project">Google Cloud project ID.</param>
     /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
     /// <param name="model">Model name (e.g. <c>"gemini-2.5-flash"</c>).</param>
-    public static GeminiAgentModel CreateVertexAI(string project, string location, string model) =>
+    public static GeminiAgentModel CreateAgentPlatform(string project, string location, string model) =>
+        // The SDK's own parameter is still called vertexAI; that name is Google's, not ours.
+        // See — it is left alone deliberately rather than papered over.
         new(new Client(project: project, location: location, vertexAI: true), model);
+
+    /// <summary>
+    /// Creates a <see cref="GeminiAgentModel"/> for Gemini Enterprise Agent Platform using
+    /// Application Default Credentials.
+    /// </summary>
+    /// <param name="project">Google Cloud project ID.</param>
+    /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
+    /// <param name="model">Model name (e.g. <c>"gemini-3.6-flash"</c>).</param>
+    [Obsolete("Vertex AI was renamed Gemini Enterprise Agent Platform; use CreateAgentPlatform instead.")]
+    public static GeminiAgentModel CreateVertexAI(string project, string location, string model) =>
+        CreateAgentPlatform(project, location, model);
 
     /// <inheritdoc />
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
@@ -94,7 +107,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 streamUsage = new TokenUsage
                 {
                     InputTokens = chunk.UsageMetadata.PromptTokenCount ?? 0,
-                    OutputTokens = chunk.UsageMetadata.CandidatesTokenCount ?? 0
+                    OutputTokens = OutputTokensOf(chunk.UsageMetadata)
                 };
 
             if (chunk.Candidates is not { Count: > 0 })
@@ -151,6 +164,10 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     private GenerateContentConfig BuildConfig(AgentRequest request)
     {
         var config = new GenerateContentConfig();
+
+        // Only when set: null must reach the provider as "absent", not as 0.
+        if (request.Temperature is { } temperature)
+            config.Temperature = (float)temperature;
 
         if (request.SystemPrompt is not null)
         {
@@ -317,6 +334,27 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         return parts;
     }
 
+    /// <summary>
+    /// Output tokens for a response, counting reasoning tokens as output.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>CandidatesTokenCount</c> alone is not what Gemini charges for.</b> A thinking model
+    /// reports the tokens it spent reasoning in a separate <c>ThoughtsTokenCount</c>, they are billed
+    /// as output, and they routinely dwarf the visible answer — a one-word reply from
+    /// <c>gemini-2.5-flash</c> measured 3 prompt + 2 candidate + 28 thought tokens. Counting only the
+    /// candidates under-reports that call by 6x.
+    /// </para>
+    /// <para>
+    /// The consequence is not a cosmetic metric: <c>TokenUsage</c> feeds budget accounting, so an
+    /// under-count means a budget that silently fails to stop a run. Reasoning tokens belong in
+    /// output because that is where the invoice puts them.
+    /// </para>
+    /// </remarks>
+    /// <param name="usage">Usage metadata as reported by the SDK.</param>
+    private static int OutputTokensOf(GenerateContentResponseUsageMetadata usage) =>
+        (usage.CandidatesTokenCount ?? 0) + (usage.ThoughtsTokenCount ?? 0);
+
     private static AgentResponse MapResponse(GenerateContentResponse response)
     {
         string? text = null;
@@ -362,7 +400,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 ? new TokenUsage
                 {
                     InputTokens = response.UsageMetadata.PromptTokenCount ?? 0,
-                    OutputTokens = response.UsageMetadata.CandidatesTokenCount ?? 0
+                    OutputTokens = OutputTokensOf(response.UsageMetadata)
                 }
                 : null
         };

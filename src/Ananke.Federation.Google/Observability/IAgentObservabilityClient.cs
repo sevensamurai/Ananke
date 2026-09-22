@@ -2,7 +2,7 @@ namespace Ananke.Federation.Google.Observability;
 
 /// <summary>
 /// Seam for Agent Platform observability data — Cloud Trace traces and Cloud Monitoring metrics.
-/// Allows <see cref="VertexAIRemoteCellMonitor"/> to be tested without real Google Cloud calls.
+/// Allows <see cref="AgentRuntimeRemoteCellMonitor"/> to be tested without real Google Cloud calls.
 /// </summary>
 internal interface IAgentObservabilityClient
 {

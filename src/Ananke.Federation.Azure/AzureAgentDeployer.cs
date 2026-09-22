@@ -38,7 +38,7 @@ public sealed class AzureAgentDeployer(
     private readonly ISystemPromptCompiler _systemPromptCompiler = systemPromptCompiler ?? new AzureSystemPromptCompiler();
 
     /// <inheritdoc />
-    public string Platform => "azure-ai";
+    public string Platform => "azure";
 
     /// <inheritdoc />
     public async Task<DeployabilityReport> ValidateAsync(

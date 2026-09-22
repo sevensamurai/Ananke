@@ -14,7 +14,7 @@ namespace Ananke.Orchestration.Tests;
 /// <para>
 /// Token usage no longer works that way. It used to share the per-job capture-and-restore
 /// dance, which is what made fork branches and sub-workflows lose their tokens; the recorder
-/// is now scoped once per execution instead (ADR-arch-028 Part B). The usage tests below still
+/// is now scoped once per execution instead. The usage tests below still
 /// pin the totals, which is the behaviour that must not change.
 /// </para>
 /// </summary>

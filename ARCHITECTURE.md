@@ -73,6 +73,8 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 | **Design** | `Ananke.Design` | YAML manifest import, Mermaid export. Depends on Orchestration. |
 | **Documents** | `Ananke.Documents` | PDF/Markdown extractors (`IDocumentExtractor`). Depends on Knowledge. |
 | **Providers** | `Ananke.Orchestration.OpenAI`, `.Anthropic`, `.Google` | LLM provider implementations of `IAgentModel`/`IStreamingAgentModel`. Depend on Abstractions + Orchestration. |
+| **Providers (auth-only)** | `Ananke.Orchestration.Bedrock` | Amazon Bedrock auth and endpoint construction — no third wire format. Depends on Abstractions + the OpenAI and Anthropic provider packages, whose adapters it points at Bedrock's endpoints. |
+| **Conformance** | `Ananke.Orchestration.Conformance`, `.Conformance.NUnit` | Shared scenarios every `IStreamingAgentModel`/`IToolSchemaTranslator`/`IJsonSchemaTranslator` adapter must satisfy. The contract depends on Abstractions alone; the NUnit fixtures add only that and the contract itself. |
 | **Interop** | `Ananke.MCP`, `Ananke.A2A` | Protocol bridges (MCP server, A2A agent-to-agent). Depend on Orchestration. |
 | **Skills** | `Ananke.Skills` | External skill catalog (OpenClaw). Depends on Orchestration. |
 | **Platforms** | `Ananke.Platforms`, `.Platforms.Slack`, `.Platforms.Discord` | Messaging platform adapters. Platforms depends on Orchestration; Slack depends on Organics + Platforms; Discord depends on Orchestration + Platforms. |
@@ -104,6 +106,10 @@ graph TD
     OPENAI["Ananke.Orchestration.OpenAI"]
     ANTHRO["Ananke.Orchestration.Anthropic"]
     GOOGLE["Ananke.Orchestration.Google"]
+    BEDROCK["Ananke.Orchestration.Bedrock"]
+
+    CONFORM["Ananke.Orchestration.Conformance"]
+    CONFORM_NUNIT["Ananke.Orchestration.Conformance.NUnit"]
 
     MCP["Ananke.MCP"]
     A2A["Ananke.A2A"]
@@ -151,6 +157,13 @@ graph TD
     ANTHRO --> ORCH
     GOOGLE --> ABS
     GOOGLE --> ORCH
+    BEDROCK --> ABS
+    BEDROCK --> OPENAI
+    BEDROCK --> ANTHRO
+
+    %% Conformance
+    CONFORM --> ABS
+    CONFORM_NUNIT --> CONFORM
 
     %% Interop & extensions
     MCP --> ORCH
@@ -425,7 +438,7 @@ These are the **interface boundaries** that define the system. Any redesign shou
 - **Solution**: `src/Ananke.slnx`
 - **Shared settings**: `src/Directory.Build.props` — owns `TargetFramework` (net10.0), `Nullable`, `ImplicitUsings`, `VersionPrefix`, `TreatWarningsAsErrors`
 - **Individual csproj files** only set: `IsPackable`, `PackageId`, `Description`, optionally `PackageTags`
-- **Version**: Single source of truth in `Directory.Build.props` → `<VersionPrefix>0.8.0</VersionPrefix>`
+- **Version**: Single source of truth in `Directory.Build.props` → `<VersionPrefix>` (0.8.9 at the time of writing; read the file rather than trusting this line)
 - **Analyzers**: `Ananke.Analyzers` targets `netstandard2.0` and is bundled into `Ananke.Orchestration`'s NuGet package
 - **Meta-package**: `Ananke` (the root package) references all other packages
 

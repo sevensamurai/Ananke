@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Ananke.Abstractions.Trajectory;
 using Ananke.Orchestration.Tools;
 
@@ -19,6 +22,14 @@ internal sealed class TrajectorySnapshotBuilder
     private int _hallucinatedToolCalls;
     private int _faultedToolCalls;
     private int _retryCount;
+    private int _duplicateToolCalls;
+
+    /// <summary>
+    /// Fingerprints of calls already made this episode. Hashes rather than the arguments
+    /// themselves — a tool call can carry anything, and this only ever needs to answer
+    /// "have I seen exactly this before".
+    /// </summary>
+    private readonly HashSet<string> _seenCalls = new(StringComparer.Ordinal);
 
     public TrajectorySnapshotBuilder(
         string agentId,
@@ -33,8 +44,18 @@ internal sealed class TrajectorySnapshotBuilder
 
     public string EpisodeId => _episodeId;
 
-    internal void RecordToolCall(bool hallucinated, bool faulted)
+    internal void RecordToolCall(
+        bool hallucinated, bool faulted, string? toolName = null, string? arguments = null)
     {
+        if (toolName is not null)
+        {
+            lock (_seenCalls)
+            {
+                if (!_seenCalls.Add(Fingerprint(toolName, arguments)))
+                    _duplicateToolCalls++;
+            }
+        }
+
         Interlocked.Increment(ref _totalToolCalls);
         if (hallucinated)
             Interlocked.Increment(ref _hallucinatedToolCalls);
@@ -45,6 +66,31 @@ internal sealed class TrajectorySnapshotBuilder
     }
 
     internal void RecordRetry() => Interlocked.Increment(ref _retryCount);
+
+    /// <summary>
+    /// A stable, non-reversible key for one call. Arguments are re-serialized first so that
+    /// whitespace and escaping differences do not read as different calls; malformed JSON is
+    /// fingerprinted verbatim, since a model that emits it twice really did repeat itself.
+    /// </summary>
+    private static string Fingerprint(string toolName, string? arguments)
+    {
+        var normalized = arguments ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            try
+            {
+                using var parsed = JsonDocument.Parse(normalized);
+                normalized = JsonSerializer.Serialize(parsed.RootElement);
+            }
+            catch (JsonException)
+            {
+                // Keep it as written.
+            }
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{toolName}\u0000{normalized}"));
+        return Convert.ToHexStringLower(hash);
+    }
 
     internal async ValueTask CompleteAsync(
         bool succeeded,
@@ -84,6 +130,8 @@ internal sealed class TrajectorySnapshotBuilder
             FaultedToolCalls = _faultedToolCalls,
             RecoveredFaults = recoveredFaults,
             AbandonedFaults = abandonedFaults,
+            DuplicateToolCalls = _duplicateToolCalls,
+            DistinctToolCalls = _seenCalls.Count,
             TotalCost = 0m,             // M4: wired via IBudgetMeter
             CostPerSuccessfulTrajectory = 0m,
             Duration = now - _startedAt,

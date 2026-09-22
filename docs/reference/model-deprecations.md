@@ -78,16 +78,16 @@ categorically different from production code drifting onto one.
 
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
+| `gemini-3.7-flash` | `Gemini37Flash` | Current | — |
 | `gemini-3.6-flash` | `Gemini36Flash` | Current | — |
 | `gemini-3.5-flash-lite` | `Gemini35FlashLite` | Current | — |
-| `gemini-3.1-pro` | `Gemini31Pro` | Current | — (no GA 3.5+ Pro successor yet) |
+| `gemini-3.1-pro-preview` | `Gemini31Pro` | Current | — (the Pro line has no GA id yet; the wire id keeps the `-preview` suffix) |
 | `gemini-3.1-flash-image` | `Gemini31FlashImage` | Current | — |
 | `gemma-4` | `Gemma4` | Current | — |
 | `lyria-3` | `Lyria3` | Current | — |
 | `gemini-3.5-flash` | `Gemini35Flash` | Legacy | `Gemini36Flash` |
 | `gemini-3.1-flash-lite` | `Gemini31FlashLite` | Legacy | `Gemini35FlashLite` |
-| `gemini-3.1-flash` | `Gemini31Flash` | Legacy | `Gemini36Flash` |
-| `gemini-2.5-pro` | `Gemini25Pro` | Deprecated | `Gemini31Pro` |
+| `gemini-2.5-pro` | `Gemini25Pro` | Deprecated | `Gemini31Pro` (`gemini-3.1-pro-preview`) |
 | `gemini-2.5-flash` | `Gemini25Flash` | Deprecated | `Gemini36Flash` |
 
 ### Removed models (Retired, then deleted)
@@ -99,6 +99,7 @@ switch to its replacement.
 
 | Removed model | Was constant | Provider retirement date | Replacement |
 |---|---|---|---|
+| `gemini-3.1-flash` | `Gemini31Flash` | observed gone 2026-08-30 | `Gemini36Flash` |
 | `claude-opus-4-1` | `Opus41` | 2026-08-05 | `Opus5` |
 | `claude-opus-4` | `Opus4` | 2026-06-15 | `Fable5` |
 | `claude-sonnet-4` | `Sonnet4` | 2026-06-15 | `Sonnet5` |

@@ -143,7 +143,7 @@ default implementation, so every provider supplies its own. All three are implem
 |---|---|
 | `ClaudeCredentialProvider` (Anthropic) | Without a `clientFactory`, returns `true` when `ANTHROPIC_API_KEY` (or the constructor-supplied key) is present and non-empty. With a `clientFactory` supplied, performs a live API round-trip (`PingAsync`). |
 | `AzureAgentCredentialProvider` (Azure) | Calls `GetCredentialAsync(Platform, ct)` and returns whether the result is non-null. |
-| `VertexAICredentialProvider` (Google) | Calls `GetCredentialAsync(Platform, ct)` and returns whether the result is non-null. |
+| `AgentRuntimeCredentialProvider` (Google) | Calls `GetCredentialAsync(Platform, ct)` and returns whether the result is non-null. |
 
 ---
 

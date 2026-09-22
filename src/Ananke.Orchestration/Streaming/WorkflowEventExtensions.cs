@@ -3,7 +3,7 @@ using Ananke.Orchestration.Workflows;
 namespace Ananke.Orchestration.Streaming;
 
 /// <summary>
-/// Extension methods for subscribing to specific <see cref="WorkflowEvent{TState}"/> types
+/// Extension methods for subscribing to specific <see cref="WorkflowEvent"/> types
 /// from <see cref="Workflow{TState}.StreamAsync"/> without pattern matching boilerplate.
 /// </summary>
 /// <example>
@@ -19,10 +19,10 @@ public static class WorkflowEventExtensions
     /// <summary>
     /// Filters the event stream to only events of type <typeparamref name="TEvent"/>.
     /// </summary>
-    public static async IAsyncEnumerable<TEvent> OfType<TState, TEvent>(
-        this IAsyncEnumerable<WorkflowEvent<TState>> events,
+    public static async IAsyncEnumerable<TEvent> OfType<TEvent>(
+        this IAsyncEnumerable<WorkflowEvent> events,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-        where TEvent : WorkflowEvent<TState>
+        where TEvent : WorkflowEvent
     {
         await foreach (var e in events.WithCancellation(ct))
         {
@@ -45,11 +45,11 @@ public static class WorkflowEventExtensions
     /// }
     /// </code>
     /// </example>
-    public static async IAsyncEnumerable<WorkflowEvent<TState>> On<TState, TEvent>(
-        this IAsyncEnumerable<WorkflowEvent<TState>> events,
+    public static async IAsyncEnumerable<WorkflowEvent> On<TEvent>(
+        this IAsyncEnumerable<WorkflowEvent> events,
         Action<TEvent> handler,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-        where TEvent : WorkflowEvent<TState>
+        where TEvent : WorkflowEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
 
@@ -66,11 +66,11 @@ public static class WorkflowEventExtensions
     /// Invokes an async <paramref name="handler"/> for each event of type <typeparamref name="TEvent"/>
     /// and forwards all events unchanged.
     /// </summary>
-    public static async IAsyncEnumerable<WorkflowEvent<TState>> OnAsync<TState, TEvent>(
-        this IAsyncEnumerable<WorkflowEvent<TState>> events,
+    public static async IAsyncEnumerable<WorkflowEvent> OnAsync<TEvent>(
+        this IAsyncEnumerable<WorkflowEvent> events,
         Func<TEvent, Task> handler,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-        where TEvent : WorkflowEvent<TState>
+        where TEvent : WorkflowEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
 

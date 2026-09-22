@@ -260,13 +260,13 @@ internal static class ServeCommand
 
         await foreach (var evt in runner.StreamAsync(definition, input, options, ct))
         {
-            var line = JsonSerializer.Serialize(MapEvent(evt), JsonOptions);
+            var line = JsonSerializer.Serialize(MapEvent<string>(evt), JsonOptions);
             await writer.WriteLineAsync(line.AsMemory(), ct);
             await writer.FlushAsync(ct);
         }
     }
 
-    private static object MapEvent<TState>(WorkflowEvent<TState> evt) => evt switch
+    private static object MapEvent<TState>(WorkflowEvent evt) => evt switch
     {
         JobStarted<TState> e => new { type = "job_started", job = e.JobName },
         JobCompleted<TState> e => new

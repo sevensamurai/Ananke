@@ -25,6 +25,9 @@ jobs:
         shell: pwsh
         run: pwsh scripts/fix-encoding.ps1 -Check
 
+      - name: Check for internal document references in shipped files
+        run: bash scripts/check-internal-refs.sh
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
@@ -52,7 +55,11 @@ jobs:
           echo "✓ Release notes found: $NOTES"
 
   publish:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Packages, tags and releases come from the public repo only. Forks build and test,
+    # but must never push to NuGet or cut a release under their own name.
+    if: >-
+      github.repository == 'sevensamurai/Ananke' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     steps:

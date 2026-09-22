@@ -149,6 +149,29 @@ public sealed record EmpiricalEntry
     /// </summary>
     public required string Source { get; init; }
 
+    /// <summary>
+    /// The verdict of a check that was actually run against this entry, when one was.
+    /// <see langword="null"/> means the entry is advisory.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is an authority marker, not extra provenance.</b> <see cref="Source"/> says where an
+    /// entry came from; this says whether something <em>judged</em> it. The two halves it separates
+    /// are treated differently at the point of use: advisory content loses to what is observed now,
+    /// with no ceremony, because that is what advisory means. A verified record is observed fact too
+    /// — only older — so it is superseded by re-running the check that produced it, not discarded
+    /// because it is inconvenient.
+    /// </para>
+    /// <para>
+    /// Both halves are recalled and budgeted identically. They differ on what a reader may do with
+    /// them, which is why this is a property of the entry rather than a separate store.
+    /// </para>
+    /// </remarks>
+    public EmpiricalVerification? Verification { get; init; }
+
+    /// <summary>Whether this entry carries the verdict of a check that was run.</summary>
+    public bool IsVerifiedRecord => Verification is not null;
+
     // ── Entity scoping ───────────────────────────────────────────────
 
     /// <summary>
@@ -326,6 +349,32 @@ public sealed record EmpiricalMatch
 
     /// <summary>Composite score: relevance × confidence × recency.</summary>
     public required float Score { get; init; }
+
+    /// <summary>
+    /// The depth this match should be rendered at, when a token budget decided one.
+    /// <see langword="null"/> when no budget was in force — the caller renders it whole, as recall
+    /// has always done.
+    /// </summary>
+    public RecallDepth? Depth { get; init; }
+}
+
+/// <summary>
+/// The verdict of a check that was run against an entry, and what ran it.
+/// </summary>
+/// <remarks>
+/// The oracle is named rather than described so that superseding the record is a concrete
+/// instruction — re-run <em>this</em> — instead of an appeal to re-verify somehow.
+/// </remarks>
+public sealed record EmpiricalVerification
+{
+    /// <summary>What judged it: a build, a test run, a named check, a person.</summary>
+    public required string Oracle { get; init; }
+
+    /// <summary>The verdict. A recorded failure is as much a record as a recorded pass.</summary>
+    public required bool Passed { get; init; }
+
+    /// <summary>When the check was run.</summary>
+    public required DateTimeOffset VerifiedAt { get; init; }
 }
 
 /// <summary>Evidence provided when reinforcing an experience entry.</summary>
@@ -402,6 +451,36 @@ public sealed record RecallOptions
     /// Default is <see langword="false"/>.
     /// </summary>
     public bool IncludeGlobal { get; init; }
+
+    /// <summary>
+    /// How many tokens the recalled set may occupy once rendered. <see langword="null"/> — the
+    /// default — leaves recall count-budgeted, exactly as before.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The number is supplied, never discovered.</b> This library does not know which model was
+    /// selected and does not reference anything that does; a caller that knows the window passes a
+    /// share of it in. Reaching for the routing types from here would couple learning to model
+    /// selection to save one parameter.
+    /// </para>
+    /// <para>
+    /// <see cref="TopK"/> still applies and is still a ceiling: a budget can only reduce what comes
+    /// back, never enlarge it.
+    /// </para>
+    /// </remarks>
+    public int? TokenBudget { get; init; }
+
+    /// <summary>
+    /// The depth to render matches at. <see langword="null"/> lets the budget choose — the deepest
+    /// depth at which the whole matched set fits.
+    /// </summary>
+    /// <remarks>
+    /// Leaving this unset prefers <em>coverage over detail</em>: it would rather show every match
+    /// shallowly than a subset of them in full. A partial view that does not look partial is the
+    /// failure this whole tier exists to avoid, so dropping entries is the last resort rather than
+    /// the first. Set it explicitly to invert that trade.
+    /// </remarks>
+    public RecallDepth? Depth { get; init; }
 }
 
 /// <summary>

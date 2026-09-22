@@ -37,6 +37,15 @@ namespace Ananke.Orchestration;
 ///     </description>
 ///   </item>
 ///   <item>
+///     <term><see cref="SupervisedPlan{TState}"/></term>
+///     <description>
+///     Supervised Plan — a decomposed plan runs step by step; when a node reports that
+///     its contract cannot be met, a coordinator decides what the plan becomes and the
+///     work resumes under the new version, until the plan settles or the change-of-plan
+///     cap is reached.
+///     </description>
+///   </item>
+///   <item>
 ///     <term><see cref="Interview{TState}"/></term>
 ///     <description>
 ///     Interview (conversational) — a multi-turn, human-driven exchange that walks a
@@ -192,5 +201,36 @@ public static class AgenticPattern
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return new InterviewBuilder<TState>(name);
+    }
+
+    /// <summary>
+    /// Creates a builder for the <b>Supervised Plan</b> pattern. A decomposed plan runs
+    /// step by step against pinned contracts; when a node reports that its contract cannot
+    /// be met, a coordinator decides what the plan becomes — a new contract, another
+    /// attempt, or a stop — and the work resumes under the new version.
+    /// </summary>
+    /// <typeparam name="TState">
+    /// The workflow state type. Must carry a <see cref="Planning.PlanCoordination"/> slot, which is
+    /// how the pass outcome reaches the coordinator and the decision reaches the loop.
+    /// </typeparam>
+    /// <param name="name">
+    /// Workflow name used in traces, logs, and diagram export.
+    /// </param>
+    /// <returns>A fluent builder. Call <see cref="Patterns.SupervisedPlanBuilder{TState}.Build"/>
+    /// to produce the <see cref="Workflow{TState}"/>.</returns>
+    /// <example>
+    /// <code>
+    /// var workflow = AgenticPattern.SupervisedPlan&lt;DeliveryState&gt;("feature-delivery")
+    ///     .WithPlan(tree)
+    ///     .Supervised(new SupervisionOptions { Executor = cheap, Supervisor = smart, Verifier = checks })
+    ///     .Tracking(s =&gt; s.Coordination, (s, c) =&gt; s with { Coordination = c })
+    ///     .WithCoordinator(new AgentPlanSupervisor(supervision).AsCoordinator())
+    ///     .Build();
+    /// </code>
+    /// </example>
+    public static SupervisedPlanBuilder<TState> SupervisedPlan<TState>(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new SupervisedPlanBuilder<TState>(name);
     }
 }

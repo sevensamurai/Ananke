@@ -129,7 +129,9 @@ var model = OpenAIChatAgentModel.Create(
     endpoint: new Uri("http://localhost:11434/v1"));
 ```
 
-That includes Ollama, LM Studio, vLLM, and Azure OpenAI-style endpoints.
+That includes Ollama, LM Studio, vLLM, and Azure OpenAI-style endpoints. Running one locally
+has caveats worth knowing before you rely on it — see
+[17 — Local & self-hosted models](guides/17-local-models.md).
 
 ---
 

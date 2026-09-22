@@ -10,7 +10,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-028 Part D: a ceiling that spans runs. Without persistence a crash-loop re-spends
+/// a ceiling that spans runs. Without persistence a crash-loop re-spends
 /// the same budget indefinitely, which is the case a monthly limit exists for.
 /// </summary>
 [TestFixture]
@@ -147,7 +147,7 @@ public class PeriodBudgetTests
 
         await OneJob(Budget(10m, periodLimit: 100m, warnPeriod: 0.5m), recorder).RunAsync(new PeriodState());
 
-        var events = new List<WorkflowEvent<PeriodState>>();
+        var events = new List<WorkflowEvent>();
         await foreach (var e in OneJob(Budget(10m, periodLimit: 100m, warnPeriod: 0.5m), recorder)
                            .StreamAsync(new PeriodState()))
             events.Add(e);

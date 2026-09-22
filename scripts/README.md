@@ -1,16 +1,49 @@
 # scripts/
 
-Local developer scripts. Run these before opening a pull request.
+Local developer scripts.
 
-| Script | Shell |
-|---|---|
-| [`check-docs.ps1`](#check-docsps1--documentation-drift-check) | `pwsh` |
-| [`fix-encoding.ps1`](#fix-encodingps1--utf-8-bom-check) | `pwsh` |
+| Script | Shell | When |
+|---|---|---|
+| [`install-hooks.sh`](#install-hookssh--git-hook-setup) | `bash` | **Once, after cloning** |
+| [`check-docs.ps1`](#check-docsps1--documentation-drift-check) | `pwsh` | Before opening a pull request |
+| [`fix-encoding.ps1`](#fix-encodingps1--utf-8-bom-check) | `pwsh` | Before opening a pull request |
 
-Both are PowerShell 7 and run cross-platform. The dev environment is **WSL Ubuntu 26.04**, so
-install `pwsh` there: `sudo snap install powershell --classic` — there is no `powershell` package
-in the 26.04 archive, so `apt install` will not find it. CI runs them on `ubuntu-latest`, where
-`pwsh` is preinstalled.
+The two PR gates are PowerShell 7 and run cross-platform. The dev environment is **WSL Ubuntu
+26.04**, so install `pwsh` there: `sudo snap install powershell --classic` — there is no
+`powershell` package in the 26.04 archive, so `apt install` will not find it. CI runs them on
+`ubuntu-latest`, where `pwsh` is preinstalled. `install-hooks.sh` is plain bash on purpose: it is
+the first thing run in a new clone, so it must not depend on `pwsh` already being there.
+
+## `install-hooks.sh` — git hook setup
+
+Points this clone's git at [`git-hooks/`](./git-hooks/):
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+**Why a script for one `git config` line.** The hook scripts are committed, but
+`core.hooksPath` — the setting that makes git run them — lives in `.git/config`, which is per-clone
+and never travels with a fetch. A fresh clone therefore has the hooks sitting on disk and executes
+none of them, **silently**. Nothing about the working tree looks wrong. The script also restores the
+execute bit, which a clone across a mode-dropping filesystem loses just as quietly.
+
+Safe to re-run. It refuses rather than clobbering if `core.hooksPath` already points somewhere else.
+
+### What the hooks do
+
+`post-commit`, `post-merge` and `post-checkout` re-sync the codegraph index so it cannot drift out of
+step with the tree — a stale index answers confidently about code that no longer exists. All three
+delegate to a shared `_codegraph-sync` body, which **never fails the git operation** (every path
+exits `0`; errors go to `.codegraph/hook-errors.log`) and **stays silent for contributors who do not
+have codegraph installed**. Full rationale in
+[`internals/tooling-setup.md` §5.2](../internals/tooling-setup.md).
+
+Verify the wiring:
+
+```bash
+git config --get core.hooksPath     # -> scripts/git-hooks
+```
 
 ## `check-docs.ps1` — documentation drift check
 
@@ -26,6 +59,13 @@ goes stale and an AI assistant reading it is primed with false facts.
    anywhere under `src/**/*.cs`.
 2. Scans inline `` `code` `` spans in Markdown for backtick-quoted identifiers.
 3. Flags any that exist **nowhere** in the source — the rename/typo/removal failure mode.
+4. Runs the same question **backwards**: every name in
+   [`check-docs-required.txt`](./check-docs-required.txt) must appear somewhere under
+   `docs/`, so a shipped type that no doc mentions is a gate failure.
+
+Step 4 exists because steps 1–3 are blind to it. A stale name leaves a token to scan for;
+a type that shipped undocumented leaves nothing at all, and the run comes back green — which
+is how one iteration landed eleven public plan-tier types with no doc naming any of them.
 
 Any external type the codebase actually uses (e.g. `HttpClient`, `QdrantClient`) appears
 in source and passes automatically, so false positives are low. It is **not** a semantic
@@ -46,6 +86,7 @@ Exit code `0` = clean, `1` = drift found. Useful flags:
 | `-IncludeCodeBlocks` | Also scan fenced ```` ```code``` ```` blocks (noisier; periodic deep audits) |
 | `-IncludeExamples` | Also scan `src/demos/**` and `PLAN-*.md` (skipped by default) |
 | `-Path <dirs>` | Override scan roots (default: `src`, `docs`) |
+| `-RequiredFile <path>` | Override the required-names list (default: `scripts/check-docs-required.txt`) |
 
 ### When something is flagged
 
@@ -53,6 +94,10 @@ Exit code `0` = clean, `1` = drift found. Useful flags:
 - **It's a genuine external library type, third-party product, MSBuild property, or a
   documented placeholder** → add it to [`check-docs-ignore.txt`](./check-docs-ignore.txt),
   with a comment. Prefer fixing the doc; only ignore when the name is truly not a code symbol.
+- **It's a required name no doc mentions** → document it, or drop its line from
+  [`check-docs-required.txt`](./check-docs-required.txt) if the type is gone. That list is
+  the vocabulary a consumer needs to use a tier at all, not an inventory of every public
+  type — a second copy of the API surface would be wrong on the first rename.
 
 ### Optional: enforce on every push
 

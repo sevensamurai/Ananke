@@ -35,7 +35,7 @@ public sealed class HybridRouter
 
     /// <summary>
     /// Determines the hosting target for a cell by name. Returns the platform
-    /// identifier (e.g. <c>"azure-ai"</c>, <c>"vertex-ai"</c>) or <see langword="null"/>
+    /// identifier (e.g. <c>"azure"</c>, <c>"vertex-ai"</c>) or <see langword="null"/>
     /// for local hosting.
     /// </summary>
     /// <param name="cellName">The cell name to route.</param>
@@ -82,7 +82,7 @@ public sealed class HybridRouter
     /// </summary>
     /// <param name="platform">The platform string returned by <see cref="ResolveAsync"/>.</param>
     /// <param name="emulatedPlatform">
-    /// The platform being emulated (e.g. <c>"azure-ai"</c>) when the method returns
+    /// The platform being emulated (e.g. <c>"azure"</c>) when the method returns
     /// <see langword="true"/>; <see langword="null"/> otherwise.
     /// </param>
     public static bool IsLocalEmulated(string? platform, out string? emulatedPlatform)
@@ -107,7 +107,7 @@ public sealed class HybridRouter
 public sealed record RoutingRule
 {
     /// <summary>
-    /// The target platform identifier (e.g. <c>"azure-ai"</c>, <c>"vertex-ai"</c>, <c>"claude"</c>).
+    /// The target platform identifier (e.g. <c>"azure"</c>, <c>"vertex-ai"</c>, <c>"claude"</c>).
     /// Use <see langword="null"/> to explicitly force local hosting.
     /// </summary>
     public required string? TargetPlatform { get; init; }
@@ -144,7 +144,7 @@ public sealed record RoutingRule
     /// Creates a rule that routes all cells to the local emulator for
     /// <paramref name="platform"/> (i.e. <c>local-emulated:&lt;platform&gt;</c>).
     /// </summary>
-    /// <param name="platform">Platform to emulate (e.g. <c>"azure-ai"</c>).</param>
+    /// <param name="platform">Platform to emulate (e.g. <c>"azure"</c>).</param>
     public static RoutingRule EmulateAll(string platform)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platform);

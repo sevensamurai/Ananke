@@ -21,13 +21,20 @@ public static class EmpiricalMemoryTools
     /// <param name="recallDescription">Description for the recall tool.</param>
     /// <param name="commitDescription">Description for the commit tool.</param>
     /// <param name="reinforceDescription">Description for the reinforce tool.</param>
+    /// <param name="recallOptions">
+    /// Options the recall tool searches with, including the token allocation recalled entries may
+    /// occupy. The allocation is <em>supplied</em> — this library does not know which model was
+    /// selected — so a caller that knows the window passes a share of it in here. When
+    /// <see langword="null"/>, recall stays count-budgeted, as before.
+    /// </param>
     public static ToolKit Create(
         IEmpiricalMemory memory,
         string name = "empirical",
         AffectOptions? affectOptions = null,
         string? recallDescription = null,
         string? commitDescription = null,
-        string? reinforceDescription = null)
+        string? reinforceDescription = null,
+        RecallOptions? recallOptions = null)
     {
         ArgumentNullException.ThrowIfNull(memory);
         var affect = affectOptions ?? new AffectOptions();
@@ -52,8 +59,16 @@ public static class EmpiricalMemoryTools
                 description: recallDescription,
                 execute: async situation =>
                 {
-                    var results = await memory.RecallAsync(situation);
-                    return FormatRecallResults(results);
+                    var options = recallOptions ?? new RecallOptions();
+
+                    // Ranked without the budget, then allocated here rather than in the store. The
+                    // rendered result has to say how many matches were *not* loaded, and only the
+                    // caller holding both numbers can say it — a store returns the survivors and
+                    // the count it started from is gone.
+                    var ranked = await memory.RecallAsync(situation, options with { TokenBudget = null });
+                    var allocation = RecallBudget.Apply(ranked, options);
+
+                    return FormatRecallResults(allocation.Matches, allocation.Considered);
                 },
                 paramName: "situation",
                 paramDescription:
@@ -123,51 +138,40 @@ public static class EmpiricalMemoryTools
                 paramDescription: "The ID of the empirical entry to reinforce");
     }
 
-    internal static string FormatRecallResults(IReadOnlyList<EmpiricalMatch> matches)
+    /// <summary>
+    /// Renders a recalled set, at whatever depth the budget allowed, with the two things a reader
+    /// needs and cannot infer: what it may contradict, and what it is not being shown.
+    /// </summary>
+    internal static string FormatRecallResults(IReadOnlyList<EmpiricalMatch> matches, int considered = -1)
     {
         if (matches.Count == 0)
             return "No relevant experience found in memory.";
 
+        // A budget tags each match with the depth it bought. Untagged means no budget was in force,
+        // and recall keeps returning whole entries as it always has.
+        var depth = matches[0].Depth ?? RecallDepth.Full;
+        var omitted = considered < 0 ? 0 : considered - matches.Count;
+
         var sb = new StringBuilder();
-        sb.AppendLine($"Found {matches.Count} relevant experience(s):");
+        sb.Append($"Found {matches.Count} relevant experience(s)");
+        if (depth != RecallDepth.Full)
+            sb.Append($", shown at {depth} depth to fit the available context");
+        sb.AppendLine(".");
+
+        // An omission that does not announce itself reads as completeness — which is the specific
+        // way a partial view becomes a confident false belief.
+        if (omitted > 0)
+            sb.AppendLine($"{omitted} further match(es) were not loaded; ask again more narrowly to see them.");
+
+        sb.AppendLine();
+        sb.Append(EmpiricalRecallRenderer.RenderAuthorityNote(
+            hasAdvisory: matches.Any(m => !m.Entry.IsVerifiedRecord),
+            hasRecords: matches.Any(m => m.Entry.IsVerifiedRecord)));
         sb.AppendLine();
 
         foreach (var match in matches)
         {
-            var entry = match.Entry;
-            sb.AppendLine($"--- [{entry.Kind}] {entry.Id} (score: {match.Score:F3}, confidence: {entry.Confidence:F2}) ---");
-            sb.AppendLine(entry.Description.ToString());
-
-            if (entry.Tags.Count > 0)
-                sb.AppendLine($"Tags: {string.Join(", ", entry.Tags)}");
-
-            if (entry.Condition is not null)
-                sb.AppendLine($"Condition: {entry.Condition}");
-            if (entry.Effect is not null)
-                sb.AppendLine($"Effect: {entry.Effect}");
-            if (entry.Latency is not null)
-                sb.AppendLine($"Latency: {entry.Latency.Value.TotalMinutes:F0} minutes");
-
-            if (entry.Goal is not null)
-                sb.AppendLine($"Goal: {entry.Goal}");
-            if (entry.Steps is { Count: > 0 })
-            {
-                sb.AppendLine("Steps:");
-                for (var i = 0; i < entry.Steps.Count; i++)
-                    sb.AppendLine($"  {i + 1}. {entry.Steps[i]}");
-            }
-
-            if (entry.Situation is not null)
-                sb.AppendLine($"Situation: {entry.Situation}");
-            if (entry.PreferredApproach is not null)
-                sb.AppendLine($"Prefer: {entry.PreferredApproach}");
-            if (entry.AvoidedApproach is not null)
-                sb.AppendLine($"Avoid: {entry.AvoidedApproach}");
-
-            sb.AppendLine(
-                $"Observed: {entry.ObservationCount} time(s) | " +
-                $"Source: {entry.Source} | " +
-                $"Last seen: {entry.LastObserved:yyyy-MM-dd HH:mm} UTC");
+            sb.Append(EmpiricalRecallRenderer.Render(match, match.Depth ?? depth));
             sb.AppendLine();
         }
 

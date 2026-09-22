@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The NUnit half ofD2: thin fixtures that enumerate the framework-neutral
+       scenarios in Ananke.Orchestration.Conformance and give NUnit consumers inherit-and-done.
+
+       This is deliberately a *library*, not a test project — it carries NUnit but neither
+       Microsoft.NET.Test.Sdk nor NUnit3TestAdapter, so referencing it never turns a consumer's
+       project into something the SDK tries to run. -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Orchestration.Conformance.NUnit</PackageId>
+    <Description>NUnit fixtures over the Ananke.Orchestration conformance contract. Inherit one, supply the adapter, and every scenario runs as its own test case.</Description>
+    <PackageTags>ai;agents;conformance;contract-tests;providers;nunit</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration.Conformance\Ananke.Orchestration.Conformance.csproj" />
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

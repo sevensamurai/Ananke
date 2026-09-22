@@ -280,7 +280,7 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
 
         // Client-side composite scoring: vectorScore × confidence × recencyWeight
         var now = _timeProvider.GetUtcNow();
-        var matches = results
+        var ranked = results
             .Select(p =>
             {
                 var entry = MapScoredPointToEntry(p);
@@ -299,6 +299,10 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
             .Where(m => m.Entry.ConsolidatedInto is null && m.Score >= options.ScoreThreshold)
             .OrderByDescending(m => m.Score)
             .ToList();
+
+        // The same allocation every store applies, so a token budget means the same thing whichever
+        // one is backing recall. Qdrant already applied TopK as its query limit.
+        var matches = RecallBudget.Apply(ranked, options).Matches;
 
         RecallCounter.Add(1);
         if (matches.Count > 0) RecallHitCounter.Add(1);

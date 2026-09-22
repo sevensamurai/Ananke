@@ -30,7 +30,7 @@ namespace Ananke.Orchestration.Agents.Context;
 ///     thresholdTokens: 3000,
 ///     recentMessageCount: 4);
 ///
-/// var compacted = await strategy.ApplyAsync(messages, systemPrompt, ct);
+/// var projection = await strategy.ApplyAsync(messages, systemPrompt, ContextBudget.Unspecified, ct);
 /// </code>
 /// </example>
 public sealed class SummarizingContextStrategy : IContextStrategy
@@ -91,21 +91,32 @@ public sealed class SummarizingContextStrategy : IContextStrategy
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<AgentMessage>> ApplyAsync(
+    public async Task<ContextProjection> ApplyAsync(
         IReadOnlyList<AgentMessage> messages,
         string? systemPrompt,
+        ContextBudget budget,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(budget);
+
+        var applied = budget.Resolve(_thresholdTokens);
+
         if (messages.Count <= _recentMessageCount)
-            return messages;
+            return ContextProjection.Unchanged(messages, applied);
 
         var systemTokens = systemPrompt is not null ? _tokenCounter.EstimateTokens(systemPrompt) : 0;
         var total = systemTokens;
+        var shadowedTokens = 0;
         for (var i = 0; i < messages.Count; i++)
-            total += _tokenCounter.EstimateTokens(messages[i]);
+        {
+            var cost = _tokenCounter.EstimateTokens(messages[i]);
+            total += cost;
+            if (i < messages.Count - _recentMessageCount)
+                shadowedTokens += cost;
+        }
 
-        if (total <= _thresholdTokens)
-            return messages;
+        if (total <= applied)
+            return ContextProjection.Unchanged(messages, applied);
 
         // Split: old messages to summarize, recent messages to keep
         var splitIndex = messages.Count - _recentMessageCount;
@@ -133,7 +144,14 @@ public sealed class SummarizingContextStrategy : IContextStrategy
         result.Add(AgentMessage.User($"[Previous conversation summary: {summaryText}]"));
         result.AddRange(recentMessages);
 
-        return result;
+        return new ContextProjection
+        {
+            Messages = result,
+            ShadowedCount = oldMessages.Count,
+            ShadowedTokens = shadowedTokens,
+            Reason = ContextShadowReason.Summarized,
+            AppliedBudget = applied
+        };
     }
 
     private static string FormatMessagesForSummary(IReadOnlyList<AgentMessage> messages)

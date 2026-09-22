@@ -1,0 +1,10 @@
+{
+  "route": [ "tokyo", "hakone", "kyoto", "osaka" ],
+  "stays": {
+    "tokyo":  [ { "id": "shinjuku-hotel", "rank": 1 }, { "id": "asakusa-inn", "rank": 2 } ],
+    "kyoto":  [ { "id": "gion-machiya", "rank": 1 }, { "id": "station-hotel", "rank": 2 } ],
+    "osaka":  [ { "id": "namba-hotel", "rank": 1 } ],
+    "hakone": [ { "id": "onsen-ryokan", "rank": 1, "freeNights": ["2027-04-04", "2027-04-13", "2027-04-14"] },
+                { "id": "lakeside-inn", "rank": 2, "freeNights": ["2027-04-14"] } ]
+  }
+}

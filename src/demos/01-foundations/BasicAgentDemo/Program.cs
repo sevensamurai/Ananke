@@ -224,7 +224,6 @@ if (maxLevel < 4)
 
 // =====================================================================
 //  LEVEL 4 — Streaming chat workflow + stock tools + OpenTelemetry
-//            (absorbed from SimpleWorkflowDemo)
 // =====================================================================
 Console.WriteLine();
 Console.WriteLine("-- Level 4: Streaming chat workflow + OTel tracing ------");

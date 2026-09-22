@@ -530,6 +530,19 @@
                     ]
                 },
                 {
+                    "title": "18 \u2014 Plans and Contracts",
+                    "path": "guides/18-plans-and-contracts.md",
+                    "tags": [
+                        "plan",
+                        "contract",
+                        "adjudication",
+                        "supervision",
+                        "long-running",
+                        "decomposition",
+                        "verification"
+                    ]
+                },
+                {
                     "title": "UV Setup (Python Interop)",
                     "path": "guides/uv-setup-for-dotnet-developers.md",
                     "tags": [

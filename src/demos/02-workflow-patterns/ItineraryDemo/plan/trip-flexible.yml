@@ -1,0 +1,15 @@
+plan: japan-week-flexible
+
+root:
+  goal: A week in Japan in the school holidays, seeing iconic places, with the onsen in Hakone
+  criteria:
+    - week_planned(2027-04-01, 2027-04-15, 7)
+    - follows_route()
+  constraints:
+    - Any seven nights in a row, arriving from Thursday 1 April and leaving by Thursday 15 April 2027
+    - Hakone is a must
+  children:
+    - id: hakone
+      goal: Find two nights in a row in Hakone within the dates allowed
+      criteria:
+        - stay(hakone, 2027-04-01, 2027-04-15, 2)

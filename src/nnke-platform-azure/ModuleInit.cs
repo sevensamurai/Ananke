@@ -7,7 +7,7 @@ namespace Ananke.Tool.Platform.Azure;
 /// <summary>
 /// Module initializer for the <c>nnke-platform-azure</c> companion tool.
 /// Runs automatically when this assembly is loaded by <c>nnke-platform</c>'s adapter probing.
-/// Registers a factory for <c>"azure-ai"</c> into <see cref="FederationDeployerRegistry"/>
+/// Registers a factory for <c>"azure"</c> into <see cref="FederationDeployerRegistry"/>
 /// so the CLI can deploy workflows to Azure AI Agent Service without a direct project reference.
 /// </summary>
 internal static class ModuleInit
@@ -15,7 +15,7 @@ internal static class ModuleInit
     [ModuleInitializer]
     internal static void Initialize()
     {
-        FederationDeployerRegistry.RegisterFactory("azure-ai", registry =>
+        FederationDeployerRegistry.RegisterFactory("azure", registry =>
         {
             var endpointStr = Environment.GetEnvironmentVariable("AZURE_AI_ENDPOINT")
                 ?? throw new InvalidOperationException(

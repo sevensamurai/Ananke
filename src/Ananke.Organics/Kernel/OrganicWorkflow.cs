@@ -34,7 +34,7 @@ public sealed class OrganicWorkflow<TState>(
     }
 
     /// <summary>Streams events and records on completion.</summary>
-    public async IAsyncEnumerable<WorkflowEvent<TState>> StreamAsync(
+    public async IAsyncEnumerable<WorkflowEvent> StreamAsync(
         TState initialState,
         WorkflowStreamOptions? options = null,
         [EnumeratorCancellation] CancellationToken ct = default)

@@ -4,7 +4,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-028 D14. The period is part of the storage key, so these boundaries decide when a
+///D14. The period is part of the storage key, so these boundaries decide when a
 /// budget resets — there is no scheduled job to get wrong, but there is arithmetic to get wrong.
 /// </summary>
 [TestFixture]

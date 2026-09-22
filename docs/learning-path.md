@@ -68,6 +68,10 @@ Push Ananke to its limits.
 - **[15 — Empirical Memory](guides/15-empirical-memory.md)** — Episodes, skills, Monte Carlo reward propagation, skill packaging.
 - **[15a — Memory Tuning](guides/15a-empirical-memory-tuning.md)** — Decay parameters, importance scoring, offline learning optimisation.
 - **[16 — Agentic Patterns](guides/16-agentic-patterns.md)** — Review & Critique, Iterative Refinement, and the full pattern catalog.
+- **[17 — Local & Self-Hosted Models](guides/17-local-models.md)** — Ollama, llama.cpp and vLLM, and the four ways a small local model behaves differently from a hosted one.
+- **[18 — Plans and Contracts](guides/18-plans-and-contracts.md)** — `PlanTree`, pinned contracts and executable criteria, verification and abstention, the supervisor / Planner seats, re-ruling rather than cancelling.
+- **[20 — Platform Recommendation](guides/20-platform-recommendation.md)** — `nnke-platform eval`, platform-fit scoring against a manifest, the hybrid router, testing federation flows with no cloud credentials.
+- **[21 — Enterprise Clouds](guides/21-enterprise-clouds.md)** — Amazon Bedrock and Microsoft Foundry: SigV4 and Entra auth, endpoint choice, bring-your-own model ids, and orchestrating agents over A2A.
 - **[UV Setup — Python Interop](guides/uv-setup-for-dotnet-developers.md)** — Run Python, Node.js, and Docker tools from Ananke via the external skill catalog.
 
 ---

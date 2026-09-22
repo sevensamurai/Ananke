@@ -201,6 +201,38 @@ internal static class PatternCatalog
             },
             new()
             {
+                Key = "supervised-plan",
+                Title = "Supervised Plan (Plan-Coordinate)",
+                Style = "code",
+                Topology = "plan → coordinate → [settled?] → End  (loop if the plan changed)",
+                DslEquivalent = null,
+                ApiEntryPoint = "AgenticPattern.SupervisedPlan<TState>(name)",
+                UseCases = ["Long-running work whose plan may turn out to be wrong", "Decomposed delivery with acceptance criteria per step", "Cheap executor with an escalated planner"],
+                ScaffoldCommand = "nnke new workflow <name> --pattern supervised-plan",
+                DocsRef = "nnke docs agentic-patterns",
+                Description = """
+                    A goal is decomposed into work items with pinned contracts and run
+                    step by step. When a node reports that its contract cannot be met it
+                    stops rather than delivering something adjacent, and a coordinator
+                    decides what the plan becomes — a replacement contract, another
+                    attempt, or a stop. A change of plan is a new version with a reason,
+                    not a flag on a task, so the work already proved stays proved and
+                    what was dropped is still readable. The two roles are separate
+                    because a node's work is gated by checks that catch a bad answer,
+                    while a change of plan is checked by nothing.
+                    """,
+                ApiExample = """
+                    var workflow = AgenticPattern.SupervisedPlan<DeliveryState>("delivery")
+                        .WithPlan(tree)
+                        .Supervised(new SupervisionOptions { Executor = cheap, Supervisor = smart, Verifier = checks })
+                        .Tracking(s => s.Coordination, (s, c) => s with { Coordination = c })
+                        .WithCoordinator(new AgentPlanSupervisor(supervision).AsCoordinator())
+                        .MaxChangesOfPlan(3)
+                        .Build();
+                    """,
+            },
+            new()
+            {
                 Key = "iterative-refinement",
                 Title = "Iterative Refinement",
                 Style = "code",

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The provider conformance contract, as an ordinary library rather than a test project.: as a *test* project these fixtures could not be referenced by the
+       adapters' own test projects, which is why their only subclasses were fakes.
+
+       This assembly references no test framework: the scenarios are named
+       delegates and every assertion is Shouldly, which throws its own exception type. The
+       inherit-and-done NUnit fixtures live in Ananke.Orchestration.Conformance.NUnit. -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Orchestration.Conformance</PackageId>
+    <Description>Provider conformance contract for Ananke.Orchestration — the scenarios an IStreamingAgentModel, IToolSchemaTranslator or IJsonSchemaTranslator implementation must satisfy.</Description>
+    <PackageTags>ai;agents;conformance;contract-tests;providers</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -5,6 +5,7 @@ using Ananke.Orchestration.Budget;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Execution;
 using Ananke.Orchestration.Jobs;
+using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Routing;
 using Ananke.Orchestration.Streaming;
 
@@ -100,6 +101,7 @@ public sealed class Workflow<TState>
     private readonly Dictionary<string, Func<TState, Exception, Task>> _onFaultActions = [];
     private readonly Dictionary<string, TimeSpan> _timeouts = [];
     private readonly Dictionary<string, InterruptMode> _interrupts = [];
+    private readonly Dictionary<string, Func<TState, bool>> _interruptPredicates = [];
     private readonly HashSet<string> _inputJobs = [];
     private readonly List<JoinDescriptor<TState>> _joins = [];
     private Func<TState, string, Exception, Task>? _onError;
@@ -388,6 +390,127 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
+    /// Registers a plan as a job: it runs to completion, one node at a time, in place.
+    /// </summary>
+    /// <param name="name">The job's name, as any other job's.</param>
+    /// <param name="plan">Where in the state the plan is. Usually produced by an earlier job.</param>
+    /// <param name="supervision">Who runs a node, who rules on it, and where the tree lives.</param>
+    /// <param name="mapResult">Folds what the run produced back into the workflow's state.</param>
+    /// <remarks>
+    /// <para>
+    /// The same shape as <see cref="SubFlow{TChild}(string, Workflow{TChild}, Func{TState, TChild},
+    /// Func{TState, TChild, TState}, int)"/>, and for the same reason: a plan is a unit of work
+    /// inside a workflow, not a second way to run one.
+    /// </para>
+    /// <para>
+    /// Named for <em>supervision</em> rather than for planning because steering long-running work is
+    /// what the job is for — the contracts, the verification and the bound on each node are the
+    /// steering, and the plan is only what is being steered.
+    /// </para>
+    /// <para>
+    /// A dispute reported by a node stops the run and arrives in <see cref="PlanRunResult.HaltedAt"/>.
+    /// Nothing here rules on whether the plan should change: that belongs to whoever authored the
+    /// criterion, which is a decision above this job rather than inside it.
+    /// </para>
+    /// <para>
+    /// <b>This overload is for a plan an earlier job produced.</b> The tree it returns is used to
+    /// <em>seed</em> the store and nothing more — every pass after the first reads the store, so a
+    /// tree kept in <typeparamref name="TState"/> beyond that point is a staler second copy. For a
+    /// plan the workflow already has, take the <see cref="Supervise(string, PlanTree,
+    /// SupervisionOptions, Func{TState, PlanRunResult, TState})"/> overload and leave the tree out of
+    /// the state entirely.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var workflow = new Workflow&lt;DeliveryState&gt;("feature-delivery")
+    ///     .Job("decompose", planner)
+    ///     .Supervise("deliver", s =&gt; s.Plan, supervision, (s, r) =&gt; s with { Outcome = r })
+    ///     .Chain("decompose", "deliver")
+    ///     .Then("deliver", Workflow.End);
+    /// </code>
+    /// </example>
+    public Workflow<TState> Supervise(
+        string name,
+        Func<TState, PlanTree> plan,
+        SupervisionOptions supervision,
+        Func<TState, PlanRunResult, TState> mapResult)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(supervision);
+        ArgumentNullException.ThrowIfNull(mapResult);
+
+        return Job(name, new SupervisedJob<TState>(name, plan, supervision, mapResult));
+    }
+
+    /// <summary>
+    /// Registers a supervised plan as a job, for a plan the workflow already has.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The tree is the supervisor's, not the workflow state's.</b> It is written to the store
+    /// once, if the store does not already hold this plan, and every pass after that reads the store
+    /// — so carrying it in <typeparamref name="TState"/> would put a second, staler copy of it in
+    /// front of the run. Use the <see cref="Supervise(string, Func{TState, PlanTree},
+    /// SupervisionOptions, Func{TState, PlanRunResult, TState})"/> overload only when an earlier job
+    /// <em>produces</em> the plan, which is the one case the state genuinely carries it.
+    /// </para>
+    /// <para>
+    /// Two supervised jobs sharing a store and a plan id supervise the same plan, and the second one
+    /// picks up where the first stopped.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var workflow = new Workflow&lt;DeliveryState&gt;("feature-delivery")
+    ///     .Supervise("deliver", PlanManifest.Load("plan.yml").ToTree(), supervision,
+    ///                (s, r) =&gt; s with { Outcome = r })
+    ///     .Then("deliver", Workflow.End);
+    /// </code>
+    /// </example>
+    public Workflow<TState> Supervise(
+        string name,
+        PlanTree plan,
+        SupervisionOptions supervision,
+        Func<TState, PlanRunResult, TState> mapResult)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
+        return Supervise(name, _ => plan, supervision, mapResult);
+    }
+
+    /// <summary>
+    /// Registers a supervised plan the workflow already has, and outputs a type-safe
+    /// <see cref="JobRef"/>.
+    /// </summary>
+    public Workflow<TState> Supervise(
+        string name,
+        PlanTree plan,
+        SupervisionOptions supervision,
+        Func<TState, PlanRunResult, TState> mapResult,
+        out JobRef jobRef)
+    {
+        Supervise(name, plan, supervision, mapResult);
+        jobRef = new JobRef(name);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a supervised plan as a job and outputs a type-safe <see cref="JobRef"/>.
+    /// </summary>
+    public Workflow<TState> Supervise(
+        string name,
+        Func<TState, PlanTree> plan,
+        SupervisionOptions supervision,
+        Func<TState, PlanRunResult, TState> mapResult,
+        out JobRef jobRef)
+    {
+        Supervise(name, plan, supervision, mapResult);
+        jobRef = new JobRef(name);
+        return this;
+    }
+
+    /// <summary>
     /// Chains one or more jobs together in a linear sequence.
     /// </summary>
     /// <param name="jobNames"></param>
@@ -543,6 +666,102 @@ public sealed class Workflow<TState>
     /// <summary>Marks a job as an input-collecting turn using a type-safe <see cref="JobRef"/>.</summary>
     public Workflow<TState> AwaitInput(JobRef node) =>
         AwaitInput(node.Name);
+
+    /// <summary>
+    /// Pauses execution before <paramref name="jobName"/> only on the arrivals where
+    /// <paramref name="when"/> returns <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A pause with a reason to happen.</b> <see cref="InterruptBefore(string)"/> pauses on every
+    /// arrival, which is the right thing for an approval gate and the wrong thing for an escalation:
+    /// a run that should steer itself until it cannot has no way to say so, and ends up asking a
+    /// person about every decision it was perfectly able to make.
+    /// </para>
+    /// <para>
+    /// The predicate sees the workflow state and nothing else, and it is evaluated at the moment the
+    /// run arrives at the job. Everything else is unchanged — same checkpoint, same
+    /// <c>Interrupted</c> event, same <c>ResumeAsync</c> — so a host cannot tell a conditional pause
+    /// from an unconditional one, and does not have to.
+    /// </para>
+    /// <para>
+    /// <b>The condition says whether, never where.</b> A job already marked
+    /// <see cref="InterruptAfter(string)"/> keeps its side and becomes a conditional after-pause;
+    /// a job with no pause configured yet gets the before-pause this has always meant. Say it
+    /// outright with <see cref="InterruptAfterWhen(string, Func{TState, bool})"/> rather than
+    /// relying on the order the two calls happen to be written in.
+    /// </para>
+    /// </remarks>
+    public Workflow<TState> InterruptWhen(string jobName, Func<TState, bool> when)
+    {
+        ThrowIfFrozen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+        ArgumentNullException.ThrowIfNull(when);
+
+        // Where the pause happens is not this method's to decide. Forcing Before here made
+        // `.InterruptAfter(j).InterruptWhen(j, p)` and `.InterruptWhen(j, p).InterruptAfter(j)` mean
+        // two different things, and silently demoted the first — a pause moving from one side of a
+        // job to the other because of the order two lines were written in.
+        _interrupts[jobName] = _interrupts.TryGetValue(jobName, out var configured)
+            ? configured
+            : InterruptMode.Before;
+        _interruptPredicates[jobName] = when;
+        return this;
+    }
+
+    /// <summary>Pauses before a job on the arrivals a predicate names, using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> InterruptWhen(JobRef jobRef, Func<TState, bool> when) =>
+        InterruptWhen(jobRef.Name, when);
+
+    /// <summary>
+    /// Pauses execution <em>after</em> <paramref name="jobName"/> completes, only on the arrivals
+    /// where <paramref name="when"/> returns <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// The after-side spelling of <see cref="InterruptWhen(string, Func{TState, bool})"/>, and the
+    /// one to reach for when the condition depends on what the job produced rather than on what it
+    /// was given. Requires <see cref="UseCheckpointing"/> like every other pause.
+    /// </remarks>
+    public Workflow<TState> InterruptAfterWhen(string jobName, Func<TState, bool> when)
+    {
+        ArgumentNullException.ThrowIfNull(when);
+        InterruptAfter(jobName);
+        _interruptPredicates[jobName] = when;
+        return this;
+    }
+
+    /// <summary>Pauses after a job on the arrivals a predicate names, using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> InterruptAfterWhen(JobRef jobRef, Func<TState, bool> when) =>
+        InterruptAfterWhen(jobRef.Name, when);
+
+    /// <summary>
+    /// Marks <paramref name="node"/> as an input-collecting turn that happens only on the arrivals
+    /// where <paramref name="when"/> returns <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="AwaitInput(string)"/> is to <see cref="InterruptBefore(string)"/> what this is to
+    /// <see cref="InterruptWhen(string, Func{TState, bool})"/>: the same pause, plus membership of
+    /// <see cref="WorkflowDefinition{TState}.InputJobs"/> so a host can tell a turn that wants a reply
+    /// from a gate that wants approval. Without it, a conditional turn could be wired but not
+    /// recognised — the pause would arrive with nothing saying what it is waiting for.
+    /// </remarks>
+    public Workflow<TState> AwaitInputWhen(string node, Func<TState, bool> when)
+    {
+        ArgumentNullException.ThrowIfNull(when);
+
+        // Before, always — an input turn collects a reply the job is about to act on, so there is no
+        // after-side reading of it. InterruptBefore rather than InterruptWhen because the latter now
+        // keeps whatever side is already configured, and a job wired InterruptAfter first must not
+        // turn this into an after-pause that no host could answer in time.
+        InterruptBefore(node);
+        _interruptPredicates[node] = when;
+        _inputJobs.Add(node);
+        return this;
+    }
+
+    /// <summary>Marks a conditional input-collecting turn using a type-safe <see cref="JobRef"/>.</summary>
+    public Workflow<TState> AwaitInputWhen(JobRef node, Func<TState, bool> when) =>
+        AwaitInputWhen(node.Name, when);
 
     public Workflow<TState> UseRunner(IWorkflowRunner runner)
     {
@@ -805,7 +1024,7 @@ public sealed class Workflow<TState>
     /// }
     /// </code>
     /// </example>
-    public IAsyncEnumerable<WorkflowEvent<TState>> StreamAsync(
+    public IAsyncEnumerable<WorkflowEvent> StreamAsync(
         TState initialState,
         WorkflowStreamOptions? options = null,
         CancellationToken ct = default)
@@ -887,7 +1106,11 @@ public sealed class Workflow<TState>
         {
             if (!_jobs.TryGetValue(jobName, out var descriptor))
                 throw new InvalidOperationException($"Interrupt references undefined job '{jobName}'.");
-            _jobs[jobName] = descriptor with { Interrupt = mode };
+            _jobs[jobName] = descriptor with
+            {
+                Interrupt = mode,
+                InterruptWhen = _interruptPredicates.GetValueOrDefault(jobName)
+            };
         }
 
         foreach (var (_, descriptor) in _jobs)

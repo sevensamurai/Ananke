@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Workflows;
@@ -12,7 +13,7 @@ internal static class P01_SingleAgent
     {
         PatternRunner.PrintHeader("1. Single Agent (ReAct tool-calling loop)");
 
-        var model = SimulatedModel.Fixed("""{"Answer":"The weather in Seattle is sunny and 22 C - great for a walk!"}""");
+        var model = SimulatedAgentModel.Fixed("""{"Answer":"The weather in Seattle is sunny and 22 C - great for a walk!"}""");
 
         var tools = new ToolKit("weather")
             .AddTool("get_weather", "Gets current weather for a city",

@@ -63,7 +63,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
         // text accumulates over thinking deltas, and its signature lands as a *separate* delta
         // afterwards (Anthropic 12.39.0). So a ReasoningPart is only well-formed once the stream
         // has moved past the block — which is why parts are assembled at the end rather than
-        // emitted incrementally. See ADR-arch-029 D2/D3.
+        // emitted incrementally. SeeD2/D3.
         var streamBlocks = new SortedDictionary<long, StreamBlock>();
 
         int streamInputTokens = 0, streamOutputTokens = 0;
@@ -168,11 +168,25 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     /// provider sent them.
     /// </summary>
     /// <remarks>
-    /// Returns <see langword="null"/> for a purely textual response. That is ADR-arch-029 D1: parts
+    /// Returns <see langword="null"/> for a purely textual response. That isD1: parts
     /// are required only when the response carries something that is not a <see cref="TextPart"/>,
     /// so a plain text reply keeps letting <see cref="AgentResponse.Text"/> carry it rather than
     /// paying for a wrapper that adds nothing.
     /// </remarks>
+    /// <summary>
+    /// AppliesD1 to an assembled part list: a purely textual response leaves
+    /// <c>Parts</c> null and lets <c>Text</c> carry it.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="GenerateStreamAsync"/>'s <c>BuildStreamParts</c> has always applied this rule; the
+    /// unary path did not, so the same text-only reply came back as <c>[TextPart]</c> from
+    /// <see cref="GenerateAsync"/> and as <see langword="null"/> from the stream. D1 binds both
+    /// paths, and its own table names <c>Anthropic (text only) → Parts = null</c> as the shape —
+    /// wrapping text in a part carries nothing <c>Text</c> did not. Found by the conformance suite.
+    /// </remarks>
+    private static IReadOnlyList<ContentPart>? PartsOrNull(List<ContentPart> parts) =>
+        parts.Count == 0 || parts.TrueForAll(p => p is TextPart) ? null : parts;
+
     private static IReadOnlyList<ContentPart>? BuildStreamParts(SortedDictionary<long, StreamBlock> blocks)
     {
         if (blocks.Count == 0 || blocks.Values.All(b => b.Kind == StreamBlockKind.Text))
@@ -249,7 +263,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
         return new AgentResponse
         {
             Text = text,
-            Parts = responseParts.Count > 0 ? responseParts : null,
+            Parts = PartsOrNull(responseParts),
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
             Usage = message.Usage is not null
                 ? new TokenUsage
@@ -291,6 +305,24 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
 
         if (system is not null)
             parameters = parameters with { System = system };
+
+        // Only when set: null must reach the provider as "absent", not as 0.
+        //
+        // Anthropic deprecated sampling parameters — temperature, top_p and top_k — on **Opus 4.7
+        // and later**. The SDK's obsolete message describes a softer rule than the service applies:
+        // rejection is by **presence, not value**, so sending temperature at all is a 400 on those
+        // models even when the value is 1.0. Opus 4.6 and below, and every Sonnet and Haiku, still
+        // accept [0, 1].
+        //
+        // Passed through anyway, deliberately. The caller asked for a temperature and Anthropic is
+        // entitled to refuse it; swallowing it here would mean a request that quietly did something
+        // other than what it said, which is worse than a 400 that names the problem. The default is
+        // null, so nothing is sent unless a caller opts in — which is the correct wire shape for
+        // Opus 4.7+.
+#pragma warning disable CS0618 // Deprecated by Anthropic; passed through so refusal is visible, not silent.
+        if (request.Temperature is { } temperature)
+            parameters = parameters with { Temperature = temperature };
+#pragma warning restore CS0618
 
         return parameters;
     }

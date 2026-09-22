@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
@@ -12,7 +13,7 @@ internal static class P13_StreamingChat
     {
         PatternRunner.PrintHeader("13. Streaming Chat (StreamingChatWorkflow)");
 
-        var model = SimulatedModel.Fixed("The capital of France is Paris. It's known for the Eiffel Tower.");
+        var model = SimulatedAgentModel.Fixed("The capital of France is Paris. It's known for the Eiffel Tower.");
 
         var tools = new ToolKit("geography")
             .AddTool("get_capital", "Gets the capital of a country",

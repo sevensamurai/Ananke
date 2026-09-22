@@ -129,7 +129,7 @@ public class BudgetTests
                 costPer1KInputTokens: 0.01m,
                 costPer1KOutputTokens: 0.03m);
 
-        var events = new List<Streaming.WorkflowEvent<BudgetState>>();
+        var events = new List<Streaming.WorkflowEvent>();
         await foreach (var evt in workflow.StreamAsync(new BudgetState()))
         {
             events.Add(evt);

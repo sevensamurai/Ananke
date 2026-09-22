@@ -25,4 +25,14 @@ public record JobDescriptor<TState>
 
     public TimeSpan? Timeout { get; init; }
     public InterruptMode? Interrupt { get; init; }
+
+    /// <summary>
+    /// When set, the interrupt happens only on the arrivals where this returns <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// A pause with a reason to happen. <see cref="Interrupt"/> still says <em>where</em> — before the
+    /// job or after it — and this says <em>whether this time</em>. Absent means every arrival pauses,
+    /// which is what <c>InterruptBefore</c> has always meant.
+    /// </remarks>
+    public Func<TState, bool>? InterruptWhen { get; init; }
 }

@@ -18,6 +18,7 @@ relevant documentation guide and demo (where available).
 | **Fork / Join** | Fan-out to parallel branches, fan-in with a merge function | [02 — Workflows](../guides/02-workflows.md) | — |
 | **Sub-workflows** | Nest a workflow inside another with `SubFlow()` | [02 — Workflows](../guides/02-workflows.md) | — |
 | **Workflow streaming** | Stream workflow events as `IAsyncEnumerable<WorkflowEvent>` | [02 — Workflows](../guides/02-workflows.md) | — |
+| **Progress from below a job** | `WorkflowEventReporting` — an ambient `IWorkflowEventSink`; a job reports its own `WorkflowEvent` and it reaches the caller's stream, and a `SubFlow`'s inner events arrive there too | [02 — Workflows](../guides/02-workflows.md) | — |
 | **Type-safe state** | Workflow state is generic (`TState`), validated at compile time | [02 — Workflows](../guides/02-workflows.md) | — |
 | **Graph validation** | Invalid topologies fail at build time, not at runtime | [02 — Workflows](../guides/02-workflows.md) | — |
 
@@ -29,7 +30,11 @@ relevant documentation guide and demo (where available).
 | **OpenAI provider** | `OpenAIChatAgentModel` — GPT-4.1, GPT-4o, o-series, and any compatible endpoint | [03 — Agents](../guides/03-agents.md) | [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo) |
 | **Anthropic provider** | `AnthropicAgentModel` — Claude Sonnet, Haiku, Opus | [03 — Agents](../guides/03-agents.md) | — |
 | **Google Gemini provider** | `GeminiAgentModel` — Gemini 2.5 Pro, Flash | [03 — Agents](../guides/03-agents.md) | — |
-| **Local / custom endpoints** | Ollama, LM Studio, vLLM, Azure OpenAI, Groq, Deepseek, Together AI | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
+| **Local / custom endpoints** | Ollama, LM Studio, vLLM, Azure OpenAI, Groq, Deepseek, Together AI | [17 — Local Models](../guides/17-local-models.md) | — |
+| **Model classification** | `ModelClassification` — size class, parameter count, weights (API-only / open), licence SPDX and OSI status, family. Queryable via `ModelCatalog.SmallModels` / `.LicensedUnder(...)`, kept out of routing so it can never affect what gets selected | [17 — Local Models](../guides/17-local-models.md) | — |
+| **Effective context window** | `LocalDeployment` reports what the server was launched with; `ModelProfile.ContextTokens` reads that instead of the catalogue's `MaxContextTokens`, so routing sees the runtime's actual window rather than the weights' rated one | [17 — Local Models](../guides/17-local-models.md) | — |
+| **Amazon Bedrock provider** | `Ananke.Orchestration.Bedrock` — SigV4 and API-key auth, endpoint construction for the existing OpenAI/Anthropic adapters. No third wire format, no model catalogue | [21 — Enterprise Clouds](../guides/21-enterprise-clouds.md) | — |
+| **Provider conformance suite** | `Ananke.Orchestration.Conformance` — 28 framework-neutral scenarios every shipped adapter must satisfy; a coverage test fails the build if one is added with no fixture | — | — |
 | **Structured output** | Typed response deserialization via `AgentJob<TState, TResponse>` | [03 — Agents](../guides/03-agents.md) | — |
 | **Token-level streaming** | Stream individual tokens via `IStreamingAgentModel.GenerateStreamAsync` | [05 — Streaming Chat](../guides/05-streaming-chat.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **StreamingChatWorkflow** | Pre-built workflow for chat UIs with tool calling and SSE | [05 — Streaming Chat](../guides/05-streaming-chat.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
@@ -156,11 +161,11 @@ relevant documentation guide and demo (where available).
 
 | Feature | Description | Guide | Demo |
 |---|---|---|---|
-| **Text DSL** | Define workflow topology in plain text, parse with `WorkflowScaffold.Parse` | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
-| **YAML manifests** | Declare models, agent jobs, and connections in `.ananke.yml` files | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
+| **Text DSL** | Define workflow topology in plain text, parse with `WorkflowScaffold.Parse` | [13 — Design Tooling](../guides/13-design-tooling.md) | [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
+| **YAML manifests** | Declare models, agent jobs, and connections in `.ananke.yml` files | [13 — Design Tooling](../guides/13-design-tooling.md) | [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
 | **ModelResolver** | Resolve model instances from YAML manifest + configuration | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
-| **Runtime binding** | `Bind()` job implementations to a scaffold at runtime | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
-| **Mermaid export** | `workflow.ToMermaid()` — generate diagrams from any validated workflow | [13 — Design Tooling](../guides/13-design-tooling.md) | [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo) |
+| **Runtime binding** | `Bind()` job implementations to a scaffold at runtime | [13 — Design Tooling](../guides/13-design-tooling.md) | [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
+| **Mermaid export** | `workflow.ToMermaid()` — generate diagrams from any validated workflow | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
 | **WorkflowToolResolver** | Resolve manifest-declared tools into per-job `ToolKit` instances — wires tools from YAML to the scaffolded workflow | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
 | **InMemoryToolBindingResolver** | In-memory `IToolBindingResolver` for tests and local scaffolding without external registries | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
 | **RouterStageDescriptor / RouterStageFactory** | Declare smart-router stages in YAML manifests; `RouterStageFactory` constructs the pipeline at bind time | [13 — Design Tooling](../guides/13-design-tooling.md) | — |
@@ -169,6 +174,8 @@ relevant documentation guide and demo (where available).
 
 | Feature | Description | Guide | Demo |
 |---|---|---|---|
+| **Simulated agent model** | `SimulatedAgentModel` — an `IStreamingAgentModel` that answers from a script: fixed, JSON, sequenced, computed from the request, or read from a file. Records every request it was sent | [14 — Testing](../guides/14-testing.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+| **Scripted runs as files** | `SimulatedScript` — matched on what the model was *sent*, scoped with `SimulatedRequestPart`, successive replies per entry for work that fails and is then fixed | [14 — Testing](../guides/14-testing.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
 | **In-memory distributed lock** | `InMemoryDistributedLock` — zero-config replacement for Redis in tests | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory knowledge store** | `InMemoryKnowledgeStore` — vector store that runs without external services | [14 — Testing](../guides/14-testing.md) | — |
 | **In-memory handoff channel** | `InMemoryHandoffChannel` — test agent handoff without MQTT | [14 — Testing](../guides/14-testing.md) | — |
@@ -202,6 +209,31 @@ relevant documentation guide and demo (where available).
 | **AgenticPattern builder** | Pre-wired workflow builders for recognized orchestration patterns; validates at `Build()` | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
 | **Review & Critique** | Generator → critic loop until approval or max iterations | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
 | **Iterative Refinement** | Single-agent refinement loop until quality threshold | [16 — Agentic Patterns](../guides/16-agentic-patterns.md) | [AgenticDesignPatternsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/AgenticDesignPatternsDemo) |
+
+## Plans & Contracts
+
+| Feature | Description | Guide | Demo |
+|---|---|---|---|
+| **Pinned contracts** | `AgentContract` — goal, acceptance and quality criteria, constraints; re-rendered into every assembly so compaction cannot evict them | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Versioned plan tree** | `PlanTree` — a decomposition plus every version it has been through, with the reason each change was made | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Derived status** | `NodeLifecycle` and `ContractOutcome` computed from verdicts and children via `LifecycleOf` / `OutcomeOf`; nothing is stored but the in-flight mark a running attempt needs | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Re-ruling, not cancelling** | `Rerule` mints a new `PlanVersion`; dropped work stays fully readable in earlier versions | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Durable plan stores** | `IPlanTreeStore` with `InMemoryPlanTreeStore` and `FilePlanTreeStore` — a run that dies mid-plan is resumable | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
+| **Post-order execution** | `PlanExecutor` runs children in order, then the node that decomposed them, reloading the tree around every node | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **A plan as data** | `PlanManifest` — YAML beside `WorkflowManifest`: the decomposition, the contracts, and `revisions:` with the reason each change was made. No conditions, no expressions; an unknown key is an error | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **A plan as a job** | `Supervise` — registers a plan as an ordinary workflow job that runs it to completion; the same shape as `SubFlow`, with no consumer-written control loop | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Bounded run to completion** | `ExecuteToCompletionAsync` repeats passes while the tree is still changing and stops when it is not — no retry ceiling to tune, and oscillating work is caught too | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **A readable account of a run** | `SessionTrace` joins the plan's events with the spans below them — jobs, model calls, tool calls — into one local transcript that explains rather than dumps | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
+| **External verification** | `IVerifier` / `DeterministicVerifier` — nobody rules on their own work, abstention is reported rather than guessed, and a change of plan reports which of its new criteria nothing can decide |
+| **A model as reviewer** | `AgentVerifier` on the `reviewer` role rules from the record on what no check could decide — never overturning a check, never passing what it cannot tell, and recording the grounds for what it does rule | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
+| **Provider-stated retry delays** | `ProviderRetryDelay` — a 429 that says `Retry-After` or `retryDelay` is waited out as asked rather than on an exponential curve, capped at two minutes so a daily quota fails fast instead of hanging | [14 — Testing](../guides/14-testing.md) | — |
+| **Deterministic checks** | `IDeterministicCheck` — gates that decide without judgement, named by their `Oracle`. `ProcessCheck` runs a command and reads its exit code, `PredicateCheck` evaluates a predicate; both refuse criteria they were not given, and a check that could not run throws rather than reporting a verdict | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
+| **Contract disputes** | `PlanViolation` — a node that finds its contract wrong returns rather than routing around it | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
+| **Agent-run nodes** | `PlanNodeAgentRunner` — runs a node as an agent job with its contract pinned and its report mapped to verdicts | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Plan progress as workflow events** | `PlanNodeStarted`, `PlanNodeReported`, `PlanNodeDisputed`, `PlanNodeFailed`, `PlanNodeVerified`, `PlanPassCompleted`, `PlanDecisionTaken`, `PlanVersionMinted` — read through `StreamAsync`, no observer to implement | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Plan progress as text** | `PlanNarrator` / `.Narrate()` — the switch over plan events, shipped once: a node's start folded into what it reported, steps and passes numbered, silence for a ruling that simply passed | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **A plan rendered for a person** | `PlanReportExporter` — `ToOutline()` for the tree as it stands, `ToLineage()` for what each version changed, added and dropped, and why. Derived from the versions, nothing elided | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
+| **Budgeted tree projection** | `PlanTreeProjection` renders the tree for one node and records what it had to omit in `NodeReading` | [18 — Plans and Contracts](../guides/18-plans-and-contracts.md) | — |
 
 ## Organics
 

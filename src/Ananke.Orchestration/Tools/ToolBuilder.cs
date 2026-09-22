@@ -1,4 +1,5 @@
 using Ananke.Abstractions.Providers;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Orchestration.Tools;
 
@@ -78,6 +79,33 @@ public sealed class ToolBuilder
     {
         _params.Add(new ToolParameter(name, description, ToolArgs.JsonTypeFor(typeof(T)),
             IsRequired: required, Examples: examples));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a parameter that is a list of <typeparamref name="T"/>, an element at a time.
+    /// </summary>
+    /// <typeparam name="T">
+    /// The element's type, usually a record. Its schema is generated as an answer's is, so a
+    /// description on a property reaches the model and a <see cref="DateOnly"/> is a date.
+    /// </typeparam>
+    /// <param name="name">Parameter name (used as the JSON property key).</param>
+    /// <param name="description">What the list is, sent to the LLM.</param>
+    /// <param name="required">When <see langword="true"/>, included in the JSON Schema <c>required</c> array.</param>
+    /// <remarks>
+    /// <b>What a tool checks should be shaped like what the answer will be.</b> A tool that takes the
+    /// same fields the answer carries cannot be handed a form the answer could not take — and a
+    /// consumer is not left parsing a string the model wrote, refusing what it could not read.
+    /// </remarks>
+    public ToolBuilder ParamList<T>(string name, string description, bool required = true)
+    {
+        _params.Add(new ToolParameter(
+            name,
+            description,
+            JsonType: "array",
+            IsRequired: required,
+            Items: JsonSchemaGenerator.GenerateForType(typeof(T))));
+
         return this;
     }
 
@@ -178,7 +206,7 @@ public sealed class ToolBuilder
     /// <summary>
     /// Marks this tool as a platform-native capability that requires no user code
     /// or endpoint (e.g. <c>"code_execution"</c>, <c>"web_search"</c>,
-    /// <c>"vertex_extension:code_interpreter"</c>).
+    /// <c>"google_search"</c>).
     /// </summary>
     /// <param name="capability">Platform capability identifier.</param>
     public ToolBuilder PlatformNative(string capability)

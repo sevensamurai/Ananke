@@ -64,7 +64,7 @@ public sealed record ToolBinding
 /// </remarks>
 public sealed record DeploymentProfile
 {
-    /// <summary>Profile name (e.g. <c>"azure-ai"</c>, <c>"local"</c>, <c>"staging"</c>).</summary>
+    /// <summary>Profile name (e.g. <c>"azure"</c>, <c>"local"</c>, <c>"staging"</c>).</summary>
     public required string Name { get; init; }
 
     /// <summary>

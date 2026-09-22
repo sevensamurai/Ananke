@@ -16,7 +16,7 @@ detail to come back to.
 
 1. `GeminiAgentModel` — the sole entry point: `IStreamingAgentModel` implementation wrapping
    the Google GenAI client; `.Create(apiKey, model)` for the public Gemini API,
-   `.CreateVertexAI(project, location, model)` for Vertex AI — `src/Ananke.Orchestration.Google/GeminiAgentModel.cs`
+   `.CreateAgentPlatform(project, location, model)` for Vertex AI — `src/Ananke.Orchestration.Google/GeminiAgentModel.cs`
 
 ---
 
@@ -29,4 +29,4 @@ detail to come back to.
 
 | Type | Kind | Purpose | Source |
 |------|------|---------|--------|
-| `GeminiAgentModel` | Sealed class | `IStreamingAgentModel` implementation. Wraps the Google GenAI client. `.Create(apiKey, model)` for the public Gemini API, `.CreateVertexAI(project, location, model)` for Vertex AI. | `src/Ananke.Orchestration.Google/GeminiAgentModel.cs` |
+| `GeminiAgentModel` | Sealed class | `IStreamingAgentModel` implementation. Wraps the Google GenAI client. `.Create(apiKey, model)` for the public Gemini API, `.CreateAgentPlatform(project, location, model)` for Vertex AI. | `src/Ananke.Orchestration.Google/GeminiAgentModel.cs` |

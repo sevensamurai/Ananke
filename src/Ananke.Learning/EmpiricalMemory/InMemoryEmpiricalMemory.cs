@@ -218,9 +218,17 @@ public sealed class InMemoryEmpiricalMemory : IEmpiricalMemory
 
         scored.Sort((a, b) => b.Score.CompareTo(a.Score));
 
-        var results = scored
-            .Take(options.TopK)
-            .ToList();
+        // TopK first — a budget can only reduce what recall returns, never enlarge it — then the
+        // allocation decides how deeply what survives is rendered.
+        var allocation = RecallBudget.Apply([.. scored.Take(options.TopK)], options);
+        var results = allocation.Matches;
+
+        if (allocation.Omitted > 0)
+        {
+            _logger.LogDebug(
+                "Empirical recall: {Omitted} of {Considered} matches did not fit a {Budget}-token budget",
+                allocation.Omitted, allocation.Considered, options.TokenBudget);
+        }
 
         RecallCounter.Add(1);
         if (results.Count > 0) RecallHitCounter.Add(1);

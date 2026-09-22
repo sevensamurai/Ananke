@@ -9,7 +9,7 @@ namespace Ananke.Tool.Platform.Azure;
 /// </summary>
 internal static class AdapterInstaller
 {
-    private const string AdapterId = "azure-ai";
+    private const string AdapterId = "azure";
     private const string ManifestFileName = "azure-ai.adapter.json";
 
     internal static void Run(string[] args)
@@ -43,7 +43,7 @@ internal static class AdapterInstaller
         WriteManifest(targetDir);
 
         Console.WriteLine($"nnke-platform-azure: installed {copied} file(s) to {targetDir}");
-        Console.WriteLine("Run 'nnke-platform deploy --platform azure-ai' to deploy.");
+        Console.WriteLine("Run 'nnke-platform deploy --platform azure' to deploy.");
     }
 
     private static void WriteManifest(string targetDir)

@@ -55,15 +55,25 @@ public sealed class RoleManifestFactory(IReadOnlyDictionary<string, ModelDefinit
             {
                 Provider = modelDefinition.Provider,
                 Model = modelDefinition.Model,
-                Endpoint = modelDefinition.Endpoint
+                Endpoint = modelDefinition.Endpoint,
+                Temperature = modelDefinition.Temperature
             };
         }
 
-        return new ModelDefinition
-        {
-            Provider = "studio",
-            Model = modelAlias
-        };
+        // Unresolved. Recorded as a reference rather than dressed up as a provider.
+        //
+        // This used to return Provider = "studio", which no provider factory has ever registered
+        // and which ModelResolver rejects with "call Register(\"studio\", ...)" — advice for a
+        // provider that does not exist. It was not LM Studio either: that is reached as
+        // provider "openai" with a custom endpoint, as this repository does everywhere including
+        // MiniAgencyDemo. It was a sentinel that leaked into a real field.
+        //
+        // Ref is the vocabulary for exactly this state, so an unresolved alias is
+        // now visible to DeployabilityValidator as FED016 and refused by ModelResolver, instead of
+        // travelling as a provider nothing can serve. Deliberately not a throw:
+        // StudioOptions.ModelAliasMap defaults to empty, so building manifests without a map is a
+        // supported path.
+        return new ModelDefinition { Ref = modelAlias };
     }
 
     private static Dictionary<string, ToolManifestEntry> CreateToolEntries(AgentRole role, ToolKit? toolKit)

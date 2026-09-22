@@ -23,7 +23,7 @@ Key primitives: sequential chains, conditional routing via `Workflow.Decide<T>`,
 
 An **agent** is an LLM wrapped behind the `IStreamingAgentModel` interface. An `AgentJob` drops that LLM into any workflow step — you supply a system prompt, user prompt template, optional tools, and a mapping from the model's response to your state type.
 
-Because the provider is injected as an interface, you can swap OpenAI for Anthropic, Google Gemini, or a local Ollama endpoint without changing workflow code. Structured output (JSON schema) works the same across all providers. The provider is a detail, not a foundation.
+Because the provider is injected as an interface, you can swap OpenAI for Anthropic, Google Gemini, or a local Ollama endpoint without changing workflow code ([guide 17](guides/17-local-models.md) covers what changes when the model is small and self-hosted, even though the code does not). Structured output (JSON schema) works the same across all providers. The provider is a detail, not a foundation.
 
 [Learn more →](guides/03-agents.md)
 

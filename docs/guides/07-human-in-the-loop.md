@@ -1,4 +1,4 @@
-<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl, ask, awaitinput, conversational -->
+<!-- topic: human-in-the-loop, tags: interrupt, checkpoint, resume, approval, hitl, ask, awaitinput, conversational, escalation, interruptwhen -->
 # 07 — Human-in-the-Loop
 
 Pause workflow execution at any step for human review, checkpoint the full state,
@@ -12,7 +12,8 @@ and resume with optional modifications.
 
 Human-in-the-loop in Ananke works through three mechanisms:
 
-1. **Interrupt** — mark a job as requiring human approval before or after it runs
+1. **Interrupt** — mark a job as requiring human approval before or after it runs, either every
+   time or only when a condition over state says so
 2. **Checkpoint** — persist the full workflow state so it survives process restarts
 3. **Resume** — continue execution from the checkpoint, optionally modifying state
 
@@ -121,6 +122,98 @@ conversation/thread id) — fold-then-resume happens in one call.
 For a full interview — welcome → icebreaker → a loop of `AwaitInput` turns, with expand/skip/
 update navigation over a question agenda — use `AgenticPattern.Interview<TState>` instead of
 wiring `AwaitInput` by hand. See [Guide 16 — Agentic Patterns](16-agentic-patterns.md#interview-conversational).
+
+---
+
+## Pausing only when it matters (`InterruptWhen`, `AwaitInputWhen`)
+
+Everything above stops **every time the job is reached**. That is right for a gate — somebody must
+see every trade before it executes — and wrong for the other shape:
+
+> Let the run steer itself, and stop only when it reaches something it cannot decide.
+
+Written with an unconditional interrupt, that second shape becomes the first: a run that wanted a
+person *at the wall* asks about every decision it was perfectly able to make. So the pause takes a
+condition:
+
+```csharp
+var workflow = new Workflow<ReviewState>("draft-and-check")
+    .Job("draft",  async (state, ct) => state with { Draft = await Write(ct) })
+    .Job("check",  async (state, ct) => state with { Score = Score(state.Draft) })
+    .Chain("draft", "check")
+    .Then("check", Workflow.End)
+    // Only the drafts the checks are unsure about reach a person.
+    .InterruptWhen("check", state => state.Score < 0.6)
+    .UseCheckpointing(checkpointStore);
+```
+
+The predicate sees **workflow state and nothing else**, and it is evaluated when the run arrives at
+the job. `InterruptBefore(job)` is the same thing with the condition always true, and stays the
+shorter spelling when that is what you mean.
+
+**A host learns nothing new.** A conditional pause checkpoints, reports `Interrupted` and is
+continued by `ResumeAsync` exactly like an unconditional one — the condition changes *whether* a
+pause happens, never what a pause is. `AwaitInputWhen(job, when)` is the input-collecting version, so
+a conditional turn still lands in `WorkflowDefinition.InputJobs` and a UI can still tell *"answer
+this"* from *"approve this"*.
+
+Two things worth knowing before you reach for it:
+
+- **The condition is code, so it does not survive a topology round-trip.** `ToDsl()` exports
+  `interrupt(name, when)` / `ask(name, when)` — the fact that a pause is conditional, not the
+  predicate — and `WorkflowScaffold` **refuses** to build such a directive rather than quietly
+  turning your escalation into a gate that stops every time.
+- **The entry job still cannot be interrupted**, conditionally or otherwise: no work has happened
+  yet, so there is nothing to approve and nothing for a predicate to read.
+
+---
+
+## Escalating a supervised plan
+
+A plan that changes itself when it hits a contradiction is [Guide 18](18-plans-and-contracts.md)'s
+subject. The part that belongs on *this* page is what happens when a halt is not the plan's to
+answer — and the answer is that it is an ordinary conditional pause, wired by the builder:
+
+```csharp
+var workflow = AgenticPattern.SupervisedPlan<DeliveryState>("feature-delivery")
+    .WithPlan(PlanManifest.Load("plan.yml").ToTree())
+    .Supervised(supervision)
+    .Tracking(s => s.Coordination, (s, c) => s with { Coordination = c })
+    .WithCoordinator(new AgentPlanSupervisor(supervision).AsCoordinator())
+    // A dispute the coordinator can re-rule, it re-rules. A step that broke is a person's.
+    .EscalateToAPerson(coordination => coordination.Cause is PlanHaltCause.Failed)
+    .Build()
+    .UseCheckpointing(checkpointStore);
+
+var run = await workflow.RunAsync(new DeliveryState());
+// run.Status == Interrupted, only if a halt matched the condition
+
+var answered = await workflow.ResumeAsync(run.Id, state => state with
+{
+    Coordination = state.Coordination! with
+    {
+        Decision = PlanDecision.Rerule(replacementContract, rationale, nodeId: "deliver")
+    }
+});
+```
+
+The person's answer travels the way every other human input travels: injected into state by
+`ResumeAsync`. **On that round the coordinator is not asked** — the answer that came from outside the
+run is the decision, and a coordinator deciding for itself here would overwrite what somebody was
+stopped and consulted for, then have its own answer recorded as theirs. So the coordinator in the
+slot needs no awareness of pauses at all: the one above is an ordinary model-backed planner, and it
+simply does not run on the rounds a person answered. Resuming with nothing decided still asks it —
+somebody looked and did not answer, which is not the same as nobody having been asked.
+
+`EscalateToAPerson()` with no argument stops at **every** halt, which is the approval-gate shape.
+
+**What it costs is the one plan-specific thing on this page.** A decision taken on a round the run
+paused for is reported and **never counted**, because that round is bounded by somebody being there
+to answer it. If you also set `MaxChangesOfPlan(n)` — optional, and unset by default — it bounds the
+re-planning the run does *by itself*, so the two compose rather than competing. The framework reads
+which is which from how the coordinator was entered, not from who claims to have written the answer.
+
+A settled plan is never put to a person: the condition only sees a halt.
 
 ---
 

@@ -138,17 +138,22 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         return null;
     }
 
-    public async IAsyncEnumerable<WorkflowEvent<TState>> StreamAsync<TState>(
+    public async IAsyncEnumerable<WorkflowEvent> StreamAsync<TState>(
         WorkflowDefinition<TState> definition,
         TState initialState,
         WorkflowStreamOptions? options = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         options ??= new WorkflowStreamOptions();
-        var channel = Channel.CreateBounded<WorkflowEvent<TState>>(
+        var channel = Channel.CreateBounded<WorkflowEvent>(
             new BoundedChannelOptions(options.Capacity)
             {
-                SingleWriter = true,
+                // Not single-writer: every branch of a fork runs concurrently under
+                // Task.WhenAll and each one reports its own job events through this same
+                // writer, as does any job that reports progress of its own. Declaring a
+                // single writer here would let the channel take a path that assumes writes
+                // are serialised, which they are not.
+                SingleWriter = false,
                 SingleReader = true,
                 FullMode = BoundedChannelFullMode.Wait
             });
@@ -156,12 +161,25 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var execution = new WorkflowExecution<TState>(definition.Name, initialState, definition.Metadata);
 
+        // Established before the run starts, so it flows into the runner task and into every fork
+        // branch, nested runner and job below it. Nothing is handed a writer; everything reports to
+        // whatever sink the flow it is running in has — including work that has never heard of a
+        // workflow channel.
+        using var reporting = WorkflowEventReporting.BeginScope(new ChannelEventSink(channel.Writer));
+
+        // Not the owner means an outer stream is already being read from this flow, and the rule is
+        // that the outermost reader wins — which is what carries a sub-workflow's events up to the
+        // parent's stream. It also means this stream will yield nothing, so say so rather than
+        // handing back an enumerable that quietly ends.
+        if (!reporting.IsOwner)
+            LogNestedStreamHasNoEvents(definition.Name);
+
         var task = Task.Run(async () =>
         {
             try
             {
                 await ExecuteAsync(definition, execution, definition.EntryJob,
-                    linkedCts.Token, events: channel.Writer).ConfigureAwait(false);
+                    linkedCts.Token).ConfigureAwait(false);
             }
             finally
             {
@@ -192,12 +210,12 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         string? startJob,
         CancellationToken ct,
         bool skipFirstInterrupt = false,
-        ChannelWriter<WorkflowEvent<TState>>? events = null,
         bool skipFirstJobExecution = false)
     {
         var totalSw = Stopwatch.StartNew();
         execution.Status = ExecutionStatus.Running;
         var currentJobName = startJob;
+
 
         // One recorder per execution. BeginScope does not nest, so a sub-workflow's runner
         // inherits its parent's — which is what makes child spend visible to the parent's
@@ -252,7 +270,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     await _checkpointStore.SaveAsync(budgetCheckpoint, ct).ConfigureAwait(false);
                 }
 
-                await EmitEventAsync(events, new BudgetExceeded<TState>
+                await EmitEventAsync(new BudgetExceeded<TState>
                 {
                     WorkflowName = definition.Name,
                     ExecutionId = execution.Id,
@@ -272,7 +290,10 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 execution.CurrentJob = currentJobName;
 
                 // --- Interrupt Before ---
-                if (descriptor.Interrupt == InterruptMode.Before && !skipFirstInterrupt)
+                // A pause with a reason to happen: absent predicate means every arrival pauses,
+                // which is what InterruptBefore has always meant.
+                if (descriptor.Interrupt == InterruptMode.Before && !skipFirstInterrupt
+                    && (descriptor.InterruptWhen?.Invoke(execution.State) ?? true))
                 {
                     if (_checkpointStore is null)
                         throw new InvalidOperationException(
@@ -285,7 +306,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     LogInterruptedBefore(definition.Name, execution.Id, currentJobName);
 
-                    await EmitEventAsync(events, new Interrupted<TState>
+                    await EmitEventAsync(new Interrupted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -295,6 +316,10 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     return execution;
                 }
+
+                // Consumed here, remembered for the job about to run: a decision taken on this
+                // arrival was taken on an answer that came from outside the run.
+                var resumedIntoThisJob = skipFirstInterrupt;
                 skipFirstInterrupt = false;
 
                 // When resuming after a fork, skip re-executing the forking job body
@@ -307,7 +332,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     var resumeFork = definition.ResolveFork(currentJobName);
                     if (resumeFork is not null)
                     {
-                        await EmitEventAsync(events, new ForkStarted<TState>
+                        await EmitEventAsync(new ForkStarted<TState>
                         {
                             WorkflowName = definition.Name,
                             ExecutionId = execution.Id,
@@ -315,7 +340,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                         }, ct).ConfigureAwait(false);
 
                         var joinTarget = await ExecuteForkJoinAsync(
-                            definition, resumeFork, execution, trace, events, budgetGate, ct).ConfigureAwait(false);
+                            definition, resumeFork, execution, trace, budgetGate, ct).ConfigureAwait(false);
 
                         // null: a branch reached the budget. Totals already include the fork's
                         // spend, so re-evaluate and end the run rather than joining.
@@ -329,7 +354,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                         currentJobName = joinTarget;
 
-                        await EmitEventAsync(events, new JoinCompleted<TState>
+                        await EmitEventAsync(new JoinCompleted<TState>
                         {
                             WorkflowName = definition.Name,
                             ExecutionId = execution.Id,
@@ -337,7 +362,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                             State = execution.State
                         }, ct).ConfigureAwait(false);
 
-                        await EmitEventAsync(events, new StateUpdated<TState>
+                        await EmitEventAsync(new StateUpdated<TState>
                         {
                             WorkflowName = definition.Name,
                             ExecutionId = execution.Id,
@@ -360,12 +385,12 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 // finally block regardless of how the job exits (success, fault, interrupt).
                 // The usage recorder is deliberately NOT part of this: it is scoped once per
                 // execution, not per job, which is what lets branches and sub-workflows record
-                // into it instead of silently getting their own (ADR-arch-028 D7).
+                // into it instead of silently getting their own.
                 var prevTrace = WorkflowTraceContext.Value;
 
                 WorkflowTraceContext.Value = new TraceInfo(
                     definition.Name, execution.Id, currentJobName, trace, jobSpan,
-                    _storeCompletions);
+                    _storeCompletions, resumedIntoThisJob);
 
                 if (descriptor.OnEnter is not null)
                     await descriptor.OnEnter(execution.State).ConfigureAwait(false);
@@ -380,7 +405,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 LogJobStarting(currentJobName, definition.Name, execution.Id);
 
-                await EmitEventAsync(events, new JobStarted<TState>
+                await EmitEventAsync(new JobStarted<TState>
                 {
                     WorkflowName = definition.Name,
                     ExecutionId = execution.Id,
@@ -400,7 +425,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     LogJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
 
-                    await EmitEventAsync(events, new JobCompleted<TState>
+                    await EmitEventAsync(new JobCompleted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -409,7 +434,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                         State = execution.State
                     }, ct).ConfigureAwait(false);
 
-                    await EmitEventAsync(events, new StateUpdated<TState>
+                    await EmitEventAsync(new StateUpdated<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -433,7 +458,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     LogInterruptedBySubflow(definition.Name, execution.Id, currentJobName);
 
-                    await EmitEventAsync(events, new Interrupted<TState>
+                    await EmitEventAsync(new Interrupted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -482,7 +507,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 // The baseline matters for a sub-workflow, which inherits its parent's recorder:
                 // without it the child would report the parent's spend as its own. Assignment,
                 // not accumulation — summing per-job deltas is not well defined once fork
-                // branches record concurrently (ADR-arch-028 D6/D7).
+                // branches record concurrently.
                 var verdict = await budgetGate.EvaluateAsync(ct).ConfigureAwait(false);
                 if (verdict.RunTotals.Usage.TotalTokens > 0)
                     execution.CumulativeUsage = verdict.RunTotals.Usage;
@@ -497,7 +522,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     LogBudgetWarning(definition.Name, execution.Id, warnSpent, warnAt);
 
-                    await EmitEventAsync(events, new BudgetWarning<TState>
+                    await EmitEventAsync(new BudgetWarning<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -514,7 +539,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 }
 
                 // --- Interrupt After ---
-                if (descriptor.Interrupt == InterruptMode.After)
+                if (descriptor.Interrupt == InterruptMode.After
+                    && (descriptor.InterruptWhen?.Invoke(execution.State) ?? true))
                 {
                     if (_checkpointStore is null)
                         throw new InvalidOperationException(
@@ -528,7 +554,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     LogInterruptedAfter(definition.Name, execution.Id, currentJobName);
 
-                    await EmitEventAsync(events, new Interrupted<TState>
+                    await EmitEventAsync(new Interrupted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -543,7 +569,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 var forkConn = definition.ResolveFork(currentJobName);
                 if (forkConn is not null)
                 {
-                    await EmitEventAsync(events, new ForkStarted<TState>
+                    await EmitEventAsync(new ForkStarted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -551,7 +577,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     }, ct).ConfigureAwait(false);
 
                     var joinTarget = await ExecuteForkJoinAsync(
-                        definition, forkConn, execution, trace, events, budgetGate, ct).ConfigureAwait(false);
+                        definition, forkConn, execution, trace, budgetGate, ct).ConfigureAwait(false);
 
                     // null: a branch reached the budget. Totals already include the fork's
                     // spend, so re-evaluate and end the run rather than joining.
@@ -565,7 +591,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                     currentJobName = joinTarget;
 
-                    await EmitEventAsync(events, new JoinCompleted<TState>
+                    await EmitEventAsync(new JoinCompleted<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -573,7 +599,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                         State = execution.State
                     }, ct).ConfigureAwait(false);
 
-                    await EmitEventAsync(events, new StateUpdated<TState>
+                    await EmitEventAsync(new StateUpdated<TState>
                     {
                         WorkflowName = definition.Name,
                         ExecutionId = execution.Id,
@@ -603,7 +629,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                         LogLoopExited(definition.Name, execution.Id, currentJobName, completedIterations, exitReason.Value.ToString());
 
-                        await EmitEventAsync(events, new LoopExited<TState>
+                        await EmitEventAsync(new LoopExited<TState>
                         {
                             WorkflowName = definition.Name,
                             ExecutionId = execution.Id,
@@ -634,7 +660,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
             LogWorkflowCompleted(definition.Name, execution.Id, totalSw.ElapsedMilliseconds, execution.History.Count);
 
-            await EmitEventAsync(events, new WorkflowCompleted<TState>
+            await EmitEventAsync(new WorkflowCompleted<TState>
             {
                 WorkflowName = definition.Name,
                 ExecutionId = execution.Id,
@@ -666,7 +692,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 branchOutcomes: execution.BranchOutcomes);
             LogWorkflowFaulted(ex, definition.Name, execution.Id, ex.Message);
 
-            await EmitEventAsync(events, new WorkflowFaulted<TState>
+            await EmitEventAsync(new WorkflowFaulted<TState>
             {
                 WorkflowName = definition.Name,
                 ExecutionId = execution.Id,
@@ -791,7 +817,6 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         ForkConnection fork,
         WorkflowExecution<TState> execution,
         ITrace trace,
-        ChannelWriter<WorkflowEvent<TState>>? events,
         BudgetGate budgetGate,
         CancellationToken ct)
     {
@@ -808,7 +833,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
         var branchTasks = fork.Targets.Select(target =>
             RunBranchAsync(definition, target, execution.State, execution.Id,
-                forkSpan, events, budgetGate, branchCt, failFastCts: forkCts)).ToList();
+                forkSpan, budgetGate, branchCt, failFastCts: forkCts)).ToList();
 
         // Branch faults now come back as results rather than exceptions, so this
         // gathers first and decides after, instead of catching.
@@ -866,7 +891,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         foreach (var outcome in outcomes.Where(o => !o.Succeeded))
         {
             execution.RecordBranchOutcome(outcome);
-            await EmitEventAsync(events, new BranchFaulted<TState>
+            await EmitEventAsync(new BranchFaulted<TState>
             {
                 WorkflowName = definition.Name,
                 ExecutionId = execution.Id,
@@ -936,7 +961,6 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         TState branchState,
         string executionId,
         ISpan parentSpan,
-        ChannelWriter<WorkflowEvent<TState>>? events,
         BudgetGate budgetGate,
         CancellationToken ct,
         CancellationTokenSource? failFastCts)
@@ -950,7 +974,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         try
         {
             return await ExecuteBranchAsync(
-                definition, startJob, branchState, executionId, branchSpan, history, events,
+                definition, startJob, branchState, executionId, branchSpan, history,
                 budgetGate, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -1000,7 +1024,6 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         string executionId,
         ISpan branchSpan,
         List<JobExecution> history,
-        ChannelWriter<WorkflowEvent<TState>>? events,
         BudgetGate budgetGate,
         CancellationToken ct)
     {
@@ -1053,7 +1076,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
             LogBranchJobStarting(currentJobName, definition.Name);
 
-            await EmitEventAsync(events, new JobStarted<TState>
+            await EmitEventAsync(new JobStarted<TState>
             {
                 WorkflowName = definition.Name,
                 ExecutionId = executionId,
@@ -1073,7 +1096,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 LogBranchJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
 
-                await EmitEventAsync(events, new JobCompleted<TState>
+                await EmitEventAsync(new JobCompleted<TState>
                 {
                     WorkflowName = definition.Name,
                     ExecutionId = executionId,
@@ -1114,7 +1137,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             // loop, so a cycle inside one would otherwise spend without any check ever running —
             // exactly the runaway a guardrail exists for. Stop this branch and let the fork
             // report it; siblings notice independently at their own next check, so nothing is
-            // cancelled and ADR-arch-025 D2 stays intact.
+            // cancelled andD2 stays intact.
             if ((await budgetGate.EvaluateAsync(ct).ConfigureAwait(false)).State == BudgetState.Exceeded)
             {
                 LogBranchBudgetStopped(currentJobName, definition.Name);
@@ -1163,18 +1186,40 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             lastCompletedJob, state, history, BranchOutcomeKind.Succeeded, Exception: null);
     }
 
-    private static async ValueTask EmitEventAsync<TState>(
-        ChannelWriter<WorkflowEvent<TState>>? events,
-        WorkflowEvent<TState> evt,
-        CancellationToken ct = default)
+    /// <summary>
+    /// Writes reported events into a stream's channel, and stops quietly once nobody is reading.
+    /// </summary>
+    /// <remarks>
+    /// A consumer who stops enumerating mid-run is not an error — the reader is disposed, the
+    /// channel closes, and whatever is still running finds out by trying to report. Throwing there
+    /// would turn "the caller looked away" into a faulted workflow.
+    /// </remarks>
+    private sealed class ChannelEventSink(ChannelWriter<WorkflowEvent> writer) : IWorkflowEventSink
     {
-        if (events is null) return;
-        try { await events.WriteAsync(evt, ct).ConfigureAwait(false); }
-        catch (ChannelClosedException) { }
-        catch (OperationCanceledException) { }
+        public async ValueTask ReportAsync(WorkflowEvent evt, CancellationToken ct = default)
+        {
+            try { await writer.WriteAsync(evt, ct).ConfigureAwait(false); }
+            catch (ChannelClosedException) { }
+            catch (OperationCanceledException) { }
+        }
     }
 
+    /// <summary>
+    /// Sends an event wherever the current flow is reporting, if anywhere.
+    /// </summary>
+    /// <remarks>
+    /// The runner does not hold the reader's channel and does not pass one down. Everything that
+    /// emits — the main path, a fork branch, a nested runner, a job — reports to the ambient sink,
+    /// which is what lets a sub-workflow's events reach the stream its parent is being read from.
+    /// </remarks>
+    private static ValueTask EmitEventAsync(WorkflowEvent evt, CancellationToken ct = default) =>
+        WorkflowEventReporting.ReportAsync(evt, ct);
+
     // -- Source-generated structured log methods ----------------------
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "StreamAsync for {WorkflowName} is nested inside a stream that is already being read; its events go to the outer stream and this one yields nothing")]
+    private partial void LogNestedStreamHasNoEvents(string workflowName);
 
     [LoggerMessage(Level = LogLevel.Warning,
         Message = "Workflow {WorkflowName} [{ExecutionId}] passed its budget warning threshold: estimated {EstimatedCost} > {WarnAtCost}")]

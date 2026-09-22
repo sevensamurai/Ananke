@@ -24,4 +24,16 @@ public sealed record TraceInfo(
     string? CurrentJob = null,
     ITrace? Trace = null,
     ISpan? CurrentSpan = null,
-    bool StoreCompletions = false);
+    bool StoreCompletions = false,
+    bool ResumedInto = false)
+{
+    /// <summary>
+    /// Whether this job is the one the run was resumed into after a pause.
+    /// </summary>
+    /// <remarks>
+    /// So whatever it decides, it decides on an answer that came from outside the run — which is a
+    /// fact about how the job was entered, observed by the runner, rather than a claim anybody made
+    /// about who is on the other side.
+    /// </remarks>
+    public bool ResumedInto { get; init; } = ResumedInto;
+}

@@ -83,7 +83,7 @@ public sealed record UsageSnapshot
 /// Replaces the earlier <c>TokenUsageCapture</c>, which exposed a mutable accumulator
 /// through an ambient reference that callers assigned. Correctness then depended on every
 /// caller preserving that reference's identity — an unstated contract, and one that fork
-/// branches and sub-workflows both broke. See ADR-arch-028 Part B.
+/// branches and sub-workflows both broke. SeePart B.
 /// <para>
 /// Implementations must be safe for concurrent callers: fork branches record in parallel.
 /// </para>

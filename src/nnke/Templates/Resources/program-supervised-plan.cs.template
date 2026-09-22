@@ -1,0 +1,118 @@
+using System.Text.Json;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration;
+using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Planning;
+using Ananke.Orchestration.Workflows;
+
+// -------------------------------------------------------------------
+//  {{name}} -- Supervised Plan Pattern
+//
+//  A decomposed plan runs step by step against pinned contracts. When a
+//  node reports that its contract cannot be met, it stops rather than
+//  delivering something adjacent -- and a coordinator decides what the
+//  plan becomes. The change of plan is a new version, with a reason.
+//  Uses SimulatedModel -- runs without API keys.
+// -------------------------------------------------------------------
+
+Console.WriteLine($"  {{name}} -- Supervised Plan");
+Console.WriteLine();
+
+// The plan: a goal, decomposed into work items with acceptance criteria.
+var plan = PlanTree.Create(
+    "delivery",
+    new AgentContract
+    {
+        Goal = "Ship offline export.",
+        AcceptanceCriteria = ["An exported file matches the online report."]
+    },
+    [
+        ("assemble", new AgentContract
+        {
+            Goal = "Assemble the report in memory before writing it.",
+            AcceptanceCriteria = ["The approach handles the largest report."]
+        })
+    ]);
+
+// What runs a node. A real one is a model; this one reports a contradiction the
+// first time round, which is the case the pattern exists for.
+var attempts = 0;
+
+PlanNodeRunner runner = (context, _) =>
+{
+    if (context.Node.Id == "assemble" && ++attempts == 1)
+    {
+        Console.WriteLine("    assemble: the largest report is 4 GB and memory is 2 GB -- disputing");
+        return Task.FromResult(new NodeOutcome
+        {
+            Violation = new PlanViolation
+            {
+                Criterion = "The approach handles the largest report.",
+                Reason = "No buffer size makes this work; assembling in memory is not the work.",
+                At = DateTimeOffset.UtcNow
+            }
+        });
+    }
+
+    Console.WriteLine($"    {context.Node.Id}: done");
+    return Task.FromResult(new NodeOutcome
+    {
+        Verdicts =
+        [
+            .. context.Contract.AcceptanceCriteria.Select(c => new CriterionVerdict
+            {
+                Criterion = c,
+                Passed = true,
+                Oracle = "build + tests",
+                At = DateTimeOffset.UtcNow
+            })
+        ]
+    });
+};
+
+var supervision = new SupervisionOptions { Runner = runner };
+
+// Who decides what a halted plan becomes. Replace with AgentPlanCoordinator to put a
+// model in this slot, or with an IJob<DeliveryState> to put a person or a queue in it.
+PlanCoordinator coordinator = (coordination, _) =>
+{
+    Console.WriteLine($"    coordinator: '{coordination.NodeId}' stopped -- {coordination.Dispute?.Reason}");
+
+    return Task.FromResult(PlanDecision.Rerule(
+        new AgentContract
+        {
+            Goal = "Stream the report straight to storage.",
+            AcceptanceCriteria = ["The approach handles a report larger than memory."]
+        },
+        reason: coordination.Dispute!.Reason));
+};
+
+var workflow = AgenticPattern.SupervisedPlan<DeliveryState>("{{name}}")
+    .WithPlan(plan)
+    .Supervised(supervision)
+    .Tracking(s => s.Coordination, (s, c) => s with { Coordination = c })
+    .WithCoordinator(coordinator)
+    .MaxChangesOfPlan(3)
+    .Build();
+
+var result = await workflow.RunAsync(new DeliveryState());
+var outcome = result.State.Coordination!.Result;
+
+Console.WriteLine();
+Console.WriteLine($"  Root status:      {outcome.RootStatus}");
+Console.WriteLine($"  Halted at:        {outcome.HaltedAt ?? "(nothing -- the plan settled)"}");
+Console.WriteLine($"  Plan versions:    {outcome.Tree.Lineage.Count}");
+Console.WriteLine($"  Changes of plan:  {result.State.Coordination.Changes}");
+Console.WriteLine($"  Status:           {result.Status}");
+
+// --- SimulatedModel: replace with real provider ---
+
+internal sealed class SimulatedModel(Func<AgentRequest, string> responder) : IAgentModel
+{
+    public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new AgentResponse
+        {
+            Text = responder(request),
+            Usage = new TokenUsage { InputTokens = 100, OutputTokens = 50 }
+        });
+}

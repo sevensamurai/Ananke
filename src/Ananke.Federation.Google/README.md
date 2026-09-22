@@ -15,15 +15,15 @@ monitor running agents via Agent Observability, and route executions through Gem
 
 | Type | Purpose |
 |---|---|
-| `VertexAIDeployer` | `IFederationDeployer` — creates/updates/deletes agents via Agent Runtime REST API from a `WorkflowManifest` |
-| `VertexAIWorkflowHost` | `IWorkflowHost` — manages cells as Agent Runtime agents; `StartAsync` deploys, `StopAsync` tears down |
-| `VertexAIRemoteCellMonitor` | `IRemoteCellMonitor` — polls health and metrics via Cloud Trace v2 and Cloud Monitoring v3 |
-| `VertexAICredentialProvider` | `IFederationCredentialProvider` — resolves a `Google.GenAI.Client` via Application Default Credentials (ADC) |
-| `VertexAIModelMapper` | `IModelMapper` — maps manifest model references to Gemini model identifiers; Google models pass through directly |
-| `VertexAIToolSchemaTranslator` | Translates `ToolDefinition`s to Agent Platform `Tool` instances (Function Declarations, Extensions, OpenAPI specs) |
-| `VertexAISystemPromptCompiler` | `ISystemPromptCompiler` — compiles a system prompt from a manifest for Agent Runtime |
-| `VertexAIValidator` | `IPlatformValidator` — live credential, model availability, and tool compatibility checks via Google Cloud APIs |
-| `RemoteCellMonitorOptions` | Configures health thresholds (error rate, latency) and look-back window for `VertexAIRemoteCellMonitor` |
+| `AgentRuntimeDeployer` | `IFederationDeployer` — creates/updates/deletes agents via Agent Runtime REST API from a `WorkflowManifest` |
+| `AgentRuntimeWorkflowHost` | `IWorkflowHost` — manages cells as Agent Runtime agents; `StartAsync` deploys, `StopAsync` tears down |
+| `AgentRuntimeRemoteCellMonitor` | `IRemoteCellMonitor` — polls health and metrics via Cloud Trace v2 and Cloud Monitoring v3 |
+| `AgentRuntimeCredentialProvider` | `IFederationCredentialProvider` — resolves a `Google.GenAI.Client` via Application Default Credentials (ADC) |
+| `AgentRuntimeModelMapper` | `IModelMapper` — maps manifest model references to Gemini model identifiers; Google models pass through directly |
+| `AgentRuntimeToolSchemaTranslator` | Translates `ToolDefinition`s to Agent Platform `Tool` instances (Function Declarations, Extensions, OpenAPI specs) |
+| `AgentRuntimeSystemPromptCompiler` | `ISystemPromptCompiler` — compiles a system prompt from a manifest for Agent Runtime |
+| `AgentRuntimeValidator` | `IPlatformValidator` — live credential, model availability, and tool compatibility checks via Google Cloud APIs |
+| `RemoteCellMonitorOptions` | Configures health thresholds (error rate, latency) and look-back window for `AgentRuntimeRemoteCellMonitor` |
 
 ## Authentication
 
@@ -31,7 +31,7 @@ This adapter uses **Application Default Credentials (ADC)**. Provide your Google
 project ID and region:
 
 ```csharp
-var credentials = new VertexAICredentialProvider(
+var credentials = new AgentRuntimeCredentialProvider(
     project: "my-gcp-project",
     location: "us-central1");
 ```
@@ -43,18 +43,18 @@ The service account requires these IAM roles:
 
 | Role | Used by |
 |---|---|
-| `roles/aiplatform.user` | `VertexAIDeployer` — Agent Runtime agents.create / agents.delete |
-| `roles/cloudtrace.viewer` | `VertexAIRemoteCellMonitor` — Cloud Trace read |
-| `roles/monitoring.viewer` | `VertexAIRemoteCellMonitor` — Cloud Monitoring read |
+| `roles/aiplatform.user` | `AgentRuntimeDeployer` — Agent Runtime agents.create / agents.delete |
+| `roles/cloudtrace.viewer` | `AgentRuntimeRemoteCellMonitor` — Cloud Trace read |
+| `roles/monitoring.viewer` | `AgentRuntimeRemoteCellMonitor` — Cloud Monitoring read |
 
 ## Quick start
 
 ### Deploy a workflow
 
 ```csharp
-var credentials = new VertexAICredentialProvider("my-gcp-project", "us-central1");
+var credentials = new AgentRuntimeCredentialProvider("my-gcp-project", "us-central1");
 var registry    = new InMemoryDeploymentRegistry();
-var deployer    = new VertexAIDeployer(credentials, registry);
+var deployer    = new AgentRuntimeDeployer(credentials, registry);
 
 DeploymentRecord record = await deployer.DeployAsync(manifest, toolKit, new DeployOptions
 {
@@ -67,7 +67,7 @@ DeploymentRecord record = await deployer.DeployAsync(manifest, toolKit, new Depl
 ### Monitor a deployment
 
 ```csharp
-var monitor = new VertexAIRemoteCellMonitor(
+var monitor = new AgentRuntimeRemoteCellMonitor(
     project: "my-gcp-project",
     options: new RemoteCellMonitorOptions
     {
@@ -82,7 +82,7 @@ RemoteCellMetrics metrics = await monitor.GetMetricsAsync(record.DeploymentId);
 
 ## Tool translation
 
-`VertexAIToolSchemaTranslator` groups tools by execution mode:
+`AgentRuntimeToolSchemaTranslator` groups tools by execution mode:
 
 | Ananke mode | Agent Platform equivalent |
 |---|---|
@@ -95,7 +95,7 @@ to the supervisor process (supervisor-only hybrid constraint).
 
 ## Model mapping
 
-`VertexAIModelMapper` maps any Ananke model reference to its Gemini equivalent.
+`AgentRuntimeModelMapper` maps any Ananke model reference to its Gemini equivalent.
 Google models pass through unchanged; OpenAI and Anthropic models are mapped to
 the nearest Gemini equivalent.
 
@@ -114,7 +114,7 @@ the nearest Gemini equivalent.
 
 ## Monitoring
 
-`VertexAIRemoteCellMonitor` queries two Google Cloud APIs:
+`AgentRuntimeRemoteCellMonitor` queries two Google Cloud APIs:
 
 - **Cloud Trace v2** (`cloudtrace.googleapis.com/v2/projects/{p}/traces`) for
   per-invocation trace records. Each span is checked for error status and latency.
@@ -136,13 +136,13 @@ values — both degrade gracefully without throwing.
 
 | Method | Status | Notes |
 |---|---|---|
-| `VertexAIDeployer.ValidateAsync` | ✅ Implemented | Live credential + model + tool checks |
-| `VertexAIDeployer.DeployAsync` | ✅ Implemented | Calls Agent Runtime REST API via ADC |
-| `VertexAIDeployer.TeardownAsync` | ✅ Implemented | Calls Agent Runtime REST API via ADC |
-| `VertexAIRemoteCellMonitor.GetHealthAsync` | ✅ Implemented | Cloud Trace v2 · graceful degradation |
-| `VertexAIRemoteCellMonitor.GetMetricsAsync` | ✅ Implemented | Cloud Monitoring v3 · graceful degradation |
-| `VertexAIWorkflowHost.StartAsync` | ✅ Implemented | Delegates to `VertexAIDeployer.DeployAsync` |
-| `VertexAIWorkflowHost.StopAsync` | ✅ Implemented | Delegates to `VertexAIDeployer.TeardownAsync` |
+| `AgentRuntimeDeployer.ValidateAsync` | ✅ Implemented | Live credential + model + tool checks |
+| `AgentRuntimeDeployer.DeployAsync` | ✅ Implemented | Calls Agent Runtime REST API via ADC |
+| `AgentRuntimeDeployer.TeardownAsync` | ✅ Implemented | Calls Agent Runtime REST API via ADC |
+| `AgentRuntimeRemoteCellMonitor.GetHealthAsync` | ✅ Implemented | Cloud Trace v2 · graceful degradation |
+| `AgentRuntimeRemoteCellMonitor.GetMetricsAsync` | ✅ Implemented | Cloud Monitoring v3 · graceful degradation |
+| `AgentRuntimeWorkflowHost.StartAsync` | ✅ Implemented | Delegates to `AgentRuntimeDeployer.DeployAsync` |
+| `AgentRuntimeWorkflowHost.StopAsync` | ✅ Implemented | Delegates to `AgentRuntimeDeployer.TeardownAsync` |
 
 ## New platform capabilities (Agent Platform GA)
 
@@ -212,7 +212,7 @@ real-time multimodal `AgentJob` scenarios on deployed cells.
 | `Vertex AI Agent Engine` | `Agent Runtime` (part of Agent Platform) |
 | `gemini-2.5-pro` / `gemini-2.5-flash` | `gemini-3.1-pro` / `gemini-3.1-flash` (defaults) |
 | `Platform = "vertex-ai"` in `DeployOptions` | `Platform = "gemini-agent-platform"` (old value still accepted) |
-| `new VertexAIRemoteCellMonitor()` | `new VertexAIRemoteCellMonitor("my-project")` |
+| `new AgentRuntimeRemoteCellMonitor()` | `new AgentRuntimeRemoteCellMonitor("my-project")` |
 
 No code changes are required in consuming applications — the `VertexAI*` class
 names are stable. Update model strings in `secrets.json` / configuration if you

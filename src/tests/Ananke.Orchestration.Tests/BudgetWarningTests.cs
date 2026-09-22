@@ -8,7 +8,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-028 D12: an optional warning tier that reports without stopping. A budget is a
+/// an optional warning tier that reports without stopping. A budget is a
 /// guardrail against a spike, so being told before the ceiling is reached is the useful part.
 /// </summary>
 [TestFixture]
@@ -23,7 +23,7 @@ public class BudgetWarningTests
         CostPer1KOutputTokens = 0m
     };
 
-    private static async Task<List<WorkflowEvent<BudgetState2>>> RunAsync(BudgetConfig budget, int jobs)
+    private static async Task<List<WorkflowEvent>> RunAsync(BudgetConfig budget, int jobs)
     {
         var model = new FixedUsageModel(inputTokens: 1000, outputTokens: 0);
         var workflow = new Workflow<BudgetState2>("budget-warn").WithBudget(budget);
@@ -34,7 +34,7 @@ public class BudgetWarningTests
         var chain = Enumerable.Range(0, jobs).Select(i => $"job-{i}").Append(Workflow.End).ToArray();
         workflow = workflow.Chain(chain);
 
-        var events = new List<WorkflowEvent<BudgetState2>>();
+        var events = new List<WorkflowEvent>();
         await foreach (var evt in workflow.StreamAsync(new BudgetState2()))
             events.Add(evt);
         return events;

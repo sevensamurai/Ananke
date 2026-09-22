@@ -67,9 +67,9 @@ public static class ModelCatalog
         },
         ["google"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["gemini"] = [Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Pro, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
+            ["gemini"] = [Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Pro, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
             ["pro"] = [Models.Google.Gemini31Pro, Models.Google.Gemini25Pro],
-            ["flash"] = [Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
+            ["flash"] = [Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
         },
     };
 
@@ -93,9 +93,9 @@ public static class ModelCatalog
         },
         ["google"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            Models.Google.Gemini31Pro, Models.Google.Gemini31Flash, Models.Google.Gemini31FlashImage,
+            Models.Google.Gemini31Pro, Models.Google.Gemini31FlashImage,
             Models.Google.Gemini31FlashLite, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite,
-            Models.Google.Gemini36Flash,
+            Models.Google.Gemini36Flash, Models.Google.Gemini37Flash,
             Models.Google.Gemma4, Models.Google.Lyria3,
             Models.Google.Gemini25Pro, Models.Google.Gemini25Flash,
         },

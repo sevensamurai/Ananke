@@ -51,7 +51,7 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
 
         _inner = inner;
         _pipeline = pipeline;
-        _shouldRetry = shouldRetry ?? IsRateLimitException;
+        _shouldRetry = shouldRetry ?? IsTransientRateLimit;
         _maxStreamRetryAttempts = maxStreamRetryAttempts;
         _baseDelay = baseDelay ?? TimeSpan.FromSeconds(1);
     }
@@ -64,7 +64,8 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
     /// <param name="baseDelay">Initial delay between retries (exponential backoff). Default is 1 second.</param>
     /// <param name="shouldRetry">
     /// Optional predicate to determine if an exception is retryable.
-    /// Defaults to <see cref="IsRateLimitException"/> which detects HTTP 429 across providers.
+    /// Defaults to <see cref="IsTransientRateLimit"/> — HTTP 429 across providers, minus the ones
+    /// that say the account is out of allowance rather than going too fast.
     /// </param>
     public static ResilientAgentModel Create(
         IStreamingAgentModel inner,
@@ -72,7 +73,7 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
         TimeSpan? baseDelay = null,
         Func<Exception, bool>? shouldRetry = null)
     {
-        var retryPredicate = shouldRetry ?? IsRateLimitException;
+        var retryPredicate = shouldRetry ?? IsTransientRateLimit;
         var delay = baseDelay ?? TimeSpan.FromSeconds(1);
 
         var pipeline = new ResiliencePipelineBuilder()
@@ -83,6 +84,12 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
                 BackoffType = DelayBackoffType.Exponential,
                 UseJitter = true,
                 Delay = delay,
+
+                // A provider that states how long to wait knows better than the curve. Returning
+                // null leaves the exponential backoff in charge, which is what happens when it
+                // says nothing.
+                DelayGenerator = args => ValueTask.FromResult(
+                    ProviderRetryDelay.From(args.Outcome.Exception)),
                 OnRetry = args =>
                 {
                     RecordRetryOtelEvent(args.Outcome.Exception!, args.AttemptNumber + 1, args.RetryDelay);
@@ -146,7 +153,7 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
             {
                 if (enumerator is not null) await enumerator.DisposeAsync().ConfigureAwait(false);
 
-                var delay = CalculateBackoff(attempt);
+                var delay = ProviderRetryDelay.From(ex) ?? CalculateBackoff(attempt);
                 RecordRetryOtelEvent(ex, attempt, delay);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
@@ -165,6 +172,19 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
         var jitter = Random.Shared.NextDouble() * exponential * 0.25;
         return TimeSpan.FromMilliseconds(exponential + jitter);
     }
+
+    /// <summary>
+    /// A rate limit that waiting can clear: HTTP 429, <b>excluding</b> the ones that mean the
+    /// account has run out of allowance.
+    /// </summary>
+    /// <remarks>
+    /// The two are the same status code everywhere, so retrying on 429 alone spends every attempt
+    /// against a wall that does not move — and shows the message explaining why on the last attempt
+    /// instead of the first. <see cref="IsRateLimitException"/> still answers the narrower question
+    /// it always did, which is what a caller supplying its own predicate is composing from.
+    /// </remarks>
+    public static bool IsTransientRateLimit(Exception ex) =>
+        IsRateLimitException(ex) && !TerminalProviderError.Is(ex);
 
     /// <summary>
     /// Detects HTTP 429 (Too Many Requests) errors across provider SDKs without referencing
@@ -189,23 +209,71 @@ public sealed class ResilientAgentModel : IStreamingAgentModel
         return false;
     }
 
+    /// <summary>
+    /// The HTTP status an exception carries under a conventionally-named property, or
+    /// <see langword="null"/> when it carries none this can read.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It must never throw, and that is not defensiveness.</b> This is reached from
+    /// <c>catch (…) when (!ShouldRetry(ex))</c>, and the CLR swallows an exception raised inside an
+    /// exception filter and reads the filter as <see langword="false"/>. So a throw here does not
+    /// surface as a bug — it silently inverts the decision, and every error becomes retryable.
+    /// </para>
+    /// <para>
+    /// <b>Which is what <see cref="Type.GetProperty(string)"/> did.</b> It raises
+    /// <see cref="System.Reflection.AmbiguousMatchException"/> when a derived type hides a base
+    /// property of the same name, and <c>Google.GenAI.ClientError</c> hides
+    /// <see cref="HttpRequestException.StatusCode"/> with an <see cref="int"/> of its own. Every
+    /// Gemini failure therefore classified as retryable, terminal ones included — a depleted account
+    /// paying for three round trips per node, which is the exact fault
+    /// <see cref="TerminalProviderError"/> exists to prevent.
+    /// </para>
+    /// <para>
+    /// Enumerating rather than resolving also fixes the reason the hiding was a problem: both
+    /// declarations are considered, and the first that holds a value answers.
+    /// </para>
+    /// </remarks>
     private static int? TryGetHttpStatus(Exception ex)
     {
-        var type = ex.GetType();
+        // "Status" first, then "StatusCode": System.ClientModel.ClientResultException (OpenAI SDK)
+        // carries an int Status, and a type with both means the more specific one by that name.
+        return Read(ex, "Status") ?? Read(ex, "StatusCode");
 
-        // Covers System.ClientModel.ClientResultException (OpenAI SDK) which has int Status
-        if (type.GetProperty("Status")?.GetValue(ex) is int status)
-            return status;
+        static int? Read(Exception ex, string name)
+        {
+            foreach (var property in ex.GetType().GetProperties())
+            {
+                if (!string.Equals(property.Name, name, StringComparison.Ordinal))
+                    continue;
 
-        // Covers exceptions with HttpStatusCode StatusCode property
-        if (type.GetProperty("StatusCode")?.GetValue(ex) is HttpStatusCode httpStatus)
-            return (int)httpStatus;
+                object? value;
 
-        // Covers exceptions with int StatusCode property
-        if (type.GetProperty("StatusCode")?.GetValue(ex) is int statusCode)
-            return statusCode;
+                // An indexer, a property that throws on read, a type that will not let us look:
+                // none of them are an answer, and none of them may escape.
+                try
+                {
+                    value = property.GetIndexParameters().Length == 0 ? property.GetValue(ex) : null;
+                }
+                catch
+                {
+                    continue;
+                }
 
-        return null;
+                // Null is what an unset hidden base property reads as, so it is skipped rather than
+                // answered with — the declaration that actually holds the status is the other one.
+                switch (value)
+                {
+                    case int status:
+                        return status;
+
+                    case HttpStatusCode http:
+                        return (int)http;
+                }
+            }
+
+            return null;
+        }
     }
 
     private static void RecordRetryOtelEvent(Exception ex, int attempt, TimeSpan delay)

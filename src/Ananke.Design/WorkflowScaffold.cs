@@ -81,6 +81,21 @@ public sealed class WorkflowScaffold<TState>
                 $"SubFlow directive(s) reference unknown job(s): {string.Join(", ", unknownSubFlows)}. " +
                 "Each subflow name must appear in a connection.");
 
+        // A conditional pause is refused rather than downgraded. Silently building it as an
+        // unconditional one would turn an escalation — stop only when the run cannot go on — into a
+        // gate that stops every time, which is the failure the conditional pause exists to prevent.
+        var conditional = connections
+            .Where(c => c is ConnectionLine.Interrupt { Conditional: true } or ConnectionLine.Ask { Conditional: true })
+            .Select(c => c is ConnectionLine.Interrupt i ? i.JobName : ((ConnectionLine.Ask)c).JobName)
+            .ToList();
+
+        if (conditional.Count > 0)
+            throw new InvalidOperationException(
+                $"Conditional pause(s) cannot be built from a topology: {string.Join(", ", conditional)}. "
+                + "The condition is a predicate over workflow state, so it lives in code — call "
+                + "InterruptWhen(job, when) or AwaitInputWhen(job, when) on the built workflow. "
+                + "The directive is parsed and re-emitted so a round-trip does not lose it.");
+
         var unknownInterrupts = _interruptJobs.Where(n => !_jobNames.Contains(n)).ToList();
         if (unknownInterrupts.Count > 0)
             throw new InvalidOperationException(
@@ -530,8 +545,8 @@ public sealed class WorkflowScaffold<TState>
             ? $"{l.From} -> loop({l.LoopTarget}, exit: {l.ExitTarget})"
             : $"{l.From} -> loop({l.LoopTarget}, exit: {l.ExitTarget}, maxIterations: {l.MaxIterations})",
         ConnectionLine.SubFlow s => $"subflow({s.Name})",
-        ConnectionLine.Interrupt i => $"interrupt({i.JobName})",
-        ConnectionLine.Ask a => $"ask({a.JobName})",
+        ConnectionLine.Interrupt i => i.Conditional ? $"interrupt({i.JobName}, when)" : $"interrupt({i.JobName})",
+        ConnectionLine.Ask a => a.Conditional ? $"ask({a.JobName}, when)" : $"ask({a.JobName})",
         _ => throw new InvalidOperationException($"Unsupported connection line type: {connection.GetType().Name}")
     };
 

@@ -20,8 +20,7 @@ namespace Ananke.Federation.LocalEmulators;
 /// <para>
 /// <b>Real emulators</b> (require local tooling or network):
 /// <c>web_search</c>, <c>web_fetch</c>, <c>bash</c>, <c>text_editor</c>,
-/// <c>code_execution</c>, <c>code_interpreter</c>,
-/// <c>vertex_extension:code_interpreter</c>, <c>file_search</c>,
+/// <c>code_execution</c>, <c>code_interpreter</c>, <c>file_search</c>,
 /// <c>memory</c>, <c>memory_bank</c>, <c>memory_profiles</c>, <c>memory_search</c>.
 /// </para>
 /// <para>
@@ -83,10 +82,9 @@ public static class DefaultPlatformNativeExecutors
         var textEditor = new TextEditorExecutor(bash.SandboxRoot);
         registry.Register(textEditor);
 
-        // code_execution, code_interpreter, vertex_extension:code_interpreter all delegate to bash
+        // code_execution and code_interpreter both delegate to bash
         registry.Register(new CodeExecutionExecutor(bash, "code_execution"));
         registry.Register(new CodeExecutionExecutor(bash, "code_interpreter"));
-        registry.Register(new CodeExecutionExecutor(bash, "vertex_extension:code_interpreter"));
 
         // File search
         registry.Register(new FileSearchExecutor(fileSearchRoot));

@@ -39,6 +39,8 @@ var result = await workflow.RunAsync(new MyState());
 | `.Then("a", Workflow.Fork("b", "c"))` | Fan-out to parallel branches |
 | `.Join(["b","c"], "d", merge)` | Fan-in with merge function |
 | `.SubFlow("name", inner, mapIn, mapOut)` | Nest a workflow inside another |
+| `.Supervise("name", plan, supervision, mapResult)` | Run a plan to completion as one job — see [18 — Plans and Contracts](18-plans-and-contracts.md) |
+| `AgenticPattern.SupervisedPlan<T>("name")` | A plan that can change: the supervised job, a coordinator job, and the loop between them — see [18 — Plans and Contracts](18-plans-and-contracts.md) |
 
 ---
 
@@ -147,6 +149,28 @@ await foreach (var evt in workflow.StreamAsync(initialState))
     }
 }
 ```
+
+The stream yields `WorkflowEvent` — the non-generic base. That matters in two places:
+
+- **A `SubFlow`'s inner events arrive on this stream too**, carrying the inner workflow's
+  `WorkflowName` and `ExecutionId`. A nested workflow has a state type of its own, which is why the
+  stream cannot be typed to one.
+- **A job can report progress of its own**, for work that would otherwise be a silent gap between
+  `JobStarted` and `JobCompleted`:
+
+```csharp
+public sealed record StepFinished : WorkflowEvent
+{
+    public required string Step { get; init; }
+}
+
+// inside a job — it never sees a channel, and the runner never learns what this means
+await WorkflowEventReporting.ReportAsync(
+    new StepFinished { WorkflowName = name, ExecutionId = id, Step = "verify" }, ct);
+```
+
+Reporting with nothing scoped is a no-op, so the same job works under `RunAsync` and `StreamAsync`
+alike.
 
 ---
 

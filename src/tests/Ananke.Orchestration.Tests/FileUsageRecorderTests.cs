@@ -7,7 +7,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-028 D15: the shipped default for period budgets. The point is survival across
+/// the shipped default for period budgets. The point is survival across
 /// process restarts — without persistence a crash-loop re-spends the same budget indefinitely.
 /// </summary>
 [TestFixture]

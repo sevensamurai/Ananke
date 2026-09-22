@@ -8,7 +8,7 @@ namespace Ananke.Federation.Recommendation;
 /// </summary>
 public sealed record PlatformFitScore
 {
-    /// <summary>Canonical platform identifier (e.g. <c>"azure-ai"</c>).</summary>
+    /// <summary>Canonical platform identifier (e.g. <c>"azure"</c>).</summary>
     public required string Platform { get; init; }
 
     /// <summary>Weighted total score in <c>[0, 1]</c>. Zero when any <see cref="FitReasonKind.Block"/> reason is present.</summary>

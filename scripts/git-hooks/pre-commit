@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Block a commit that cites an internal document from a shipped file.
+# See scripts/check-internal-refs.sh for what counts and why.
+#
+# Unlike the codegraph hooks, this one is allowed to fail the git operation —
+# that is its whole job. The escape hatch is the standard one, and the failure
+# message says so: git commit --no-verify.
+
+set -uo pipefail
+
+checker="$(git rev-parse --show-toplevel)/scripts/check-internal-refs.sh"
+
+# A clone missing the script should not be a clone that cannot commit.
+[ -x "$checker" ] || exit 0
+
+exec "$checker" --staged
