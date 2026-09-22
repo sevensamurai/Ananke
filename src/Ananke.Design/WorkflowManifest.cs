@@ -1,5 +1,6 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Design.Tools;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Design;
 
@@ -38,7 +39,7 @@ public sealed class WorkflowManifest
 
     /// <summary>
     /// Deployment profiles from the optional <c>profiles:</c> section, keyed by profile name
-    /// (e.g. <c>"local"</c>, <c>"azure-ai"</c>, <c>"vertex-ai"</c>).
+    /// (e.g. <c>"local"</c>, <c>"azure"</c>, <c>"vertex-ai"</c>).
     /// Each profile rebinds tool execution modes for a target environment.
     /// </summary>
     public Dictionary<string, ProfileDefinition> Profiles { get; init; } = [];
@@ -95,13 +96,21 @@ public sealed class WorkflowManifest
     ///   <item>Block scalars (<c>|</c> literal style for multi-line <c>system_prompt</c>)</item>
     ///   <item>Dash-prefixed list items (<c>- item</c> under <c>connections:</c>)</item>
     ///   <item>Comment lines (<c># ...</c>) and blank lines (skipped)</item>
+    ///   <item>Trailing comments in the <c>models:</c> section, where <c>#</c> follows whitespace</item>
+    ///   <item><b>Flow mappings in the <c>models:</c> section only</b> — <c>coder: { ref: devstral2 }</c></item>
     /// </list>
     /// <para><b>Not supported</b> (by design — not needed by the manifest schema):</para>
     /// <list type="bullet">
     ///   <item>Anchors / aliases (<c>&amp;</c> / <c>*</c>), merge keys (<c>&lt;&lt;</c>)</item>
-    ///   <item>Flow sequences (<c>[a, b]</c>) or flow mappings (<c>{a: 1}</c>)</item>
+    ///   <item>Flow sequences (<c>[a, b]</c>), and flow mappings outside <c>models:</c></item>
     ///   <item>Quoted strings, tags (<c>!!str</c>), multi-document (<c>---</c>)</item>
     /// </list>
+    /// <para>
+    /// <b>The rule that governs what belongs on which list:</b> an unsupported construct must not
+    /// look like an absent one. Flow mappings moved to the supported list because manifests used
+    /// them and the parser dropped the alias silently, so every job referencing it reported
+    /// <c>FED011</c> "model alias not defined" about an alias plainly present in the file.
+    /// </para>
     /// <para>
     /// A general-purpose YAML library (e.g. YamlDotNet, SharpYaml) was evaluated and rejected:
     /// the manifest schema is fixed, the parser is well-tested (14 tests), and adding a
@@ -191,7 +200,18 @@ public sealed class WorkflowManifest
             switch (section)
             {
                 case Section.Models:
-                    if (trimmed.EndsWith(':') && indent == 2)
+                    // A flow mapping is self-contained — `coder: { ref: devstral2 }` — so it is
+                    // tried before the block form, and leaves no current block behind.
+                    if (indent == 2 && TryParseModelFlowMapping(trimmed, out var flowAlias, out var flowFields))
+                    {
+                        var flowDef = new ModelDefinition();
+                        foreach (var field in flowFields)
+                            ApplyModelField(flowDef, field);
+                        models[flowAlias] = flowDef;
+                        currentBlock = null;
+                        blockIndent = 2;
+                    }
+                    else if (trimmed.EndsWith(':') && indent == 2)
                     {
                         currentBlock = trimmed[..^1];
                         models[currentBlock] = new ModelDefinition();
@@ -199,7 +219,7 @@ public sealed class WorkflowManifest
                     }
                     else if (currentBlock is not null && indent > blockIndent)
                     {
-                        ApplyModelField(models[currentBlock], trimmed);
+                        ApplyModelField(models[currentBlock], StripTrailingComment(trimmed));
                     }
                     break;
 
@@ -289,6 +309,81 @@ public sealed class WorkflowManifest
             def.Model = line["model:".Length..].Trim();
         else if (line.StartsWith("endpoint:"))
             def.Endpoint = line["endpoint:".Length..].Trim();
+        else if (line.StartsWith("ref:"))
+            def.Ref = line["ref:".Length..].Trim();
+        else if (line.StartsWith("temperature:") &&
+                 double.TryParse(line["temperature:".Length..].Trim(),
+                     System.Globalization.NumberStyles.Float,
+                     System.Globalization.CultureInfo.InvariantCulture, out var temperature))
+            def.Temperature = temperature;
+    }
+
+    /// <summary>
+    /// Recognises a single-line YAML flow mapping in the <c>models:</c> section —
+    /// <c>coder: { ref: devstral2 }</c> — and splits it into <c>key: value</c> fields.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This parser is a hand-rolled YAML subset, not a YAML implementation, and the flow form is
+    /// supported here because manifests in the wild use it: before this, an alias declared that way
+    /// was <b>silently dropped</b>, so every job referencing it failed with <c>FED011</c>
+    /// "model alias not defined" while the alias was plainly there on the page.
+    /// </para>
+    /// <para>
+    /// Deliberately scoped to <c>models:</c>. Flow mappings elsewhere are still unsupported, and the
+    /// rule to keep is the one this fixed: <b>an unsupported construct must not look like an absent
+    /// one.</b>
+    /// </para>
+    /// </remarks>
+    /// <param name="line">Trimmed line, comments included.</param>
+    /// <param name="alias">Model alias declared before the colon.</param>
+    /// <param name="fields">The <c>key: value</c> pairs found between the braces.</param>
+    /// <returns><see langword="true"/> if the line is a flow mapping.</returns>
+    private static bool TryParseModelFlowMapping(
+        string line,
+        [NotNullWhen(true)] out string? alias,
+        out IReadOnlyList<string> fields)
+    {
+        alias = null;
+        fields = [];
+
+        var separator = line.IndexOf(':', StringComparison.Ordinal);
+        if (separator <= 0)
+            return false;
+
+        var value = StripTrailingComment(line[(separator + 1)..].Trim());
+        if (value.Length < 2 || value[0] != '{' || value[^1] != '}')
+            return false;
+
+        alias = line[..separator].Trim();
+        if (alias.Length == 0)
+            return false;
+
+        // Flat only: these mappings carry scalar fields, so a plain comma split is sufficient and
+        // a nested one would be a manifest this parser does not claim to read.
+        fields = [.. value[1..^1]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a trailing <c>#</c> comment, applying YAML's rule that a comment starts only where
+    /// <c>#</c> follows whitespace.
+    /// </summary>
+    /// <remarks>
+    /// The whitespace rule is what keeps <c>endpoint: http://host/v1#fragment</c> intact. Whole-line
+    /// comments are already skipped by the main loop; this handles the trailing kind, which the
+    /// <c>models:</c> section needs because aliases there are routinely annotated.
+    /// </remarks>
+    private static string StripTrailingComment(string line)
+    {
+        for (var i = 1; i < line.Length; i++)
+        {
+            if (line[i] == '#' && char.IsWhiteSpace(line[i - 1]))
+                return line[..i].TrimEnd();
+        }
+
+        return line;
     }
 
     private static void ApplyJobField(JobDefinition def, string trimmed)
@@ -802,6 +897,38 @@ public sealed class ModelDefinition
     /// LM Studio, vLLM, or Azure OpenAI.
     /// </summary>
     public string? Endpoint { get; set; }
+
+    /// <summary>
+    /// Name of a model declared in <i>another</i> manifest's <c>models:</c> section, as
+    /// <c>coder: { ref: devstral2 }</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nothing resolves this.</b> Cross-manifest model catalogues are a convention that manifests
+    /// in this repository already use — a workflow points at
+    /// <c>roles.ananke.yml</c> — but no code reads them. The property exists so the reference
+    /// survives parsing and can be reported, rather than being dropped.
+    /// </para>
+    /// <para>
+    /// <b>Why that matters more than it looks.</b> <see cref="Provider"/> and <see cref="Model"/>
+    /// carry defaults, so an alias that declared only a <c>ref</c> used to parse into a perfectly
+    /// valid-looking <c>openai</c> / <c>gpt-5.4-mini</c> definition — silently substituting a paid
+    /// frontier model for whatever the reference named. A validator that sees this set can refuse
+    /// instead; see <c>FED016</c> in <c>DeployabilityValidator</c>.
+    /// </para>
+    /// </remarks>
+    public string? Ref { get; set; }
+
+    /// <summary>
+    /// Sampling temperature for this model alias, from <c>temperature:</c>. <see langword="null"/>
+    /// leaves it to the provider.
+    /// </summary>
+    /// <remarks>
+    /// A model field by decision — <c>max_tool_rounds</c> is the job's, this is
+    /// the model's. Nullable because <c>0</c> is a meaningful value and must stay distinguishable
+    /// from unset.
+    /// </remarks>
+    public double? Temperature { get; set; }
 }
 
 /// <summary>

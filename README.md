@@ -165,8 +165,7 @@ guide it illustrates, is in [docs/demos.md](docs/demos.md).
 | Demo | What it shows |
 |---|---|
 | [`AgenticDesignPatternsDemo`](src/demos/02-workflow-patterns/AgenticDesignPatternsDemo/) | A runnable catalogue of 14 recognized agentic design patterns |
-| [`DesignPipelineDemo`](src/demos/02-workflow-patterns/DesignPipelineDemo/) | Declarative ETL pipeline — graph topology, model config and prompts all from a YAML manifest |
-| [`SelfImprovingWorkflowDemo`](src/demos/02-workflow-patterns/SelfImprovingWorkflowDemo/) | A workflow that diagnoses its own missing capability and adapts |
+| [`ItineraryDemo`](src/demos/02-workflow-patterns/ItineraryDemo/) | A week planned around one place that cannot be had as asked — a live run steered by checks over a service |
 
 ### 03 — Memory and knowledge
 
@@ -201,17 +200,6 @@ guide it illustrates, is in [docs/demos.md](docs/demos.md).
 | [`ChannelsDemo`](src/demos/06-interop-and-channels/ChannelsDemo/) | A tool-calling agent running as a long-lived Discord or Slack bot |
 | [`LocalPlatformLoopDemo`](src/demos/06-interop-and-channels/LocalPlatformLoopDemo/) | The local design loop — declare platform-native tools and run them locally |
 
-### Retired demos
-
-Consolidated during the demo reorganization: the categories above cover the same ground with fewer,
-better-maintained projects. Listed so older links and articles referencing them make sense.
-
-| Demo | Status | Where the material went |
-|---|---|---|
-| `SimpleWorkflowDemo` | **Retired** | Streaming chat and tool calling — see [`AgenticWebDemo`](src/demos/05-applications/AgenticWebDemo/); tracing is covered by the [Observability guide](docs/guides/10-observability.md) |
-| `ExtendedFlowDemo` | **Retired** | Fork/Join, SubFlow and Interrupt — see [`AgenticDesignPatternsDemo`](src/demos/02-workflow-patterns/AgenticDesignPatternsDemo/) and the [Workflows guide](docs/guides/02-workflows.md) |
-| `DistributedServicesDemo` | **Retired** | MQTT pub/sub and handoff channels — see [`ChannelsDemo`](src/demos/06-interop-and-channels/ChannelsDemo/) and the [Distributed Systems guide](docs/guides/09-distributed.md) |
-
 ---
 
 ## Packages
@@ -225,6 +213,9 @@ better-maintained projects. Listed so older links and articles referencing them 
 | [`Ananke.Orchestration.OpenAI`](src/Ananke.Orchestration.OpenAI/) | OpenAI provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.OpenAI.svg)](https://www.nuget.org/packages/Ananke.Orchestration.OpenAI) |
 | [`Ananke.Orchestration.Anthropic`](src/Ananke.Orchestration.Anthropic/) | Anthropic / Claude provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Anthropic.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Anthropic) |
 | [`Ananke.Orchestration.Google`](src/Ananke.Orchestration.Google/) | Google Gemini provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Google.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Google) |
+| [`Ananke.Orchestration.Bedrock`](src/Ananke.Orchestration.Bedrock/) | Amazon Bedrock — SigV4 and API-key auth, endpoint construction, for the existing OpenAI/Anthropic adapters | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Bedrock.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Bedrock) |
+| [`Ananke.Orchestration.Conformance`](src/Ananke.Orchestration.Conformance/) | Provider conformance contract — shared scenarios every `IStreamingAgentModel` adapter must satisfy | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Conformance.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Conformance) |
+| [`Ananke.Orchestration.Conformance.NUnit`](src/Ananke.Orchestration.Conformance.NUnit/) | Inherit-and-done NUnit fixtures over `Ananke.Orchestration.Conformance` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Conformance.NUnit.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Conformance.NUnit) |
 | [`Ananke.MCP`](src/Ananke.MCP/) | Expose workflows and tools as MCP server capabilities | [![NuGet](https://img.shields.io/nuget/v/Ananke.MCP.svg)](https://www.nuget.org/packages/Ananke.MCP) |
 | [`Ananke.A2A`](src/Ananke.A2A/) | Agent-to-Agent (A2A) protocol — call remote agents as `IAgentModel`, expose workflows as A2A endpoints | [![NuGet](https://img.shields.io/nuget/v/Ananke.A2A.svg)](https://www.nuget.org/packages/Ananke.A2A) |
 | [`Ananke.Learning`](src/Ananke.Learning/) | Empirical memory, offline learning, episode store, Monte Carlo reward propagation, skill package export/import | [![NuGet](https://img.shields.io/nuget/v/Ananke.Learning.svg)](https://www.nuget.org/packages/Ananke.Learning) |
@@ -261,6 +252,7 @@ The full documentation hub and progressive learning path are at **[docs/learning
 | [MCP & A2A Interop](docs/guides/12-mcp-and-interop.md) | Expose as MCP server, consume MCP tools, A2A agent-to-agent protocol |
 | [Design Tooling](docs/guides/13-design-tooling.md) | Visual workflow design, YAML manifests, Mermaid diagram export |
 | [Agentic Patterns](docs/guides/16-agentic-patterns.md) | Review & Critique, Iterative Refinement — pre-wired pattern builders |
+| [Local & Self-Hosted Models](docs/guides/17-local-models.md) | Ollama, llama.cpp, vLLM — the context, routing, and licence traps that come with them |
 | [nnke Tool Companion](docs/cli/nnke-tool.md) | Design-time CLI — scaffold, validate, diagram, MCP companion for AI tools |
 | [nnke-platform Tool](docs/cli/nnke-platform-tool.md) | Federation CLI — install adapters, deploy workflows, monitor and manage cloud deployments |
 | [Empirical Memory & Skill Packaging](docs/guides/15-empirical-memory.md) | Patterns, skills, heuristics, confidence tracking, offline learning, episode store, skill export/import |

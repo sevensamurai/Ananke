@@ -20,7 +20,7 @@ using Ananke.Orchestration.Google;
 IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-2.5-flash");
 
 // Gemini Enterprise Agent Platform (project + location, uses Application Default Credentials)
-IStreamingAgentModel model = GeminiAgentModel.CreateVertexAI(project, location, "gemini-2.5-flash");
+IStreamingAgentModel model = GeminiAgentModel.CreateAgentPlatform(project, location, "gemini-2.5-flash");
 
 // Or from an existing Google.GenAI.Client
 var client = new Google.GenAI.Client(apiKey: apiKey);

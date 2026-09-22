@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Ananke.Federation.Adapters;
 using Ananke.Federation.Deployment;
@@ -20,7 +21,7 @@ namespace Ananke.Tool.Platform;
 ///         the <c>targetCliVersion</c> range, and loads only compatible adapter DLLs so their
 ///         module initializers fire and call <see cref="FederationDeployerRegistry.RegisterFactory"/>.
 ///         All outcomes are recorded in <see cref="AdapterDiagnostics"/>.</item>
-///   <item>Calls <see cref="FederationDeployerRegistry.MaterializeFactories"/> so every registered
+///   <item>Calls <see cref="FederationDeployerRegistry.MaterializeFactories(IDeploymentRegistry)"/> so every registered
 ///         factory receives the live <see cref="IDeploymentRegistry"/>.</item>
 /// </list>
 /// </para>
@@ -66,9 +67,54 @@ internal sealed class PlatformHost : IDisposable
             _ownedRegistry = fileRegistry;
         }
 
+        RegisterBuiltInDeployers();
         LoadAdapterAssemblies();
-        FederationDeployerRegistry.MaterializeFactories(Registry);
+        FederationDeployerRegistry.MaterializeFactories(Registry, (platform, error) =>
+            AdapterDiagnostics.Record(new AdapterLoadResult
+            {
+                AdapterId = platform,
+                Status = AdapterLoadStatus.LoadFailed,
+                Path = AnankePaths.AdaptersDirectory,
+                ErrorMessage = error.Message,
+            }));
     }
+
+    /// <summary>
+    /// Registers the deployers that ship inside <c>Ananke.Federation</c> itself, before the
+    /// adapters directory is probed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="LocalFederationDeployer"/> is a built-in, not an adapter: it lives in a package the
+    /// CLI already references, so it needs no probe, no manifest and no credentials. It is what makes
+    /// the deploy/status/teardown lifecycle exercisable without a cloud account — it is
+    /// a first-class substrate rather than a test fixture.
+    /// </para>
+    /// <para>
+    /// <b>Built-ins are registered first, and that is how they win.</b>
+    /// <see cref="FederationDeployerRegistry.MaterializeFactories(IDeploymentRegistry)"/> skips any factory whose platform
+    /// already has a live deployer, so a probed adapter claiming <c>"local"</c> is ignored rather than
+    /// overriding the built-in. It is skipped silently, which matches how the registry already treats
+    /// a duplicate factory; surfacing that collision as a diagnostic is open question 1 in the plan.
+    /// </para>
+    /// <para>
+    /// The <see cref="FederationDeployerRegistry.TryResolve"/> guard keeps this idempotent.
+    /// <see cref="FederationDeployerRegistry"/> is static and process-wide while a
+    /// <see cref="PlatformHost"/> is per-invocation, so constructing a second host in one process —
+    /// which only happens in tests — must not throw. The first host's deployer stays bound to the
+    /// first host's registry, which is the same behaviour materialized factories already have.
+    /// </para>
+    /// </remarks>
+    private void RegisterBuiltInDeployers()
+    {
+        if (!FederationDeployerRegistry.TryResolve(LocalPlatform, out _))
+            FederationDeployerRegistry.Register(new LocalFederationDeployer(Registry));
+    }
+
+    /// <summary>
+    /// Platform identifier of the built-in in-process substrate.
+    /// </summary>
+    internal const string LocalPlatform = "local";
 
     /// <summary>
     /// Tries to resolve a deployer for the given platform from the
@@ -151,7 +197,15 @@ internal sealed class PlatformHost : IDisposable
 
             try
             {
-                Assembly.LoadFrom(dllPath);
+                var assembly = Assembly.LoadFrom(dllPath);
+
+                // Loading is not enough. An adapter registers itself from a [ModuleInitializer], and
+                // a module initializer runs at or before *first access to a type in the module* —
+                // merely loading the assembly is not an access. Without this line no probed adapter
+                // ever registered, on any platform, and `deploy` resolved nothing while
+                // `adapters doctor` reported every adapter healthy.
+                RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
+
                 AdapterDiagnostics.Record(new AdapterLoadResult
                 {
                     AdapterId = manifest.Id,

@@ -13,7 +13,6 @@ namespace BasicAgentDemo.Workflow;
 
 /// <summary>
 /// Level 4 — Streaming chat workflow with stock tools and OpenTelemetry tracing.
-/// Absorbed from SimpleWorkflowDemo.
 /// </summary>
 internal static class Level4
 {

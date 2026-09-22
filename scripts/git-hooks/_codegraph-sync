@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Shared body for the codegraph git hooks. Not a hook itself — post-commit,
+# post-merge and post-checkout all delegate here so the logic exists once.
+#
+# Keeps .codegraph/ in step with the working tree. The index is a snapshot; when
+# it drifts it still answers confidently, which is worse than having no index at
+# all — a stale graph reports callers that no longer exist and misses ones that
+# do. `codegraph sync` is incremental (~0.4s for a one-file change on this repo,
+# ~0.2s for a no-op), so this runs inline rather than in the background.
+#
+# THREE RULES, in order of importance:
+#   1. Never fail the git operation. A commit must not be lost because an
+#      indexing tool had a bad day. Every path exits 0.
+#   2. Be silent when it cannot work. Contributors without codegraph installed
+#      should see nothing at all, not a warning on every commit.
+#   3. Be quiet when it does work. `-q` exists for exactly this.
+
+set -u
+
+# Rule 2: not installed, or not initialised in this clone — nothing to do.
+command -v codegraph >/dev/null 2>&1 || exit 0
+[ -d "$(git rev-parse --show-toplevel 2>/dev/null)/.codegraph" ] || exit 0
+
+# Rule 1: never let a sync failure escape. Errors go to the log, not the console,
+# so a broken index surfaces when someone looks rather than on every commit.
+if ! codegraph sync -q >/dev/null 2>&1; then
+    log="$(git rev-parse --show-toplevel)/.codegraph/hook-errors.log"
+    printf '%s  %s failed\n' "$(date -Is)" "${1:-sync}" >>"$log" 2>/dev/null || true
+fi
+
+exit 0

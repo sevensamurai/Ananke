@@ -43,13 +43,19 @@ internal static class DeployCommand
             Description = "Validate and show what would be deployed without actually deploying."
         };
 
+        var catalogOption = new Option<FileInfo?>("--catalog")
+        {
+            Description = "Manifest whose models: section resolves `ref:` model aliases (e.g. roles.ananke.yml)."
+        };
+
         var command = new Command("deploy", "Deploy a workflow to a target platform.")
         {
             fileArg,
             platformOption,
             profileOption,
             forceOption,
-            dryRunOption
+            dryRunOption,
+            catalogOption
         };
 
         command.SetAction(async parseResult =>
@@ -61,9 +67,21 @@ internal static class DeployCommand
             var dryRun = parseResult.GetValue(dryRunOption);
             var json = parseResult.GetValue<bool>("--json");
             var inMemory = parseResult.GetValue<bool>("--in-memory");
+            var catalog = parseResult.GetValue(catalogOption);
 
             using var host = new PlatformHost(inMemory);
-            return await ExecuteAsync(host, file, platform, profile, force, dryRun, json);
+            try
+            {
+                return await ExecuteAsync(host, file, platform, profile, force, dryRun, json, catalog);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("atalogue"))
+            {
+                // A bad --catalog is a user error, not a crash. Scoped to catalogue failures so it
+                // does not swallow InvalidOperationExceptions raised by a deployer.
+                if (json) JsonOutput.Write(new { status = "error", message = ex.Message });
+                else Console.Error.WriteLine($"  ✗ {ex.Message}");
+                return 1;
+            }
         });
 
         return command;
@@ -76,7 +94,8 @@ internal static class DeployCommand
         string? profileName,
         bool force,
         bool dryRun,
-        bool json)
+        bool json,
+        FileInfo? catalog = null)
     {
         // ── 1. Resolve adapter ───────────────────────────────────────────────
         var deployer = host.ResolveDeployer(platform);
@@ -95,6 +114,8 @@ internal static class DeployCommand
             return 1;
         }
 
+        PreviewNotice.WriteIfPreview(platform);
+
         // ── 2. Load manifest ─────────────────────────────────────────────────
         if (!file.Exists)
         {
@@ -112,7 +133,7 @@ internal static class DeployCommand
 
         // ── 4. Structural validation ─────────────────────────────────────────
         var validator = new DeployabilityValidator();
-        var report = validator.Validate(manifest, toolKit, platform);
+        var report = validator.Validate(manifest, toolKit, platform, ModelCatalogue.Load(catalog));
 
         if (!report.IsDeployable)
         {
@@ -186,8 +207,24 @@ internal static class DeployCommand
         }
         catch (Exception ex) { WriteError(json, $"Deployment failed: {ex.Message}"); return 2; }
 
-        // ── 8. Persist record ────────────────────────────────────────────────
-        await host.Registry.RegisterAsync(record);
+        // ── 8. Persist the final record ──────────────────────────────────────
+        // Every shipped deployer registers the record itself — that is what the IDeploymentRegistry
+        // in its constructor is for — and then returns a *newer* copy carrying the platform resource
+        // id and the final status, which nothing had persisted. So this step is an update, not a
+        // registration: calling RegisterAsync here threw "Deployment '...' already exists" and
+        // escaped as an unhandled exception. That was invisible until `local` became resolvable,
+        // because no adapter resolved and this line was unreachable.
+        //
+        // The fallback keeps a deployer that does *not* self-register working: DeployAsync's
+        // contract says it returns a record, not that it stores one.
+        try
+        {
+            await host.Registry.UpdateAsync(record);
+        }
+        catch (KeyNotFoundException)
+        {
+            await host.Registry.RegisterAsync(record);
+        }
 
         if (json)
             JsonOutput.Write(new
@@ -255,10 +292,12 @@ internal static class DeployCommand
     }
 
     internal static string AdapterInstallHint(string platform) =>
-        platform switch
+        // Resolve first so this switch lists canonical identifiers only. It used to spell out
+        // "gemini-agent-platform" beside "vertex-ai" — a fifth place aliases had to be maintained.
+        PlatformIdentifiers.Resolve(platform) switch
         {
-            "azure-ai" => "Install nnke-platform-azure: dotnet tool install -g nnke-platform-azure",
-            "vertex-ai" or "gemini-agent-platform" => "Install nnke-platform-google: dotnet tool install -g nnke-platform-google",
+            "azure" => "Install nnke-platform-azure: dotnet tool install -g nnke-platform-azure",
+            "vertex-ai" => "Install nnke-platform-google: dotnet tool install -g nnke-platform-google",
             "claude" => "Install nnke-platform-anthropic: dotnet tool install -g nnke-platform-anthropic",
             _ => $"Install the adapter for '{platform}' and ensure it is loaded before invoking this command."
         };

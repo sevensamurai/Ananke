@@ -121,7 +121,7 @@ Starts a local HTTP server that accepts workflow trigger requests. Useful for te
 
 ```bash
 nnke-platform login --platform azure
-nnke-platform deploy my-agent.ananke.yml --platform azure-ai
+nnke-platform deploy my-agent.ananke.yml --platform azure
 nnke-platform status --workflow my-agent
 ```
 

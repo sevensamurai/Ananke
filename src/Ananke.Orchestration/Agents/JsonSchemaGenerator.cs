@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,6 +8,12 @@ namespace Ananke.Orchestration.Agents;
 public static class JsonSchemaGenerator
 {
     private const int MaxDepth = 10;
+
+    /// <summary>
+    /// Reads the <c>?</c> a reference type carries, which <see cref="Nullable.GetUnderlyingType"/>
+    /// cannot: that annotation lives on the property, not on the type.
+    /// </summary>
+    private static readonly NullabilityInfoContext Nullability = new();
 
     public static string Generate<T>() =>
         JsonSerializer.Serialize(GenerateForType(typeof(T)));
@@ -28,7 +35,7 @@ public static class JsonSchemaGenerator
                 continue;
 
             var propName = GetJsonPropertyName(prop);
-            properties[propName] = GetPropertySchema(prop.PropertyType, depth + 1);
+            properties[propName] = Described(prop, depth + 1);
             required.Add(propName);
         }
 
@@ -45,6 +52,36 @@ public static class JsonSchemaGenerator
     {
         var attr = prop.GetCustomAttribute<JsonPropertyNameAttribute>();
         return attr?.Name ?? prop.Name;
+    }
+
+    /// <summary>
+    /// One property's schema: its type, what it means, and whether it may be left out.
+    /// </summary>
+    /// <remarks>
+    /// <b>What a field means belongs in the schema, not in a paragraph of the prompt.</b> A
+    /// schema-constrained reply is shaped by its schema on every call; a sentence explaining the same
+    /// field is read once, competes with everything else in the prompt, and drifts from the type.
+    /// </remarks>
+    private static Dictionary<string, object> Described(PropertyInfo prop, int depth)
+    {
+        var schema = GetPropertySchema(prop.PropertyType, depth);
+
+        // A reference type's ? is an annotation on the property, so it is read here rather than in
+        // GetPropertySchema, which sees only the type — as a dictionary's values and an array's
+        // elements do.
+        if (Nullable.GetUnderlyingType(prop.PropertyType) is null
+            && !prop.PropertyType.IsValueType
+            && Nullability.Create(prop).ReadState is NullabilityState.Nullable
+            && schema.TryGetValue("type", out var typed)
+            && typed is string only)
+        {
+            schema["type"] = new[] { only, "null" };
+        }
+
+        if (prop.GetCustomAttribute<DescriptionAttribute>() is { Description.Length: > 0 } described)
+            schema["description"] = described.Description;
+
+        return schema;
     }
 
     internal static Dictionary<string, object> GetPropertySchema(Type type) =>
@@ -70,8 +107,12 @@ public static class JsonSchemaGenerator
         if (actual == typeof(bool))
             return Typed("boolean", isNullable);
 
-        // Date / time
-        if (actual == typeof(DateTime) || actual == typeof(DateTimeOffset) || actual == typeof(DateOnly))
+        // Date / time. A DateOnly is a day, and a model answering an instant for one writes a
+        // timestamp that will not parse back into it.
+        if (actual == typeof(DateOnly))
+            return TypedWithFormat("string", "date", isNullable);
+
+        if (actual == typeof(DateTime) || actual == typeof(DateTimeOffset))
             return TypedWithFormat("string", "date-time", isNullable);
 
         if (actual == typeof(TimeSpan))

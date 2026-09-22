@@ -20,6 +20,8 @@ namespace Ananke.Design.Dsl;
 ///   <item><c>a -&gt; loop(target, exit: x, maxIterations: n)</c> — loop with an iteration cap (default 10)</item>
 ///   <item><c>subflow(name)</c> — marks a job as a nested sub-workflow</item>
 ///   <item><c>interrupt(name)</c> — pauses execution before the named job</item>
+///   <item><c>interrupt(name, when)</c> — the pause is conditional. Parsed and re-emitted, never
+///   built: the condition is a predicate over state and lives in code</item>
 ///   <item><c>ask(name)</c> — marks a job as a free-text, input-collecting turn</item>
 /// </list>
 /// </remarks>
@@ -59,15 +61,16 @@ internal static partial class WorkflowDslParser
         RegexOptions.IgnoreCase)]
     private static partial Regex SubFlowPattern();
 
-    // interrupt(name)
+    // interrupt(name) — and interrupt(name, when), which says a condition exists without
+    // pretending the condition itself round-trips: it is a predicate over state, written in code.
     [GeneratedRegex(
-        @$"^interrupt\((?<job>{Id})\)$",
+        @$"^interrupt\((?<job>{Id})(?<when>\s*,\s*when)?\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex InterruptPattern();
 
-    // ask(name)
+    // ask(name), ask(name, when)
     [GeneratedRegex(
-        @$"^ask\((?<job>{Id})\)$",
+        @$"^ask\((?<job>{Id})(?<when>\s*,\s*when)?\)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex AskPattern();
 
@@ -134,11 +137,11 @@ internal static partial class WorkflowDslParser
 
         match = InterruptPattern().Match(line);
         if (match.Success)
-            return new ConnectionLine.Interrupt(match.Groups["job"].Value);
+            return new ConnectionLine.Interrupt(match.Groups["job"].Value, match.Groups["when"].Success);
 
         match = AskPattern().Match(line);
         if (match.Success)
-            return new ConnectionLine.Ask(match.Groups["job"].Value);
+            return new ConnectionLine.Ask(match.Groups["job"].Value, match.Groups["when"].Success);
 
         match = ToolDirectivePattern().Match(line);
         if (match.Success)

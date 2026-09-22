@@ -7,7 +7,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-029 D1/D3: <c>AnthropicAgentModel</c> populated <c>AgentResponse.Parts</c> on its unary
+/// <c>AnthropicAgentModel</c> populated <c>AgentResponse.Parts</c> on its unary
 /// path and left it <see langword="null"/> on its streaming path, so a caller who switched
 /// <c>GenerateAsync</c> → <c>GenerateStreamAsync</c> silently lost reasoning content — including the
 /// <see cref="ReasoningPart.Signature"/> Q20 wired for multi-turn continuation.

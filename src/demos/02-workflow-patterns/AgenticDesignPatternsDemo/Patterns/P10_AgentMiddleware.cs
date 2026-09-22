@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Workflows;
@@ -12,7 +13,7 @@ internal static class P10_AgentMiddleware
     {
         PatternRunner.PrintHeader("10. Agent-Level Middleware (guardrails + logging)");
 
-        var innerModel = SimulatedModel.Fixed("""{"Summary":"The data shows a 15% increase in Q3."}""");
+        var innerModel = SimulatedAgentModel.Fixed("""{"Summary":"The data shows a 15% increase in Q3."}""");
 
         var guardrail = new GuardrailAgentModelMiddleware.Builder()
             .DenyPattern("pii-ssn", @"\b\d{3}-\d{2}-\d{4}\b")

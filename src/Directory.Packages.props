@@ -18,8 +18,9 @@
   <ItemGroup Label="LLM Providers">
     <PackageVersion Include="OpenAI" Version="2.12.0" />
     <PackageVersion Include="Anthropic" Version="12.39.0" />
-    <PackageVersion Include="Google.GenAI" Version="1.16.0" />
+    <PackageVersion Include="Google.GenAI" Version="1.18.0" />
     <PackageVersion Include="Azure.AI.Projects.Agents" Version="2.0.0" />
+    <PackageVersion Include="AWSSDK.Core" Version="4.0.101.1" />
   </ItemGroup>
   <ItemGroup Label="Infrastructure">
     <PackageVersion Include="Neo4j.Driver" Version="6.3.0" />

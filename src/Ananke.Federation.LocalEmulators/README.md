@@ -28,7 +28,7 @@ registry.ApplyTo(toolKit, platform: "azure-ai");
 | `web_fetch` | Real | `HttpClient` GET |
 | `bash` | Real | OS shell in a temp sandbox directory |
 | `text_editor` | Real | File I/O scoped to the bash sandbox |
-| `code_execution` / `code_interpreter` / `vertex_extension:code_interpreter` | Real | Subprocess via bash; Python / Node / C# (`dotnet-script`) |
+| `code_execution` / `code_interpreter` | Real | Subprocess via bash; Python / Node / C# (`dotnet-script`) |
 | `file_search` | Real | Keyword search over a configurable root directory |
 | `memory` / `memory_bank` / `memory_profiles` / `memory_search` | Real | In-process concurrent dictionary store |
 | `bing_search` / `bing_grounding` / `bing_custom_search` | Stub | Deterministic fixture — for test use |

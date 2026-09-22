@@ -1,7 +1,7 @@
 namespace Ananke.Federation.Google;
 
 /// <summary>
-/// Configuration options for <see cref="VertexAIRemoteCellMonitor"/>.
+/// Configuration options for <see cref="AgentRuntimeRemoteCellMonitor"/>.
 /// </summary>
 public sealed record RemoteCellMonitorOptions
 {

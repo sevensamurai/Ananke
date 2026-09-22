@@ -52,7 +52,7 @@ public readonly record struct BudgetVerdict(
 /// main path and every fork branch.
 /// </summary>
 /// <remarks>
-/// Shared deliberately. The whole subject of ADR-arch-028 is guarantees the main path had and the
+/// Shared deliberately. The whole subject here is guarantees the main path had and the
 /// branch path silently lacked; a second copy of this arithmetic in the branch loop would be the
 /// next one to drift. Both paths ask the same object the same question.
 /// <para>

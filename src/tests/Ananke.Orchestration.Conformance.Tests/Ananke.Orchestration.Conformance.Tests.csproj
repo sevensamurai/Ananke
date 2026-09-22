@@ -30,6 +30,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Ananke.Orchestration.Conformance\Ananke.Orchestration.Conformance.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Conformance.NUnit\Ananke.Orchestration.Conformance.NUnit.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Planning.Conformance\Ananke.Orchestration.Planning.Conformance.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Planning.Conformance.NUnit\Ananke.Orchestration.Planning.Conformance.NUnit.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <ProjectReference Include="..\..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
     <ProjectReference Include="..\Ananke.TestHelpers\Ananke.TestHelpers.csproj" />

@@ -77,7 +77,7 @@ public sealed class GeminiToolSchemaTranslator : IToolSchemaTranslator
 
         return capability switch
         {
-            "code_execution" or "code_interpreter" or "vertex_extension:code_interpreter" =>
+            "code_execution" or "code_interpreter" =>
                 new Tool { CodeExecution = new ToolCodeExecution() },
 
             "google_search" or "google_search_retrieval" =>

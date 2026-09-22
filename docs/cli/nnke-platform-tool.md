@@ -65,9 +65,17 @@ dotnet tool install -g nnke-platform-anthropic
 dotnet tool install -g nnke-platform-all
 ```
 
-Installing an adapter copies its assemblies into `~/.ananke/adapters/`
-(Windows: `%USERPROFILE%\.ananke\adapters\`). On every run, `nnke-platform` probes that
-directory and loads whatever adapters are present — no configuration file or restart required.
+Installing an adapter copies its assemblies into the adapters directory. **The path differs by
+platform**, and `nnke-platform adapters list` always prints the one it actually used:
+
+| Platform | Adapters directory |
+|---|---|
+| Windows | `%USERPROFILE%\.ananke\adapters\` |
+| Linux / macOS, `XDG_DATA_HOME` set | `$XDG_DATA_HOME/.ananke/adapters/` |
+| Linux / macOS, default | `~/.local/share/.ananke/adapters/` |
+
+On every run, `nnke-platform` probes that directory and loads whatever adapters are present — no
+configuration file or restart required.
 
 Update adapters independently:
 
@@ -86,30 +94,40 @@ dotnet tool uninstall -g nnke-platform-azure
 
 ```bash
 nnke-platform --help
-nnke-platform capabilities --platform azure-ai
+nnke-platform capabilities --platform azure
 ```
 
 ---
 
 ## Platform Setup
 
-Each platform requires credentials before you can deploy. `nnke-platform login` stores them
-per platform and does not share them with `nnke`.
+Each platform requires credentials before you can deploy. **`nnke-platform` stores none of them** —
+all three clouds ship credential chains of their own, and a fourth copy is a copy that goes stale.
+`nnke-platform login --platform <p>` prints the variables a platform needs and how to obtain them;
+`nnke-platform whoami` reports what `deploy` would actually use, and why any platform is
+unavailable.
 
-### Azure AI Agent Service (`azure-ai`)
+### Microsoft Foundry Agent Service (`azure`)
 
 | Variable | Description |
 |---|---|
-| `AZURE_AI_ENDPOINT` | Your Azure AI Foundry endpoint URL |
+| `AZURE_AI_ENDPOINT` | Your Foundry **project** endpoint |
 
 ```bash
-nnke-platform login --platform azure-ai
-# or set the env var directly:
-export AZURE_AI_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/
+export AZURE_AI_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
 ```
 
 Authentication uses the Azure credential chain (managed identity in CI, `az login` locally).
 No additional API key is needed when using Entra-based auth.
+
+> ⚠️ **This is the project endpoint, not the model endpoint.** Federation administers agents inside a
+> Foundry *project*; orchestration calls a *model*. They are different resources granted by different
+> roles, and a model key does not open a project endpoint:
+>
+> | Variable | What it addresses | Used by |
+> |---|---|---|
+> | `AZURE_AI_ENDPOINT` | `https://<res>.services.ai.azure.com/api/projects/<project>` | `nnke-platform` — deploy and administer agents |
+> | `AZURE_OPENAI_ENDPOINT` | `https://<res>.openai.azure.com/openai/v1/` | `Ananke.Orchestration.OpenAI` — call a model |
 
 ### Google Vertex AI / Gemini (`vertex-ai`)
 
@@ -119,8 +137,7 @@ No additional API key is needed when using Entra-based auth.
 | `GOOGLE_CLOUD_LOCATION` | Region (e.g. `us-central1`) — defaults to `us-central1` if unset |
 
 ```bash
-nnke-platform login --platform vertex-ai
-# or:
+nnke-platform login --platform vertex-ai   # prints what to set
 export GOOGLE_CLOUD_PROJECT=my-gcp-project
 export GOOGLE_CLOUD_LOCATION=us-central1
 ```
@@ -139,8 +156,7 @@ Workload Identity in GCP).
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
 
 ```bash
-nnke-platform login --platform claude
-# or:
+nnke-platform login --platform claude      # prints what to set
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
@@ -156,24 +172,38 @@ nnke-platform whoami
 
 | Command | Description |
 |---|---|
-| `nnke-platform validate <file> --platform <p>` | Validate a manifest's deployability to a target platform |
+| `nnke-platform validate <file> --platform <p>` | Validate a manifest's deployability — offline, no platform contact |
+| `nnke-platform check <file> --platform <p>` | **Preflight**: credentials and platform readiness. Contacts the platform; creates nothing |
 | `nnke-platform capabilities [--platform <p>]` | List known platform-native tool capabilities |
 | `nnke-platform eval <file>` | Score a manifest against candidate platforms and recommend the best fit |
 | `nnke-platform profiles <file> [profile]` | List or inspect deployment profiles in a manifest |
 | `nnke-platform deploy <file> --platform <p>` | Deploy a workflow to a target platform |
 | `nnke-platform status [--deployment-id <id>]` | Show deployment status |
 | `nnke-platform teardown --deployment-id <id>` | Tear down a deployed workflow |
-| `nnke-platform trends [--deployment-id <id>]` | Show metrics trends for deployments |
-| `nnke-platform analyze <file>` | Analyze manifest complexity and runtime trends |
-| `nnke-platform lineage <cell> <file>` | Show federated ancestor/descendant tree for a cell |
+| `nnke-platform analyze <file>` | Analyze a manifest's structural complexity |
+| `nnke-platform lineage <cell> <file>` | Show the ancestor/descendant tree for a cell |
 | `nnke-platform mesh <file>` | Mesh status with platform, deployment ID, and remote health |
-| `nnke-platform apoptosis [--auto] <file>` | Identify (and optionally teardown) idle or aged cells |
-| `nnke-platform compare <cell> --across <p,p>` | Compare token/latency metrics across platforms |
-| `nnke-platform events [--follow]` | Stream mesh and deployment events |
-| `nnke-platform login --platform <p>` | Configure credentials for a platform |
-| `nnke-platform whoami` | Show configured platform identities |
-| `nnke-platform adapters list` | List all installed adapters with status and version |
-| `nnke-platform adapters doctor` | Report unhealthy adapters with remediation hints (exits 2 if any are degraded) |
+| `nnke-platform login --platform <p>` | Print the variables a platform needs. Stores nothing |
+| `nnke-platform whoami` | Show what `deploy` would use, and why any platform is unavailable |
+| `nnke-platform adapters list` | List installed adapters with status and version |
+| `nnke-platform adapters doctor` | Report adapters whose platform does not resolve (exits 2 if any) |
+
+`validate` and `check` are the two halves of the same question. `validate` is offline and asks
+*"could this manifest deploy?"*; `check` contacts the platform and asks *"can this machine deploy
+it?"* Neither creates anything.
+
+`deploy`, `check` and `validate` accept `--catalog <file>` to resolve `ref:` model aliases against
+another manifest's `models:` section.
+
+### Not in this release
+
+Withdrawn deliberately rather than shipped non-functional. Each can return without breaking anyone:
+
+| Command | Why |
+|---|---|
+| `trends`, `compare`, `events` | Federation metrics are held in memory per process, so these could only ever report *"no data"* — indistinguishable from a healthy nothing-to-report. They need a metrics store that outlives a command |
+| `apoptosis` | Identifies and tears down idle cells; needs a substrate population nothing yet produces |
+| `analyze --deployment-id` | Same root cause as `trends`. `analyze` keeps its structural analysis |
 
 All commands support `--json` for machine-readable output and `--in-memory` for dry-run / test mode
 (no disk state written).
@@ -184,10 +214,17 @@ All commands support `--json` for machine-readable output and `--in-memory` for 
 
 | Platform flag | Service | Adapter package | Status |
 |---|---|---|---|
-| `azure-ai` | Azure AI Agent Service (Azure AI Foundry) | `nnke-platform-azure` | Stable |
-| `vertex-ai` | Google Vertex AI / Gemini Agent Platform | `nnke-platform-google` | Stable |
-| `claude` | Anthropic Claude (managed agents) | `nnke-platform-anthropic` | **Preview** |
-| `local` | Local in-process execution (no cloud) | *(none)* | Stable |
+| `local` | In-process substrate — no cloud, no credentials, no adapter | *(built in)* | **Stable** |
+| `azure` | Microsoft Foundry Agent Service | `nnke-platform-azure` | **Preview** |
+| `vertex-ai` | Gemini Enterprise Agent Platform | `nnke-platform-google` | **Preview** |
+| `claude` | Anthropic Claude managed agents | `nnke-platform-anthropic` | **Preview** |
+
+`local` is a first-class substrate, not a test fixture: the full `deploy → status → teardown`
+lifecycle runs against it with no cloud account, which is how the CLI is exercised in CI. Note it
+*simulates* deployment — it records the lifecycle rather than executing the workflow.
+
+**The three vendor adapters ship as preview** because none has been verified against a live service.
+Targeting one prints a notice to stderr; `--json` output is unaffected.
 
 ### Platform identifier aliases
 
@@ -195,10 +232,18 @@ Post-May-2026 platform names are accepted everywhere a platform flag is accepted
 
 | Alias | Resolves to | Note |
 |---|---|---|
-| `foundry` | `azure-ai` | Emitted as diagnostic `FED060` (warning) |
-| `gemini-enterprise` | `vertex-ai` | Emitted as diagnostic `FED060` (warning) |
+| `azure-ai` | `azure` | Emitted as diagnostic `FED060` (info) |
+| `foundry` | `azure` | Emitted as diagnostic `FED060` (info) |
+| `gemini-enterprise` | `vertex-ai` | Emitted as diagnostic `FED060` (info) |
+| `gemini-agent-platform` | `vertex-ai` | Emitted as diagnostic `FED060` (info) |
 
-Existing manifests using `azure-ai` or `vertex-ai` continue to work unchanged.
+**Aliases are permanent.** A platform identifier is persisted in deployment records, so anything
+that has ever been written stays resolvable. Existing manifests using `azure-ai` or `vertex-ai`
+continue to work unchanged.
+
+Identifiers name the **cloud**, not the product, because product names churn — *Azure AI Studio →
+Azure AI Foundry → Microsoft Foundry* in about a year, while the Azure resource model, endpoints and
+RBAC did not move. The current product name lives in the profile's display name instead.
 
 ---
 
@@ -217,13 +262,13 @@ able to run and be tested locally — no cloud credentials, no adapter installat
 
 ```bash
 # Register a local emulated deployment (validates + writes a DeploymentRecord)
-nnke-platform up --emulate azure-ai my-workflow.ananke.yml
+nnke-platform up --emulate azure my-workflow.ananke.yml
 
 # Then run the workflow locally via nnke
 nnke serve my-workflow.ananke.yml --port 5000
 
 # Or deploy with a local target in CI (no credentials, produces DeploymentRecord)
-nnke-platform deploy my-workflow.ananke.yml --target local --emulate azure-ai
+nnke-platform deploy my-workflow.ananke.yml --target local --emulate azure
 ```
 
 ### Emulator tiers
@@ -244,8 +289,8 @@ return fixture data rather than real results.
 | Target | Meaning |
 |---|---|
 | `"local"` | Run in-process, no emulation layer |
-| `"azure-ai"` / `"vertex-ai"` / `"claude"` | Deploy to the named managed platform |
-| `"local-emulated:azure-ai"` | Run locally through registered emulators, simulating the named platform |
+| `"azure"` / `"vertex-ai"` / `"claude"` | Deploy to the named managed platform |
+| `"local-emulated:azure"` | Run locally through registered emulators, simulating the named platform |
 
 This lets you pin individual cells to local emulation while the rest of the mesh deploys remotely.
 
@@ -253,7 +298,7 @@ This lets you pin individual cells to local emulation while the rest of the mesh
 
 | Code | Severity | Meaning |
 |---|---|---|
-| `FED060` | Warning | Platform alias resolved (e.g. `foundry → azure-ai`) |
+| `FED060` | Info | Platform alias resolved (e.g. `foundry → azure`) |
 | `FED061` | Error | `PlatformNative` capability declared but no executor registered |
 | `FED062` | Warning | Capability covered by a stub — results are deterministic, not real |
 
@@ -270,7 +315,7 @@ profiles:
     tools:
       search: { execute: local }
       code:   { execute: local }
-  azure-ai:
+  azure:
     tools:
       search: { platform: bing_search }
       code:   { platform: code_interpreter }
@@ -287,7 +332,7 @@ profiles:
 Apply a profile at deploy time:
 
 ```bash
-nnke-platform deploy my-workflow.ananke.yml --platform azure-ai --profile azure-ai
+nnke-platform deploy my-workflow.ananke.yml --platform azure --profile azure
 ```
 
 ---
@@ -304,16 +349,16 @@ export AZURE_AI_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/
 nnke-platform whoami
 
 # 3. See what capabilities Azure AI supports
-nnke-platform capabilities --platform azure-ai
+nnke-platform capabilities --platform azure
 
 # 4. Validate your manifest
-nnke-platform validate my-workflow.ananke.yml --platform azure-ai
+nnke-platform validate my-workflow.ananke.yml --platform azure
 
 # 5. List deployment profiles
 nnke-platform profiles my-workflow.ananke.yml
 
 # 6. Deploy
-nnke-platform deploy my-workflow.ananke.yml --platform azure-ai --profile azure-ai
+nnke-platform deploy my-workflow.ananke.yml --platform azure --profile azure
 
 # 7. Check status
 nnke-platform status --deployment-id <id>
@@ -329,11 +374,12 @@ nnke-platform events --follow
 Before deploying, configure credentials for the target platform:
 
 ```bash
-nnke-platform login --platform azure-ai
-nnke-platform whoami
+nnke-platform login --platform azure   # prints the variables to set
+nnke-platform whoami                   # reports what deploy would use
 ```
 
-Credentials are stored per platform and are not shared with `nnke`.
+Nothing is written to disk. If a `credentials.json` from an earlier release is still present,
+`whoami` reports it as unused and safe to delete.
 
 ---
 
@@ -360,7 +406,7 @@ Every command supports `--json` for structured output that AI tools, CI pipeline
 
 ```bash
 nnke-platform status --json
-nnke-platform capabilities --platform azure-ai --json
+nnke-platform capabilities --platform azure --json
 nnke-platform trends --deployment-id <id> --json
 ```
 

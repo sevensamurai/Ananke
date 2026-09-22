@@ -173,11 +173,20 @@ public static class Models
     /// <summary>Google Gemini model identifiers. Already short wire names.</summary>
     public static class Google
     {
-        /// <summary>Gemini 3.1 Pro — Agent Platform GA flagship, frontier reasoning.</summary>
-        public const string Gemini31Pro = "gemini-3.1-pro";
+        /// <summary>
+        /// Gemini 3.1 Pro — flagship, frontier reasoning. <b>Preview-only: the wire id carries the
+        /// suffix</b>, and the unsuffixed <c>gemini-3.1-pro</c> answers 404.
+        /// </summary>
+        /// <remarks>
+        /// Verified against <c>ListModels</c> and a live call on 2026-08-30 — the pro line has no GA
+        /// id yet, while the flash line does. Named here as the id that works rather than the one
+        /// the naming scheme implies: a constant whose value 404s is worse than a suffix.
+        /// </remarks>
+        public const string Gemini31Pro = "gemini-3.1-pro-preview";
 
-        /// <summary>Gemini 3.1 Flash — legacy, superseded by Gemini 3.5 Flash, still fully supported.</summary>
-        public const string Gemini31Flash = "gemini-3.1-flash";
+        // Gemini31Flash (gemini-3.1-flash) was removed — the API answers 404 for it, so it is
+        // retired rather than legacy. Its consumers moved to Gemini36Flash. See
+        // docs/reference/model-deprecations.md.
 
         /// <summary>Gemini 3.1 Flash Image — multimodal variant with image generation.</summary>
         public const string Gemini31FlashImage = "gemini-3.1-flash-image";
@@ -201,6 +210,13 @@ public static class Models
         /// forward from Gemini 3.5 Flash's spec as the closest known baseline.
         /// </summary>
         public const string Gemini36Flash = "gemini-3.6-flash";
+
+        /// <summary>
+        /// Gemini 3.7 Flash — current generation, 1M-token window. Whether it supersedes
+        /// <see cref="Gemini36Flash"/> is not recorded: both are served, and the provider has not
+        /// said. The starred model is unchanged until something says otherwise.
+        /// </summary>
+        public const string Gemini37Flash = "gemini-3.7-flash";
 
         /// <summary>Gemma 4 — open-weight model available via Agent Platform / Model Garden.</summary>
         public const string Gemma4 = "gemma-4";

@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Pages is published from the public repo only; forks have no site to deploy.
+    if: github.repository == 'sevensamurai/Ananke'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -12,8 +12,7 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers OpenAI provider services: <see cref="IToolSchemaTranslator"/>,
-    /// <see cref="ISystemPromptCompiler"/>, <see cref="IModelMapper"/>, and
-    /// <see cref="ICredentialProvider"/> implementations.
+    /// <see cref="ISystemPromptCompiler"/>, <see cref="ICredentialProvider"/> implementations.
     /// </summary>
     /// <param name="services">The DI service collection.</param>
     /// <param name="apiKey">
@@ -27,7 +26,6 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IToolSchemaTranslator, OpenAIToolSchemaTranslator>();
         services.AddSingleton<ISystemPromptCompiler, OpenAISystemPromptCompiler>();
-        services.AddSingleton<IModelMapper, OpenAIModelMapper>();
         services.AddSingleton<ICredentialProvider>(new OpenAICredentialProvider(apiKey));
         return services;
     }

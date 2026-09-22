@@ -97,7 +97,8 @@ public sealed class PlatformRecommenderTests
         var kit = MakeKit(("search", "sharepoint_grounding"));
         var report = _recommender.Evaluate(MakeManifest(), kit, ["azure-ai", "claude"]);
 
-        var azure = report.Scores.First(s => s.Platform == "azure-ai");
+        // Requested as "azure-ai"; scored under the canonical identifier it resolves to.
+        var azure = report.Scores.First(s => s.Platform == "azure");
         var claude = report.Scores.First(s => s.Platform == "claude");
 
         azure.CapabilityCoverage.ShouldBe(1.0);
@@ -130,7 +131,7 @@ public sealed class PlatformRecommenderTests
             MakeManifest(intents: ["enterprise_data", "governance"]),
             kit);
 
-        report.Recommended.ShouldBe("azure-ai");
+        report.Recommended.ShouldBe("azure");
     }
 
     [Test]
@@ -197,7 +198,8 @@ public sealed class PlatformRecommenderTests
             new ToolKit("empty"),
             ["azure-ai", "claude"]);
 
-        var azure = report.Scores.First(s => s.Platform == "azure-ai");
+        // Requested as "azure-ai"; scored under the canonical identifier it resolves to.
+        var azure = report.Scores.First(s => s.Platform == "azure");
         var claude = report.Scores.First(s => s.Platform == "claude");
 
         azure.GovernanceFit.ShouldBe(1.0);
@@ -231,7 +233,8 @@ public sealed class PlatformRecommenderTests
             new ToolKit("empty"),
             ["azure-ai", "vertex-ai"]); // azure = medium, vertex = low
 
-        var azure = report.Scores.First(s => s.Platform == "azure-ai");
+        // Requested as "azure-ai"; scored under the canonical identifier it resolves to.
+        var azure = report.Scores.First(s => s.Platform == "azure");
         var vertex = report.Scores.First(s => s.Platform == "vertex-ai");
 
         azure.CostLatencyFit.ShouldBeLessThan(vertex.CostLatencyFit);
@@ -242,6 +245,6 @@ public sealed class PlatformRecommenderTests
     {
         var report = _recommender.Evaluate(MakeManifest(), new ToolKit("empty"), ["foundry"]);
 
-        report.Scores.ShouldContain(s => s.Platform == "azure-ai");
+        report.Scores.ShouldContain(s => s.Platform == "azure");
     }
 }

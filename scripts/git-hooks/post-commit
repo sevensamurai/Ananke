@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Re-sync the codegraph index after a commit. See _codegraph-sync.
+exec "$(dirname "$0")/_codegraph-sync" post-commit

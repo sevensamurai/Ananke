@@ -9,7 +9,7 @@ namespace Ananke.Federation.Agents;
 /// </summary>
 public interface IManagedAgentClient
 {
-    /// <summary>Platform identifier this client targets (e.g. <c>"azure-ai"</c>).</summary>
+    /// <summary>Platform identifier this client targets (e.g. <c>"azure"</c>).</summary>
     string Platform { get; }
 
     /// <summary>

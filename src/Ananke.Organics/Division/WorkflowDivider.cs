@@ -312,7 +312,8 @@ public sealed class WorkflowDivider(
                     {
                         Provider = modelDef.Provider,
                         Model = modelDef.Model,
-                        Endpoint = modelDef.Endpoint
+                        Endpoint = modelDef.Endpoint,
+                        Temperature = modelDef.Temperature
                     };
                 }
             }

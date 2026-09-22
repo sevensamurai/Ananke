@@ -22,7 +22,8 @@ namespace Ananke.Federation.Validation;
 ///   <item><c>FED003</c> — Unknown platform-native capability (warning — passthrough still works)</item>
 ///   <item><c>FED010</c> — No model alias defined for an agent job</item>
 ///   <item><c>FED011</c> — Model alias references undefined model</item>
-///   <item><c>FED012</c> — Model provider not supported on target platform</item>
+///   <item><c>FED012</c> — Model provider not supported on target platform <i>(reserved; not emitted)</i></item>
+///   <item><c>FED016</c> — Model alias is an unresolved cross-manifest reference</item>
 ///   <item><c>FED013</c> — Model not available on target platform</item>
 ///   <item><c>FED014</c> — Custom endpoint may not be reachable from platform</item>
 ///   <item><c>FED015</c> — No model mapper available for target platform</item>
@@ -68,7 +69,11 @@ public sealed class DeployabilityValidator : IDeployabilityValidator
     }
 
     /// <inheritdoc />
-    public DeployabilityReport Validate(WorkflowManifest manifest, ToolKit toolKit, string targetPlatform)
+    public DeployabilityReport Validate(
+        WorkflowManifest manifest,
+        ToolKit toolKit,
+        string targetPlatform,
+        IReadOnlyDictionary<string, ModelDefinition>? modelCatalogue = null)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(toolKit);
@@ -81,22 +86,15 @@ public sealed class DeployabilityValidator : IDeployabilityValidator
         ValidatePlatform(resolvedPlatform, diagnostics);
         ValidateTopology(manifest, toolKit, diagnostics);
         ValidateTools(toolKit, resolvedPlatform, diagnostics);
-        ValidateModels(manifest, resolvedPlatform, diagnostics);
+        ValidateModels(manifest, resolvedPlatform, diagnostics, modelCatalogue);
 
         return new DeployabilityReport { Diagnostics = diagnostics };
     }
 
-    // Maps the May-2026 post-rebrand names back to the canonical SDK-era identifiers.
-    private static readonly IReadOnlyDictionary<string, string> PlatformAliases =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["foundry"] = "azure-ai",
-            ["gemini-enterprise"] = "vertex-ai"
-        };
-
     private static string ResolvePlatformAlias(string platform, List<DeployDiagnostic> diagnostics)
     {
-        if (!PlatformAliases.TryGetValue(platform, out var canonical))
+        var canonical = PlatformIdentifiers.Resolve(platform);
+        if (string.Equals(canonical, platform, StringComparison.OrdinalIgnoreCase))
             return platform;
 
         diagnostics.Add(new DeployDiagnostic
@@ -211,7 +209,11 @@ public sealed class DeployabilityValidator : IDeployabilityValidator
         }
     }
 
-    private void ValidateModels(WorkflowManifest manifest, string targetPlatform, List<DeployDiagnostic> diagnostics)
+    private void ValidateModels(
+        WorkflowManifest manifest,
+        string targetPlatform,
+        List<DeployDiagnostic> diagnostics,
+        IReadOnlyDictionary<string, ModelDefinition>? modelCatalogue)
     {
         var mapper = _modelMappers.FirstOrDefault(m =>
             string.Equals(m.Platform, targetPlatform, StringComparison.OrdinalIgnoreCase));
@@ -244,6 +246,47 @@ public sealed class DeployabilityValidator : IDeployabilityValidator
                     Component = jobName
                 });
                 continue;
+            }
+
+            // A `ref` that nothing resolved must not reach the mapper. ModelDefinition's Provider
+            // and Model carry defaults, so an alias declaring only `ref: devstral2` parses into a
+            // valid-looking openai/gpt-5.4-mini — which is how a manifest pointing at a local Ollama
+            // model silently became a paid frontier call, and validated clean while doing it.
+            if (modelDef.Ref is { } reference)
+            {
+                if (modelCatalogue is null)
+                {
+                    diagnostics.Add(new DeployDiagnostic
+                    {
+                        Severity = DeployDiagnosticSeverity.Error,
+                        Code = "FED016",
+                        Message = $"Agent job '{jobName}' uses model alias '{job.ModelAlias}', which "
+                            + $"references '{reference}' from a model catalogue, and no catalogue was "
+                            + "supplied.",
+                        Component = jobName,
+                        Suggestion = "Supply the catalogue that declares it (for the CLI, "
+                            + "--catalog <file>), or declare the model inline with 'provider:' and 'model:'."
+                    });
+                    continue;
+                }
+
+                if (!modelCatalogue.TryGetValue(reference, out var resolved))
+                {
+                    diagnostics.Add(new DeployDiagnostic
+                    {
+                        Severity = DeployDiagnosticSeverity.Error,
+                        Code = "FED016",
+                        Message = $"Agent job '{jobName}' uses model alias '{job.ModelAlias}', which "
+                            + $"references '{reference}' — not present in the supplied catalogue.",
+                        Component = jobName,
+                        Suggestion = $"Add '{reference}' to the catalogue's models: section, or correct the reference."
+                    });
+                    continue;
+                }
+
+                // Resolved locally, for this validation only. The manifest is not rewritten: it keeps
+                // meaning what its own file says.
+                modelDef = resolved;
             }
 
             if (modelDef.Endpoint is not null)

@@ -1,6 +1,6 @@
 {
   "platforms": {
-    "azure-ai": {
+    "azure": {
       "capabilities": [
         "code_interpreter",
         "file_search",
@@ -24,7 +24,6 @@
       "capabilities": [
         "code_execution",
         "code_interpreter",
-        "vertex_extension:code_interpreter",
         "google_search",
         "google_search_retrieval",
         "bash",
@@ -53,6 +52,9 @@
         "bash",
         "memory"
       ]
+    },
+    "local": {
+      "capabilities": []
     }
   }
 }

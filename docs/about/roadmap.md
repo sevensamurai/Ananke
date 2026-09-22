@@ -1,9 +1,9 @@
 <!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
-### Where We Are — v0.8.6
+### Where We Are — v0.8.9
 
-**0.8.6 is the current release.**
+**0.8.9 is the current release.**
 
 The core framework is feature-complete. Workflows, agents, state machines, empirical
 memory, distributed infrastructure, MCP/A2A interop, observability, design tooling,
@@ -19,6 +19,12 @@ No new functionality is planned before 1.0. The remaining work is:
 If you are building on Ananke today, 0.8.x is production-ready for non-critical workloads.
 The surface area that matters — `IStreamingAgentModel`, `IJob<T>`, `Workflow<T>`,
 `AbstractStateMachine`, `IEmpiricalMemory` — will not change between 0.8.0 and 1.0.
+
+**One qualification on "no new functionality".** 0.9.0 does add capability, on purpose: small
+language models, an audit layer, and the enterprise cloud surfaces. Those are additive and do not
+disturb the contracts above. The `nnke-platform` federation CLI is the one place where 1.0 will ship
+a **smaller** surface than 0.8.x did — verbs that could not return a true answer are being withdrawn
+rather than carried across the line, since removing one after 1.0 would be a breaking change.
 
 ---
 
@@ -37,7 +43,11 @@ The surface area that matters — `IStreamingAgentModel`, `IJob<T>`, `Workflow<T
 | **0.8.4** | Platform review loops and studio scaffolding: richer Slack integrations (slash commands, interactivity, assistant pane, modals, approval blocks), work-review and budget gates in Organics, async review parking, `Ananke.Roles` package, OTel budget meter, `WorkItemReviewNotifier`, and `MiniAgencyDemo`. |
 | **0.8.5** | Agent trajectory observability and resilience (`TrajectorySnapshot`, `IAdaptiveHarnessPolicy`, `IHallucinationObserver`), Organics division governance (`IDivisionApprovalGate` with concrete gates, `IDivisionOutcomeTracker`), and Federation platform-fit scoring (`PlatformRecommender`). |
 | **0.8.6** | Declarative loops and conversational interview workflows (`loop()`/`ask()` DSL, `AgenticPattern.Interview`), multi-label knowledge graph nodes (`GraphNode.EffectiveLabels`), and a documentation drift guard (`scripts/check-docs.ps1`, `MAP.md`) that found and fixed real stale-doc drift across the repo. |
-| **0.8.x** | Bug fixes and minor improvements only. |
+| **0.8.7** | Composition-boundary fixes and a model lifecycle system: `Models` moved to `Ananke.Abstractions.Agents`, all three provider lineups refreshed, and deprecated or retired model ids became build-time diagnostics (`ANNKE001`–`ANNKE003`). No new features. |
+| **0.8.8** | Reasoning-content correctness (`ReasoningPart`, so provider thinking blocks no longer leak into `.Text`), a safer completion-logging default, and Anthropic adapter parity. No new features. |
+| **0.8.9** | The quality release: spend budgets with usage accounting (`WithBudget`), fork branches that report their outcome, and roughly two dozen fixes from the code-quality review. |
+| **0.9.0** | *In progress.* Enterprise cloud surfaces — Amazon Bedrock and Microsoft Foundry reached through the existing adapters, with a conformance suite every adapter is subject to — plus the gaps found by stressing the framework for small, self-hosted models: model classification and licence policy, catalogue coverage for the open-weight families, and honest handling of local context windows and zero-cost routing. |
+| **0.9.\*** | Bug fixes and minor improvements. Most likely the last line before 1.0. |
 | **1.0.0** | API lock — semantic versioning honoured from this point forward. |
 
 After 1.0, breaking changes to established interfaces will require a major version bump

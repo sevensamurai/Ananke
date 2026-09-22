@@ -84,6 +84,7 @@ record PipelineState(string Topic = "", string Facts = "", string Summary = "");
 | Use the nnke CLI tools | [nnke Tools overview](cli/nnke-tools.md) |
 | Serve a manifest locally without credentials | [`nnke serve`](cli/nnke-tool.md) |
 | Agentic patterns (review, refine) | [Guide 16](guides/16-agentic-patterns.md) |
+| Running models locally (Ollama, vLLM) | [Guide 17](guides/17-local-models.md) |
 
 -> [Complete learning path](learning-path.md) | [Browse runnable demos](demos.md)
 

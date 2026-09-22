@@ -288,6 +288,36 @@ public class UndefinedJobNameAnalyzerTests
         await VerifyNoDiagnosticsAsync(source);
     }
 
+    [Test]
+    public async Task SuperviseRegistersAJob_NoDiagnostics()
+    {
+        // A job registered through .Supervise() is registered. The analyzer knowing only about
+        // .Job() and .SubFlow() would report every connection to a supervised job as undefined —
+        // a build error on correct code, which is worse than the mistake it exists to catch.
+        var source = """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Ananke.Orchestration.Planning;
+            using Ananke.Orchestration.Workflows;
+
+            class Program
+            {
+                void Build(SupervisionOptions supervision, Func<string, PlanTree> plan)
+                {
+                    var w = new Workflow<string>("test")
+                        .Job("a", (s, ct) => Task.FromResult(s))
+                        .Supervise("deliver", plan, supervision, (s, r) => s)
+                        .Then("a", "deliver")
+                        .Then("deliver", Workflow.End)
+                        .Build();
+                }
+            }
+            """;
+
+        await VerifyNoDiagnosticsAsync(source);
+    }
+
     private static async Task VerifyNoDiagnosticsAsync(string source)
     {
         var test = new CSharpAnalyzerTest<UndefinedJobNameAnalyzer, DefaultVerifier>

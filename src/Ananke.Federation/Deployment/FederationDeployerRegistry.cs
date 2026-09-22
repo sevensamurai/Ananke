@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Ananke.Federation.Validation;
 
 namespace Ananke.Federation.Deployment;
 
@@ -10,7 +11,7 @@ namespace Ananke.Federation.Deployment;
 /// <remarks>
 /// <para>
 /// Module initializers in companion packages call <see cref="RegisterFactory"/> to register
-/// a lazy factory. The CLI host then calls <see cref="MaterializeFactories"/> once the
+/// a lazy factory. The CLI host then calls <see cref="MaterializeFactories(IDeploymentRegistry)"/> once the
 /// <see cref="IDeploymentRegistry"/> is available, which creates and registers the actual
 /// deployer instances.
 /// </para>
@@ -63,20 +64,11 @@ public static class FederationDeployerRegistry
         if (_deployers.TryGetValue(platform, out deployer))
             return true;
 
-        // Fall back to canonical alias (e.g. foundry → azure-ai).
-        if (PlatformAliases.TryGetValue(platform, out var canonical))
-            return _deployers.TryGetValue(canonical, out deployer);
-
-        return false;
+        // Fall back to the canonical identifier (e.g. foundry → azure-ai).
+        var canonical = PlatformIdentifiers.Resolve(platform);
+        return !string.Equals(canonical, platform, StringComparison.OrdinalIgnoreCase)
+            && _deployers.TryGetValue(canonical, out deployer);
     }
-
-    // Maps post-rebrand names to canonical SDK-era identifiers.
-    private static readonly IReadOnlyDictionary<string, string> PlatformAliases =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["foundry"] = "azure-ai",
-            ["gemini-enterprise"] = "vertex-ai"
-        };
 
     /// <summary>
     /// Returns a snapshot of all currently registered platform identifiers.
@@ -87,7 +79,7 @@ public static class FederationDeployerRegistry
     /// <summary>
     /// Registers a deferred deployer factory for a platform. Intended for use by companion
     /// package module initializers. The factory receives the host's <see cref="IDeploymentRegistry"/>
-    /// when <see cref="MaterializeFactories"/> is called.
+    /// when <see cref="MaterializeFactories(IDeploymentRegistry)"/> is called.
     /// </summary>
     /// <param name="platform">The platform identifier (e.g. <c>"azure-ai"</c>).</param>
     /// <param name="factory">
@@ -111,7 +103,35 @@ public static class FederationDeployerRegistry
     /// Factories for platforms that already have a live deployer registered are skipped.
     /// </summary>
     /// <param name="deploymentRegistry">The deployment registry to pass to each factory.</param>
-    public static void MaterializeFactories(IDeploymentRegistry deploymentRegistry)
+    public static void MaterializeFactories(IDeploymentRegistry deploymentRegistry) =>
+        MaterializeFactories(deploymentRegistry, onError: null);
+
+    /// <summary>
+    /// As <see cref="MaterializeFactories(IDeploymentRegistry)"/>, reporting a factory that throws
+    /// to <paramref name="onError"/> instead of letting it escape.
+    /// </summary>
+    /// <param name="deploymentRegistry">The deployment registry to pass to each factory.</param>
+    /// <param name="onError">
+    /// Receives the platform identifier and the failure. When <see langword="null"/> the failure is
+    /// still contained — an adapter that cannot construct simply does not resolve.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <b>One adapter must not be able to take down the tool.</b> Adapter factories run arbitrary
+    /// third-party code and routinely read configuration: the Google adapter throws outright when
+    /// <c>GOOGLE_CLOUD_PROJECT</c> is unset. Before module initializers actually fired, no factory
+    /// ever ran and this could not bite; the moment they did, a single unconfigured adapter crashed
+    /// <i>every</i> command — including read-only ones like <c>adapters doctor</c>, and including
+    /// commands targeting a completely different platform.
+    /// </para>
+    /// <para>
+    /// Contained, not silenced: the platform does not resolve, and <c>adapters doctor</c> reports it
+    /// as unresolved with the factory's own message.
+    /// </para>
+    /// </remarks>
+    public static void MaterializeFactories(
+        IDeploymentRegistry deploymentRegistry,
+        Action<string, Exception>? onError)
     {
         ArgumentNullException.ThrowIfNull(deploymentRegistry);
 
@@ -120,9 +140,16 @@ public static class FederationDeployerRegistry
             if (_deployers.ContainsKey(platform))
                 continue;
 
-            var deployer = factory(deploymentRegistry);
-            // Best-effort: another thread may have materialized the same platform concurrently.
-            _deployers.TryAdd(deployer.Platform, deployer);
+            try
+            {
+                var deployer = factory(deploymentRegistry);
+                // Best-effort: another thread may have materialized the same platform concurrently.
+                _deployers.TryAdd(deployer.Platform, deployer);
+            }
+            catch (Exception ex)
+            {
+                onError?.Invoke(platform, ex);
+            }
         }
     }
 

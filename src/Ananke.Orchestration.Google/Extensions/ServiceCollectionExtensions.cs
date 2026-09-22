@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers Gemini Developer API provider services using an API key.
     /// Registers <see cref="IToolSchemaTranslator"/>, <see cref="ISystemPromptCompiler"/>,
-    /// <see cref="IModelMapper"/>, <see cref="IJsonSchemaTranslator"/>, and
+    /// <see cref="IJsonSchemaTranslator"/>, and
     /// <see cref="ICredentialProvider"/> implementations.
     /// </summary>
     /// <param name="services">The DI service collection.</param>
@@ -28,7 +28,6 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IToolSchemaTranslator, GeminiToolSchemaTranslator>();
         services.AddSingleton<ISystemPromptCompiler, GeminiSystemPromptCompiler>();
-        services.AddSingleton<IModelMapper, GeminiModelMapper>();
         services.AddSingleton<IJsonSchemaTranslator, GeminiJsonSchemaTranslator>();
         services.AddSingleton<ICredentialProvider>(new GeminiApiKeyCredentialProvider(apiKey));
         return services;
@@ -48,9 +47,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IToolSchemaTranslator, GeminiToolSchemaTranslator>();
         services.AddSingleton<ISystemPromptCompiler, GeminiSystemPromptCompiler>();
-        services.AddSingleton<IModelMapper, GeminiModelMapper>();
         services.AddSingleton<IJsonSchemaTranslator, GeminiJsonSchemaTranslator>();
-        services.AddSingleton<ICredentialProvider>(new VertexAICredentialProvider(project, location));
+        services.AddSingleton<ICredentialProvider>(new AgentPlatformCredentialProvider(project, location));
         return services;
     }
 }

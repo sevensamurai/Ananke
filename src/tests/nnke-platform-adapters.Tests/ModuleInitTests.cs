@@ -38,10 +38,10 @@ public sealed class ModuleInitTests
     // ── Factory registration ──────────────────────────────────────────────────
 
     [Test]
-    public void Azure_module_init_registers_azure_ai_factory()
+    public void Azure_module_init_registers_azure_factory()
     {
         FederationDeployerRegistry.RegisteredFactoryPlatforms
-            .ShouldContain("azure-ai", StringComparer.OrdinalIgnoreCase);
+            .ShouldContain("azure", StringComparer.OrdinalIgnoreCase);
     }
 
     [Test]
@@ -83,8 +83,10 @@ public sealed class ModuleInitTests
 
         FederationDeployerRegistry.MaterializeFactories(registry);
 
+        // Deliberately resolved by the legacy identifier: it is a permanent alias, and a
+        // deployment registered before the rename must still find its deployer.
         FederationDeployerRegistry.TryResolve("azure-ai", out var deployer).ShouldBeTrue();
-        deployer!.Platform.ShouldBe("azure-ai");
+        deployer!.Platform.ShouldBe("azure");
     }
 
     [Test]
@@ -133,26 +135,50 @@ public sealed class ModuleInitTests
     // ── Missing env vars ──────────────────────────────────────────────────────
 
     [Test]
-    public void Azure_factory_throws_when_endpoint_env_var_missing()
+    public void Azure_factory_failure_is_contained_and_reported()
     {
         FederationDeployerRegistry.Reset();
         Azure.ModuleInit.Initialize();
         Environment.SetEnvironmentVariable("AZURE_AI_ENDPOINT", null);
 
-        var registry = new InMemoryDeploymentRegistry();
-        Should.Throw<InvalidOperationException>(() =>
-            FederationDeployerRegistry.MaterializeFactories(registry));
+        AssertContained("azure", "AZURE_AI_ENDPOINT");
     }
 
     [Test]
-    public void Google_factory_throws_when_project_env_var_missing()
+    public void Google_factory_failure_is_contained_and_reported()
     {
         FederationDeployerRegistry.Reset();
         Google.ModuleInit.Initialize();
         Environment.SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", null);
 
+        AssertContained("vertex-ai", "GOOGLE_CLOUD_PROJECT");
+    }
+
+    /// <summary>
+    /// These two used to assert that <c>MaterializeFactories</c> <i>threw</i>. The factory still
+    /// does — it genuinely cannot construct a deployer without its configuration, and the message
+    /// naming the variable is the useful part. What changed is that materialization no longer lets
+    /// that escape.
+    /// </summary>
+    /// <remarks>
+    /// The inversion is deliberate and is not a weakening. While module initializers never fired, no
+    /// factory ran and the old contract was untestable in practice; the moment the probe was fixed,
+    /// a single unconfigured adapter crashed <b>every</b> command — <c>adapters doctor</c> included,
+    /// and commands aimed at other platforms included. Contained, not silenced: the platform does
+    /// not resolve, and the factory's own message reaches the caller.
+    /// </remarks>
+    private static void AssertContained(string platform, string expectedInMessage)
+    {
         var registry = new InMemoryDeploymentRegistry();
-        Should.Throw<InvalidOperationException>(() =>
-            FederationDeployerRegistry.MaterializeFactories(registry));
+        var failures = new List<(string Platform, Exception Error)>();
+
+        Should.NotThrow(() => FederationDeployerRegistry.MaterializeFactories(
+            registry, (p, e) => failures.Add((p, e))));
+
+        FederationDeployerRegistry.TryResolve(platform, out _).ShouldBeFalse();
+
+        var failure = failures.ShouldHaveSingleItem();
+        failure.Platform.ShouldBe(platform);
+        failure.Error.Message.ShouldContain(expectedInMessage);
     }
 }

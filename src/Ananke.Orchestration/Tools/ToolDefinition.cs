@@ -131,12 +131,18 @@ public sealed record ToolPrerequisite(string Name, Func<CancellationToken, Task<
 /// or enum-like parameters.
 /// </param>
 /// <param name="IsRequired">When <c>true</c>, the parameter is included in the JSON Schema <c>required</c> array.</param>
+/// <param name="Items">
+/// For an <c>"array"</c> parameter, the schema of one element — generated from a record type, so a
+/// model fills in fields rather than writing a string somebody has to parse. <see langword="null"/>
+/// for every scalar parameter.
+/// </param>
 public record ToolParameter(
     string Name,
     string Description,
     string JsonType = "string",
     IReadOnlyList<string>? Examples = null,
-    bool IsRequired = false);
+    bool IsRequired = false,
+    IReadOnlyDictionary<string, object>? Items = null);
 
 public record ToolDefinition
 {
@@ -161,7 +167,7 @@ public record ToolDefinition
 
     /// <summary>
     /// Platform-native capability identifier (e.g. <c>"code_execution"</c>,
-    /// <c>"web_search"</c>, <c>"vertex_extension:code_interpreter"</c>).
+    /// <c>"web_search"</c>, <c>"google_search"</c>).
     /// Only meaningful when <see cref="ExecutionMode"/> is
     /// <see cref="ToolExecutionMode.PlatformNative"/>.
     /// </summary>
@@ -219,6 +225,9 @@ public record ToolDefinition
 
                 if (param.Examples is { Count: > 0 })
                     prop["examples"] = param.Examples;
+
+                if (param.Items is { Count: > 0 })
+                    prop["items"] = param.Items;
 
                 properties[param.Name] = prop;
                 if (param.IsRequired)

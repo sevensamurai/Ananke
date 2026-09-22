@@ -20,7 +20,7 @@ public sealed record AdapterManifest
     };
 
     /// <summary>
-    /// Short machine-readable identifier for the adapter (e.g. <c>"azure-ai"</c>).
+    /// Short machine-readable identifier for the adapter (e.g. <c>"azure"</c>).
     /// Must match the platform identifier used in <see cref="Ananke.Federation.Deployment.FederationDeployerRegistry"/>.
     /// </summary>
     public required string Id { get; init; }

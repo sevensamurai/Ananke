@@ -42,9 +42,22 @@ public sealed class GeminiEmbeddingModel : IEmbeddingModel
     /// <param name="project">Google Cloud project ID.</param>
     /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
     /// <param name="model">Embedding model name (e.g. <c>"text-embedding-004"</c>).</param>
+    public static GeminiEmbeddingModel CreateAgentPlatform(
+        string project, string location, string model = "text-embedding-004") =>
+        // The SDK's own parameter is still called vertexAI; that name is Google's, not ours.
+        new(new Client(project: project, location: location, vertexAI: true), model);
+
+    /// <summary>
+    /// Creates a <see cref="GeminiEmbeddingModel"/> for Gemini Enterprise Agent Platform using
+    /// Application Default Credentials.
+    /// </summary>
+    /// <param name="project">Google Cloud project ID.</param>
+    /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
+    /// <param name="model">Embedding model name (e.g. <c>"text-embedding-004"</c>).</param>
+    [Obsolete("Vertex AI was renamed Gemini Enterprise Agent Platform; use CreateAgentPlatform instead.")]
     public static GeminiEmbeddingModel CreateVertexAI(
         string project, string location, string model = "text-embedding-004") =>
-        new(new Client(project: project, location: location, vertexAI: true), model);
+        CreateAgentPlatform(project, location, model);
 
     /// <inheritdoc />
     public async Task<ReadOnlyMemory<float>> EmbedAsync(string text, CancellationToken ct = default)

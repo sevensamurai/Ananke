@@ -12,6 +12,11 @@ decorator composition, and local/custom LLM endpoints.
 
 Any OpenAI-compatible endpoint works via the `endpoint` parameter:
 
+> **Connecting is the easy part.** A self-hosted model differs from a hosted one in ways the wire
+> protocol hides — the context window your server was launched with, zero cost dominating
+> `CheapestFit`, quantization, and structured-output requests that succeed while ignoring the schema.
+> [17 — Local & self-hosted models](17-local-models.md) covers all of it.
+
 ```csharp
 using Ananke.Orchestration.OpenAI;
 
@@ -155,6 +160,27 @@ Each retry attempt increments the `ananke.model.retry` counter (meter
 `Ananke.Orchestration.Tools`, tag `agent_id`) — see [10 — Observability](10-observability.md) for
 wiring metrics into an OTEL exporter. Pair it with `WithTrajectoryObserver` (below) to also
 surface the retry count on the completed episode's `TrajectorySnapshot.RetryCount`.
+
+### What is not retried, and why it needs saying
+
+**An account that has run out of allowance answers HTTP 429 exactly as a busy one does.** Retrying
+on the status code alone therefore spends every attempt against a wall that does not move — found
+live, at three round trips *per job* across a whole plan, with the sentence explaining it shown on
+the third attempt instead of the first.
+
+`TerminalProviderError.Is(exception)` is the classifier both retry loops now consult, and its order
+of questions is the design:
+
+| Question | Answer | Because |
+|---|---|---|
+| Did the provider state a delay? | **retry** | It classified its own error, and it did not say "never" |
+| Does the message name a window that moves — per minute, per day, a quota id? | **retry** | A free tier answers a per-minute limit in a depleted account's exact words |
+| Does it say the balance, credits or quota are gone? | **terminal** | Nothing moves without somebody paying |
+| Anything else | **retry** | Unchanged behaviour |
+
+**When in doubt it retries.** A wrong *terminal* ends a run that waiting would have rescued; a wrong
+*transient* costs two more calls. And when retries do run out, the exception carries the provider's
+own words rather than only a count of attempts — whatever records the failure keeps the message.
 
 ---
 

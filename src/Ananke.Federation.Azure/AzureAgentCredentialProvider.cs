@@ -25,7 +25,7 @@ public sealed class AzureAgentCredentialProvider : IFederationCredentialProvider
     }
 
     /// <inheritdoc />
-    public string Platform => "azure-ai";
+    public string Platform => "azure";
 
     /// <summary>The configured endpoint URI.</summary>
     public Uri Endpoint => _endpoint;

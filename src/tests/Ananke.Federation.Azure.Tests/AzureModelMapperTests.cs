@@ -63,7 +63,7 @@ public sealed class AzureModelMapperTests
     [Test]
     public void AzureAI_provider_passes_through()
     {
-        var result = _mapper.Map(new ModelDefinition { Provider = "azure-ai", Model = Models.OpenAI.Gpt54Mini });
+        var result = _mapper.Map(new ModelDefinition { Provider = "azure", Model = Models.OpenAI.Gpt54Mini });
         result.ShouldBe(Models.OpenAI.Gpt54Mini);
     }
 

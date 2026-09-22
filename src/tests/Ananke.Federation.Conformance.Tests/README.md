@@ -24,10 +24,10 @@ regressions are caught in CI rather than production.
 
 ```csharp
 [TestFixture]
-public sealed class VertexAIDeployerConformanceTests : FederationDeployerConformanceTests
+public sealed class AgentRuntimeDeployerConformanceTests : FederationDeployerConformanceTests
 {
     protected override IFederationDeployer CreateDeployer() =>
-        new VertexAIFederationDeployer(GetSandboxCredentials());
+        new AgentRuntimeFederationDeployer(GetSandboxCredentials());
 }
 ```
 
@@ -35,10 +35,10 @@ public sealed class VertexAIDeployerConformanceTests : FederationDeployerConform
 
 ```csharp
 [TestFixture]
-public sealed class VertexAIAgentClientConformanceTests : ManagedAgentClientConformanceTests
+public sealed class AgentRuntimeAgentClientConformanceTests : ManagedAgentClientConformanceTests
 {
     protected override IManagedAgentClient CreateClient() =>
-        new VertexAIAgentClient(GetSandboxCredentials());
+        new AgentRuntimeAgentClient(GetSandboxCredentials());
 
     protected override async Task<string> SeedDeploymentAsync(IManagedAgentClient client)
     {

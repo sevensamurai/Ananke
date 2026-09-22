@@ -28,7 +28,7 @@ detail to come back to.
 
 ## Dependencies
 
-- `Ananke.Federation.Google` (project) — `VertexAICredentialProvider`, `VertexAIDeployer`
+- `Ananke.Federation.Google` (project) — `AgentRuntimeCredentialProvider`, `AgentRuntimeDeployer`
 - `Ananke.Federation` (project) — `FederationDeployerRegistry`, `AdapterManifest`, `AnankePaths`
 
 ## Key Types
@@ -37,14 +37,14 @@ detail to come back to.
 |------|------|---------|--------|
 | `Program` | Entry point | Calls `AdapterInstaller.Run(args)` — the entire executable's job is install/uninstall | `src/nnke-platform-google/Program.cs` |
 | `AdapterInstaller` | Internal static class | Copies the build output into `AnankePaths.AdaptersDirectory` and writes `vertex-ai.adapter.json`; `--uninstall` removes both | `src/nnke-platform-google/AdapterInstaller.cs` |
-| `ModuleInit` | Internal static class | `[ModuleInitializer]` — runs when `nnke-platform` loads this DLL; registers a `"vertex-ai"` factory into `FederationDeployerRegistry` that builds a `VertexAICredentialProvider` (from `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION`) and a `VertexAIDeployer` | `src/nnke-platform-google/ModuleInit.cs` |
+| `ModuleInit` | Internal static class | `[ModuleInitializer]` — runs when `nnke-platform` loads this DLL; registers a `"vertex-ai"` factory into `FederationDeployerRegistry` that builds a `AgentRuntimeCredentialProvider` (from `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION`) and a `AgentRuntimeDeployer` | `src/nnke-platform-google/ModuleInit.cs` |
 
 ## Notes
 
 - Requires `GOOGLE_CLOUD_PROJECT` to be set before `nnke-platform deploy` runs —
   `ModuleInit` throws `InvalidOperationException` immediately if it is missing.
   `GOOGLE_CLOUD_LOCATION` defaults to `us-central1` if unset.
-- The `VertexAI*` class names (`VertexAICredentialProvider`, `VertexAIDeployer`) are
+- The `VertexAI*` class names (`AgentRuntimeCredentialProvider`, `AgentRuntimeDeployer`) are
   preserved for backwards compatibility after Google's rebrand to Gemini Enterprise
   Agent Platform — see `src/Ananke.Federation.Google/README.md`.
 - Structurally identical to `nnke-platform-anthropic` and `nnke-platform-azure` — only

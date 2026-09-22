@@ -12,7 +12,7 @@ namespace Ananke.Federation.Azure;
 public sealed class AzureModelMapper : IModelMapper
 {
     /// <inheritdoc />
-    public string Platform => "azure-ai";
+    public string Platform => "azure";
 
     // Provider/model → Azure model deployment name. Keys are "{provider}/{model}" lowercase.
     // Deprecated model constants are referenced on purpose: manifests written against a
@@ -37,7 +37,7 @@ public sealed class AzureModelMapper : IModelMapper
 
         // Anthropic → nearest Azure-hosted equivalent: no entries. The current-gen Anthropic
         // constants were never added here, so a manifest naming one falls through to Map()'s null.
-        // Open follow-up, same gap as VertexAIModelMapper.
+        // Open follow-up, same gap as AgentRuntimeModelMapper.
     };
 #pragma warning restore ANNKE001
 
@@ -53,7 +53,7 @@ public sealed class AzureModelMapper : IModelMapper
         // If provider is already openai or azure, pass through the model name
         if (string.Equals(model.Provider, "openai", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(model.Provider, "azure", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(model.Provider, "azure-ai", StringComparison.OrdinalIgnoreCase))
+            string.Equals(model.Provider, "azure-ai", StringComparison.OrdinalIgnoreCase)) // legacy spelling, still accepted
             return model.Model;
 
         return null;

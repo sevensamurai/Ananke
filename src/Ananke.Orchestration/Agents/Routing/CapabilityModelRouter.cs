@@ -11,7 +11,25 @@ namespace Ananke.Orchestration.Agents.Routing;
 /// </summary>
 public enum RoutingStrategy
 {
-    /// <summary>Cheapest model that meets requirements. Ties broken by speed (fastest wins).</summary>
+    /// <summary>
+    /// Cheapest model that meets requirements. Ties broken by speed (fastest wins).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A zero-cost profile dominates this strategy absolutely.</b> Local and self-hosted models
+    /// cost nothing to call, so a profile left at the default rates sorts ahead of every paid model
+    /// that also satisfies the requirements — and because the tie-break prefers speed, the
+    /// <i>smallest</i> free model wins among several. Adding one local model for privacy or for
+    /// development can therefore re-route work you expected a frontier model to handle.
+    /// </para>
+    /// <para>
+    /// The control is <see cref="TaskRequirements.MinIntelligenceTier"/>, which defaults to
+    /// <c>1</c> — set it, or give the small model a
+    /// <see cref="ModelProfile.IntelligenceTier"/> that reflects what it can actually be trusted
+    /// with. The router logs a one-time warning when this happens so it is visible rather than
+    /// silent, but it does not second-guess the strategy: cheapest means cheapest.
+    /// </para>
+    /// </remarks>
     CheapestFit,
 
     /// <summary>Fastest model that meets requirements. Ties broken by cost (cheapest wins).</summary>
@@ -119,7 +137,7 @@ public sealed record RoutingWeights
 ///     .Build();
 /// </code>
 /// </example>
-public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
+public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver, IModelContextResolver
 {
     private readonly List<ModelProfile> _profiles = [];
     private readonly RoutingStrategy _strategy;
@@ -127,12 +145,19 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
     private readonly Func<ModelProfile, decimal>? _scorer;
     private readonly ILogger _logger;
     private ModelProfile? _fallback;
+    private Func<ModelProfile, bool>? _policy;
 
     /// <summary>
     /// Model names already warned about for this process — avoids re-logging a deprecated
     /// model warning on every single routed request.
     /// </summary>
     private static readonly ConcurrentDictionary<string, byte> WarnedDeprecatedModels = new();
+
+    /// <summary>
+    /// Model names already warned about for displacing a paid candidate on price alone. Separate
+    /// ledger from <see cref="WarnedDeprecatedModels"/>, so one warning never suppresses the other.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, byte> WarnedZeroCostSelections = new();
 
     /// <summary>Creates a router with a built-in strategy (CheapestFit, FastestFit, or BestFit).</summary>
     /// <param name="strategy">The built-in selection strategy.</param>
@@ -175,9 +200,14 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
     /// <code>
     /// // Custom scorer: prefer large context windows, penalise cost
     /// var router = new CapabilityModelRouter(p =>
-    ///     p.MaxContextTokens / 100_000m - p.CostPer1KTokens * 2);
+    ///     p.ContextTokens / 100_000m - p.CostPer1KTokens * 2);
     /// </code>
     /// </example>
+    /// <remarks>
+    /// A scorer that weighs context should read <see cref="ModelProfile.ContextTokens"/> rather than
+    /// <see cref="ModelProfile.MaxContextTokens"/>, or it will rank a self-hosted model on a window
+    /// its server was never launched with.
+    /// </remarks>
     public CapabilityModelRouter(Func<ModelProfile, decimal> scorer, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(scorer);
@@ -205,11 +235,56 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
         return this;
     }
 
+    /// <summary>
+    /// Restricts routing to profiles satisfying <paramref name="policy"/>, applied before the
+    /// strategy ranks anything. Use it to express a deployment constraint that is not a capability
+    /// — "only OSI-approved open weights", "only models we can self-host".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the difference between <i>cheapest</i> and <i>cheapest compliant</i>. A policy is a
+    /// rule about which models are permissible at all, so it filters candidates rather than scoring
+    /// them: no strategy can trade a policy away against price or speed.
+    /// </para>
+    /// <para>
+    /// <b>The fallback is exempt, deliberately.</b> A fallback exists to answer a request nothing
+    /// else can, and silently applying a policy to it would turn a policy violation into an
+    /// unexplained "no model satisfies" error. If the fallback must also be constrained, do not set
+    /// one.
+    /// </para>
+    /// <para>
+    /// Pairs with <see cref="ModelClassification"/>, which supplies the facts most policies are
+    /// written against.
+    /// </para>
+    /// </remarks>
+    /// <param name="policy">Returns <see langword="true"/> for a profile routing may select.</param>
+    /// <example>
+    /// <code>
+    /// router.WithPolicy(p =&gt; p.Classification.Weights == ModelWeights.OpenWeights
+    ///                      &amp;&amp; p.Classification.LicenseIsOsiApproved);
+    /// </code>
+    /// </example>
+    public CapabilityModelRouter WithPolicy(Func<ModelProfile, bool> policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        _policy = policy;
+        return this;
+    }
+
     /// <inheritdoc />
     public IAgentModel Select(AgentRequest request) => SelectProfile(request).Model;
 
     /// <inheritdoc />
     public ModelCostRates ResolveCostRates(AgentRequest request) => SelectProfile(request).GetCostRates();
+
+    /// <inheritdoc />
+    public ModelContextWindow ResolveContextWindow(AgentRequest request)
+    {
+        var profile = SelectProfile(request);
+        // ContextTokens, not MaxContextTokens: a locally served model is measured by the window its
+        // server was actually launched with, not by what its weights allow.
+        return new ModelContextWindow(profile.Name, profile.ContextTokens);
+    }
 
     /// <summary>Wraps this router as an <see cref="IAgentModel"/> for use in <c>AgentJob</c>.</summary>
     public IAgentModel ToAgentModel() => new RoutedAgentModel(this);
@@ -219,7 +294,8 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
         ArgumentNullException.ThrowIfNull(request);
 
         var requirements = TaskRequirements.InferFrom(request);
-        var candidates = _profiles.Where(p => p.Satisfies(requirements)).ToList();
+        var permitted = _policy is null ? _profiles : _profiles.Where(_policy);
+        var candidates = permitted.Where(p => p.Satisfies(requirements)).ToList();
 
         ModelProfile selected;
         if (candidates.Count == 0)
@@ -257,6 +333,7 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
         }
 
         WarnIfDeprecated(selected);
+        WarnIfZeroCostDisplacedAPaidModel(selected, candidates);
         return selected;
     }
 
@@ -279,5 +356,51 @@ public sealed class CapabilityModelRouter : IModelRouter, IModelCostResolver
                 profile.Name, replacement);
         else
             _logger.LogWarning("Routed to deprecated model '{Model}'.", profile.Name);
+    }
+
+    /// <summary>
+    /// Logs a warning the first time this process lets a free, lowest-tier model win on price over
+    /// a paid model that was equally eligible. Once per model name, like the deprecation warning.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Every clause of the condition is doing work.</b> Only
+    /// <see cref="RoutingStrategy.CheapestFit"/> orders on price, so it is the only strategy where
+    /// free is unbeatable by construction — <see cref="RoutingStrategy.FastestFit"/> and
+    /// <see cref="RoutingStrategy.BestFit"/> rank on something else, and the weighted and custom
+    /// strategies score by a formula the caller wrote and presumably meant. The selected model must
+    /// actually be free, and at <see cref="ModelProfile.IntelligenceTier"/> <c>1</c>: a free model
+    /// the caller has rated higher is a considered judgement, not an accident of pricing.
+    /// </para>
+    /// <para>
+    /// <b>And it must have displaced something.</b> Warning when the free model was the only
+    /// candidate would fire on every request in a purely local setup — noise that teaches people to
+    /// filter the channel, which would cost more than this warning is worth. There is no hazard
+    /// unless a paid alternative was passed over.
+    /// </para>
+    /// </remarks>
+    /// <param name="selected">The profile routing chose.</param>
+    /// <param name="candidates">Every profile that satisfied the request's requirements.</param>
+    private void WarnIfZeroCostDisplacedAPaidModel(ModelProfile selected, List<ModelProfile> candidates)
+    {
+        if (_strategy != RoutingStrategy.CheapestFit)
+            return;
+
+        if (selected.IntelligenceTier != 1 || selected.CostPer1KTokens != 0)
+            return;
+
+        if (!candidates.Any(c => c.CostPer1KTokens > 0))
+            return;
+
+        if (!WarnedZeroCostSelections.TryAdd(selected.Name, 0))
+            return;
+
+        _logger.LogWarning(
+            "Routed to '{Model}' because it is free, over {DisplacedCount} paid model(s) that also "
+            + "met the requirements. CheapestFit ranks on price, so a zero-cost profile wins every "
+            + "time it qualifies. Raise TaskRequirements.MinIntelligenceTier, or give the profile an "
+            + "IntelligenceTier that reflects what it can be trusted with.",
+            selected.Name,
+            candidates.Count(c => c.CostPer1KTokens > 0));
     }
 }

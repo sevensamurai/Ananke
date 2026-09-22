@@ -205,6 +205,32 @@ foreach (var entry in entries)
 
 ---
 
+## Local embedding models
+
+`OpenAIEmbeddingModel` takes an `endpoint`, so an Ollama or vLLM server serves embeddings the same way
+it serves chat:
+
+```csharp
+var embeddingModel = OpenAIEmbeddingModel.Create(
+    apiKey: "no-key-required",
+    model: "nomic-embed-text",
+    endpoint: new Uri("http://model-host:11434/v1"));
+```
+
+For a knowledge base this is often a stronger privacy argument than it is for chat — the documents
+you ingest are the private material, and they never leave the host.
+
+Two consequences to plan for before you ingest anything:
+
+- **Vector size must match the model.** Local embedders commonly emit 768 or 1024 dimensions against
+  OpenAI's 1536. A Qdrant collection is created with a fixed vector size, so a mismatch is a
+  collection you have to recreate, not a setting you can change.
+- **Changing embedder invalidates the store.** Vectors produced by different models are not
+  comparable, and nothing re-embeds silently on your behalf. Switching embedder means re-ingesting
+  the corpus — including switching between a local model and a hosted one.
+
+See [17 — Local & self-hosted models](17-local-models.md) for the rest of the self-hosting picture.
+
 ## Persistent Store — Qdrant
 
 For production, use Qdrant for persistent, distributed vector storage:

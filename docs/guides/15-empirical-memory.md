@@ -353,6 +353,5 @@ builder.Services.AddOpenTelemetry()
 **Also see:**
 - [EntityMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/EntityMemoryDemo) — per-entity memory isolation; same workflow, different empirical + knowledge stores per customer
 - [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) — OpenClaw skill pipeline and UCB-based adaptive routing evolution in isolation
-- [SelfImprovingWorkflowDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/SelfImprovingWorkflowDemo) — a workflow that records its own performance and uses empirical memory to refine its strategy across runs
 
 ← [Learning Path](../learning-path.md)

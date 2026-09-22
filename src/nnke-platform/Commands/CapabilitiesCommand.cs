@@ -41,6 +41,10 @@ internal static class CapabilitiesCommand
 
         if (platform is not null)
         {
+            // This command loads platform-capabilities.json itself rather than going through
+            // PlatformCapabilities, so it needs the alias resolution explicitly.
+            platform = PlatformIdentifiers.Resolve(platform);
+
             if (!data.TryGetValue(platform, out var caps))
             {
                 if (json)

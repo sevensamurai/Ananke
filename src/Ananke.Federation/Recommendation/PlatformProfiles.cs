@@ -15,8 +15,44 @@ internal static class PlatformProfiles
     public static PlatformProfile? Get(string canonicalPlatform) =>
         _data.Value.TryGetValue(canonicalPlatform, out var p) ? p : null;
 
-    /// <summary>All canonical platform identifiers present in <c>platform-profiles.json</c>.</summary>
+    /// <summary>
+    /// Every key <see cref="Get"/> accepts — canonical identifiers <b>and</b> their declared
+    /// aliases, because <see cref="Load"/> registers a profile under both.
+    /// </summary>
+    /// <remarks>
+    /// This is a lookup-key set, not a platform list: with two aliases declared it returns six
+    /// entries for three platforms. For the canonical identifiers alone use
+    /// <see cref="CanonicalPlatforms"/> — reading aliases back as platforms is how
+    /// <c>PlatformIdentifiers</c> first mapped every alias to itself.
+    /// </remarks>
     public static IReadOnlyCollection<string> KnownPlatforms => (IReadOnlyCollection<string>)_data.Value.Keys;
+
+    /// <summary>
+    /// The canonical platform identifiers declared as top-level keys in
+    /// <c>platform-profiles.json</c>, excluding aliases.
+    /// </summary>
+    public static IReadOnlySet<string> CanonicalPlatforms => _canonical.Value;
+
+    private static readonly Lazy<IReadOnlySet<string>> _canonical = new(LoadCanonical, LazyThreadSafetyMode.PublicationOnly);
+
+    private static IReadOnlySet<string> LoadCanonical()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var assembly = typeof(PlatformProfiles).Assembly;
+        using var stream = assembly.GetManifestResourceStream("Ananke.Federation.Recommendation.platform-profiles.json");
+        if (stream is null)
+            return result;
+
+        using var doc = JsonDocument.Parse(stream);
+        if (!doc.RootElement.TryGetProperty("platforms", out var platforms))
+            return result;
+
+        foreach (var platform in platforms.EnumerateObject())
+            result.Add(platform.Name);
+
+        return result;
+    }
 
     // ── internals ────────────────────────────────────────────────────
 

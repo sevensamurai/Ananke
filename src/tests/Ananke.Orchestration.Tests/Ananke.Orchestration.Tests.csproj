@@ -46,6 +46,7 @@
     <ProjectReference Include="..\..\Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Conformance.NUnit\Ananke.Orchestration.Conformance.NUnit.csproj" />
   </ItemGroup>
 
   <ItemGroup>

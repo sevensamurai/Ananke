@@ -35,11 +35,11 @@ internal abstract record ConnectionLine
     internal sealed record SubFlow(string Name) : ConnectionLine;
 
     /// <summary><c>interrupt(name)</c> — pauses execution before the named job.</summary>
-    internal sealed record Interrupt(string JobName) : ConnectionLine;
+    internal sealed record Interrupt(string JobName, bool Conditional = false) : ConnectionLine;
 
     /// <summary>
     /// <c>ask(name)</c> — marks a job as a free-text, input-collecting turn: pauses before
     /// the job (like <see cref="Interrupt"/>) plus a contract that resume injects the user's reply.
     /// </summary>
-    internal sealed record Ask(string JobName) : ConnectionLine;
+    internal sealed record Ask(string JobName, bool Conditional = false) : ConnectionLine;
 }

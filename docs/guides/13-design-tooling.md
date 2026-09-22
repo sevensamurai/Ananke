@@ -4,7 +4,7 @@
 Define workflow topologies in a text DSL or YAML manifest, bind code at runtime,
 and export validated graphs as Mermaid diagrams.
 
-**Demo:** [DesignPipelineDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/DesignPipelineDemo)
+**Demo:** [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) — its ingestion workflow loads an `.ananke.yml` manifest, parses the topology with `WorkflowScaffold.Parse`, and binds each job in code.
 
 → **Full DSL reference:** [Workflow DSL Reference](../reference/workflow-dsl.md)
 

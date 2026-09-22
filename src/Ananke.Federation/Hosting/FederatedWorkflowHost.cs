@@ -34,7 +34,7 @@ public sealed class FederatedWorkflowHost : IWorkflowHost
     /// </summary>
     /// <param name="localHost">The local (in-process) host for cells that don't route to a platform.</param>
     /// <param name="platformHosts">
-    /// Platform-specific hosts keyed by platform identifier (e.g. <c>"azure-ai"</c>).
+    /// Platform-specific hosts keyed by platform identifier (e.g. <c>"azure"</c>).
     /// </param>
     /// <param name="router">Hybrid router that determines where each cell should run.</param>
     /// <param name="allowFallbackToLocal">

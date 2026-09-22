@@ -438,4 +438,219 @@ public class WorkflowManifestTests
 
         manifest.Profiles.ShouldBeEmpty();
     }
+
+    // ── Flow mappings in models: (L3) ────────────────────────────────
+
+    /// <summary>
+    /// Before L3 a flow-mapped alias was dropped entirely, so every job referencing it reported
+    /// <c>FED011</c> "model alias not defined" about an alias plainly present in the file. Five of
+    /// the reference manifests in this repository failed this way.
+    /// </summary>
+    [Test]
+    public void Parse_ModelFlowMapping_DeclaresTheAlias()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  coder:    { ref: devstral2 }",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models.ShouldContainKey("coder");
+        manifest.Models["coder"].Ref.ShouldBe("devstral2");
+    }
+
+    [Test]
+    public void Parse_ModelFlowMapping_ReadsMultipleFields()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  local: { provider: openai, model: devstral2:latest, endpoint: http://localhost:11434/v1 }",
+            "jobs:",
+            "connections:",
+        ]);
+
+        var model = manifest.Models["local"];
+        model.Provider.ShouldBe("openai");
+        model.Model.ShouldBe("devstral2:latest");
+        model.Endpoint.ShouldBe("http://localhost:11434/v1");
+    }
+
+    /// <summary>
+    /// Aliases in real manifests are routinely annotated, and a comment that lands inside the value
+    /// is the same silent-corruption shape the flow mapping itself had.
+    /// </summary>
+    [Test]
+    public void Parse_ModelFlowMapping_StripsTrailingComment()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  escalation: { ref: opus }     # used via `ask_opus`, not as a primary model",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["escalation"].Ref.ShouldBe("opus");
+    }
+
+    [Test]
+    public void Parse_ModelBlockForm_ReadsRefAndStripsTrailingComment()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  router:",
+            "    ref: devstral2        # resolved from roles.ananke.yml",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["router"].Ref.ShouldBe("devstral2");
+    }
+
+    /// <summary>
+    /// A comment marker only starts a comment where it follows whitespace, so a URL fragment
+    /// survives.
+    /// </summary>
+    [Test]
+    public void Parse_ModelEndpoint_KeepsAHashThatIsNotAComment()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  m:",
+            "    endpoint: http://localhost:11434/v1#frag",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["m"].Endpoint.ShouldBe("http://localhost:11434/v1#frag");
+    }
+
+    /// <summary>
+    /// Flow mappings stay scoped to <c>models:</c>. This pins that a following block-form alias is
+    /// still read — i.e. the flow branch does not leave a stale current block behind.
+    /// </summary>
+    [Test]
+    public void Parse_FlowMapping_DoesNotSwallowTheNextAlias()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  a: { ref: x }",
+            "  b:",
+            "    provider: anthropic",
+            "    model: claude-opus-4",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["a"].Ref.ShouldBe("x");
+        manifest.Models["b"].Ref.ShouldBeNull();
+        manifest.Models["b"].Provider.ShouldBe("anthropic");
+    }
+
+    /// <summary>
+    /// An alias with no <c>ref</c> must not gain one — <see cref="ModelDefinition.Ref"/> being null
+    /// is what lets the validator tell a declared model from an unresolved reference.
+    /// </summary>
+    [Test]
+    public void Parse_OrdinaryModel_HasNoRef()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  m:",
+            "    provider: openai",
+            "    model: gpt-5.6-terra",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["m"].Ref.ShouldBeNull();
+    }
+
+    // ── temperature is a model field ─────────────────
+
+    [Test]
+    public void Parse_ModelTemperature_IsRead()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  devstral2:",
+            "    provider: openai",
+            "    model: devstral2:latest",
+            "    temperature: 0",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["devstral2"].Temperature.ShouldBe(0d);
+    }
+
+    [Test]
+    public void Parse_ModelTemperature_InAFlowMapping()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  warm: { provider: openai, model: gpt-5.6-terra, temperature: 0.7 }",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["warm"].Temperature.ShouldBe(0.7d);
+    }
+
+    /// <summary>
+    /// Unset must stay distinguishable from <c>0</c>, or every model silently pins a temperature
+    /// nobody chose.
+    /// </summary>
+    [Test]
+    public void Parse_ModelWithoutTemperature_LeavesItUnset()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  m:",
+            "    provider: openai",
+            "jobs:",
+            "connections:",
+        ]);
+
+        manifest.Models["m"].Temperature.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// Decimal temperatures must not depend on the host's locale — a comma-decimal culture would
+    /// otherwise read <c>0.7</c> as <c>7</c>.
+    /// </summary>
+    [Test]
+    public void Parse_ModelTemperature_IsCultureInvariant()
+    {
+        var original = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture =
+                new System.Globalization.CultureInfo("de-DE");
+
+            var manifest = WorkflowManifest.Parse([
+                "name: test",
+                "models:",
+                "  m: { temperature: 0.7 }",
+                "jobs:",
+                "connections:",
+            ]);
+
+            manifest.Models["m"].Temperature.ShouldBe(0.7d);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = original;
+        }
+    }
 }

@@ -33,6 +33,19 @@ public sealed class ToolArgs
     }
 
     /// <summary>
+    /// Gets a string argument by name, or <paramref name="fallback"/> when the model did not supply
+    /// one.
+    /// </summary>
+    /// <remarks>
+    /// <b>The reader for a parameter declared <c>required: false</c>.</b> Without it the builder can
+    /// describe an optional argument that nothing is able to read — <see cref="Get(string)"/> throws
+    /// on precisely the case the declaration exists to allow, and the tool call fails with a message
+    /// about a missing required argument that was never required.
+    /// </remarks>
+    public string? GetOrDefault(string name, string? fallback = null) =>
+        _args.TryGetValue(name, out var value) && value is not null ? Get(name) : fallback;
+
+    /// <summary>
     /// Gets a typed argument by name. <see cref="JsonElement"/> values are deserialized
     /// via <see cref="JsonSerializer"/>; other values are cast or converted via
     /// <see cref="Convert.ChangeType(object, Type, IFormatProvider)"/>.

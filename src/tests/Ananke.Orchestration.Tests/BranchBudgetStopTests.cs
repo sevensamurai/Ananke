@@ -8,7 +8,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// ADR-arch-028 D11/D13: the budget must bind inside fork branches, not only on the main path.
+/// the budget must bind inside fork branches, not only on the main path.
 /// It matters most since D4 made loops work in branches — a cycle inside one would otherwise
 /// spend with no check ever running, which is precisely the runaway a guardrail exists for.
 /// </summary>

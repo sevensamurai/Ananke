@@ -210,16 +210,8 @@ public sealed class PlatformRecommender : IPlatformRecommender
         return PlatformCapabilities.KnownPlatforms.ToList();
     }
 
-    private static string ResolveAlias(string platform)
-    {
-        // Use the same alias map as DeployabilityValidator
-        return platform.ToLowerInvariant() switch
-        {
-            "foundry" => "azure-ai",
-            "gemini-enterprise" => "vertex-ai",
-            _ => platform
-        };
-    }
+    private static string ResolveAlias(string platform) =>
+        PlatformIdentifiers.Resolve(platform);
 
     private static PlatformFitScore ScorePlatform(
         string platform,
@@ -277,7 +269,17 @@ public sealed class PlatformRecommender : IPlatformRecommender
         ToolKit toolKit,
         List<FitReason> reasons)
     {
-        var platformCaps = PlatformCapabilities.GetForPlatform(platform);
+        // An unrecognised platform must not score as "declares no capabilities" — that reads as a
+        // real zero rather than an absence, which is exactly how a renamed identifier hides.
+        if (!PlatformCapabilities.TryGetForPlatform(platform, out var platformCaps))
+        {
+            reasons.Add(new FitReason
+            {
+                Kind = FitReasonKind.Block,
+                Message = $"Platform '{platform}' is not recognized, so its capabilities are unknown.",
+            });
+            return 0.0;
+        }
 
         // Identify required platform-native capabilities
         var required = toolKit.Tools.Values

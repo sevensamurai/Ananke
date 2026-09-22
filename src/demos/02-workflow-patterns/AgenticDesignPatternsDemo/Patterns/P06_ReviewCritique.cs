@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
@@ -13,7 +14,7 @@ internal static class P06_ReviewCritique
         var iteration = 0;
 
         var generator = AgentJobFactory.Create<ArticleState, ArticleGenResponse>("generator",
-                SimulatedModel.Json(new ArticleGenResponse { Draft = "AI agents can autonomously perform tasks." }))
+                SimulatedAgentModel.Json(new ArticleGenResponse { Draft = "AI agents can autonomously perform tasks." }))
             .WithPrompt(s => $"Write an article about: {s.Topic}. Current draft: {s.Draft}")
             .MapResult((s, r) =>
             {
@@ -23,7 +24,7 @@ internal static class P06_ReviewCritique
             .Build();
 
         var critic = AgentJobFactory.Create<ArticleState, ArticleCritiqueResponse>("critic",
-                SimulatedModel.Json(new ArticleCritiqueResponse { Score = 0.0, Feedback = "Needs more depth." }))
+                SimulatedAgentModel.Json(new ArticleCritiqueResponse { Score = 0.0, Feedback = "Needs more depth." }))
             .WithPrompt(s => $"Critique this draft (0-1 score): {s.Draft}")
             .MapResult((s, r) =>
             {

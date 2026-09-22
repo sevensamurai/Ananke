@@ -52,7 +52,7 @@ public sealed class PlatformNativeExecutorRegistry
     /// Registers an executor scoped to a specific platform. Takes priority over the
     /// platform-agnostic registration when resolving for that platform.
     /// </summary>
-    /// <param name="platform">Platform identifier (e.g. <c>"azure-ai"</c>).</param>
+    /// <param name="platform">Platform identifier (e.g. <c>"azure"</c>).</param>
     /// <param name="executor">The executor to register.</param>
     /// <returns>This registry for fluent chaining.</returns>
     public PlatformNativeExecutorRegistry RegisterForPlatform(string platform, IPlatformNativeExecutor executor)

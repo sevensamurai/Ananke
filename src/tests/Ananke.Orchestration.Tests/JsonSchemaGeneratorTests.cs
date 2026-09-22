@@ -5,6 +5,7 @@ using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Agents.Routing;
+using Ananke.Orchestration.Planning;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -38,10 +39,44 @@ public class JsonSchemaGeneratorTests
         ((string)((Dictionary<string, object>)props["Flag"])["type"]).ShouldBe("boolean");
     }
 
+    // ── Derived properties ───────────────────────────────────────────────────
+    // Every property that is emitted is also marked required, so a computed one that cannot be set
+    // is demanded from the model and can only be satisfied by declining to answer at all.
+
+    [Test]
+    public void Generate_ADerivedProperty_IsNeitherEmittedNorRequired()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(Operation));
+
+        var properties = (Dictionary<string, object>)schema["properties"];
+        var required = (List<string>)schema["required"];
+
+        properties.ShouldNotContainKey(nameof(Operation.IsNamed));
+        required.ShouldNotContain(nameof(Operation.IsNamed));
+    }
+
+    // ── Described properties ─────────────────────────────────────────────────
+    // A field explained only in the prompt competes with everything else there and drifts from the
+    // type. The schema is applied on every call, so the meaning of a step's answer lives there.
+
+    [Test]
+    public void Generate_TheReportAStepAnswersWith_DescribesEveryField()
+    {
+        var report = (Dictionary<string, object>)
+            JsonSchemaGenerator.GenerateForType(typeof(PlanNodeReport))["properties"];
+        var operation = (Dictionary<string, object>)
+            JsonSchemaGenerator.GenerateForType(typeof(Operation))["properties"];
+
+        foreach (var (name, schema) in report.Concat(operation))
+        {
+            ((Dictionary<string, object>)schema).ShouldContainKey(
+                "description", $"{name} reaches the model with no meaning attached");
+        }
+    }
+
     // ── Nullable types ───────────────────────────────────────────────────────
-    // Note: nullable reference types (string?, MyClass?) cannot be distinguished
-    // from their non-nullable equivalents at runtime via Nullable.GetUnderlyingType.
-    // Only nullable value types (int?, bool?, etc.) carry the Nullable<T> wrapper.
+    // A nullable value type carries the Nullable<T> wrapper; a nullable reference type carries only
+    // an annotation, which NullabilityInfoContext reads off the property.
 
     private record Nullables
     {
@@ -131,12 +166,78 @@ public class JsonSchemaGeneratorTests
         var schema = JsonSchemaGenerator.GenerateForType(typeof(WithDates));
         var props = (Dictionary<string, object>)schema["properties"];
 
-        foreach (var key in new[] { "CreatedAt", "UpdatedAt", "BirthDate" })
+        foreach (var key in new[] { "CreatedAt", "UpdatedAt" })
         {
             var propSchema = (Dictionary<string, object>)props[key];
             ((string)propSchema["type"]).ShouldBe("string");
             ((string)propSchema["format"]).ShouldBe("date-time");
         }
+    }
+
+    [Test]
+    public void Generate_ADateOnlyProperty_IsADateRatherThanAnInstant()
+    {
+        // A model answering a date-time for a day writes a timestamp, and a DateOnly will not parse
+        // one back.
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(WithDates));
+        var props = (Dictionary<string, object>)schema["properties"];
+        var birthDate = (Dictionary<string, object>)props["BirthDate"];
+
+        ((string)birthDate["type"]).ShouldBe("string");
+        ((string)birthDate["format"]).ShouldBe("date");
+    }
+
+    // ── What a field means ────────────────────────────────────────────────
+
+    private record Described
+    {
+        // Fully qualified: NUnit has a Description attribute of its own, for naming a test.
+        [System.ComponentModel.Description("Every option the step found, best first.")]
+        public string Options { get; init; } = string.Empty;
+
+        public string Plain { get; init; } = string.Empty;
+    }
+
+    [Test]
+    public void Generate_ADescribedProperty_CarriesItsDescription()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(Described));
+        var props = (Dictionary<string, object>)schema["properties"];
+
+        ((string)((Dictionary<string, object>)props["Options"])["description"])
+            .ShouldBe("Every option the step found, best first.");
+    }
+
+    [Test]
+    public void Generate_APropertyWithNoDescription_CarriesNone() =>
+        ((Dictionary<string, object>)((Dictionary<string, object>)
+                JsonSchemaGenerator.GenerateForType(typeof(Described))["properties"])["Plain"])
+            .ShouldNotContainKey("description");
+
+    // ── Nullable reference types ──────────────────────────────────────────
+
+    private record MaybeText
+    {
+        public string? Said { get; init; }
+        public string Asked { get; init; } = string.Empty;
+    }
+
+    [Test]
+    public void Generate_ANullableReferenceProperty_IncludesNullType()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(MaybeText));
+        var props = (Dictionary<string, object>)schema["properties"];
+
+        ((string[])((Dictionary<string, object>)props["Said"])["type"]).ShouldBe(["string", "null"]);
+    }
+
+    [Test]
+    public void Generate_ANonNullableReferenceProperty_IsUnchanged()
+    {
+        var schema = JsonSchemaGenerator.GenerateForType(typeof(MaybeText));
+        var props = (Dictionary<string, object>)schema["properties"];
+
+        ((string)((Dictionary<string, object>)props["Asked"])["type"]).ShouldBe("string");
     }
 
     // ── Nested object ─────────────────────────────────────────────────────────

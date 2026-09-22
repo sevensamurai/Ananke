@@ -62,7 +62,7 @@ public abstract class PlatformWorkflowHostBase : IWorkflowHost
         _logger = logger ?? NullLogger.Instance;
     }
 
-    /// <summary>Platform identifier (e.g. <c>"azure-ai"</c>). Used to build <see cref="DeployOptions"/>.</summary>
+    /// <summary>Platform identifier (e.g. <c>"azure"</c>). Used to build <see cref="DeployOptions"/>.</summary>
     protected abstract string Platform { get; }
 
     /// <summary>

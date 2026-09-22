@@ -6,7 +6,7 @@ namespace Ananke.Orchestration.Budget;
 /// <remarks>
 /// A budget exists to stop a spike or a buggy workflow from producing an unexpected bill.
 /// It is a guardrail, not cost accounting, and deliberately binds approximately — see
-/// ADR-arch-028 Part C.
+///
 /// </remarks>
 public enum BudgetMode
 {

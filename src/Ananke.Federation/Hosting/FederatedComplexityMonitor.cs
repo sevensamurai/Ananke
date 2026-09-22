@@ -1,6 +1,7 @@
 using Ananke.Design;
 using Ananke.Federation.Deployment;
 using Ananke.Federation.Monitoring;
+using Ananke.Federation.Validation;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Workflows;
 using Ananke.Organics.Division;
@@ -110,8 +111,11 @@ public sealed class FederatedComplexityMonitor : IHealthMonitor, IRemoteCellSour
     {
         var (toolCount, jobCount) = GetStructuralMetrics(workflowName);
 
+        // Both sides are resolved: the record's identifier was persisted at deploy time and may
+        // predate a rename, while the monitor reports whatever this build calls the platform.
+        var deployedPlatform = PlatformIdentifiers.Resolve(deployment.Platform);
         var monitor = _remoteMonitors.FirstOrDefault(m =>
-            string.Equals(m.Platform, deployment.Platform, StringComparison.OrdinalIgnoreCase));
+            string.Equals(PlatformIdentifiers.Resolve(m.Platform), deployedPlatform, StringComparison.OrdinalIgnoreCase));
 
         float avgLatencyMs = 0f;
         decimal avgCost = 0m;

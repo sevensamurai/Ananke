@@ -67,7 +67,7 @@ public class ContextStrategyTests
         var strategy = new SlidingWindowContextStrategy(maxTokens: 1000);
         var messages = MakeMessages(3);
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.ShouldBeSameAs(messages);
     }
@@ -78,7 +78,7 @@ public class ContextStrategyTests
         var strategy = new SlidingWindowContextStrategy(maxTokens: 100);
         IReadOnlyList<AgentMessage> messages = [];
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(0);
     }
@@ -99,7 +99,7 @@ public class ContextStrategyTests
 
         // Budget: 200 tokens — can only fit last 2 messages
         var strategy = new SlidingWindowContextStrategy(maxTokens: 200);
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(2);
         result[^1].Content.ShouldBe("current question");
@@ -115,7 +115,7 @@ public class ContextStrategyTests
         };
 
         var strategy = new SlidingWindowContextStrategy(maxTokens: 50);
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(1);
         result[0].Content.ShouldBe("must keep");
@@ -136,7 +136,7 @@ public class ContextStrategyTests
 
         // Budget: 250 tokens. System prompt takes ~100, leaving ~150 for messages
         var strategy = new SlidingWindowContextStrategy(maxTokens: 250);
-        var result = await strategy.ApplyAsync(messages, systemPrompt);
+        var result = (await strategy.ApplyAsync(messages, systemPrompt, ContextBudget.Unspecified)).Messages;
 
         // Should drop oldest to fit within budget
         result.Count.ShouldBeLessThan(3);
@@ -154,7 +154,7 @@ public class ContextStrategyTests
         };
 
         var strategy = new SlidingWindowContextStrategy(maxTokens: 100);
-        var result = await strategy.ApplyAsync(messages, systemPrompt);
+        var result = (await strategy.ApplyAsync(messages, systemPrompt, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(1);
         result[0].Content.ShouldBe("latest");
@@ -178,7 +178,7 @@ public class ContextStrategyTests
         var strategy = new SummarizingContextStrategy(summarizer, thresholdTokens: 10000);
         var messages = MakeMessages(3);
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.ShouldBeSameAs(messages);
         summarizer.CallCount.ShouldBe(0);
@@ -192,7 +192,7 @@ public class ContextStrategyTests
         var strategy = new SummarizingContextStrategy(summarizer, thresholdTokens: 1);
         var messages = MakeMessages(3);
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.ShouldBeSameAs(messages);
         summarizer.CallCount.ShouldBe(0);
@@ -217,7 +217,7 @@ public class ContextStrategyTests
             AgentMessage.User("recent 2"),
         };
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         // 1 summary + 2 recent
         result.Count.ShouldBe(3);
@@ -242,7 +242,7 @@ public class ContextStrategyTests
             AgentMessage.User("current question"),
         };
 
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         // The summary should contain "fact A" and "fact B" but not "current question"
         result[0].Content!.ShouldContain("fact A");
@@ -265,7 +265,7 @@ public class ContextStrategyTests
         };
 
         // With the large system prompt, total tokens should exceed threshold
-        var result = await strategy.ApplyAsync(messages, systemPrompt);
+        var result = (await strategy.ApplyAsync(messages, systemPrompt, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(2); // 1 summary + 1 recent
         summarizer.CallCount.ShouldBe(1);
@@ -354,7 +354,7 @@ public class ContextStrategyTests
         };
 
         // 3 messages × 100 = 300 > 250. Should drop first message.
-        var result = await strategy.ApplyAsync(messages, null);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
 
         result.Count.ShouldBe(2);
         result[0].Content.ShouldBe("b");

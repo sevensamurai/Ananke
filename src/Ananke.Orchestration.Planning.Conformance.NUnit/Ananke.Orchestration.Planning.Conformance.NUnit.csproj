@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Inherit-and-done NUnit fixtures over the plan-tier conformance contract. Separate from the
+       contract itself so that a consumer on another runner pays no NUnit dependency to use it. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <PackageId>Ananke.Orchestration.Planning.Conformance.NUnit</PackageId>
+    <Description>NUnit fixtures over Ananke.Orchestration.Planning.Conformance — inherit, supply the seam, done.</Description>
+    <PackageTags>ai;agents;conformance;contract-tests;planning;nunit</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration.Planning.Conformance\Ananke.Orchestration.Planning.Conformance.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Conformance\Ananke.Orchestration.Conformance.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Conformance.NUnit\Ananke.Orchestration.Conformance.NUnit.csproj" />
+  </ItemGroup>
+
+</Project>

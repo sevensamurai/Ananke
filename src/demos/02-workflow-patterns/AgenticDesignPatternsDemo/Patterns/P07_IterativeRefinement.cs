@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Orchestration;
 using Ananke.Orchestration.Agents;
@@ -12,7 +13,7 @@ internal static class P07_IterativeRefinement
 
         var round = 0;
         var refineAgent = AgentJobFactory.Create<RefinementState, RefinementResponse>("refine",
-                SimulatedModel.Json(new RefinementResponse { Output = "Refined output." }))
+                SimulatedAgentModel.Json(new RefinementResponse { Output = "Refined output." }))
             .WithPrompt(s => $"Improve this output: {s.Output}")
             .MapResult((s, r) =>
             {

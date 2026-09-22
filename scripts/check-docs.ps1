@@ -31,6 +31,14 @@
     file that contains it, matching normal Markdown link semantics. This catches the
     other half of doc drift: a cross-referenced file that was since renamed or moved.
 
+    A THIRD check runs in the opposite direction. The two above catch a doc naming
+    something that does not exist; they are blind to something existing that no doc
+    names, because absence has no token to flag -- it reads as silence. So
+    check-docs-required.txt lists names that MUST appear somewhere under docs/, and a
+    public type shipping undocumented is a gate failure rather than a review finding.
+    An iteration once landed eleven public plan-tier types and documented none of them,
+    with this script green throughout.
+
     This is NOT a semantic check. It does not verify signatures, namespaces, or that a
     type is used correctly -- only that the identifier or path exists. It is a fast
     first guard, not a substitute for review or compilation.
@@ -88,6 +96,7 @@
 param(
     [string[]] $Path,
     [string]   $IgnoreFile,
+    [string]   $RequiredFile,
     [switch]   $IncludeCodeBlocks,
     [switch]   $IncludeExamples,
     [switch]   $IncludeInternals,
@@ -108,7 +117,8 @@ $scanRoots = $Path | ForEach-Object {
     if ([System.IO.Path]::IsPathRooted($_)) { $_ } else { Join-Path $root $_ }
 } | Where-Object { Test-Path $_ }
 
-if (-not $IgnoreFile) { $IgnoreFile = Join-Path $scriptDir 'check-docs-ignore.txt' }
+if (-not $IgnoreFile)   { $IgnoreFile   = Join-Path $scriptDir 'check-docs-ignore.txt' }
+if (-not $RequiredFile) { $RequiredFile = Join-Path $scriptDir 'check-docs-required.txt' }
 
 # --- Token rules ------------------------------------------------------------------
 # Tokenizer splits identifiers out of code spans. A "candidate" type/API reference is
@@ -168,6 +178,19 @@ if (Test-Path $IgnoreFile) {
     }
 }
 
+# --- Load the required-name list ---------------------------------------------------
+# The ignore list's opposite. That one says "this name is fine even though the source
+# has never heard of it"; this one says "the source has this and some doc had better
+# say so". Only the second catches drift that leaves no trace to scan for.
+$required = [System.Collections.Generic.List[string]]::new()
+if (Test-Path $RequiredFile) {
+    foreach ($line in Get-Content $RequiredFile) {
+        $hashIndex = $line.IndexOf('#')
+        $t = if ($hashIndex -ge 0) { $line.Substring(0, $hashIndex).Trim() } else { $line.Trim() }
+        if ($t) { $required.Add($t) }
+    }
+}
+
 # --- Select Markdown files ---------------------------------------------------------
 # Build artefacts are never docs. Demos and PLAN-*.md ARE included here so their path
 # references get checked; identifier checking is suppressed for them below.
@@ -180,7 +203,9 @@ foreach ($r in $scanRoots) {
     $mdFiles += Get-ChildItem -Path $r -Recurse -Filter '*.md' -File |
         Where-Object { $_.FullName -notmatch $excludeDir }
 }
-$mdFiles = @($mdFiles | Sort-Object FullName -Unique)
+# CLAUDE.md is instructions for an agent session, not documentation of the code: it names
+# placeholder identifiers (ClassName, FeatureName) and a release-notes path template.
+$mdFiles = @($mdFiles | Where-Object { $_.Name -ne 'CLAUDE.md' } | Sort-Object FullName -Unique)
 
 # Identifier checking is suppressed on three kinds of file; path checking is not
 # suppressed anywhere, because a link that does not resolve is wrong in any file.
@@ -301,11 +326,28 @@ foreach ($f in $mdFiles) {
     }
 }
 
+# --- Required names ----------------------------------------------------------------
+# Raw text rather than the tokenizer: a required name may be dotted (PlanHaltCause.Blocked)
+# or may legitimately be documented in a fenced block, and this check asks only whether
+# the docs mention it at all.
+$missingRequired = [System.Collections.Generic.List[string]]::new()
+if ($required.Count -gt 0) {
+    $docsRoot = Join-Path $root 'docs'
+    if (Test-Path $docsRoot) {
+        $docsText = (Get-ChildItem -Path $docsRoot -Filter *.md -Recurse -File |
+                     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
+
+        foreach ($name in $required) {
+            if (-not $docsText.Contains($name)) { $missingRequired.Add($name) }
+        }
+    }
+}
+
 # --- Report ------------------------------------------------------------------------
 Write-Host ''
 Write-Host ("Scanned {0} Markdown files under: {1}" -f $mdCount, ($scanRoots -join ', '))
 
-if ($findings.Count -eq 0 -and $pathFindings.Count -eq 0) {
+if ($findings.Count -eq 0 -and $pathFindings.Count -eq 0 -and $missingRequired.Count -eq 0) {
     Write-Host 'No documentation drift found. [OK]' -ForegroundColor Green
     exit 0
 }
@@ -328,6 +370,21 @@ if ($findings.Count -gt 0) {
     Write-Host ''
     Write-Host 'If an identifier is a genuine external/planned name (not a code symbol), add it to:' -ForegroundColor DarkGray
     Write-Host ("  {0}" -f ($IgnoreFile.Substring($root.Length).TrimStart('\','/'))) -ForegroundColor DarkGray
+}
+
+if ($missingRequired.Count -gt 0) {
+    Write-Host ''
+    Write-Host ("Found {0} required name(s) that no doc under docs/ mentions:" -f $missingRequired.Count) -ForegroundColor Yellow
+    Write-Host '(each is a shipped name that is supposed to be documented - the drift no scan can see)' -ForegroundColor DarkGray
+    Write-Host ''
+
+    foreach ($name in ($missingRequired | Sort-Object)) {
+        Write-Host ("  {0}" -f $name) -ForegroundColor Red
+    }
+
+    Write-Host ''
+    Write-Host 'Document it, or drop it from:' -ForegroundColor DarkGray
+    Write-Host ("  {0}" -f ($RequiredFile.Substring($root.Length).TrimStart('\','/'))) -ForegroundColor DarkGray
 }
 
 if ($pathFindings.Count -gt 0) {

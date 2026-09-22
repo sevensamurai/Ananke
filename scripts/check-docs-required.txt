@@ -1,0 +1,51 @@
+# Names that MUST appear somewhere under docs/.
+#
+# The ignore list's opposite. That one excuses a doc for naming something the source has
+# never heard of; this one refuses to let the source carry something no doc mentions.
+# Only the second catches drift that leaves nothing to scan for: a type ships, no doc is
+# written, and a checker looking for stale names sees a clean run.
+#
+# It is deliberately NOT "every public type" — that would be a second, worse copy of the
+# API surface, wrong the moment anything is renamed, and it would make the gate a chore
+# rather than a signal. What belongs here is the vocabulary a *consumer* has to know to
+# use a tier at all. If you delete one of these types, delete its line.
+#
+# Matching is plain substring over docs/**/*.md, so a dotted name works.
+
+# ── The supervised plan tier ────────────────────────────────────────────────────
+# Added after an iteration landed all of these and documented none of them.
+AgentContract
+PlanTree
+PlanExecutor
+SupervisionOptions
+PlanSupervisor
+PlanDecision
+
+# What a halt can be, and the one that is not a failure
+NodeQuestion
+
+# Offering rather than deciding
+PlanAdvisor
+PlanAskingJob
+PlanChoiceJob
+PlanRefusal
+
+# Giving a step up
+AbandonAsync
+NodeLifecycle
+
+# The Planner leg
+PlanAuthor
+AuthoredPlan
+PlanAuthorJob
+
+# The review
+PlanReviewer
+PlanReviewJob
+PlanUnspent
+
+# Where a plan and a paused run live
+IPlanTreeStore
+FilePlanTreeStore
+ICheckpointStore
+FileCheckpointStore

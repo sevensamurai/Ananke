@@ -1,0 +1,15 @@
+using Ananke.Orchestration.Planning;
+
+/// <summary>
+/// Immutable state record for the {{name}} supervised plan workflow.
+/// Threaded through plan -> coordinate -> loop.
+/// </summary>
+/// <remarks>
+/// One slot, and it is not the plan. The tree lives in the supervision's store; all the
+/// workflow needs to route on is how the last pass ended and what was decided about it.
+/// </remarks>
+public sealed record DeliveryState
+{
+    /// <summary>How the last pass ended, and the coordinator's decision about it.</summary>
+    public PlanCoordination? Coordination { get; init; }
+}

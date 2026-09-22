@@ -6,7 +6,7 @@ using Shouldly;
 namespace Ananke.Orchestration.Tests;
 
 /// <summary>
-/// Gaps 1 and 2 of ADR-arch-028: token usage produced inside a fork branch, or inside a
+/// token usage produced inside a fork branch, or inside a
 /// sub-workflow, must reach the execution that owns the budget.
 /// <para>
 /// Before Part B neither did. <c>TokenUsageCapture</c> held a mutable accumulator through an

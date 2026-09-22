@@ -208,6 +208,110 @@ public class ModelResolverTests
         ex.Message.ShouldContain("ApiKey");
     }
 
+    // ── An endpoint makes the key optional ───────────────────────────
+    //
+    // A self-hosted OpenAI-compatible server has no key to give. Requiring one made the documented
+    // local-first path fail before it ran, on a secret the user had to invent.
+
+    [Test]
+    public void Resolve_EndpointWithoutApiKey_UsesPlaceholderInsteadOfThrowing()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  local:",
+            "    provider: openai",
+            "    model: llama3.2:1b",
+            "    endpoint: http://model-host:11434/v1",
+            "jobs:",
+            "connections:",
+        ]);
+
+        var resolver = new ModelResolver()
+            .Register("openai", "OpenAI", (string apiKey, string model, Uri? endpoint) =>
+                new FakeAgentModel(apiKey, model));
+
+        var resolved = resolver.Resolve(manifest, _ => null);
+
+        ((FakeAgentModel)resolved["local"]).ApiKey.ShouldBe(ModelResolver.PlaceholderApiKey);
+    }
+
+    [Test]
+    public void Resolve_EndpointFromConfigWithoutApiKey_UsesPlaceholder()
+    {
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  local:",
+            "    provider: openai",
+            "    model: llama3.2:1b",
+            "jobs:",
+            "connections:",
+        ]);
+
+        var resolver = new ModelResolver()
+            .Register("openai", "OpenAI", (string apiKey, string model, Uri? endpoint) =>
+                new FakeAgentModel(apiKey, model));
+
+        var resolved = resolver.Resolve(manifest, key => key switch
+        {
+            "OpenAI:Endpoint" => "http://model-host:11434/v1",
+            _ => null
+        });
+
+        ((FakeAgentModel)resolved["local"]).ApiKey.ShouldBe(ModelResolver.PlaceholderApiKey);
+    }
+
+    [Test]
+    public void Resolve_EndpointWithApiKey_PrefersTheConfiguredKey()
+    {
+        // Hosted OpenAI-compatible providers — Groq, Together, Foundry — have both an endpoint and
+        // a real key. The placeholder must never displace one that was configured.
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  hosted:",
+            "    provider: openai",
+            "    model: llama-3.3-70b",
+            "    endpoint: https://api.example.com/v1",
+            "jobs:",
+            "connections:",
+        ]);
+
+        var resolver = new ModelResolver()
+            .Register("openai", "OpenAI", (string apiKey, string model, Uri? endpoint) =>
+                new FakeAgentModel(apiKey, model));
+
+        var resolved = resolver.Resolve(manifest, key => key switch
+        {
+            "OpenAI:ApiKey" => "sk-real-key",
+            _ => null
+        });
+
+        ((FakeAgentModel)resolved["hosted"]).ApiKey.ShouldBe("sk-real-key");
+    }
+
+    [Test]
+    public void Resolve_NoEndpointAndNoApiKey_StillThrows()
+    {
+        // The absence of both can only mean a hosted provider, which certainly needs a key.
+        var manifest = WorkflowManifest.Parse([
+            "name: test",
+            "models:",
+            "  hosted:",
+            "    provider: openai",
+            "jobs:",
+            "connections:",
+        ]);
+
+        var resolver = new ModelResolver()
+            .Register("openai", "OpenAI", (string apiKey, string model, Uri? endpoint) =>
+                new FakeAgentModel(apiKey, model));
+
+        var ex = Should.Throw<InvalidOperationException>(() => resolver.Resolve(manifest, _ => null));
+        ex.Message.ShouldContain("ApiKey");
+    }
+
     [Test]
     public void Resolve_MultipleModels_AllResolved()
     {

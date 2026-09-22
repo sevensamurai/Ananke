@@ -12,9 +12,9 @@ public sealed class AzureRemoteCellMonitorTests
     public void SetUp() => _monitor = new AzureRemoteCellMonitor();
 
     [Test]
-    public void Platform_is_azure_ai()
+    public void Platform_is_azure()
     {
-        _monitor.Platform.ShouldBe("azure-ai");
+        _monitor.Platform.ShouldBe("azure");
     }
 
     [Test]

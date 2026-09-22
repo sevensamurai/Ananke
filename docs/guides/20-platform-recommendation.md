@@ -58,7 +58,7 @@ The final score is the weighted average of the four axes.
 nnke-platform eval
 
 # Restrict to specific candidates
-nnke-platform eval my-workflow.ananke.yml --candidates azure-ai vertex-ai
+nnke-platform eval my-workflow.ananke.yml --candidates azure vertex-ai
 
 # Machine-readable output
 nnke-platform eval --format json
@@ -233,7 +233,7 @@ foreach (var score in report.Scores)
 // With live validation
 var validators = new IPlatformValidator[]
 {
-    new LocalPlatformValidator(emulatedPlatform: "azure-ai"),
+    new LocalPlatformValidator(emulatedPlatform: "azure"),
     new LocalPlatformValidator(emulatedPlatform: "vertex-ai"),
 };
 

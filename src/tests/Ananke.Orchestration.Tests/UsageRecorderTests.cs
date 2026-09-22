@@ -79,7 +79,7 @@ public class InMemoryUsageRecorderTests
     }
 
     /// <summary>
-    /// The property the whole design rests on (ADR-arch-028 D9): fork branches record
+    /// The property the whole design rests on: fork branches record
     /// concurrently, so a read-modify-write without a lock loses updates. The old
     /// UsageAccumulator.Add was exactly that, safe only because each job owned a private
     /// instance and main-path jobs are sequential.

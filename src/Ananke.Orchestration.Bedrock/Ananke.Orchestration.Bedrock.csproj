@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Orchestration.Bedrock</PackageId>
+    <Description>Amazon Bedrock access for Ananke.Orchestration — SigV4 signing, Bedrock API-key auth, and endpoint construction. Deliberately contains no wire-format code: requests are served by the OpenAI and Anthropic adapters against Bedrock's compatible endpoints.</Description>
+    <PackageTags>ai;agents;bedrock;aws;sigv4;openai-compatible;anthropic-messages</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Orchestration.Bedrock.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Anthropic\Ananke.Orchestration.Anthropic.csproj" />
+  </ItemGroup>
+
+</Project>

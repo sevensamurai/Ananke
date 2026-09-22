@@ -52,16 +52,20 @@ services.AddWorkflowOrchestration(o => o
 
 ## Features
 
-- **Typed workflow builder** — `Workflow<TState>` with `Job`, `Then`, `Chain`, `Loop`, `Fork`, `Join`, and `SubFlow`
+- **Typed workflow builder** — `Workflow<TState>` with `Job`, `Then`, `Chain`, `Loop`, `Fork`, `Join`, `SubFlow`, and `Supervise`
 - **Routing primitives** — `Workflow.Decide(...)`, `Workflow.DecideAsync(...)`, and `Workflow.DecideWithAgent(...)`
 - **Agent jobs** — `AgentJob<TState,TResponse>` for structured output and `TextAgentJob<TState>` for plain-text generations
 - **Streaming chat workflow** — `StreamingChatWorkflow` builder for agent → tools → agent loops with delta callbacks
 - **Checkpointing and resume** — `ICheckpointStore`, interrupts, and `IWorkflowRunner.ResumeAsync(...)`
-- **Workflow event streaming** — `IWorkflowRunner.StreamAsync(...)` for progress, fork/join, and terminal events
+- **Workflow event streaming** — `IWorkflowRunner.StreamAsync(...)` for progress, fork/join, and terminal events, including a `SubFlow`'s inner workflow
+- **Progress from below a job** — `WorkflowEventReporting` is an ambient `IWorkflowEventSink`: a job reports a `WorkflowEvent` of its own and it reaches the caller's stream, without the runner learning what the job does
 - **Tool execution** — `ToolKit`, `ToolDefinition`, `ToolBuilder`, memory-backed tool gating, and execution strategies
 - **Smart tool routing** — `CompositeSmartToolRouter` and routing stages surfaced through `SmartToolRouterMiddleware`
 - **Model middleware** — logging, guardrails, caching, resilience, and tool-window narrowing at the `IAgentModel` layer
 - **Pattern builders** — `AgenticPattern.ReviewCritique<TState>()`, `AgenticPattern.IterativeRefinement<TState>()`, and `AgenticPattern.Interview<TState>()` (conversational turns via `Workflow<TState>.AwaitInput`, resumed by platform adapters via `WorkflowInputExtensions.ResumeWithInputAsync`)
+- **Plans and contracts** — `AgentContract` pinned into every assembly, a versioned `PlanTree` read from an `IPlanTreeStore`, `PlanExecutor` walking it post-order, and `IVerifier` ruling on a node's work from outside it
+- **Gates that ship** — `ProcessCheck` decides a criterion by a command's exit code and `PredicateCheck` by a predicate; a check that could not run throws rather than reporting a criterion as unmet
+- **Simulated model** — `SimulatedAgentModel` answers from a script rather than a provider: fixed, JSON, sequenced, or read from a file, recording every request so a test can assert on what the model was sent
 - **Tracing and budgets** — `IWorkflowTracer`, workflow trace context, token-usage capture for model calls, and a `BudgetExceeded<TState>` workflow event backed by `IBudgetMeter`
 - **Adaptive harness** — `CompositeAdaptiveHarnessPolicy` reacts to per-episode `TrajectorySnapshot`s (from `Ananke.Abstractions.Trajectory`): triggers a learning cycle on hallucination spikes and rewards/penalizes tool affinities on clean successes or abandoned faults
 
@@ -78,6 +82,16 @@ services.AddWorkflowOrchestration(o => o
 | `StreamingChatWorkflow` | Pre-built streaming conversation loop with optional memory and tools |
 | `ToolKit` | Named collection of tools, tool-memory integration, and routing hooks |
 | `AgenticPattern` | Factory for common multi-step agent patterns |
+| `SimulatedAgentModel` | Scripted `IStreamingAgentModel` for demos and tests — no key, no network, and every request recorded |
+| `AgentContract` | Goal, acceptance/quality criteria, constraints and iteration bound, re-rendered into every assembly so compaction cannot evict them |
+| `PlanTree` | A decomposition and every version it has been through; node status is derived from it, never stored |
+| `PlanEvent` | Plan progress on the workflow's event stream — node started, reported, disputed, verified, pass completed, version minted |
+| `SupervisionOptions` | Who runs a node, who rules on it, where the tree lives — and `ReruleAsync`, so the job that decides a plan should change needs no executor of its own |
+| `SupervisedJob<TState>` | A plan as one job in a workflow — runs it to completion, one node at a time, and never rules on a dispute itself |
+| `PlanExecutor` | Runs a plan — children in order, then the node that decomposed them; one pass per call, or to completion with a stop condition derived from the tree rather than a retry count |
+| `IVerifier` / `DeterministicVerifier` | Rules on whether a node met its contract, from outside the node, abstaining where no check can decide — and answering, before a re-ruling is minted, which of its new criteria nothing can decide |
+| `AgentVerifier` | A model on the `reviewer` role, ruling from the record on what the checks left undecided; it never overturns a check, never passes what it cannot tell, and records its grounds |
+| `ProcessCheck` / `PredicateCheck` | The two shipped `IDeterministicCheck` gates — a command's exit code, and a predicate |
 | `CompositeAdaptiveHarnessPolicy` | Default `IAdaptiveHarnessPolicy`/`ITrajectoryObserver` — adapts tool affinities and triggers learning cycles from completed-episode trajectory snapshots |
 
 ## Package boundaries

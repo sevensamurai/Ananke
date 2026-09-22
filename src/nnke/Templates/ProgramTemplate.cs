@@ -23,6 +23,7 @@ internal static class ProgramTemplate
         "handoff" => "program-handoff.cs.template",
         "organic-host" => "program-organic-host.cs.template",
         "streaming-chat" => "program-streaming-chat.cs.template",
+        "supervised-plan" => "program-supervised-plan.cs.template",
         _ => "Program.cs.template",
     };
 }

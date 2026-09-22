@@ -47,7 +47,7 @@ detail to come back to.
 | `Ananke.Orchestration` | `AgenticPattern`, `JobRef`, type-forwards for selected agent/knowledge types |
 | `Ananke.Orchestration.Workflows` | `Workflow`, `Workflow<TState>`, `WorkflowDefinition`, `WorkflowExecution`, `WorkflowResult`, `ExecutionStatus`, `WorkflowInputExtensions` |
 | `Ananke.Orchestration.Agents` | `AgentJob<TState,TResponse>`, `TextAgentJob<TState>`, `StreamingChatWorkflow`, `ChatSessionEvent`, `JsonSchemaGenerator`, token-usage capture helpers |
-| `Ananke.Orchestration.Agents.Context` | `IContextStrategy`, `SlidingWindowContextStrategy`, `SummarizingContextStrategy`, `ITokenCounter`, `ApproximateTokenCounter`, `AgentMessageExtensions` |
+| `Ananke.Orchestration.Agents.Context` | `IContextStrategy`, `SlidingWindowContextStrategy`, `SummarizingContextStrategy`, `ITokenCounter`, `ApproximateTokenCounter`, `AgentMessageExtensions`, `AgentContract`, `ContextObserving`, `ContextBaseline`, `ContextObservation` |
 | `Ananke.Orchestration.Agents.Middleware` | `IAgentModelMiddleware`, `MiddlewareAgentModel`, `GuardrailAgentModelMiddleware`, `LoggingAgentModelMiddleware`, `CachingAgentModel`, `ResilientAgentModel`, `SmartToolRouterMiddleware` |
 | `Ananke.Orchestration.Agents.Routing` | `IModelRouter`, `ModelRouter`, `CapabilityModelRouter`, `ModelCatalog`, `ModelProfile`, `ModelCapability`, `ModelCostRates`, `TaskRequirements` |
 | `Ananke.Orchestration.Jobs` | `IJob`, `DelegateJob`, `HandoffJob`, `HandoffProxy`, `SubFlowJob`, `SubFlowContext`, `SubFlowInterruptedException`, `InMemoryHandoffChannel`, `JobDescriptor`, `JobExecution`, `Handoff`, `InterruptMode` |
@@ -62,7 +62,9 @@ detail to come back to.
 | `Ananke.Orchestration.Memory` | `InMemoryConversationMemory`, `ConversationMemoryCleanupTimer` |
 | `Ananke.Orchestration.Middleware` | `IWorkflowJobMiddleware<TState>` |
 | `Ananke.Orchestration.Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder`, `InterviewBuilder`, `Interview` |
-| `Ananke.Orchestration.Streaming` | `WorkflowEvent`, `WorkflowStreamOptions`, `WorkflowEventExtensions` |
+| `Ananke.Orchestration.Agents.Simulation` | `SimulatedAgentModel`, `SimulatedModelOptions`, `SimulatedScript`, `SimulatedResponse`, `SimulatedRequestPart` |
+| `Ananke.Orchestration.Planning` | `PlanTree`, `PlanNode`, `PlanVersion`, `NodeLifecycle`, `ContractOutcome`, `CriterionVerdict`, `PlanViolation`, `NodeReading`, `IPlanTreeStore`, `InMemoryPlanTreeStore`, `FilePlanTreeStore`, `PlanExecutor`, `PlanNodeRunner`, `PlanNodeContext`, `NodeOutcome`, `PlanRunResult`, `PlanRunOutcome`, `PlanNodeAgentRunner`, `PlanNodeAgentOptions`, `PlanNodeReport`, `PlanTerm`, `PlanRetryPolicy`, `Finding`, `SupervisedJob<TState>`, `SupervisionOptions`, `PlanEvent`, `PlanNodeStarted`, `PlanNodeReported`, `PlanNodeDisputed`, `PlanNodeVerified`, `PlanPassCompleted`, `PlanDecisionTaken`, `PlanVersionMinted`, `IVerifier`, `DeterministicVerifier`, `AgentVerifier`, `Review`, `CriterionReview`, `VerificationRequest`, `Verification`, `VerificationOutcome`, `IDeterministicCheck`, `ProcessCheck`, `ProcessCheckOptions`, `PredicateCheck`, `PlanTreeProjection` |
+| `Ananke.Orchestration.Streaming` | `WorkflowEvent`, `WorkflowEvent<TState>`, `WorkflowStreamOptions`, `WorkflowEventExtensions`, `WorkflowEventReporting`, `IWorkflowEventSink` |
 | `Ananke.Orchestration.Execution` | `IWorkflowRunner`, `WorkflowRunner` |
 | `Ananke.Orchestration.Tracing` | `WorkflowTraceContext`, `NullTracer` |
 | `Ananke.Orchestration.Extensions` | `ServiceCollectionExtensions` |
@@ -82,6 +84,14 @@ detail to come back to.
 | `StreamingChatWorkflow` | Static class | Pre-built streaming agent-tools loop with delta callbacks, optional memory, and context strategies | `src/Ananke.Orchestration/Agents/StreamingChatWorkflow.cs` |
 | `ToolKit` | Class | Named collection of `ToolDefinition` with tool-memory integration, routing hooks, fault observation, and execution-strategy support | `src/Ananke.Orchestration/Tools/ToolKit.cs` |
 | `AgenticPattern` | Static class | Factory for `ReviewCritique<TState>`, `IterativeRefinement<TState>`, and `Interview<TState>` pattern builders | `src/Ananke.Orchestration/AgenticPattern.cs` |
+| `WorkflowEventReporting` | Static class | Ambient `IWorkflowEventSink` for the current flow — how a job reports progress and how a sub-workflow's events reach its parent's stream; non-nesting scope, no-op when unscoped | `src/Ananke.Orchestration/Streaming/WorkflowEventReporting.cs` |
+| `SimulatedAgentModel` | Class | Scripted stand-in for a provider — `Fixed`, `Json`, `Sequence`, a responder, or a JSON script file; records every request | `src/Ananke.Orchestration/Agents/Simulation/SimulatedAgentModel.cs` |
+| `AgentContract` | Record | Goal, acceptance and quality criteria, constraints and iteration bound for one work item; re-rendered into every assembly so no context strategy can evict it | `src/Ananke.Orchestration/Agents/Context/AgentContract.cs` |
+| `PlanTree` | Record | A decomposition and its full lineage; status, staleness and bound state are derived from it rather than stored | `src/Ananke.Orchestration/Planning/PlanTree.cs` |
+| `SupervisedJob<TState>` | Class | A plan as one `IJob<TState>`, registered by `Workflow<TState>.Supervise`; runs it to completion and returns `PlanRunResult` | `src/Ananke.Orchestration/Planning/SupervisedJob.cs` |
+| `PlanExecutor` | Class | Walks a plan post-order, reloading and saving the tree around every node; `ExecuteAsync` is one pass, `ExecuteToCompletionAsync` repeats until the tree stops changing | `src/Ananke.Orchestration/Planning/PlanExecutor.cs` |
+| `PlanNodeAgentRunner` | Class | Runs one plan node as an `AgentJob<TState,TResponse>` with the node's contract pinned | `src/Ananke.Orchestration/Planning/PlanNodeAgentRunner.cs` |
+| `IVerifier` | Interface | Rules on whether a node met its contract, external to the node by construction; `DeterministicVerifier` abstains where no check can decide, `AgentVerifier` asks a model about what it abstained on, and `CannotDecide` says so before anything runs | `src/Ananke.Orchestration/Planning/Verification.cs` |
 | `WorkflowInputExtensions` | Static class | `ResumeWithInputAsync` — channel-agnostic fold-then-resume helper for `ask`/`AwaitInput` turns | `src/Ananke.Orchestration/Workflows/WorkflowInputExtensions.cs` |
 | `ModelCatalog` | Class | Registry of `ModelProfile` entries for capability-based routing | `src/Ananke.Orchestration/Agents/Routing/ModelCatalog.cs` |
 | `CompositeSmartToolRouter` | Class | Pipeline-style smart tool router; compose stages (heuristic, semantic, affinity, health, LLM) via `ISmartToolRouter` | `src/Ananke.Orchestration/Tools/Routing/CompositeSmartToolRouter.cs` |

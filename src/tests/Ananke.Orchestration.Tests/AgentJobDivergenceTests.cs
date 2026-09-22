@@ -261,11 +261,12 @@ public class AgentJobDivergenceTests
     /// </summary>
     private sealed class CopyingContextStrategy : IContextStrategy
     {
-        public Task<IReadOnlyList<AgentMessage>> ApplyAsync(
+        public Task<ContextProjection> ApplyAsync(
             IReadOnlyList<AgentMessage> messages,
             string? systemPrompt,
+            ContextBudget budget,
             CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AgentMessage>>([.. messages]);
+            Task.FromResult(ContextProjection.Unchanged([.. messages], budget.Resolve(int.MaxValue)));
     }
 
     /// <summary>
@@ -274,11 +275,18 @@ public class AgentJobDivergenceTests
     /// </summary>
     private sealed class TruncatingContextStrategy : IContextStrategy
     {
-        public Task<IReadOnlyList<AgentMessage>> ApplyAsync(
+        public Task<ContextProjection> ApplyAsync(
             IReadOnlyList<AgentMessage> messages,
             string? systemPrompt,
+            ContextBudget budget,
             CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AgentMessage>>([messages[0]]);
+            Task.FromResult(new ContextProjection
+            {
+                Messages = [messages[0]],
+                ShadowedCount = messages.Count - 1,
+                Reason = ContextShadowReason.Dropped,
+                AppliedBudget = budget.Resolve(int.MaxValue)
+            });
     }
 
     private sealed class CostResolvingRouter(IAgentModel model) : IModelRouter, IModelCostResolver

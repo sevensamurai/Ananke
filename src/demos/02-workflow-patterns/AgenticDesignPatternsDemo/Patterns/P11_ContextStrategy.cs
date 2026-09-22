@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents.Simulation;
 using AgenticDesignPatternsDemo;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration;
@@ -18,13 +19,16 @@ internal static class P11_ContextStrategy
             messages.Add(AgentMessage.User($"Message {i}: " + new string('x', 100)));
 
         var strategy = new SlidingWindowContextStrategy(maxTokens: 500);
-        var compacted = await strategy.ApplyAsync(messages, "You are a helpful assistant.");
+        var projection = await strategy.ApplyAsync(
+            messages, "You are a helpful assistant.", ContextBudget.Unspecified);
 
         Console.WriteLine($"  Original messages: {messages.Count}");
-        Console.WriteLine($"  After compaction:  {compacted.Count}");
+        Console.WriteLine($"  After compaction:  {projection.Messages.Count}");
+        Console.WriteLine($"  Shadowed:          {projection.ShadowedCount} message(s), " +
+                          $"~{projection.ShadowedTokens} tokens ({projection.Reason})");
         Console.WriteLine($"  Strategy: SlidingWindowContextStrategy(maxTokens: 500)");
 
-        var model = SimulatedModel.Fixed("""{"Reply":"I remember the recent context."}""");
+        var model = SimulatedAgentModel.Fixed("""{"Reply":"I remember the recent context."}""");
         var agent = AgentJobFactory.Create<ContextState, ContextResponse>("chat", model)
             .WithSystemPrompt("You are a helpful assistant.")
             .WithPrompt(s => s.UserMessage)

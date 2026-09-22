@@ -23,8 +23,8 @@ internal static class ModuleInit
             var location = Environment.GetEnvironmentVariable("GOOGLE_CLOUD_LOCATION")
                 ?? "us-central1";
 
-            var credentials = new VertexAICredentialProvider(project, location);
-            return new VertexAIDeployer(credentials, registry);
+            var credentials = new AgentRuntimeCredentialProvider(project, location);
+            return new AgentRuntimeDeployer(credentials, registry);
         });
     }
 }

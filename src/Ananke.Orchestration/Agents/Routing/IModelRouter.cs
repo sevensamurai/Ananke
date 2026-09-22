@@ -22,3 +22,22 @@ public interface IModelCostResolver
     /// </summary>
     ModelCostRates ResolveCostRates(AgentRequest request);
 }
+
+/// <summary>
+/// Optional extension of <see cref="IModelRouter"/> that exposes the <em>real</em> context window
+/// of the model that would handle a request.
+/// </summary>
+/// <remarks>
+/// The counterpart of <see cref="IModelCostResolver"/>, and it exists for the same reason: the
+/// window belongs to the model that is actually selected, which is not known until selection has
+/// happened. Without it <see cref="ModelProfile.ContextTokens"/> is read when *choosing* a model and
+/// never again by anything that fills that model's window.
+/// </remarks>
+public interface IModelContextResolver
+{
+    /// <summary>
+    /// Returns the context window of the model that would handle <paramref name="request"/>.
+    /// Returns <see cref="ModelContextWindow.Unknown"/> when it cannot be determined.
+    /// </summary>
+    ModelContextWindow ResolveContextWindow(AgentRequest request);
+}

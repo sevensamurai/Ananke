@@ -90,7 +90,10 @@ public sealed class FederatedComplexityMonitorTests
             UpdatedAt = DateTimeOffset.UtcNow
         });
 
-        var remoteMonitor = new StubRemoteCellMonitor("azure-ai",
+        // The record above was written under the pre-rename identifier while the monitor reports
+        // the canonical one — the exact mismatch a persisted discriminator creates, and the reason
+        // FederatedComplexityMonitor resolves both sides.
+        var remoteMonitor = new StubRemoteCellMonitor("azure",
             health: new RemoteCellHealth
             {
                 DeploymentId = "dep-1",

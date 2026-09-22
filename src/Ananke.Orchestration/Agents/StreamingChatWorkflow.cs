@@ -78,6 +78,7 @@ public static class StreamingChatWorkflow
         private string? _systemPrompt;
         private ToolKit? _toolKit;
         private int _maxToolRounds = 10;
+        private double? _temperature;
         private Func<string, Task>? _onTextDelta;
         private Func<byte[], string, Task>? _onAudioDelta;
         private Func<string, string, Task>? _onToolCall;
@@ -141,6 +142,22 @@ public static class StreamingChatWorkflow
             return this;
         }
 
+        /// <summary>
+        /// Sets the sampling temperature for this job. Leave unset to let the provider apply its
+        /// own default.
+        /// </summary>
+        /// <remarks>
+        /// <b>Not accepted by every model.</b> Anthropic deprecated temperature for models after
+        /// Claude Opus 4.6 — they accept only <c>1.0</c> and reject anything else with a 400. The
+        /// value is passed through rather than clamped, so the provider's refusal is visible.
+        /// </remarks>
+        /// <param name="temperature">Sampling temperature; provider ranges differ.</param>
+        public Builder WithTemperature(double temperature)
+        {
+            _temperature = temperature;
+            return this;
+        }
+
         /// <summary>Called for each text delta streamed from the model.</summary>
         public Builder OnTextDelta(Func<string, Task> handler)
         {
@@ -180,6 +197,11 @@ public static class StreamingChatWorkflow
                 .Select(t => new AgentTool(t.Name, t.Description, t.ParametersJsonSchema))
                 .ToList();
 
+            // Captured like the other builder state below. Left null unless the caller set one:
+            // a chat that always answers identically is a worse chat, so this path does not adopt
+            // the deterministic default a workflow job would want.
+            var temperature = _temperature;
+
             var model = _model;
             var systemPrompt = _systemPrompt;
             var toolKit = _toolKit;
@@ -211,9 +233,11 @@ public static class StreamingChatWorkflow
                     {
                         SystemPrompt = systemPrompt,
                         Messages = contextStrategy is not null
-                            ? await contextStrategy.ApplyAsync(state.Messages, systemPrompt, ct)
+                            ? (await contextStrategy.ApplyAsync(
+                                state.Messages, systemPrompt, ContextBudget.Unspecified, ct)).Messages
                             : state.Messages,
-                        Tools = agentToolDefs
+                        Tools = agentToolDefs,
+                        Temperature = temperature
                     };
 
                     var fullText = new StringBuilder();

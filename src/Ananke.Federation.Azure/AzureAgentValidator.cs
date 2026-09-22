@@ -27,7 +27,7 @@ public sealed class AzureAgentValidator : IPlatformValidator
     }
 
     /// <inheritdoc />
-    public string Platform => "azure-ai";
+    public string Platform => "azure";
 
     /// <inheritdoc />
     public async Task<DeployabilityReport> ValidateAsync(
@@ -41,7 +41,7 @@ public sealed class AzureAgentValidator : IPlatformValidator
         var diagnostics = new List<DeployDiagnostic>();
 
         // Check credentials — attempt to create a client
-        var credential = await _credentialProvider.GetCredentialAsync("azure-ai", ct);
+        var credential = await _credentialProvider.GetCredentialAsync("azure", ct);
         if (credential is not AgentAdministrationClient)
         {
             diagnostics.Add(new DeployDiagnostic
@@ -118,7 +118,7 @@ public sealed class AzureAgentValidator : IPlatformValidator
 
             if (tool.ExecutionMode == ToolExecutionMode.PlatformNative &&
                 tool.PlatformCapability is not null &&
-                !PlatformCapabilities.GetForPlatform("azure-ai").Contains(tool.PlatformCapability))
+                !PlatformCapabilities.GetForPlatform("azure").Contains(tool.PlatformCapability))
             {
                 diagnostics.Add(new DeployDiagnostic
                 {
@@ -126,7 +126,7 @@ public sealed class AzureAgentValidator : IPlatformValidator
                     Code = "FED045",
                     Message = $"Tool '{tool.Name}' declares platform capability '{tool.PlatformCapability}' which is not a recognized Azure AI Agent Service tool type. It will be passed through as-is — the platform API will reject it if invalid.",
                     Component = tool.Name,
-                    Suggestion = $"Known Azure capabilities: {string.Join(", ", PlatformCapabilities.GetForPlatform("azure-ai"))}. If this is a new capability, this warning can be ignored."
+                    Suggestion = $"Known Azure capabilities: {string.Join(", ", PlatformCapabilities.GetForPlatform("azure"))}. If this is a new capability, this warning can be ignored."
                 });
             }
         }

@@ -27,8 +27,7 @@ See [`secrets.json.template`](./secrets.json.template) for the full key referenc
 | 01 | [BasicAgentDemo](#basicagentdemo) | Direct LLM calls · capability routing · caching | OpenAI (Anthropic optional) |
 | 01 | [StateMachineDemo](#statemachinedemo) | `AbstractStateMachine` · guards · lifecycle hooks · MQTT transport | None (MQTT optional) |
 | 02 | [AgenticDesignPatternsDemo](#agenticdesignpatternsdemo) | 14 agentic patterns — ReAct, fork/join, sub-flows, streaming, HITL | None (all simulated) |
-| 02 | [DesignPipelineDemo](#designpipelinedemo) | YAML-declared ETL pipeline · fork/join · model aliases · Mermaid export | OpenAI |
-| 02 | [SelfImprovingWorkflowDemo](#selfimprovingworkflowdemo) | Self-diagnosing workflow · YAML manifest diff · simulated doc tools | None (all simulated) |
+| 02 | [ItineraryDemo](#itinerarydemo) | Supervised plan steered live · executable criteria · replanning · attended pauses | OpenAI or Google |
 | 03 | [EntityMemoryDemo](#entitymemorydemo) | Per-entity memory isolation · cold-start vs. personalized recommendations | None |
 | 03 | [LearningPrimitivesDemo](#learningprimitivesdemo) | Skill catalog (OpenClaw/cowsay) · post-division UCB routing via Qdrant | OpenAI · Qdrant (routing scenario) |
 | 03 | [LongTermMemoryDemo](#longtermmemorydemo) | Document ingestion · vector search · knowledge catalog · cross-doc linking | OpenAI · Qdrant (optional) |
@@ -37,8 +36,10 @@ See [`secrets.json.template`](./secrets.json.template) for the full key referenc
 | 04 | [OrganicKernelDemo](#organickerneldemo) | Organic growth · complexity sensing · division · approval gate · memory feedback | None (all simulated) |
 | 05 | [AgenticWebDemo](#agenticwebdemo) | ASP.NET Core streaming chat · tool-calling agent · trade approval HITL | OpenAI · BetterStack (optional) |
 | 05 | [PetAdoptionDemo](#petadoptiondemo) | Full-stack RAG app · stateful phases · SSE streaming · mid-gen interrupts · voice/photo | OpenAI or Gemini · Docker (optional) |
+| 05 | [MiniAgencyDemo](#miniagencydemo) | Slack-backed drafter/reviewer agency · work-review gates · human reaction approval | Local OpenAI-compatible endpoint · Slack app |
 | 06 | [AgentToAgentProtocolDemo](#agenttoagentprotocoldemo) | A2A server · agent card · C# + Python clients · cross-language interop | None |
 | 06 | [ChannelsDemo](#channelsdemo) | Ananke agent as a Discord or Slack bot · `IPlatformMessageHandler` | OpenAI · Discord or Slack bot token |
+| 06 | [LocalPlatformLoopDemo](#localplatformloopdemo) | Local design loop · validate → deploy → run against three emulated clouds · mirrors `nnke-platform eval` | None |
 | 06 | [McpServerDemo](#mcpserverdemo) | MCP server exposing Ananke tools and a workflow to VS Code / Claude Desktop | None |
 
 ---
@@ -96,31 +97,19 @@ A runnable catalogue of **14 agentic design patterns** — all offline, no API k
 
 ---
 
-#### DesignPipelineDemo
+#### ItineraryDemo
 
-**[`02-workflow-patterns/DesignPipelineDemo`](./02-workflow-patterns/DesignPipelineDemo)** · [`README`](./02-workflow-patterns/DesignPipelineDemo/README.md)
+**[`02-workflow-patterns/ItineraryDemo`](./02-workflow-patterns/ItineraryDemo)** · [`README`](./02-workflow-patterns/ItineraryDemo/README.md)
 
-Declarative ETL pipeline driven from a YAML manifest (`etl-pipeline.ananke.yml`).
-The manifest declares the graph topology, model aliases, and system prompts.
-`Program.cs` binds code jobs as lambdas and runs the workflow.
-Prints a Mermaid diagram of the workflow graph after execution.
+A week in Japan planned around one place that has to be there — and steered when the service says
+that place cannot be had the way the plan first asked for it:
 
-**Secrets required:** `OpenAI:ApiKey`
+- Criteria are **invocations** a program decides — `stay_on(hakone, 2027-04-13, 2027-04-15)` — never prose
+- A step reports what it found; the loop marks it done, asks a person, or hands the halt to the Planner
+- The **Planner** rewrites the plan, and what it writes is checked before it is written
+- `--hitl` puts a person at each pause; `--verify` checks the scenario with no key at all
 
----
-
-#### SelfImprovingWorkflowDemo
-
-**[`02-workflow-patterns/SelfImprovingWorkflowDemo`](./02-workflow-patterns/SelfImprovingWorkflowDemo)** · [`README`](./02-workflow-patterns/SelfImprovingWorkflowDemo/README.md)
-
-A travel-expense analyzer workflow that **diagnoses its own missing capability**:
-
-- Run 1 uses `expense-analyzer.ananke.yml` — overseer agent detects no currency-conversion step via `inspect_workflow` / `search_docs` / `suggest_fix` tools
-- Run 2 uses `expense-analyzer-v2.ananke.yml` — fixed manifest with `convert_currencies` code job
-
-All LLM responses are simulated — no API keys required.
-
-**Secrets required:** None
+**Secrets required:** `OPENAI_API_KEY` or `GOOGLE_API_KEY` in a `.env` at the repository root
 
 ---
 
@@ -269,6 +258,21 @@ Full-stack pet adoption assistant demonstrating advanced Ananke features in a we
 
 ---
 
+#### MiniAgencyDemo
+
+**[`05-applications/MiniAgencyDemo`](./05-applications/MiniAgencyDemo)** · [`README`](./05-applications/MiniAgencyDemo/README.md)
+
+A Slack-backed two-stage agency wiring `Ananke.Roles` and work-review gates:
+
+- A drafter role generates the first response; an LLM reviewer checks the draft
+- A reaction window lets a human in the Slack channel approve or reject the review with an emoji
+- `roles.json` and `build-and-review.ananke.yml` are wired through `StudioHostBuilder`; the review loop itself lives in `MiniAgencyMessageHandler`
+- Optional rolling-window budget gate and OTel-style token metrics
+
+**Secrets required:** `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, and a local OpenAI-compatible endpoint (Ollama, LM Studio, vLLM)
+
+---
+
 ### 06 — Interop & Channels
 
 #### AgentToAgentProtocolDemo
@@ -302,6 +306,24 @@ dotnet run -- --platform slack
 - Tools exposed: `current_time`, `echo`
 
 **Secrets required:** `OpenAI:ApiKey` + `Discord:BotToken` (Discord) or `Slack:BotToken` + `Slack:AppToken` (Slack)
+
+---
+
+#### LocalPlatformLoopDemo
+
+**[`06-interop-and-channels/LocalPlatformLoopDemo`](./06-interop-and-channels/LocalPlatformLoopDemo)** · [`README`](./06-interop-and-channels/LocalPlatformLoopDemo/README.md)
+
+The **local design loop**: a workflow declaring three `PlatformNative` capabilities
+(`code_execution`, `web_search`, `memory_bank`) runs validate → deploy → run in-process against three
+emulated cloud targets (`local-emulated:azure-ai`, `:claude`, `:vertex-ai`) — no API keys, no cloud
+SDKs, no network required for the core loop.
+
+- `DefaultPlatformNativeExecutors.Register()` wires every built-in emulator; each tool's own README
+  states whether its tier is real (bash subprocess, DuckDuckGo Lite over HTTP) or in-process
+- Shows `foundry → azure-ai` alias resolution (`FED060`) and stub-coverage warnings (`FED062`)
+- Mirrors what `nnke-platform eval` does from the CLI, via `PlatformRecommender.Evaluate` in-process
+
+**Secrets required:** None
 
 ---
 

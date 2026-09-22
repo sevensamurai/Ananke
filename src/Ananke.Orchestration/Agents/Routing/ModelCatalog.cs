@@ -46,6 +46,17 @@ public sealed record ModelProfileTemplate
     public string? ReplacedBy { get; init; }
 
     /// <summary>
+    /// Descriptive facts — size, self-hostability, licence, family. Carried into
+    /// <see cref="ToProfile(IAgentModel, ModelCostRates)"/>.
+    /// </summary>
+    /// <remarks>
+    /// Best-effort, like the rest of this template: written from current published knowledge and
+    /// overridable at the call site. Unlike the capability metadata, these facets do not change with
+    /// quantization or serving runtime, so they are the part of a template most likely to stay true.
+    /// </remarks>
+    public ModelClassification Classification { get; init; } = ModelClassification.Unspecified;
+
+    /// <summary>
     /// Creates a complete <see cref="ModelProfile"/> by binding this template
     /// to a live <paramref name="model"/> instance with explicit cost <paramref name="rates"/>.
     /// Use <see cref="ModelCostRates.Zero"/> for local / self-hosted models.
@@ -66,7 +77,8 @@ public sealed record ModelProfileTemplate
             MaxContextTokens = MaxContextTokens,
             SpeedTier = SpeedTier,
             Status = Status,
-            ReplacedBy = ReplacedBy
+            ReplacedBy = ReplacedBy,
+            Classification = Classification
         };
     }
 
@@ -130,10 +142,11 @@ public static class ModelCatalog
         Anthropic.ClaudeSonnet5, Anthropic.ClaudeOpus5, Anthropic.ClaudeFable5,
 
         // Google
-        Google.Gemini3_1Pro, Google.Gemini3_1Flash,
+        Google.Gemini3_1Pro,
         Google.Gemini2_5Pro, Google.Gemini2_5Flash,
         Google.Gemini3_5Flash, Google.Gemini3_1FlashLite,
-        Google.Gemini3_6Flash, Google.Gemini3_5FlashLite,
+        Google.Gemini3_6Flash, Google.Gemini3_7Flash, Google.Gemini3_5FlashLite,
+        Google.Gemma4,
 
         // Meta (open-weight — self-hosted)
         Meta.Llama4Scout, Meta.Llama4Maverick,
@@ -141,10 +154,48 @@ public static class ModelCatalog
 
         // Mistral
         Mistral.Large, Mistral.Small, Mistral.Nemo,
+        Mistral.Ministral3B, Mistral.Ministral8B,
 
         // DeepSeek
-        DeepSeek.V3, DeepSeek.R1
+        DeepSeek.V3, DeepSeek.R1,
+
+        // Microsoft (open-weight — self-hosted)
+        Microsoft.Phi4Mini, Microsoft.Phi4,
+
+        // Alibaba (open-weight — self-hosted)
+        Alibaba.Qwen3_0_6B, Alibaba.Qwen3_4B, Alibaba.Qwen3_8B
     ];
+
+    /// <summary>
+    /// Templates for models small enough to serve on ordinary hardware —
+    /// <see cref="ModelSizeClass.Micro"/> or <see cref="ModelSizeClass.Small"/>.
+    /// </summary>
+    /// <remarks>
+    /// Size is not a capability and this does not filter on one: a small model may still be the
+    /// right choice for classification or routing hops, and a large one may be unusable to you for
+    /// reasons that have nothing to do with what it can do. Compose with
+    /// <see cref="ModelClassification.Weights"/> when what you actually mean is "runnable here".
+    /// </remarks>
+    public static IReadOnlyList<ModelProfileTemplate> SmallModels { get; } =
+        [.. All.Where(t => t.Classification.SizeClass is ModelSizeClass.Micro or ModelSizeClass.Small)];
+
+    /// <summary>
+    /// Templates whose weights are published under the given SPDX licence identifier, matched
+    /// case-insensitively.
+    /// </summary>
+    /// <remarks>
+    /// Returns nothing for a licence with no SPDX identifier — the Llama Community Licence and the
+    /// Gemma Terms of Use among them. That is deliberate rather than a gap: those models are
+    /// findable through <see cref="ModelClassification.Weights"/>, and inventing identifiers for
+    /// them would make a policy written against this method quietly wrong.
+    /// </remarks>
+    /// <param name="spdx">SPDX identifier, e.g. <c>"apache-2.0"</c> or <c>"mit"</c>.</param>
+    public static IReadOnlyList<ModelProfileTemplate> LicensedUnder(string spdx)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(spdx);
+        return [.. All.Where(t =>
+            string.Equals(t.Classification.LicenseSpdx, spdx, StringComparison.OrdinalIgnoreCase))];
+    }
 
     // ─────────────────────────────────────────────────────────────
     //  Capability shorthands
@@ -172,7 +223,8 @@ public static class ModelCatalog
     /// <see cref="ModelStatus.Current"/>.
     /// </summary>
     private static ModelProfileTemplate CreateTemplate(
-        string name, ModelCapability capabilities, int intelligenceTier, int maxContextTokens, int speedTier)
+        string name, ModelCapability capabilities, int intelligenceTier, int maxContextTokens, int speedTier,
+        string family)
     {
         var (status, replacedBy) = ModelLifecycleData.Entries.TryGetValue(name, out var entry)
             ? (entry.Status, entry.ReplacedBy)
@@ -186,7 +238,12 @@ public static class ModelCatalog
             MaxContextTokens = maxContextTokens,
             SpeedTier = speedTier,
             Status = status,
-            ReplacedBy = replacedBy
+            ReplacedBy = replacedBy,
+
+            // Every model built through here is a hosted, proprietary one: there are no weights to
+            // obtain, no licence to record, and no published parameter count. That is a statement,
+            // not a gap — it is what makes "which of these could we self-host?" answerable.
+            Classification = ModelClassification.ApiOnly(family)
         };
     }
 
@@ -203,81 +260,82 @@ public static class ModelCatalog
 
         /// <summary>GPT-4.1 — flagship model with 1M context.</summary>
         public static ModelProfileTemplate Gpt4_1 { get; } =
-            CreateTemplate(Models.OpenAI.Gpt41, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_047_576, speedTier: 3);
+            CreateTemplate(Models.OpenAI.Gpt41, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_047_576, speedTier: 3, family: "gpt");
 
         /// <summary>GPT-4.1 Mini — balanced cost/performance.</summary>
         public static ModelProfileTemplate Gpt4_1Mini { get; } =
-            CreateTemplate(Models.OpenAI.Gpt41Mini, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 1_047_576, speedTier: 4);
+            CreateTemplate(Models.OpenAI.Gpt41Mini, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 1_047_576, speedTier: 4, family: "gpt");
 
         /// <summary>GPT-4.1 Nano — fastest, cheapest GPT-4.1 variant.</summary>
         public static ModelProfileTemplate Gpt4_1Nano { get; } =
-            CreateTemplate(Models.OpenAI.Gpt41Nano, ChatModel | ModelCapability.LargeContext, intelligenceTier: 2, maxContextTokens: 1_047_576, speedTier: 5);
+            CreateTemplate(Models.OpenAI.Gpt41Nano, ChatModel | ModelCapability.LargeContext, intelligenceTier: 2, maxContextTokens: 1_047_576, speedTier: 5, family: "gpt");
 
         /// <summary>o3 — frontier reasoning model.</summary>
         public static ModelProfileTemplate O3 { get; } =
-            CreateTemplate(Models.OpenAI.O3, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 1);
+            CreateTemplate(Models.OpenAI.O3, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 1, family: "o");
 
         /// <summary>o3-mini — fast reasoning.</summary>
         public static ModelProfileTemplate O3Mini { get; } =
-            CreateTemplate(Models.OpenAI.O3Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3);
+            CreateTemplate(Models.OpenAI.O3Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3, family: "o");
 
         /// <summary>o4-mini — latest compact reasoning model.</summary>
         public static ModelProfileTemplate O4Mini { get; } =
-            CreateTemplate(Models.OpenAI.O4Mini, FrontierModel, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3);
+            CreateTemplate(Models.OpenAI.O4Mini, FrontierModel, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3, family: "o");
 
         /// <summary>GPT-4o — prior-gen frontier model.</summary>
         public static ModelProfileTemplate Gpt4o { get; } =
-            CreateTemplate(Models.OpenAI.Gpt4o, FrontierModel | ModelCapability.AudioInput, intelligenceTier: 4, maxContextTokens: 128_000, speedTier: 3);
+            CreateTemplate(Models.OpenAI.Gpt4o, FrontierModel | ModelCapability.AudioInput, intelligenceTier: 4, maxContextTokens: 128_000, speedTier: 3, family: "gpt");
 
         /// <summary>GPT-4o Mini — prior-gen compact model.</summary>
         public static ModelProfileTemplate Gpt4oMini { get; } =
-            CreateTemplate(Models.OpenAI.Gpt4oMini, FullModel | ModelCapability.Vision, intelligenceTier: 2, maxContextTokens: 128_000, speedTier: 4);
+            CreateTemplate(Models.OpenAI.Gpt4oMini, FullModel | ModelCapability.Vision, intelligenceTier: 2, maxContextTokens: 128_000, speedTier: 4, family: "gpt");
 
         /// <summary>GPT-5 — prior-gen reasoning and coding model.</summary>
         public static ModelProfileTemplate Gpt5 { get; } =
-            CreateTemplate(Models.OpenAI.Gpt5, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3);
+            CreateTemplate(Models.OpenAI.Gpt5, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3, family: "gpt");
 
         /// <summary>GPT-5 Mini — prior-gen fast, cost-efficient reasoning.</summary>
         public static ModelProfileTemplate Gpt5Mini { get; } =
-            CreateTemplate(Models.OpenAI.Gpt5Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 4);
+            CreateTemplate(Models.OpenAI.Gpt5Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 4, family: "gpt");
 
         /// <summary>GPT-5 Nano — prior-gen smallest, cheapest.</summary>
         public static ModelProfileTemplate Gpt5Nano { get; } =
-            CreateTemplate(Models.OpenAI.Gpt5Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 2, maxContextTokens: 400_000, speedTier: 5);
+            CreateTemplate(Models.OpenAI.Gpt5Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 2, maxContextTokens: 400_000, speedTier: 5, family: "gpt");
 
         /// <summary>GPT-5.2 — prior-gen incremental update over GPT-5.</summary>
         public static ModelProfileTemplate Gpt52 { get; } =
-            CreateTemplate(Models.OpenAI.Gpt52, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3);
+            CreateTemplate(Models.OpenAI.Gpt52, FrontierModel, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 3, family: "gpt");
 
         /// <summary>GPT-5.4 — legacy, 1M-class context.</summary>
         public static ModelProfileTemplate Gpt54 { get; } =
-            CreateTemplate(Models.OpenAI.Gpt54, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2);
+            CreateTemplate(Models.OpenAI.Gpt54, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2, family: "gpt");
 
         /// <summary>GPT-5.4 Mini — legacy, fast distillation of GPT-5.4.</summary>
         public static ModelProfileTemplate Gpt54Mini { get; } =
-            CreateTemplate(Models.OpenAI.Gpt54Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 4);
+            CreateTemplate(Models.OpenAI.Gpt54Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 4, family: "gpt");
 
         /// <summary>GPT-5.4 Nano — legacy, fastest, cheapest of the 5.4 line.</summary>
         public static ModelProfileTemplate Gpt54Nano { get; } =
-            CreateTemplate(Models.OpenAI.Gpt54Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 5);
+            CreateTemplate(Models.OpenAI.Gpt54Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 5, family: "gpt");
 
         /// <summary>GPT-5.5 — legacy flagship for complex reasoning and coding.</summary>
         public static ModelProfileTemplate Gpt55 { get; } =
-            CreateTemplate(Models.OpenAI.Gpt55, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+            CreateTemplate(Models.OpenAI.Gpt55, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "gpt");
 
         /// <summary>GPT-5.6 Sol — current-gen flagship: frontier reasoning for coding, research, and agentic/computer-use work, 1.05M-class context.</summary>
         public static ModelProfileTemplate Gpt56Sol { get; } =
-            CreateTemplate(Models.OpenAI.Gpt56Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2);
+            CreateTemplate(Models.OpenAI.Gpt56Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2, family: "gpt");
 
         /// <summary>GPT-5.6 Terra — current-gen, balances capability and cost (mini-tier equivalent).</summary>
         public static ModelProfileTemplate Gpt56Terra { get; } =
-            CreateTemplate(Models.OpenAI.Gpt56Terra, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 1_050_000, speedTier: 4);
+            CreateTemplate(Models.OpenAI.Gpt56Terra, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 1_050_000, speedTier: 4, family: "gpt");
 
         /// <summary>GPT-5.6 Luna — current-gen fastest, lowest-cost of the 5.6 line (nano-tier equivalent).</summary>
         public static ModelProfileTemplate Gpt56Luna { get; } =
-            CreateTemplate(Models.OpenAI.Gpt56Luna, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 1_050_000, speedTier: 5);
+            CreateTemplate(Models.OpenAI.Gpt56Luna, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 1_050_000, speedTier: 5, family: "gpt");
 
 #pragma warning restore ANNKE001
+
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -299,27 +357,27 @@ public static class ModelCatalog
 
         /// <summary>Claude Opus 4.8 — prior-generation frontier reasoning model.</summary>
         public static ModelProfileTemplate ClaudeOpus4_8 { get; } =
-            CreateTemplate(Models.Anthropic.Opus48, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+            CreateTemplate(Models.Anthropic.Opus48, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
 
         /// <summary>Claude Sonnet 4.6 — prior-generation balanced frontier model.</summary>
         public static ModelProfileTemplate ClaudeSonnet4_6 { get; } =
-            CreateTemplate(Models.Anthropic.Sonnet46, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3);
+            CreateTemplate(Models.Anthropic.Sonnet46, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3, family: "claude");
 
         /// <summary>Claude Haiku 4.5 — current-generation fast model (no Reasoning, by design).</summary>
         public static ModelProfileTemplate ClaudeHaiku4_5 { get; } =
-            CreateTemplate(Models.Anthropic.Haiku45, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 200_000, speedTier: 5);
+            CreateTemplate(Models.Anthropic.Haiku45, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 200_000, speedTier: 5, family: "claude");
 
         /// <summary>Claude Sonnet 5 — current-generation balanced frontier model.</summary>
         public static ModelProfileTemplate ClaudeSonnet5 { get; } =
-            CreateTemplate(Models.Anthropic.Sonnet5, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3);
+            CreateTemplate(Models.Anthropic.Sonnet5, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3, family: "claude");
 
         /// <summary>Claude Opus 5 — current-generation, complex agentic coding and enterprise work.</summary>
         public static ModelProfileTemplate ClaudeOpus5 { get; } =
-            CreateTemplate(Models.Anthropic.Opus5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+            CreateTemplate(Models.Anthropic.Opus5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
 
         /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
         public static ModelProfileTemplate ClaudeFable5 { get; } =
-            CreateTemplate(Models.Anthropic.Fable5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2);
+            CreateTemplate(Models.Anthropic.Fable5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
 
 #pragma warning restore ANNKE001
     }
@@ -335,38 +393,46 @@ public static class ModelCatalog
         // assignments below — ANNKE001 is expected and intentional here, not a call site to fix.
 #pragma warning disable ANNKE001
 
-        /// <summary>Gemini 3.1 Pro — Agent Platform GA flagship, frontier reasoning with 2M context.</summary>
+        /// <summary>
+        /// Gemini 3.1 Pro — flagship, frontier reasoning. Preview-only; the window is the one the
+        /// API reports, which is half what this entry used to claim.
+        /// </summary>
         public static ModelProfileTemplate Gemini3_1Pro { get; } =
-            CreateTemplate(Models.Google.Gemini31Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 2_097_152, speedTier: 2);
+            CreateTemplate(Models.Google.Gemini31Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 2, family: "gemini");
 
-        /// <summary>Gemini 3.1 Flash — Agent Platform GA fast model with reasoning and multimodal input.</summary>
-        public static ModelProfileTemplate Gemini3_1Flash { get; } =
-            CreateTemplate(Models.Google.Gemini31Flash,
-                FullModel | ModelCapability.Reasoning | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
-                intelligenceTier: 4, maxContextTokens: 1_048_576, speedTier: 4);
+        // Gemini3_1Flash (gemini-3.1-flash) was removed — the API answers 404 for it. See
+        // docs/reference/model-deprecations.md.
 
         /// <summary>Gemini 2.5 Pro — frontier reasoning model with 1M context.</summary>
         public static ModelProfileTemplate Gemini2_5Pro { get; } =
-            CreateTemplate(Models.Google.Gemini25Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 2);
+            CreateTemplate(Models.Google.Gemini25Pro, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 2, family: "gemini");
 
         /// <summary>Gemini 2.5 Flash — fast, cost-effective with thinking.</summary>
         public static ModelProfileTemplate Gemini2_5Flash { get; } =
             CreateTemplate(Models.Google.Gemini25Flash,
                 FullModel | ModelCapability.Reasoning | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
-                intelligenceTier: 3, maxContextTokens: 1_048_576, speedTier: 4);
+                intelligenceTier: 3, maxContextTokens: 1_048_576, speedTier: 4, family: "gemini");
 
         // Gemini2_0Flash (gemini-2.0-flash, shutdown 2026-06-01) was removed — already past its
         // shutdown date. See docs/reference/model-deprecations.md.
 
+        /// <summary>
+        /// Gemini 3.7 Flash — current generation, 1M-token window as reported by the API.
+        /// Capabilities and tiers carried forward from Gemini 3.6 Flash, which is the closest known
+        /// baseline; nothing independent has confirmed them.
+        /// </summary>
+        public static ModelProfileTemplate Gemini3_7Flash { get; } =
+            CreateTemplate(Models.Google.Gemini37Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 4, family: "gemini");
+
         /// <summary>Gemini 3.5 Flash — legacy, superseded by Gemini 3.6 Flash, still fully supported.</summary>
         public static ModelProfileTemplate Gemini3_5Flash { get; } =
-            CreateTemplate(Models.Google.Gemini35Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4);
+            CreateTemplate(Models.Google.Gemini35Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4, family: "gemini");
 
         /// <summary>Gemini 3.1 Flash-Lite — legacy, superseded by Gemini 3.5 Flash-Lite, still fully supported.</summary>
         public static ModelProfileTemplate Gemini3_1FlashLite { get; } =
             CreateTemplate(Models.Google.Gemini31FlashLite,
                 FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
-                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5);
+                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5, family: "gemini");
 
         /// <summary>
         /// Gemini 3.6 Flash — current-gen, frontier-level agentic and coding performance. Context/speed
@@ -374,7 +440,7 @@ public static class ModelCatalog
         /// models-page name listing.
         /// </summary>
         public static ModelProfileTemplate Gemini3_6Flash { get; } =
-            CreateTemplate(Models.Google.Gemini36Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4);
+            CreateTemplate(Models.Google.Gemini36Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 4, family: "gemini");
 
         /// <summary>
         /// Gemini 3.5 Flash-Lite — current-gen, most cost-effective Gemini model, high-throughput.
@@ -384,9 +450,36 @@ public static class ModelCatalog
         public static ModelProfileTemplate Gemini3_5FlashLite { get; } =
             CreateTemplate(Models.Google.Gemini35FlashLite,
                 FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
-                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5);
+                intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5, family: "gemini");
 
 #pragma warning restore ANNKE001
+
+        /// <summary>
+        /// Gemma 4 — Google's open-weight family, reachable both as a hosted Agent Platform id and
+        /// by self-hosting the published weights.
+        /// </summary>
+        /// <remarks>
+        /// <b>No per-size entries.</b> The identifier names the family, not a specific checkpoint, so
+        /// <see cref="ModelClassification.SizeClass"/> is left unrecorded rather than guessed —
+        /// a wrong size class would answer "can I run this?" incorrectly, which is the one question
+        /// the facet exists for. Add sized entries when the deployed lineup is known.
+        /// </remarks>
+        public static ModelProfileTemplate Gemma4 { get; } = new()
+        {
+            Name = Models.Google.Gemma4,
+            Capabilities = ChatModel,
+            IntelligenceTier = 2,
+            MaxContextTokens = 128_000,
+            SpeedTier = 4,
+            Classification = new ModelClassification
+            {
+                Weights = ModelWeights.OpenWeights,
+                // The Gemma Terms of Use have no SPDX identifier and are not OSI-approved: they
+                // carry use restrictions that an open-source licence would not.
+                LicenseIsOsiApproved = false,
+                Family = "gemma"
+            }
+        };
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -407,7 +500,18 @@ public static class ModelCatalog
             Capabilities = FullModel | ModelCapability.Vision,
             IntelligenceTier = 3,
             MaxContextTokens = 10_000_000,
-            SpeedTier = 3
+            SpeedTier = 3,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 17,
+                Weights = ModelWeights.OpenWeights,
+                // No SPDX identifier exists for the Llama Community Licence, and it is not
+                // OSI-approved: it carries acceptable-use restrictions and a monthly-active-user
+                // threshold above which a separate grant is required.
+                LicenseIsOsiApproved = false,
+                Family = "llama"
+            }
         };
 
         /// <summary>Llama 4 Maverick — 17B active params, MoE, 1M context.</summary>
@@ -417,7 +521,18 @@ public static class ModelCatalog
             Capabilities = FullModel | ModelCapability.Vision,
             IntelligenceTier = 4,
             MaxContextTokens = 1_048_576,
-            SpeedTier = 2
+            SpeedTier = 2,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 17,
+                Weights = ModelWeights.OpenWeights,
+                // No SPDX identifier exists for the Llama Community Licence, and it is not
+                // OSI-approved: it carries acceptable-use restrictions and a monthly-active-user
+                // threshold above which a separate grant is required.
+                LicenseIsOsiApproved = false,
+                Family = "llama"
+            }
         };
 
         /// <summary>Llama 3.3 70B — strong open-weight model.</summary>
@@ -427,7 +542,18 @@ public static class ModelCatalog
             Capabilities = ChatModel | ModelCapability.CodeGeneration,
             IntelligenceTier = 3,
             MaxContextTokens = 128_000,
-            SpeedTier = 2
+            SpeedTier = 2,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 70,
+                Weights = ModelWeights.OpenWeights,
+                // No SPDX identifier exists for the Llama Community Licence, and it is not
+                // OSI-approved: it carries acceptable-use restrictions and a monthly-active-user
+                // threshold above which a separate grant is required.
+                LicenseIsOsiApproved = false,
+                Family = "llama"
+            }
         };
 
         /// <summary>Llama 3.2 3B — compact, fast local model.</summary>
@@ -437,7 +563,18 @@ public static class ModelCatalog
             Capabilities = TextBase | ModelCapability.StructuredOutput,
             IntelligenceTier = 1,
             MaxContextTokens = 128_000,
-            SpeedTier = 5
+            SpeedTier = 5,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Small,
+                ApproxParametersB = 3,
+                Weights = ModelWeights.OpenWeights,
+                // No SPDX identifier exists for the Llama Community Licence, and it is not
+                // OSI-approved: it carries acceptable-use restrictions and a monthly-active-user
+                // threshold above which a separate grant is required.
+                LicenseIsOsiApproved = false,
+                Family = "llama"
+            }
         };
 
         /// <summary>Llama 3.2 1B — ultra-light edge model.</summary>
@@ -447,7 +584,18 @@ public static class ModelCatalog
             Capabilities = TextBase,
             IntelligenceTier = 1,
             MaxContextTokens = 128_000,
-            SpeedTier = 5
+            SpeedTier = 5,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Micro,
+                ApproxParametersB = 1,
+                Weights = ModelWeights.OpenWeights,
+                // No SPDX identifier exists for the Llama Community Licence, and it is not
+                // OSI-approved: it carries acceptable-use restrictions and a monthly-active-user
+                // threshold above which a separate grant is required.
+                LicenseIsOsiApproved = false,
+                Family = "llama"
+            }
         };
     }
 
@@ -465,7 +613,14 @@ public static class ModelCatalog
             Capabilities = FrontierModel,
             IntelligenceTier = 4,
             MaxContextTokens = 128_000,
-            SpeedTier = 3
+            SpeedTier = 3,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 123,
+                Weights = ModelWeights.ApiOnly,
+                Family = "mistral"
+            }
         };
 
         /// <summary>Mistral Small — cost-effective for most tasks.</summary>
@@ -475,7 +630,59 @@ public static class ModelCatalog
             Capabilities = ChatModel | ModelCapability.CodeGeneration | ModelCapability.Vision,
             IntelligenceTier = 2,
             MaxContextTokens = 128_000,
-            SpeedTier = 4
+            SpeedTier = 4,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Medium,
+                ApproxParametersB = 24,
+                Weights = ModelWeights.OpenWeights,
+                LicenseSpdx = "apache-2.0",
+                LicenseIsOsiApproved = true,
+                LicenseUri = new Uri("https://www.apache.org/licenses/LICENSE-2.0"),
+                Family = "mistral"
+            }
+        };
+
+        /// <summary>
+        /// Ministral 3B — the small end of Mistral's line. Hosted-only: no weights are published for
+        /// this size, which is why it is the one Ministral entry that cannot be self-hosted.
+        /// </summary>
+        public static ModelProfileTemplate Ministral3B { get; } = new()
+        {
+            Name = "ministral-3b",
+            Capabilities = ChatModel,
+            IntelligenceTier = 1,
+            MaxContextTokens = 128_000,
+            SpeedTier = 5,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Small,
+                ApproxParametersB = 3,
+                Weights = ModelWeights.ApiOnly,
+                Family = "ministral"
+            }
+        };
+
+        /// <summary>
+        /// Ministral 8B — weights are published, but under a research licence rather than an
+        /// OSI-approved one. Recorded as obtainable-but-restricted, which is exactly the distinction
+        /// a licence policy needs to see.
+        /// </summary>
+        public static ModelProfileTemplate Ministral8B { get; } = new()
+        {
+            Name = "ministral-8b",
+            Capabilities = ChatModel | ModelCapability.CodeGeneration,
+            IntelligenceTier = 2,
+            MaxContextTokens = 128_000,
+            SpeedTier = 4,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Small,
+                ApproxParametersB = 8,
+                Weights = ModelWeights.OpenWeights,
+                LicenseIsOsiApproved = false,
+                Family = "ministral"
+            }
         };
 
         /// <summary>Mistral Nemo — 12B open-weight, fast local inference.</summary>
@@ -485,7 +692,17 @@ public static class ModelCatalog
             Capabilities = ChatModel | ModelCapability.CodeGeneration,
             IntelligenceTier = 2,
             MaxContextTokens = 128_000,
-            SpeedTier = 4
+            SpeedTier = 4,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Medium,
+                ApproxParametersB = 12,
+                Weights = ModelWeights.OpenWeights,
+                LicenseSpdx = "apache-2.0",
+                LicenseIsOsiApproved = true,
+                LicenseUri = new Uri("https://www.apache.org/licenses/LICENSE-2.0"),
+                Family = "mistral"
+            }
         };
     }
 
@@ -503,7 +720,15 @@ public static class ModelCatalog
             Capabilities = FullModel,
             IntelligenceTier = 3,
             MaxContextTokens = 128_000,
-            SpeedTier = 3
+            SpeedTier = 3,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 37,
+                Weights = ModelWeights.OpenWeights,
+                LicenseIsOsiApproved = false,
+                Family = "deepseek"
+            }
         };
 
         /// <summary>DeepSeek R1 — reasoning-focused model.</summary>
@@ -513,7 +738,113 @@ public static class ModelCatalog
             Capabilities = FullModel | ModelCapability.Reasoning,
             IntelligenceTier = 4,
             MaxContextTokens = 128_000,
-            SpeedTier = 2
+            SpeedTier = 2,
+            Classification = new ModelClassification
+            {
+                SizeClass = ModelSizeClass.Large,
+                ApproxParametersB = 37,
+                Weights = ModelWeights.OpenWeights,
+                LicenseSpdx = "mit",
+                LicenseIsOsiApproved = true,
+                LicenseUri = new Uri("https://opensource.org/license/mit"),
+                Family = "deepseek"
+            }
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  Microsoft (open-weight — self-hosted)
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>Microsoft Phi model templates. Open weights under an OSI-approved licence.</summary>
+    public static class Microsoft
+    {
+        /// <summary>Phi-4 Mini — ~3.8B, the small end of the family and a workstation-class model.</summary>
+        public static ModelProfileTemplate Phi4Mini { get; } = new()
+        {
+            Name = "phi-4-mini",
+            Capabilities = ChatModel,
+            IntelligenceTier = 1,
+            MaxContextTokens = 128_000,
+            SpeedTier = 5,
+            Classification = PhiWeights(ModelSizeClass.Small, approxParametersB: 3.8)
+        };
+
+        /// <summary>Phi-4 — ~14B, strong reasoning for its size.</summary>
+        public static ModelProfileTemplate Phi4 { get; } = new()
+        {
+            Name = "phi-4",
+            Capabilities = ChatModel | ModelCapability.CodeGeneration | ModelCapability.Reasoning,
+            IntelligenceTier = 2,
+            MaxContextTokens = 16_000,
+            SpeedTier = 4,
+            Classification = PhiWeights(ModelSizeClass.Medium, approxParametersB: 14)
+        };
+
+        private static ModelClassification PhiWeights(ModelSizeClass sizeClass, double approxParametersB) => new()
+        {
+            SizeClass = sizeClass,
+            ApproxParametersB = approxParametersB,
+            Weights = ModelWeights.OpenWeights,
+            LicenseSpdx = "mit",
+            LicenseIsOsiApproved = true,
+            LicenseUri = new Uri("https://opensource.org/license/mit"),
+            Family = "phi"
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  Alibaba (open-weight — self-hosted)
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Alibaba Qwen model templates. The widest spread at the small end of any family here, and
+    /// Apache-2.0 across the sizes below.
+    /// </summary>
+    public static class Alibaba
+    {
+        /// <summary>Qwen 3 0.6B — the smallest entry in the catalogue. CPU-viable.</summary>
+        public static ModelProfileTemplate Qwen3_0_6B { get; } = new()
+        {
+            Name = "qwen3-0.6b",
+            Capabilities = TextBase,
+            IntelligenceTier = 1,
+            MaxContextTokens = 32_000,
+            SpeedTier = 5,
+            Classification = QwenWeights(ModelSizeClass.Micro, approxParametersB: 0.6)
+        };
+
+        /// <summary>Qwen 3 4B — small enough for a laptop, capable enough for tool use.</summary>
+        public static ModelProfileTemplate Qwen3_4B { get; } = new()
+        {
+            Name = "qwen3-4b",
+            Capabilities = ChatModel,
+            IntelligenceTier = 1,
+            MaxContextTokens = 32_000,
+            SpeedTier = 5,
+            Classification = QwenWeights(ModelSizeClass.Small, approxParametersB: 4)
+        };
+
+        /// <summary>Qwen 3 8B — the upper end of the single-consumer-GPU tier.</summary>
+        public static ModelProfileTemplate Qwen3_8B { get; } = new()
+        {
+            Name = "qwen3-8b",
+            Capabilities = ChatModel | ModelCapability.CodeGeneration,
+            IntelligenceTier = 2,
+            MaxContextTokens = 32_000,
+            SpeedTier = 4,
+            Classification = QwenWeights(ModelSizeClass.Small, approxParametersB: 8)
+        };
+
+        private static ModelClassification QwenWeights(ModelSizeClass sizeClass, double approxParametersB) => new()
+        {
+            SizeClass = sizeClass,
+            ApproxParametersB = approxParametersB,
+            Weights = ModelWeights.OpenWeights,
+            LicenseSpdx = "apache-2.0",
+            LicenseIsOsiApproved = true,
+            LicenseUri = new Uri("https://www.apache.org/licenses/LICENSE-2.0"),
+            Family = "qwen"
         };
     }
 }

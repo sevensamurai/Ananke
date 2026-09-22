@@ -37,6 +37,12 @@ detail to come back to.
 |------|------|---------|
 | `WorkflowManifest` | Record | Parsed YAML manifest — jobs, connections, model aliases, system prompts |
 | `WorkflowDslParser` | Class | Parses YAML text into `WorkflowManifest` |
+| `PlanManifest` | Record | A plan declared as data — decomposition, contracts, and `revisions:` with the reason each change was made; builds a `PlanTree` |
+| `PlanNodeManifest` | Record | One declared work item: goal, gate and rank criteria, constraints, bound, children |
+| `PlanRevisionManifest` | Record | One declared re-ruling: the node, the contract that replaced its own, why, and the children that replace its decomposition |
+| `PlanManifestParser` | Static class | Parses the plan manifest's YAML subset; unknown keys are errors rather than silences |
+| `PlanNarrator` | Class | Narrates plan events one at a time — stateful, because a node's start and its report read as one line and steps are numbered by the narration, not by the tree |
+| `PlanReportExporter` | Static class | Renders a `PlanTree` and its lineage for a reader — everything derived from the versions, nothing elided; distinct from `PlanTreeProjection`, which serves a model under a token budget |
 | `WorkflowScaffold` | Class | Converts a `WorkflowManifest` into a `Workflow<TState>` instance |
 | `ModelResolver` | Class | Resolves model alias strings (from YAML) to `IAgentModel` instances |
 | `ModelCatalog` | Class | Design-time registry of model aliases and their associated `IAgentModel` bindings |

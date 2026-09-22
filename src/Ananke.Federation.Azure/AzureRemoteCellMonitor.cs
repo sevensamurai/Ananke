@@ -15,7 +15,7 @@ namespace Ananke.Federation.Azure;
 public sealed class AzureRemoteCellMonitor : IRemoteCellMonitor
 {
     /// <inheritdoc />
-    public string Platform => "azure-ai";
+    public string Platform => "azure";
 
     /// <inheritdoc />
     public Task<RemoteCellHealth> GetHealthAsync(string deploymentId, CancellationToken ct = default)

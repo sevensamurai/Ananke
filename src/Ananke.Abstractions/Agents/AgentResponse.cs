@@ -12,7 +12,7 @@ public sealed record AgentResponse
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Adapter contract (ADR-arch-029 D1).</b> An implementation MUST populate this whenever the
+    /// <b>Adapter contract.</b> An implementation MUST populate this whenever the
     /// response carries <b>any content that is not a <see cref="TextPart"/></b> — reasoning, image,
     /// audio or document. For a response that is purely text it MAY be left <see langword="null"/>,
     /// with <see cref="Text"/> carrying the content; callers must therefore treat
@@ -27,7 +27,7 @@ public sealed record AgentResponse
     /// <b>The same rule binds both paths.</b> An adapter must not populate this on
     /// <c>GenerateAsync</c> and omit it on <c>GenerateStreamAsync</c>'s
     /// <see cref="AgentStreamChunk.CompletedResponse"/> for the same input — that asymmetry silently
-    /// drops content when a caller switches to streaming, and is what ADR-arch-029 exists to fix.
+    /// drops content when a caller switches to streaming, and is what this contract exists to prevent.
     /// </para>
     /// </remarks>
     public IReadOnlyList<ContentPart>? Parts { get; init; }

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The operation seam's contract, as an ordinary library rather than a test project — the same
+       shape as Ananke.Orchestration.Conformance, and for the same reason: a consumer's own test
+       project has to be able to reference it.
+
+       It is a separate package rather than a section of that one because that one depends on
+       Ananke.Abstractions alone, and a provider adapter proving only the streaming contract should
+       not acquire Ananke.Orchestration to do it. The seam proved here lives in Ananke.Orchestration,
+       so the dependency is unavoidable and is kept on this side of the line.
+
+       This assembly references no test framework: the scenarios are named delegates and every
+       assertion is Shouldly, which throws its own exception type. The inherit-and-done NUnit
+       fixtures live in Ananke.Orchestration.Planning.Conformance.NUnit. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <PackageId>Ananke.Orchestration.Planning.Conformance</PackageId>
+    <Description>Conformance contract for the plan tier's operation seam — the scenarios an OperationCatalog and PlanCandidateApplier pair must satisfy.</Description>
+    <PackageTags>ai;agents;conformance;contract-tests;planning</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Conformance\Ananke.Orchestration.Conformance.csproj" />
+  </ItemGroup>
+
+</Project>

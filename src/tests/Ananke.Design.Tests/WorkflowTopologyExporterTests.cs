@@ -104,6 +104,41 @@ public class WorkflowTopologyExporterTests
     // ── ToDsl: interrupt ─────────────────────────────────────────────
 
     [Test]
+    public void ToDsl_AConditionalPause_SaysThatItIsConditional()
+    {
+        // The export cannot carry the predicate — it is code — but it must not show an escalation as
+        // though it were a gate that stops every time. Losing the condition silently is how a
+        // round-trip turns "ask me when this cannot go on" into "ask me about everything".
+        var workflow = new Workflow<ScaffoldState>("test")
+            .Job("work", (s, _) => Task.FromResult(s))
+            .Job("review", (s, _) => Task.FromResult(s))
+            .Then("work", "review")
+            .Then("review", Workflow.End)
+            .InterruptWhen("review", s => s.Value > 3);
+
+        var lines = workflow.ToDsl();
+
+        lines.ShouldContain("interrupt(review, when)");
+        lines.ShouldNotContain("interrupt(review)");
+    }
+
+    [Test]
+    public void ToDsl_AConditionalInputTurn_IsStillAnAsk()
+    {
+        var workflow = new Workflow<ScaffoldState>("test")
+            .Job("work", (s, _) => Task.FromResult(s))
+            .Job("ask_question", (s, _) => Task.FromResult(s))
+            .Then("work", "ask_question")
+            .Then("ask_question", Workflow.End)
+            .AwaitInputWhen("ask_question", s => s.Value > 3);
+
+        var lines = workflow.ToDsl();
+
+        lines.ShouldContain("ask(ask_question, when)");
+    }
+
+
+    [Test]
     public void ToDsl_Interrupt_EmitsInterruptDirective()
     {
         var workflow = new Workflow<ScaffoldState>("test")
@@ -166,6 +201,25 @@ public class WorkflowTopologyExporterTests
         var lines = workflow.ToDsl();
 
         lines.ShouldContain(l => l.Contains("loop") && l.Contains("refine") && l.Contains("max: 8"));
+    }
+
+    [Test]
+    public void ToDsl_ALoopBoundedOnlyByItsExitCondition_SaysSoRatherThanPrintingIntMaxValue()
+    {
+        // A supervised plan's coordinate loop has no iteration cap by design — every way out of it is
+        // a condition. Exporting the sentinel would show a reader a ceiling of 2,147,483,647 and
+        // invite them to tune it, which is the opposite of what the absence of one means.
+        var workflow = new Workflow<ScaffoldState>("unbounded")
+            .Job("work", (s, _) => Task.FromResult(s))
+            .Job("check", (s, _) => Task.FromResult(s))
+            .Then("work", "check")
+            .Loop("check", loopTarget: "work", exitTarget: Workflow.End,
+                until: s => s.Value >= 1, maxIterations: int.MaxValue);
+
+        var lines = workflow.ToDsl();
+
+        lines.ShouldContain(l => l.Contains("loop") && l.Contains("max: none"));
+        lines.ShouldNotContain(l => l.Contains(int.MaxValue.ToString()));
     }
 
     // ── ToManifestYaml ───────────────────────────────────────────────

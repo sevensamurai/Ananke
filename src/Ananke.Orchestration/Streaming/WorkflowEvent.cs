@@ -4,12 +4,25 @@ using Ananke.Abstractions.Agents;
 namespace Ananke.Orchestration.Streaming;
 
 /// <summary>
-/// Base type for workflow-level progress events emitted by
+/// Base type for everything that reaches
 /// <see cref="Execution.IWorkflowRunner.StreamAsync{TState}"/> and
-/// <see cref="Workflow{TState}.StreamAsync"/>.
-/// Use pattern matching to handle specific event types.
+/// <see cref="Workflow{TState}.StreamAsync"/>. Use pattern matching to handle specific types.
 /// </summary>
-public abstract record WorkflowEvent<TState>
+/// <remarks>
+/// <para>
+/// <b>Nothing here mentions the workflow's state type</b>, and that is what the type exists for.
+/// A stream carries events from more than one state type: a sub-workflow's events reach its
+/// parent's stream, and a sub-workflow has a state type of its own. It also lets work happening
+/// <em>below</em> a job report progress without knowing what state the workflow around it holds —
+/// which is the only way a job can say anything at all, since a job cannot reach the runner's
+/// channel and the runner must not learn what any particular job does.
+/// </para>
+/// <para>
+/// Derive from this directly for anything that carries no state, and from
+/// <see cref="WorkflowEvent{TState}"/> for anything that does.
+/// </para>
+/// </remarks>
+public abstract record WorkflowEvent
 {
     /// <summary>Name of the workflow that produced this event.</summary>
     public required string WorkflowName { get; init; }
@@ -32,6 +45,12 @@ public abstract record WorkflowEvent<TState>
     /// </remarks>
     public string? Branch { get; init; }
 }
+
+/// <summary>
+/// Base type for workflow-level progress events that belong to a workflow of state
+/// <typeparamref name="TState"/>.
+/// </summary>
+public abstract record WorkflowEvent<TState> : WorkflowEvent;
 
 /// <summary>Emitted when a job is about to execute.</summary>
 public sealed record JobStarted<TState> : WorkflowEvent<TState>
@@ -163,4 +182,33 @@ public sealed record BudgetExceeded<TState> : WorkflowEvent<TState>
 
     /// <summary>Cumulative token usage across all LLM calls in this execution.</summary>
     public required TokenUsage CumulativeUsage { get; init; }
+}
+
+/// <summary>An agent called a tool, and this is what came back.</summary>
+/// <remarks>
+/// Reported for every call, including one to a tool nothing registered, which is reported with the
+/// error it was answered with. <see cref="Result"/> is capped; <see cref="ResultLength"/> is not.
+/// </remarks>
+public sealed record AgentToolCalled : WorkflowEvent
+{
+    /// <summary>How much of a result is kept on the event.</summary>
+    public const int ResultCap = 2000;
+
+    /// <summary>The job that made the call.</summary>
+    public required string AgentName { get; init; }
+
+    /// <summary>The tool it asked for.</summary>
+    public required string ToolName { get; init; }
+
+    /// <summary>The arguments, as the model wrote them.</summary>
+    public required string Arguments { get; init; }
+
+    /// <summary>What came back, or the error, cut to <see cref="ResultCap"/> characters.</summary>
+    public required string Result { get; init; }
+
+    /// <summary>How long the whole result was.</summary>
+    public required int ResultLength { get; init; }
+
+    /// <summary>Whether the call ended in an error.</summary>
+    public bool IsError { get; init; }
 }

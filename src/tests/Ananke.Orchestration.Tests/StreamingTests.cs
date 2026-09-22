@@ -10,7 +10,7 @@ public class StreamingTests
     [Test]
     public async Task StreamAsync_EmitsJobStartedAndCompleted()
     {
-        var events = new List<WorkflowEvent<CounterState>>();
+        var events = new List<WorkflowEvent>();
 
         await foreach (var evt in new Workflow<CounterState>("stream-basic")
             .Job("a", (s, _) => Task.FromResult(s with { Value = 1 }))
@@ -71,7 +71,7 @@ public class StreamingTests
     [Test]
     public async Task StreamAsync_FailingJob_EmitsWorkflowFaulted()
     {
-        var events = new List<WorkflowEvent<CounterState>>();
+        var events = new List<WorkflowEvent>();
 
         await foreach (var evt in new Workflow<CounterState>("stream-fault")
             .Job("boom", (_, _) => throw new InvalidOperationException("kaboom"))

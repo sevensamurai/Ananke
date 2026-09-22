@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Ananke.Abstractions.Agents;
 
+using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Usage;
 
 namespace Ananke.Orchestration.Agents.Routing;
@@ -45,16 +46,18 @@ public sealed class ModelRouter : IModelRouter
     private sealed record ModelRoute(Func<AgentRequest, bool> Predicate, IAgentModel Model);
 }
 
-public sealed class RoutedAgentModel : IStreamingAgentModel
+public sealed class RoutedAgentModel : IStreamingAgentModel, IModelContextResolver
 {
     private readonly IModelRouter _router;
     private readonly IModelCostResolver? _costResolver;
+    private readonly IModelContextResolver? _contextResolver;
 
     public RoutedAgentModel(IModelRouter router)
     {
         ArgumentNullException.ThrowIfNull(router);
         _router = router;
         _costResolver = router as IModelCostResolver;
+        _contextResolver = router as IModelContextResolver;
     }
 
     /// <summary>
@@ -65,6 +68,7 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
 
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
+        await ObserveContextIfAvailableAsync(request, ct).ConfigureAwait(false);
         var response = await _router.Select(request).GenerateAsync(request, ct).ConfigureAwait(false);
         await ReportCostIfAvailableAsync(request, response, ct).ConfigureAwait(false);
         return response;
@@ -83,6 +87,8 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
+        await ObserveContextIfAvailableAsync(request, ct).ConfigureAwait(false);
+
         await foreach (var chunk in model.GenerateStreamAsync(request, ct).ConfigureAwait(false))
         {
             if (chunk.CompletedResponse is not null)
@@ -91,15 +97,49 @@ public sealed class RoutedAgentModel : IStreamingAgentModel
         }
     }
 
-    private static async IAsyncEnumerable<AgentStreamChunk> BufferAsync(
+    private async IAsyncEnumerable<AgentStreamChunk> BufferAsync(
         IAgentModel model,
         AgentRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
+        await ObserveContextIfAvailableAsync(request, ct).ConfigureAwait(false);
+
         var response = await model.GenerateAsync(request, ct).ConfigureAwait(false);
         if (response.Text is not null)
             yield return new AgentStreamChunk { TextDelta = response.Text };
         yield return new AgentStreamChunk { CompletedResponse = response };
+    }
+
+    /// <summary>
+    /// Reports what this call is about to send, measured against the selected model's real window.
+    /// </summary>
+    /// <remarks>
+    /// The observer check comes first so a run without one never pays for either the estimate or
+    /// the extra profile selection — the same shape as <see cref="ReportCostIfAvailableAsync"/>.
+    /// Reported <em>before</em> the call: whether the prompt fitted is not answerable afterwards.
+    /// </remarks>
+    /// <inheritdoc />
+    /// <remarks>
+    /// Forwarded from the wrapped router so a caller holding only the <see cref="IAgentModel"/> —
+    /// an agent engine, typically — can still learn the window of the model that will be selected.
+    /// Without this the real window would be reachable only by whoever built the router.
+    /// </remarks>
+    public ModelContextWindow ResolveContextWindow(AgentRequest request) =>
+        _contextResolver?.ResolveContextWindow(request) ?? ModelContextWindow.Unknown;
+
+    private ValueTask ObserveContextIfAvailableAsync(AgentRequest request, CancellationToken ct)
+    {
+        if (ContextObserving.Current is null)
+            return ValueTask.CompletedTask;
+
+        var window = _contextResolver?.ResolveContextWindow(request) ?? ModelContextWindow.Unknown;
+
+        return ContextObserving.ReportAsync(new ContextObservation
+        {
+            ModelName = window.ModelName,
+            PromptTokens = RequestTokenEstimator.Estimate(request),
+            ContextTokens = window.ContextTokens
+        }, ct);
     }
 
     private Task ReportCostIfAvailableAsync(

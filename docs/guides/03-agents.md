@@ -8,6 +8,9 @@ The provider is a pluggable detail, not a foundation. Because every agent is wra
 
 **Demo:** [BasicAgentDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/01-foundations/BasicAgentDemo)
 
+> Running through **Amazon Bedrock** or **Microsoft Foundry**? The provider interface is the same;
+> the auth and endpoint setup is in [21 — Enterprise clouds](21-enterprise-clouds.md).
+
 ---
 
 ## Core Concepts
@@ -72,6 +75,9 @@ var model = OpenAIChatAgentModel.Create(
     model:    "llama3.2",
     endpoint: new Uri("http://localhost:11434/v1"));
 ```
+
+Self-hosting has its own failure modes — context windows, routing economics, quantization.
+See [17 — Local & self-hosted models](17-local-models.md).
 
 → See [Guide 11 — Advanced Agent Features](11-advanced-agents.md) for the full
 list of compatible providers and YAML configuration.

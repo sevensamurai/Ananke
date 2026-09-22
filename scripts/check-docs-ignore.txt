@@ -82,6 +82,7 @@ Sonnet35
 Haiku35
 Gemini20Flash
 Gemini20FlashLite
+Gemini31Flash       # gemini-3.1-flash: the API answers 404 for it (checked 2026-08-30)
 
 # --- External library / BCL / SDK types named in prose ---
 ActivityListener
@@ -155,13 +156,6 @@ Propagation    # "Monte Carlo Reward Propagation" Mermaid node label
 Save           # "Save checkpoint" Mermaid sequence-diagram message
 Yes            # Mermaid flowchart branch-edge label
 
-# --- 2026-08-01: retired demos, deliberately still named in README's "Retired demos"
-# table so old links and articles referencing them remain explicable. The projects are
-# gone on purpose (demos were consolidated by category); do not "fix" these names.
-SimpleWorkflowDemo
-ExtendedFlowDemo
-DistributedServicesDemo
-
 # --- 2026-08-01: path references that are correct as written and must not resolve ---
 .vscode/mcp.json                    # file the READER creates when following McpServerDemo
 .github/workflows/pages.yml         # historical: existed at v0.7.2, superseded by website.yml
@@ -173,3 +167,9 @@ Releases/SimulatedReleaseHistory.cs # aspirational file in a PLAN-*.md design no
 Interop        # "%% Interop & extensions" Mermaid comment in ARCHITECTURE.md
 Higher         # "%% Higher-order" Mermaid comment in ARCHITECTURE.md
 Styling        # "%% Styling" Mermaid comment in ARCHITECTURE.md
+
+# --- 2026-08-20: third-party SDK members named in the conformance README's stub-transport
+# guidance (ADR-arch-031 §3.1). They are Google/Anthropic SDK API, not Ananke symbols, so no
+# .cs file declares them.
+HttpClientFactory   # Google.GenAI ClientOptions.HttpClientFactory — the Google stub-transport seam
+Handlers            # Anthropic ClientOptions.Handlers — named to warn it is NOT the seam

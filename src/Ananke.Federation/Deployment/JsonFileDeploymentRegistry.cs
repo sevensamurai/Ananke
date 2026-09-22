@@ -18,9 +18,12 @@ namespace Ananke.Federation.Deployment;
 /// </para>
 /// <para>
 /// The JSON file includes a <c>schemaVersion</c> header to support future migrations.
-/// The default storage location is <c>%USERPROFILE%\.nnke-platform\deployments.json</c>
-/// on Windows, or <c>$XDG_STATE_HOME/.nnke-platform/deployments.json</c> (falling back to
-/// <c>~/.local/state/.nnke-platform/deployments.json</c>) on Linux/macOS.
+/// </para>
+/// <para>
+/// The default storage location is <see cref="Paths.AnankePaths.DeploymentsFile"/> —
+/// <c>&lt;config root&gt;/deployments/registry.json</c>, where the config root is
+/// <c>%USERPROFILE%\.ananke\</c> on Windows and <c>$XDG_DATA_HOME/.ananke/</c> on Linux and macOS,
+/// falling back to <c>~/.local/share/.ananke/</c> when <c>XDG_DATA_HOME</c> is unset.
 /// </para>
 /// </remarks>
 public sealed class JsonFileDeploymentRegistry : IDeploymentRegistry, IDisposable
@@ -171,7 +174,10 @@ public sealed class JsonFileDeploymentRegistry : IDeploymentRegistry, IDisposabl
 
     private static string BuildMutexName(string filePath)
     {
-        var canonical = Path.GetFullPath(filePath).ToUpperInvariant();
+        // Not upper-cased. Doing so assumed a case-insensitive filesystem: on Linux /x/a.json and
+        // /x/A.json are different files that would then share one mutex. Harmless — it over-locks,
+        // never under-locks — but wrong, and a tell of where this was written.
+        var canonical = Path.GetFullPath(filePath);
         var hash = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(canonical)));
         return $"nnke-platform-registry-{hash}";
     }

@@ -1,28 +1,46 @@
-using Ananke.Federation.Paths;
+using Ananke.Federation.Validation;
 using Ananke.Tool.Shared;
 using System.CommandLine;
-using System.Text.Json;
 
 namespace Ananke.Tool.Platform.Commands;
 
 /// <summary>
-/// Handles <c>nnke-platform login --platform &lt;p&gt;</c> — launches the
-/// platform-specific credential acquisition flow and persists credentials to
-/// <c>~/.ananke/credentials.json</c> (chmod 600 on POSIX).
+/// Handles <c>nnke-platform login --platform &lt;p&gt;</c> — prints the environment a platform
+/// needs, and how to obtain it. <b>Stores nothing.</b>
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Rewritten.</b> It used to prompt interactively and write
+/// <c>~/.ananke/credentials.json</c>, a file nothing ever read — so a plaintext API key sat on disk
+/// with no compensating function. It also prompted for an Azure <i>subscription id</i>, which is not
+/// what the adapter needs (it needs a project endpoint), and read secrets with
+/// <c>Console.ReadKey</c>, so it could not be scripted, piped or run in CI on any platform.
+/// </para>
+/// <para>
+/// <b>Ananke does not own a secret.</b> All three target clouds ship mature credential chains —
+/// <c>az login</c>, Application Default Credentials, <c>AWS_PROFILE</c> — and competing with those
+/// is how a fourth copy of a secret goes stale. This command's job is to say what to set and where
+/// to get it, then get out of the way.
+/// </para>
+/// <para>
+/// <b>The variable names here are a hint, not the contract.</b> Each adapter reads its own
+/// configuration and reports its own failure; <c>nnke-platform whoami</c> and
+/// <c>adapters doctor</c> surface those messages verbatim, and they are authoritative if this table
+/// ever drifts.
+/// </para>
+/// </remarks>
 internal static class LoginCommand
 {
-    private static string CredentialsPath => AnankePaths.CredentialsFile;
-
     public static Command Create()
     {
         var platformOption = new Option<string>("--platform", "-p")
         {
-            Description = "Platform to authenticate: azure, google, or anthropic.",
+            Description = "Platform to describe: azure, vertex-ai, claude, or local.",
             Required = true
         };
 
-        var command = new Command("login", "Configure credentials for a federation platform.")
+        var command = new Command("login",
+            "Print the environment variables a platform needs. Stores nothing — Ananke does not hold your credentials.")
         {
             platformOption
         };
@@ -39,136 +57,92 @@ internal static class LoginCommand
 
     private static int Execute(string platform, bool json)
     {
-        string? credential;
+        // Resolved like every other verb. This command used to be the only one that did not, so
+        // `login --platform vertex-ai` — which the guide told users to run — exited 1 while
+        // `deploy --platform vertex-ai` worked.
+        var canonical = PlatformIdentifiers.Resolve(platform);
 
-        try
+        var guidance = Guidance(canonical);
+        if (guidance is null)
         {
-            credential = platform.ToLowerInvariant() switch
-            {
-                "azure" => AcquireAzure(),
-                "google" => AcquireGoogle(),
-                "anthropic" => AcquireAnthropic(),
-                _ => null
-            };
-        }
-        catch (Exception ex)
-        {
-            if (json) JsonOutput.Write(new { status = "error", platform, message = ex.Message });
-            else Console.Error.WriteLine($"  Error during login: {ex.Message}");
+            var known = string.Join(", ", PlatformIdentifiers.Canonical.Order());
+            if (json)
+                JsonOutput.Write(new { status = "error", message = $"Unknown platform '{platform}'. Known: {known}." });
+            else
+                Console.Error.WriteLine($"  ✗ Unknown platform '{platform}'. Known: {known}.");
             return 1;
         }
-
-        if (credential is null)
-        {
-            if (json) JsonOutput.Write(new { status = "error", message = $"Unknown platform '{platform}'. Valid: azure, google, anthropic." });
-            else Console.Error.WriteLine($"  Unknown platform '{platform}'. Valid: azure, google, anthropic.");
-            return 1;
-        }
-
-        PersistCredential(platform, credential);
 
         if (json)
-            JsonOutput.Write(new { status = "ok", platform, credentialsPath = CredentialsPath });
-        else
         {
-            Console.WriteLine();
-            Console.WriteLine($"  ✓ Credentials saved for {platform}.");
-            Console.WriteLine($"    Path: {CredentialsPath}");
-            Console.WriteLine();
+            JsonOutput.Write(new
+            {
+                status = "ok",
+                platform = canonical,
+                variables = guidance.Variables.Select(v => new { name = v.Name, description = v.Description }),
+                howTo = guidance.HowTo
+            });
+            return 0;
         }
 
+        Console.WriteLine();
+        Console.WriteLine($"  {canonical} — {guidance.Summary}");
+        Console.WriteLine();
+
+        if (guidance.Variables.Count == 0)
+        {
+            Console.WriteLine("  Nothing to configure.");
+            Console.WriteLine();
+            return 0;
+        }
+
+        foreach (var v in guidance.Variables)
+            Console.WriteLine($"  export {v.Name}=   # {v.Description}");
+
+        Console.WriteLine();
+        Console.WriteLine($"  {guidance.HowTo}");
+        Console.WriteLine();
+        Console.WriteLine("  Then confirm with: nnke-platform whoami");
+        Console.WriteLine();
         return 0;
     }
 
-    // ── Platform-specific flows ──────────────────────────────────────
-
-    private static string AcquireAzure()
+    private static PlatformGuidance? Guidance(string canonical) => canonical switch
     {
-        Console.WriteLine();
-        Console.WriteLine("  Azure: delegating to 'az login'...");
-        Console.WriteLine("  (ensure the Azure CLI is installed: https://aka.ms/azure-cli)");
-        Console.WriteLine();
+        PlatformHost.LocalPlatform => new(
+            "the in-process substrate",
+            [],
+            "No credentials, no cloud account, no adapter to install."),
 
-        // In a full implementation: spawn `az login` and capture the resulting token.
-        Console.Write("  Enter your Azure subscription ID: ");
-        var subscriptionId = Console.ReadLine()?.Trim();
-        if (string.IsNullOrWhiteSpace(subscriptionId))
-            throw new InvalidOperationException("Subscription ID is required.");
+        "azure" => new(
+            "Microsoft Foundry Agent Service",
+            [new("AZURE_AI_ENDPOINT",
+                "Foundry *project* endpoint: https://<resource>.services.ai.azure.com/api/projects/<project>")],
+            "Sign in so the credential chain resolves — 'az login' locally, managed identity in CI. "
+            + "Note this is the project endpoint, not the model endpoint used by AZURE_OPENAI_ENDPOINT."),
 
-        return JsonSerializer.Serialize(new { provider = "azure", subscriptionId, method = "az-cli" });
-    }
+        "vertex-ai" => new(
+            "Gemini Enterprise Agent Platform",
+            [
+                new("GOOGLE_CLOUD_PROJECT", "GCP project id"),
+                new("GOOGLE_CLOUD_LOCATION", "region; defaults to us-central1 when unset")
+            ],
+            "Authenticate with Application Default Credentials: "
+            + "'gcloud auth application-default login' locally, Workload Identity in GCP."),
 
-    private static string AcquireGoogle()
-    {
-        Console.WriteLine();
-        Console.WriteLine("  Google Cloud: provide a service-account JSON key file path.");
-        Console.Write("  Service account JSON path: ");
-        var keyPath = Console.ReadLine()?.Trim();
-        if (string.IsNullOrWhiteSpace(keyPath) || !File.Exists(keyPath))
-            throw new InvalidOperationException($"Service account file not found: {keyPath}");
+        "claude" => new(
+            "Anthropic Claude Managed Agents (preview)",
+            [new("ANTHROPIC_API_KEY", "API key on a workspace with Claude Agents beta access")],
+            "The key needs the agents beta entitlement; without it the API authenticates and then "
+            + "404s on /v1/agents."),
 
-        return JsonSerializer.Serialize(new { provider = "google", serviceAccountKeyPath = keyPath });
-    }
+        _ => null
+    };
 
-    private static string AcquireAnthropic()
-    {
-        Console.WriteLine();
-        Console.Write("  Anthropic API key (sk-ant-...): ");
-        var key = ReadSecret();
-        if (string.IsNullOrWhiteSpace(key))
-            throw new InvalidOperationException("API key is required.");
+    private sealed record PlatformGuidance(
+        string Summary,
+        IReadOnlyList<PlatformVariable> Variables,
+        string HowTo);
 
-        return JsonSerializer.Serialize(new { provider = "anthropic", apiKey = key });
-    }
-
-    // ── Persistence ─────────────────────────────────────────────────
-
-    private static void PersistCredential(string platform, string credential)
-    {
-        var dir = Path.GetDirectoryName(CredentialsPath)!;
-        Directory.CreateDirectory(dir);
-
-        Dictionary<string, string> store;
-        if (File.Exists(CredentialsPath))
-        {
-            try
-            {
-                store = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(CredentialsPath))
-                        ?? new Dictionary<string, string>();
-            }
-            catch
-            {
-                store = new Dictionary<string, string>();
-            }
-        }
-        else
-        {
-            store = new Dictionary<string, string>();
-        }
-
-        store[platform] = credential;
-        File.WriteAllText(CredentialsPath, JsonSerializer.Serialize(store, new JsonSerializerOptions { WriteIndented = true }));
-
-        // Best-effort chmod 600 on POSIX
-        if (!OperatingSystem.IsWindows())
-        {
-            try { File.SetUnixFileMode(CredentialsPath, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
-            catch { /* non-fatal */ }
-        }
-    }
-
-    private static string ReadSecret()
-    {
-        var sb = new System.Text.StringBuilder();
-        ConsoleKeyInfo key;
-        while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
-        {
-            if (key.Key == ConsoleKey.Backspace && sb.Length > 0)
-                sb.Remove(sb.Length - 1, 1);
-            else if (key.KeyChar != '\0')
-                sb.Append(key.KeyChar);
-        }
-        Console.WriteLine();
-        return sb.ToString();
-    }
+    private sealed record PlatformVariable(string Name, string Description);
 }
