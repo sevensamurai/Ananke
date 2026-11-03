@@ -1,3 +1,5 @@
+using Ananke.Orchestration;
+using System.Diagnostics.CodeAnalysis;
 namespace Ananke.Design;
 
 /// <summary>
@@ -27,6 +29,7 @@ namespace Ananke.Design;
 /// legitimately has none, and would be discovered when the plan passed without checking anything.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 internal static class PlanManifestParser
 {
     private readonly record struct Line(int Indent, string Text, int Number);
@@ -105,6 +108,8 @@ internal static class PlanManifestParser
         IReadOnlyList<string> criteria = [];
         IReadOnlyList<string> quality = [];
         IReadOnlyList<string> constraints = [];
+        IReadOnlyList<string> touches = [];
+        string? effort = null;
         IReadOnlyList<PlanNodeManifest> children = [];
 
         while (at < source.Count && source[at].Indent >= indent)
@@ -144,6 +149,16 @@ internal static class PlanManifestParser
                     constraints = ParseScalars(source, ref at, indent + 2);
                     break;
 
+                case "touches":
+                    at++;
+                    touches = ParseScalars(source, ref at, indent + 2);
+                    break;
+
+                case "effort":
+                    effort = Require(value, line, "effort");
+                    at++;
+                    break;
+
                 case "children":
                     at++;
                     children = ParseNodes(source, ref at, indent + 2);
@@ -165,6 +180,8 @@ internal static class PlanManifestParser
             Criteria = criteria,
             Quality = quality,
             Constraints = constraints,
+            Touches = touches,
+            Effort = effort,
             Children = children
         };
     }

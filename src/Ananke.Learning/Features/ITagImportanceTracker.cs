@@ -28,4 +28,7 @@ public sealed record TagImportanceOptions
     /// required before a map is produced. Default: 10.
     /// </summary>
     public int MinSampleSize { get; init; } = 10;
+
+    /// <summary>Clock that stamps a computed map. Default: <see cref="TimeProvider.System"/>.</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }

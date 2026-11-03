@@ -997,6 +997,97 @@ public class SupervisedPlanPatternTests
     }
 
     [Test]
+    public async Task Build_AStepAskedToTryAgain_IsAttemptedAgainReadingTheLine_AndTheRunFinishesUnattended()
+    {
+        // The check stops the step until it has been told something.
+        var told = new List<string>();
+        var answered = false;
+        var planned = false;
+
+        var supervision = new SupervisionOptions
+        {
+            Store = new InMemoryPlanTreeStore(),
+            Verifier = new DeterministicVerifier(
+            [
+                new PredicateCheck("the parser", ["the parser round-trips"], _ => answered),
+                new PredicateCheck("the rest", ["output matches the golden file", "the build is green"], _ => true)
+            ]),
+            Runner = (context, _) =>
+            {
+                if (context.Node.Id == "plan-parse")
+                {
+                    told.AddRange(context.Node.Answers.Select(a => a.Answer));
+                    answered = context.Node.Answers.Count > 0;
+                }
+
+                return Task.FromResult(Answer(context, passed: true));
+            },
+            Supervisor = TriesAgain("Parse both dialects.")
+        };
+
+        var workflow = AgenticPattern.SupervisedPlan<DeliveryState>("delivery")
+            .WithPlan(Tree())
+            .Supervised(supervision)
+            .Tracking(s => s.Coordination, (s, c) => s with { Coordination = c })
+            .WithAdvisor(new AgentPlanAdvisor(supervision).AsAdvisor(), unattended: true)
+            .WithPlanner((_, _, _) =>
+            {
+                planned = true;
+                return Task.FromResult<AuthoredPlan?>(null);
+            })
+            .Build();
+
+        var result = await workflow.RunAsync(new DeliveryState()).WaitAsync(TimeSpan.FromSeconds(10));
+
+        told.ShouldBe(["Parse both dialects."]);
+        result.State.Coordination!.Result.RootOutcome.ShouldBe(ContractOutcome.Met);
+        result.State.Coordination.Changes.ShouldBe(0);
+        planned.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task Build_AStepThatFailsAgainAfterTryingAgain_IsNotAskedAThirdTime()
+    {
+        // How many times the step had been told something, at each of its attempts.
+        var attempts = new List<int>();
+
+        var supervision = new SupervisionOptions
+        {
+            Store = new InMemoryPlanTreeStore(),
+            Verifier = new DeterministicVerifier(
+                [new PredicateCheck("the parser", ["the parser round-trips"], _ => false)]),
+            Runner = (context, _) =>
+            {
+                if (context.Node.Id == "plan-parse")
+                    attempts.Add(context.Node.Answers.Count);
+
+                return Task.FromResult(Answer(context, passed: true));
+            },
+            Supervisor = TriesAgain("Parse both dialects.")
+        };
+
+        var workflow = AgenticPattern.SupervisedPlan<DeliveryState>("delivery")
+            .WithPlan(Tree())
+            .Supervised(supervision)
+            .Tracking(s => s.Coordination, (s, c) => s with { Coordination = c })
+            .WithAdvisor(new AgentPlanAdvisor(supervision).AsAdvisor(), unattended: true)
+            .WithPlanner((_, _, _) => Task.FromResult<AuthoredPlan?>(null))
+            .Build();
+
+        var result = await workflow.RunAsync(new DeliveryState()).WaitAsync(TimeSpan.FromSeconds(10));
+
+        attempts.ShouldBe([0, 1]);
+        result.State.Coordination!.Result.RootOutcome.ShouldNotBe(ContractOutcome.Met);
+    }
+
+    /// <summary>A supervisor that, at every halt, asks the step to try again with <paramref name="line"/>.</summary>
+    private static SimulatedAgentModel TriesAgain(string line) => SimulatedAgentModel.Json(new
+    {
+        options = new[] { new { summary = "The step stopped short", answer = line, recommended = true } },
+        terms = Array.Empty<string>()
+    });
+
+    [Test]
     public async Task ASettledPlan_ReachesTheReviewer_AndARejectionBecomesAHalt()
     {
         // R11, through the builder: the goal is what the review reads, and a rejection travels as a

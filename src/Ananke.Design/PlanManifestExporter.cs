@@ -1,3 +1,5 @@
+using Ananke.Orchestration;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Ananke.Design;
@@ -30,6 +32,7 @@ namespace Ananke.Design;
 /// node name that is blank or spans lines.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanManifestExporter
 {
     /// <summary>
@@ -103,6 +106,13 @@ public static class PlanManifestExporter
         AppendScalars(sb, "criteria", node.Criteria, indent, at);
         AppendScalars(sb, "quality", node.Quality, indent, at);
         AppendScalars(sb, "constraints", node.Constraints, indent, at);
+        AppendScalars(sb, "touches", node.Touches, indent, at);
+
+        if (node.Effort is { } effort)
+        {
+            RequireOneLine(effort, "effort");
+            AppendValue(sb, "effort", effort, indent, at: at);
+        }
 
         if (node.Children.Count == 0)
             return;

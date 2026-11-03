@@ -47,6 +47,10 @@ public abstract class ProviderErrorShapeTests
     protected const string RateLimitedBody =
         """{"error":{"code":429,"message":"Rate limit reached for requests per minute.","status":"RESOURCE_EXHAUSTED","type":"rate_limit_error"}}""";
 
+    /// <summary>A rate limit whose body says how long to wait — the part a provider's SDK does not read.</summary>
+    protected const string RateLimitedWithDelayBody =
+        """{"error":{"code":429,"message":"Rate limit reached for requests per minute. Please retry in 20s.","status":"RESOURCE_EXHAUSTED","type":"rate_limit_error"}}""";
+
     /// <summary>An account with nothing left — the same status code, and waiting cannot fix it.</summary>
     protected const string DepletedBody =
         """{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details.","status":"RESOURCE_EXHAUSTED","type":"insufficient_quota"}}""";
@@ -68,8 +72,17 @@ public abstract class ProviderErrorShapeTests
         ResilientAgentModel.IsRateLimitException(thrown).ShouldBeTrue(
             $"a 429 must be readable as one; the SDK threw {thrown.GetType().FullName}");
 
+        AgentJobEngine<string, string>.DefaultShouldRetry(thrown).ShouldBeFalse(
+            "the provider's SDK has already retried it; retrying again multiplies every request");
+    }
+
+    [Test]
+    public async Task A429ThatStatesItsDelay_IsRetried()
+    {
+        var thrown = await FailureFrom(HttpStatusCode.TooManyRequests, RateLimitedWithDelayBody);
+
         AgentJobEngine<string, string>.DefaultShouldRetry(thrown).ShouldBeTrue(
-            "a moving window is the case retrying exists for");
+            "the SDK waits by the header; a delay stated in the body is the wait it does not honour");
     }
 
     [Test]

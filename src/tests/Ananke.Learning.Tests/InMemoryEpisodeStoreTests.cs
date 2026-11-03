@@ -35,6 +35,23 @@ public class InMemoryEpisodeStoreTests
             CompletedAt = completedAt ?? DateTimeOffset.UtcNow
         };
 
+    [Test]
+    [CancelAfter(30_000)]
+    public async Task CommitAsync_ParallelCommitsIntoAFullStore_NeverExceedItsCapacity(CancellationToken ct)
+    {
+        // Check, evict and add have to be one step: two commits that both see room both add.
+        // Twenty rounds, because a race that shows up only sometimes is still a race.
+        for (var round = 0; round < 20; round++)
+        {
+            var store = new InMemoryEpisodeStore(maxEpisodes: 10);
+
+            await Task.WhenAll(Enumerable.Range(0, 50)
+                .Select(i => Task.Run(() => store.CommitAsync(MakeEpisode($"ep-{round}-{i}"), ct), ct)));
+
+            (await store.BrowseAsync(0, 100, ct: ct)).Count.ShouldBeLessThanOrEqualTo(10, $"round {round}");
+        }
+    }
+
     // ── CommitAndRetrieveEpisode ─────────────────────────────────
 
     [Test]

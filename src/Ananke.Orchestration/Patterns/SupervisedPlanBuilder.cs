@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Workflows;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Patterns;
 
@@ -46,6 +47,7 @@ namespace Ananke.Orchestration.Patterns;
 /// </para>
 /// </remarks>
 /// <typeparam name="TState">The workflow state type. It must carry a <see cref="PlanCoordination"/> slot.</typeparam>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class SupervisedPlanBuilder<TState>
 {
     /// <summary>The name of the job that runs the plan.</summary>
@@ -447,13 +449,13 @@ public sealed class SupervisedPlanBuilder<TState>
             { MaxChanges: { } cap, Changes: var spent } when spent >= cap => Workflow.End,
             // Somebody answered off the list. That is not a choice to apply and not a way out — it is
             // an answer for the supervisor to read, so the run goes back to the seat that authors
-            // options and asks again with it in hand (R32). Never past it to the plan: the step is
+            // options and asks again with it in hand. Never past it to the plan: the step is
             // unchanged, and re-attempting it would spend an executor on a halt nobody has answered.
             // With no advisor wired there is nothing that can read prose, and the rows below end it.
             { Said: not null } when advisor is not null => AdvisorJob,
             // Nobody has answered. The run goes back to the offer, not past it.
             { Question.Outstanding: true } => advisor is not null ? AdvisorJob : coordinator.Name,
-            // Asked, with no question left outstanding: Stop and Refer are both this now (R30) — a
+            // Asked, with no question left outstanding: Stop and Refer are both this — a
             // person's cancel, or a constraint nobody in this run may relax — told apart only by
             // what (if anything) the question itself said, not by the vocabulary.
             { Decision: PlanDecision.AskPlan, Question: null } => Workflow.End,

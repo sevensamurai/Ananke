@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Graph;
 using Ananke.Learning.Episodes;
 using Ananke.Learning.Knowledge.Builders;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Learning.Tests.Knowledge;
@@ -89,6 +90,19 @@ public sealed class EpisodeTrajectoryBuilderTests
     }
 
     // ── helper ──────────────────────────────────────────────────────────────
+
+    [Test]
+    public async Task BuildAsync_StampsEveryEdgeFromItsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        await _store.CommitAsync(MakeEpisode("ep1", ["e1", "e2"]));
+
+        await new EpisodeTrajectoryBuilder(_store, new FakeTimeProvider(now)).BuildAsync(_graph);
+
+        var edges = await _graph.NeighborsAsync("entry:e1");
+        edges.Select(e => e.Relation).ShouldBe(["step_of", "follows"], ignoreOrder: true);
+        edges.ShouldAllBe(e => e.ObservedAt == now);
+    }
 
     private static Episode MakeEpisode(string id, string[] entryIds) => new()
     {

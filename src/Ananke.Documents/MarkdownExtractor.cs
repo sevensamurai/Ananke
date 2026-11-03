@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Documents;
 using Markdig;
+using Markdig.Extensions.Yaml;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 
@@ -26,7 +27,11 @@ public sealed class MarkdownExtractor : IDocumentExtractor
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
+        .UseYamlFrontMatter()
         .Build();
+
+    // A front matter's top-level "key: value" lines and the "- item" lines under a key; more is left out.
+    private const int MaxFrontMatterLines = 200;
 
     /// <inheritdoc />
     public bool CanExtract(string fileExtension) =>
@@ -78,8 +83,9 @@ public sealed class MarkdownExtractor : IDocumentExtractor
 
         foreach (var block in document)
         {
-            // Skip phantom blocks with empty spans (e.g. LinkReferenceDefinitionGroup)
-            if (block.Span.Length <= 0)
+            // Skip phantom blocks with empty spans (e.g. LinkReferenceDefinitionGroup), and the front matter, which is
+            // the document's metadata rather than a section.
+            if (block.Span.Length <= 0 || block is YamlFrontMatterBlock)
                 continue;
 
             if (block is HeadingBlock heading)
@@ -198,8 +204,16 @@ public sealed class MarkdownExtractor : IDocumentExtractor
 
         foreach (var block in document)
         {
+            if (block is YamlFrontMatterBlock frontMatter)
+            {
+                foreach (var (key, value) in FrontMatterFields(frontMatter))
+                    metadata[key] = value;
+                continue;
+            }
+
             if (block is HeadingBlock { Level: 1 } heading && heading.Inline is not null)
             {
+                // A heading names the document; a front matter's title stands when there is none.
                 metadata["title"] = ExtractPlainText(heading.Inline);
                 break;
             }
@@ -210,5 +224,41 @@ public sealed class MarkdownExtractor : IDocumentExtractor
         }
 
         return metadata;
+    }
+
+    /// <summary>
+    /// A YAML front matter's top-level fields: <c>key: value</c>, quotes trimmed, and a key's <c>- item</c> lines joined
+    /// with <c>", "</c>. Nested maps are left out; so is anything past the first lines.
+    /// </summary>
+    private static Dictionary<string, string> FrontMatterFields(YamlFrontMatterBlock block)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        var items = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        string? current = null;
+        foreach (var raw in block.Lines.Lines.Take(Math.Min(block.Lines.Count, MaxFrontMatterLines)))
+        {
+            var line = raw.Slice.ToString().TrimEnd();
+            if (line.Length == 0 || line == "---" || line.TrimStart().StartsWith('#'))
+                continue;
+            if (!char.IsWhiteSpace(line[0]) && line.IndexOf(':') is var colon and > 0)
+            {
+                current = line[..colon].Trim();
+                var value = line[(colon + 1)..].Trim().Trim('\'', '"');
+                if (value.Length > 0)
+                    fields[current] = value;
+                continue;
+            }
+            var item = line.TrimStart();
+            if (current is not null && item.StartsWith("- ", StringComparison.Ordinal))
+            {
+                if (!items.TryGetValue(current, out var list))
+                    items[current] = list = [];
+                list.Add(item[2..].Trim().Trim('\'', '"'));
+            }
+        }
+
+        foreach (var (key, list) in items)
+            fields.TryAdd(key, string.Join(", ", list));
+        return fields;
     }
 }

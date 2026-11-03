@@ -1,10 +1,8 @@
 # Ananke.Orchestration.Conformance.Tests
 
-**Self-validation for the conformance contract.** The scenarios live in
-[`Ananke.Orchestration.Conformance`](../../Ananke.Orchestration.Conformance/README.md) and the NUnit
-fixtures over them in
-[`Ananke.Orchestration.Conformance.NUnit`](../../Ananke.Orchestration.Conformance.NUnit/README.md);
-this project is one consumer of both.
+**Self-validation for the conformance suite.** The scenarios and the NUnit fixtures over them live
+in [`Ananke.Orchestration.Conformance`](../Ananke.Orchestration.Conformance/README.md); this project
+runs them against the reference subjects and against the operation seam's reference.
 
 | File | What it proves |
 |------|----------------|

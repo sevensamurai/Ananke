@@ -1,5 +1,6 @@
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Streaming;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -36,6 +37,7 @@ namespace Ananke.Orchestration.Planning;
 /// Whether the run answers its own questions with the recommendation. Owned by whoever builds the
 /// workflow, because it is a property of the run rather than of any one halt.
 /// </param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanAskingJob<TState>(
     string name,
     PlanAdvisor advisor,
@@ -74,6 +76,7 @@ public sealed class PlanAskingJob<TState>(
             PlanVersion = coordination.Result.Tree.Current.Number,
             NodeId = coordination.NodeId!,
             HaltReason = coordination.HaltReason,
+            Summary = proposal.Summary,
             Options = proposal.Options,
             Discarded = proposal.Discarded,
             Exhausted = proposal.Exhausted
@@ -156,6 +159,7 @@ public sealed class PlanAskingJob<TState>(
 /// the decision, and a hand-wired workflow has to ask for that explicitly.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanChoiceJob<TState>(
     string name,
     SupervisionOptions supervision,
@@ -225,11 +229,13 @@ public sealed class PlanChoiceJob<TState>(
         // The plan is not changing: a choice inside the work has been made by somebody entitled to
         // make it. A step that did its task is marked done with the answer; any other step reads it
         // on its next attempt. No version, no re-ruling — and nothing left for the coordinator to
-        // decide, the same as giving a step up.
+        // decide, the same as giving a step up. A step that asked nothing is answered about what
+        // stopped it.
         if (chosen.Answer is { } answer)
         {
             await supervision.AnswerAsync(
-                coordination.Result.Tree.PlanId, haltedAt, answer, PlanCoordination.Answerer, ct)
+                coordination.Result.Tree.PlanId, haltedAt, answer, PlanCoordination.Answerer,
+                coordination.HaltReason ?? $"'{haltedAt}' stopped.", ct)
                 .ConfigureAwait(false);
 
             return write(state, coordination with

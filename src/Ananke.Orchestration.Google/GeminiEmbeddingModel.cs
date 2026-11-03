@@ -60,6 +60,9 @@ public sealed class GeminiEmbeddingModel : IEmbeddingModel
         CreateAgentPlatform(project, location, model);
 
     /// <inheritdoc />
+    public EmbeddingModelIdentity? Identity => new("google", _model);
+
+    /// <inheritdoc />
     public async Task<ReadOnlyMemory<float>> EmbedAsync(string text, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);

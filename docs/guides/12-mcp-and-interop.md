@@ -102,14 +102,32 @@ await StreamingChatWorkflow.Create("chat", model)
     .RunAsync(state);
 ```
 
-`AddMcpServerToolsAsync` is built on `McpToolInvoker`, which handles request
-serialisation, response mapping, and error propagation for each external call.
-You can also instantiate `McpToolInvoker` directly for custom transport scenarios:
+Each imported tool calls the server through `mcpClient`. A result that says `IsError` reaches the
+model as an error result, and each text block as a line.
+
+To spread calls over replicas of one server, `AddMcpPoolAsync` takes two or more clients and rotates
+between them (`McpToolInvoker`), skipping a server after `faultThreshold` failures in a row and telling
+an `IToolFaultObserver` of each:
 
 ```csharp
-var invoker = new McpToolInvoker(mcpClient);
-ToolResult result = await invoker.InvokeAsync("tool_name", arguments);
+var toolkit = await new ToolKit("search").AddMcpPoolAsync([replicaA, replicaB]);
 ```
+
+### An MCP tool type, in-process
+
+A tool type written for an MCP server — a class marked `[McpServerToolType]` whose methods carry
+`[McpServerTool]` — can be offered to a model with no server between, when the type is in reach:
+
+```csharp
+var toolkit = new ToolKit("local").AddMcpServerTools(new SearchTools(index));
+```
+
+Each tool is declared as the SDK declares it for a server, so a model sees here the name, description
+and parameters a client of that server sees. The method runs in this process. Its arguments are bound
+to its own parameters; one a server supplies itself, such as its request context, has nothing to bind
+to. An exception from the method is an error result carrying its message, and a method that answers a
+`CallToolResult` or content blocks is read as a client of that server reads it: `IsError` is an error
+result, and each text block is a line.
 
 ---
 

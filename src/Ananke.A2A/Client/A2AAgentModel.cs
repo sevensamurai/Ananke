@@ -37,6 +37,10 @@ namespace Ananke.A2A.Client;
 /// </example>
 public sealed class A2AAgentModel : IStreamingAgentModel
 {
+    // What the A2A SDK falls back to when given no client, with a 429 retried as a provider SDK would.
+    private static readonly HttpClient SharedHttpClient =
+        new(new RateLimitRetryHandler { InnerHandler = new HttpClientHandler() });
+
     private readonly A2AClient _client;
     private readonly A2AAgentModelOptions _options;
 
@@ -45,9 +49,7 @@ public sealed class A2AAgentModel : IStreamingAgentModel
         ArgumentNullException.ThrowIfNull(options);
 
         _options = options;
-        _client = options.HttpClient is not null
-            ? new A2AClient(options.AgentUrl, options.HttpClient)
-            : new A2AClient(options.AgentUrl);
+        _client = new A2AClient(options.AgentUrl, options.HttpClient ?? SharedHttpClient);
     }
 
     /// <inheritdoc />
@@ -100,7 +102,11 @@ public sealed class A2AAgentModel : IStreamingAgentModel
                         yield return new AgentStreamChunk
                         {
                             TextDelta = statusText,
-                            CompletedResponse = new AgentResponse { Text = accumulated.ToString() }
+                            CompletedResponse = new AgentResponse
+                            {
+                                Text = accumulated.ToString(),
+                                StopReason = StopReasonOf(statusEvt.Status.State)
+                            }
                         };
                         yield break;
                     }
@@ -126,6 +132,10 @@ public sealed class A2AAgentModel : IStreamingAgentModel
 
     private MessageSendParams BuildSendParams(AgentRequest request)
     {
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+        request.ThrowIfRequestFields("The A2A adapter");
+#pragma warning restore ANNKEEXP003
+
         // Build the current user turn, fusing the system prompt as a leading context block.
         var currentParts = new List<Part>();
 
@@ -180,7 +190,8 @@ public sealed class A2AAgentModel : IStreamingAgentModel
             global::A2A.AgentTask task => MapTaskToResponse(task),
             global::A2A.AgentMessage message => new AgentResponse
             {
-                Text = ExtractText(message.Parts)
+                Text = ExtractText(message.Parts),
+                StopReason = AgentStopReason.EndTurn
             },
             _ => new AgentResponse { Text = string.Empty }
         };
@@ -188,6 +199,8 @@ public sealed class A2AAgentModel : IStreamingAgentModel
 
     private static AgentResponse MapTaskToResponse(global::A2A.AgentTask task)
     {
+        var stopReason = StopReasonOf(task.Status.State);
+
         // Extract text from artifacts first, fall back to status message
         if (task.Artifacts is { Count: > 0 })
         {
@@ -199,17 +212,27 @@ public sealed class A2AAgentModel : IStreamingAgentModel
 
             var combined = string.Join("\n", texts);
             if (!string.IsNullOrEmpty(combined))
-                return new AgentResponse { Text = combined };
+                return new AgentResponse { Text = combined, StopReason = stopReason };
         }
 
         // Fall back to status message text
         if (task.Status.Message?.Parts is { Count: > 0 } statusParts)
         {
-            return new AgentResponse { Text = ExtractText(statusParts) };
+            return new AgentResponse { Text = ExtractText(statusParts), StopReason = stopReason };
         }
 
-        return new AgentResponse { Text = string.Empty };
+        return new AgentResponse { Text = string.Empty, StopReason = stopReason };
     }
+
+    /// <summary>
+    /// A task the remote agent completed, or handed back for the caller's input, ended its turn. A2A
+    /// states no output limit, so no state maps to <see cref="AgentStopReason.MaxTokens"/>.
+    /// </summary>
+    private static AgentStopReason StopReasonOf(TaskState state) => state switch
+    {
+        TaskState.Completed or TaskState.InputRequired => AgentStopReason.EndTurn,
+        _ => AgentStopReason.Unknown
+    };
 
     private static string? ExtractText(List<Part>? parts)
     {

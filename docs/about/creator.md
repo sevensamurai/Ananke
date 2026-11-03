@@ -66,7 +66,6 @@ Ananke is a release candidate. The foundation is settled; the next chapter is ac
 - In-memory implementation for every infrastructure contract — full unit-test coverage of federated, learning, MCP-exposed workflows with zero containers.
 - Empirical memory primitives — `commit`, `recall`, `reinforce`, `contradict`, offline learning sweeps with decay, curiosity exploration, and consolidation.
 - Cell division as a working demo. The [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) runs end-to-end, no API keys: a generalist bookstore workflow accumulates tools, structural tension is detected, a division is proposed and approved, two specialised peers are spawned, the parent is killed, and the outcome is recorded into empirical memory.
-- Cross-cloud federation with human approval gates — deploy the same manifest to Azure, Google, or Anthropic.
 
 **Honest work-in-progress:**
 

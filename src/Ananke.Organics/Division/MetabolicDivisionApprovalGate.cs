@@ -14,10 +14,16 @@ namespace Ananke.Organics.Division;
 ///   <item><term><see cref="MetabolicSignal.Starved"/></term><description>Rejects the plan outright, bypassing the inner gate entirely.</description></item>
 /// </list>
 /// </remarks>
+/// <param name="inner">Gate that reviews the plan when the cell is healthy.</param>
+/// <param name="thresholds">Error-rate and latency bounds. Defaults to <see cref="MetabolicThresholds.Default"/>.</param>
+/// <param name="clock">Clock that stamps each approval's <see cref="DivisionApproval.ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
 public sealed class MetabolicDivisionApprovalGate(
     IDivisionApprovalGate inner,
-    MetabolicThresholds? thresholds = null) : IDivisionApprovalGate
+    MetabolicThresholds? thresholds = null,
+    TimeProvider? clock = null) : IDivisionApprovalGate
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     private readonly MetabolicThresholds _thresholds = thresholds ?? MetabolicThresholds.Default;
 
     /// <inheritdoc />
@@ -37,13 +43,15 @@ public sealed class MetabolicDivisionApprovalGate(
                 Task.FromResult(DivisionApproval.Reject(
                     reason: $"Division blocked: cell is Starved " +
                             $"(errorRate={snapshot.ErrorRate:P1}, latencyP95={snapshot.LatencyP95Ms:F0}ms). " +
-                            "Restore metabolic health before dividing.")),
+                            "Restore metabolic health before dividing.",
+                    clock: _clock)),
 
             MetabolicSignal.Stressed =>
                 Task.FromResult(DivisionApproval.Reject(
                     reason: $"Division blocked: cell is Stressed " +
                             $"(errorRate={snapshot.ErrorRate:P1}, latencyP95={snapshot.LatencyP95Ms:F0}ms). " +
-                            "Heal the cell before dividing, or override with a non-metabolic gate.")),
+                            "Heal the cell before dividing, or override with a non-metabolic gate.",
+                    clock: _clock)),
 
             _ => inner.ReviewAsync(plan, snapshot, ct)
         };

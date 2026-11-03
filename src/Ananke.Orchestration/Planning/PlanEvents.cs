@@ -1,5 +1,6 @@
 using Ananke.Orchestration.Streaming;
 using Ananke.Orchestration.Tracing;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -18,6 +19,7 @@ namespace Ananke.Orchestration.Planning;
 /// plan, and a plan knows nothing about the state of whatever workflow is running it.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public abstract record PlanEvent : WorkflowEvent
 {
     /// <summary>The plan this is about.</summary>
@@ -46,6 +48,7 @@ public abstract record PlanEvent : WorkflowEvent
 /// view <em>this</em> run was given. Once the node has run, the tree records one reading and the
 /// question "what did it not see" is answerable only for the most recent attempt.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeStarted : PlanEvent
 {
     /// <summary>The node about to run.</summary>
@@ -73,20 +76,25 @@ public sealed record PlanNodeStarted : PlanEvent
 /// file, a commit, a change in the world — verified by its criteria, not carried in a message — so
 /// the summary is narrated and goes no further.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeReported : PlanEvent
 {
     /// <summary>The node that reported.</summary>
     public required string NodeId { get; init; }
 
-    /// <summary>Its account of what it did. Never evidence of anything.</summary>
+    /// <summary>Its account of what it did, empty when it gave none. Never evidence of anything.</summary>
     public required string Summary { get; init; }
+
+    /// <summary>What it found, each with where it can be checked again.</summary>
+    public IReadOnlyList<NodeFinding> Findings { get; init; } = [];
 }
 
 /// <summary>A node's contract was disputed, and the run stopped there.</summary>
 /// <remarks>
-/// Raised only by <see cref="PlanExecutor.DisputeAsync"/> now — an external call, never a node's own
-/// report (R26). A node cannot classify its own halt, so there is nothing here for it to get wrong.
+/// Raised only by <see cref="PlanExecutor.DisputeAsync"/> — an external call, never a node's own
+/// report. A node cannot classify its own halt, so there is nothing here for it to get wrong.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeDisputed : PlanEvent
 {
     /// <summary>The node that was disputed.</summary>
@@ -105,6 +113,7 @@ public sealed record PlanNodeDisputed : PlanEvent
 /// Distinct from a dispute, and the difference is who is claiming what: a node that disputes has
 /// decided its contract is wrong, and a node that fails has not decided anything at all.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeFailed : PlanEvent
 {
     /// <summary>The node whose attempt died.</summary>
@@ -124,6 +133,7 @@ public sealed record PlanNodeFailed : PlanEvent
     public bool Terminal { get; init; }
 }
 
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeVerified : PlanEvent
 {
     /// <summary>The node ruled on.</summary>
@@ -140,6 +150,7 @@ public sealed record PlanNodeVerified : PlanEvent
 }
 
 /// <summary>One pass over the plan finished.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanPassCompleted : PlanEvent
 {
     /// <summary>Nodes that ran, in order.</summary>
@@ -157,9 +168,10 @@ public sealed record PlanPassCompleted : PlanEvent
 
 /// <summary>A step is waiting to be told something, and the run stopped there.</summary>
 /// <remarks>
-/// Raised only by <see cref="PlanExecutor.AskAsync"/> now — the supervisor's own call (R31), never a
+/// Raised only by <see cref="PlanExecutor.AskAsync"/> — the supervisor's own call, never a
 /// step reaching and reporting a choice on its own.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeBlocked : PlanEvent
 {
     /// <summary>The step that is waiting.</summary>
@@ -173,6 +185,7 @@ public sealed record PlanNodeBlocked : PlanEvent
 }
 
 /// <summary>A step was told what it was waiting for.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeAnswered : PlanEvent
 {
     /// <summary>The step that asked.</summary>
@@ -201,6 +214,7 @@ public sealed record PlanNodeAnswered : PlanEvent
 /// show for it.</b> A term that only appeared as a constraint on some contract two changes of plan
 /// later would be a rule nobody could trace to a decision.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanTermCommitted : PlanEvent
 {
     /// <summary>Identifies it, so a later revocation names the same thing.</summary>
@@ -217,6 +231,7 @@ public sealed record PlanTermCommitted : PlanEvent
 }
 
 /// <summary>A term stopped holding, and why.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanTermContradicted : PlanEvent
 {
     /// <summary>The term revoked.</summary>
@@ -241,6 +256,7 @@ public sealed record PlanTermContradicted : PlanEvent
     public required string By { get; init; }
 }
 
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanStepAbandoned : PlanEvent
 {
     /// <summary>The step that was given up.</summary>
@@ -265,6 +281,7 @@ public sealed record PlanStepAbandoned : PlanEvent
 /// what halted, what was decided, then whatever the decision did.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanDecisionTaken : PlanEvent
 {
     /// <summary>The node the supervisor was asked about.</summary>
@@ -291,6 +308,7 @@ public sealed record PlanDecisionTaken : PlanEvent
 }
 
 /// <summary>The plan changed, and this is why.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanVersionMinted : PlanEvent
 {
     /// <summary>The node whose contract was re-ruled.</summary>
@@ -343,6 +361,7 @@ public sealed record PlanVersionMinted : PlanEvent
 }
 
 /// <summary>The supervisor was asked what a halt admits, and this is what it offered.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanProposalOffered : PlanEvent
 {
     /// <summary>The node that halted.</summary>
@@ -350,6 +369,9 @@ public sealed record PlanProposalOffered : PlanEvent
 
     /// <summary>Why it halted, as the supervisor was shown it.</summary>
     public string? HaltReason { get; init; }
+
+    /// <summary>What kind of problem the supervisor says the halt is, and why nothing would help when it offered nothing.</summary>
+    public string? Summary { get; init; }
 
     /// <summary>What was offered, in the order it was shown.</summary>
     public IReadOnlyList<PlanOption> Options { get; init; } = [];

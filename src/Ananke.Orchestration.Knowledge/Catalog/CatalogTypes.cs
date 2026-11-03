@@ -60,6 +60,31 @@ public sealed record CatalogEntry
     /// Superseded entries are excluded from <see cref="IKnowledgeCatalog.DiscoverAsync"/> results.
     /// </summary>
     public string? SupersededBy { get; init; }
+
+    /// <summary>
+    /// The document's own date, read from its header at ingestion, when it has one. Time decay ages a document from
+    /// it rather than from <see cref="IndexedAt"/>, so re-indexing an old document doesn't make it new.
+    /// </summary>
+    public DateTimeOffset? EffectiveAt { get; init; }
+
+    /// <summary>The sources this document replaces, by its own header; each is marked superseded by it.</summary>
+    public IReadOnlyList<string> Replaces { get; init; } = [];
+
+    /// <summary>
+    /// The document's header fields that ingestion kept (<c>DocumentHeaderOptions.Fields</c>), such as its status, so
+    /// documents can be listed by them (<see cref="CatalogBrowseOptions.Field"/>).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Fields { get; init; } = new Dictionary<string, string>();
+}
+
+/// <summary>The order <see cref="IKnowledgeCatalog.BrowseAsync"/> returns entries in, newest first.</summary>
+public enum CatalogBrowseOrder
+{
+    /// <summary>By when each document was indexed.</summary>
+    IndexedAt,
+
+    /// <summary>By each document's own date (<see cref="CatalogEntry.EffectiveAt"/>), else when it was indexed.</summary>
+    EffectiveAt,
 }
 
 /// <summary>A catalog search result pairing a <see cref="CatalogEntry"/> with a relevance score.</summary>
@@ -83,6 +108,18 @@ public sealed record CatalogBrowseOptions
 
     /// <summary>Maximum number of entries to return. Default is <c>50</c>.</summary>
     public int Limit { get; init; } = 50;
+
+    /// <summary>
+    /// Optional header field filter, with <see cref="Value"/>: only entries whose <see cref="CatalogEntry.Fields"/> give
+    /// this field that value are returned. Both are compared without case.
+    /// </summary>
+    public string? Field { get; init; }
+
+    /// <summary>The value <see cref="Field"/> must have.</summary>
+    public string? Value { get; init; }
+
+    /// <summary>The order entries are returned in, newest first. Default is <see cref="CatalogBrowseOrder.IndexedAt"/>.</summary>
+    public CatalogBrowseOrder Order { get; init; } = CatalogBrowseOrder.IndexedAt;
 }
 
 /// <summary>LLM-extracted enrichment data for a catalog entry.</summary>

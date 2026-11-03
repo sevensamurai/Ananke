@@ -32,7 +32,10 @@ case "$mode" in
     *)           printf 'unknown argument: %s (expected --staged)\n' "$mode" >&2; exit 2 ;;
 esac
 
-cd "$(git rev-parse --show-toplevel)" || exit 2
+# Outside a repository git prints nothing, and `cd ""` succeeds: the check would then pass over
+# no files at all. Fail instead.
+top=$(git rev-parse --show-toplevel) || exit 2
+cd "$top" || exit 2
 
 # Skipped, each for a stated reason. Kept short on purpose: a long exclusion list
 # is how a rule stops meaning anything.

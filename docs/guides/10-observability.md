@@ -101,12 +101,83 @@ when an `ActivityListener` is registered (which `AddTracingPipeline` does).
 
 ## Tool Span Attributes
 
-Tool executions within agent workflows emit span attributes:
+Each tool call within an agent job is one span, named `execute_tool {tool}` after the
+OpenTelemetry GenAI conventions. `ActivitySourceTracer` sends numbers and flags as typed values.
 
 | Attribute | Description |
 |---|---|
+| `gen_ai.operation.name` | Always `execute_tool` |
+| `gen_ai.tool.name` | The tool the model asked for |
+| `gen_ai.tool.call.id` | The id the model gave the call — the same as `AgentToolCalled.CallId` |
+| `error.type` | `_OTHER` when `ToolResult.IsError`; absent otherwise |
+| `tool.execution_mode` | How a registered tool is reached: `local`, `callback`, `mcp`, `openapi` or `platformnative` |
+| `tool.target` | A remote tool's endpoint host — never its path or query |
+| `tool_round` | The tool round the call was made in, counted from 1 |
 | `output_length` | Character count of the tool result |
-| `tool.error` | Set to `true` when `ToolResult.IsError` |
+| `tool.error` | `true` when `ToolResult.IsError` |
+
+---
+
+## Tool-Call Content and Personal Data
+
+Every tool call an agent job makes reaches the workflow's event stream as `AgentToolCalled`: its id,
+round, duration, result length and whether it failed. **What the call was asked and what came back are off by
+default.** A workflow turns them on:
+
+```csharp
+var workflow = BuildWorkflow()
+    .RecordContent(true);   // or OrchestrationOptions.RecordContent(true) for the registered runner
+```
+
+With content on, mark the properties that hold personal data with `[Redact]`, on the types the
+workflow's tools take and return. Ananke replaces a marked value with `[redacted]` wherever it
+records the value; the tool is still handed it, and the model is still sent it.
+
+```csharp
+using Ananke.Abstractions;
+
+public sealed record Guest
+{
+    [Redact] public string Phone { get; init; } = "";
+    public string Name { get; init; } = "";
+}
+
+tools.AddTool("book", "Books a room.", tool => tool
+    .ParamList<Guest>("guests", "Who stays.")              // recorded with each Phone masked
+    .OnExecute(args => ToolResult.Json(Booking(args))));   // a marked property of the result too
+```
+
+A positional record marks a property with `[property: Redact]`. A typed result is written again for
+the record exactly as the model was sent it, with marked properties masked. Arguments are the
+model's own text, read by the parameter's type; arguments that cannot be read as that type — that do
+not parse, or hold a value where the type has an object or a list — are recorded as `[redacted]`
+whole.
+
+**The workflow's state.** Events such as `StateUpdated<TState>` carry the state itself. A sink that
+writes them with `AnankeJson.Record` writes each marked property as `[redacted]`; the options keep
+the serializer's default names, and `JsonLinesEventSink` uses them. They are for writing only: a
+masked value cannot be read back, so never use them for a checkpoint.
+
+```csharp
+public ValueTask ReportAsync(WorkflowEvent evt, CancellationToken ct = default)
+{
+    _writer.WriteLine(JsonSerializer.Serialize<object>(evt, AnankeJson.Record));
+    return ValueTask.CompletedTask;
+}
+```
+
+**What is not masked.** Text has no property to mark, so it is recorded as written:
+
+- a result a tool returns as a string (`ToolResult.Ok`), an MCP server's result, an argument declared
+  with `Param` or `Param<T>`, and an error a tool returns;
+- an exception's message and stack trace on a span, and `WorkflowFaulted.Exception`, the exception
+  itself;
+- the plan's text on its events: goals, a step's summary, a dispute's reason, a question and its
+  answer;
+- anything a model or a tool wrote that quotes a marked value.
+
+Checkpoints and conversation memory hold every value whole, because a resumed run needs them. Keep
+content off, or mask free text in your own sink, where it may hold personal data.
 
 ---
 

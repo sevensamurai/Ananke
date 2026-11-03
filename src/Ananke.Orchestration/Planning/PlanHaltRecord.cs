@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -15,6 +17,7 @@ namespace Ananke.Orchestration.Planning;
 /// nobody answered reads without a heading for it.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanHaltRecord
 {
     /// <summary>

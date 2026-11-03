@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Memory;
 using Ananke.Abstractions.Tools;
@@ -23,9 +24,7 @@ namespace Ananke.Orchestration.Agents;
 /// structured-vs-text output is a real type-level distinction, and only the structured path
 /// pays for a second, JSON-coercion model call after the tool loop — but everything else
 /// (the retry loop, the tool-calling loop, context-limit enforcement, conversation memory,
-/// trajectory/hallucination reporting) was, before this type existed, copy-pasted verbatim
-/// between the two and had drifted three times (see the backlog's Q6/Q33/Q34 rows). This is
-/// now the single place that logic lives.
+/// trajectory/hallucination reporting) is shared, and this is the single place it lives.
 /// </summary>
 /// <remarks>
 /// The only behaviour that varies between a structured and a text job is captured by the four
@@ -47,11 +46,15 @@ internal sealed class AgentJobEngine<TState, TResult>
     private readonly IAgentModel _model;
     private readonly Func<TState, string> _promptBuilder;
     private readonly Func<TState, TResult, TState> _mapResult;
+
+    /// <summary>How the state is mapped when a call to a tool that ends the job ended it; null leaves it as it was.</summary>
+    private readonly Func<TState, string, TState>? _endedByTool;
     private readonly string? _systemPrompt;
     private readonly IReadOnlyList<AgentTool>? _tools;
     private readonly IReadOnlyDictionary<string, ToolDefinition>? _toolExecutors;
     private readonly Action<TState, TResult>? _onResponse;
     private readonly int _maxToolRounds;
+    private readonly int? _maxRepeatedToolRounds;
     private readonly int _maxRetryAttempts;
     private readonly TimeSpan _retryBaseDelay;
     private readonly Func<Exception, bool> _shouldRetry;
@@ -61,6 +64,7 @@ internal sealed class AgentJobEngine<TState, TResult>
     private readonly Func<TState, string>? _sessionIdBuilder;
     private readonly IContextStrategy? _contextStrategy;
     private readonly ToolOutputPolicy? _toolOutputPolicy;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// What the tool schemas cost. Sent on every call, invisible to a context strategy, and computed
@@ -91,6 +95,12 @@ internal sealed class AgentJobEngine<TState, TResult>
     /// </summary>
     private readonly double? _temperature;
 
+    /// <summary>
+    /// The fields of an endpoint's own that every request this job makes carries; <see langword="null"/>
+    /// carries none.
+    /// </summary>
+    private readonly IReadOnlyDictionary<string, JsonNode>? _requestFields;
+
     public AgentJobEngine(
         string name,
         IAgentModel model,
@@ -118,14 +128,20 @@ internal sealed class AgentJobEngine<TState, TResult>
         string finalCallSpanSuffix,
         string? coercionPrompt,
         double? temperature = null,
+        IReadOnlyDictionary<string, JsonNode>? requestFields = null,
         ToolOutputPolicy? toolOutputPolicy = null,
-        AgentContract? contract = null)
+        AgentContract? contract = null,
+        TimeProvider? timeProvider = null,
+        int? maxRepeatedToolRounds = null,
+        Func<TState, string, TState>? endedByTool = null)
     {
         Name = name;
         _model = model;
         _temperature = temperature;
+        _requestFields = requestFields;
         _promptBuilder = promptBuilder;
         _mapResult = mapResult;
+        _endedByTool = endedByTool;
         // Composed once, here, rather than at each call site. The contract is pinned by being part
         // of what every assembly carries by construction — there is no path through this type that
         // can assemble a request and leave it out, which is the property a per-call-site render
@@ -150,6 +166,7 @@ internal sealed class AgentJobEngine<TState, TResult>
         _sessionIdBuilder = sessionIdBuilder;
         _contextStrategy = contextStrategy;
         _toolOutputPolicy = toolOutputPolicy;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger;
         _hallucinationObserver = hallucinationObserver;
         _trajectoryObserver = trajectoryObserver;
@@ -158,6 +175,7 @@ internal sealed class AgentJobEngine<TState, TResult>
         _extractResult = extractResult;
         _finalCallSpanSuffix = finalCallSpanSuffix;
         _coercionPrompt = coercionPrompt;
+        _maxRepeatedToolRounds = maxRepeatedToolRounds;
     }
 
     public string Name { get; }
@@ -199,28 +217,25 @@ internal sealed class AgentJobEngine<TState, TResult>
 
         messages.Add(AgentMessage.User(userPrompt));
 
-        if (_contextStrategy is not null)
-        {
-            var projection = await CompactAsync(messages, ct).ConfigureAwait(false);
-            if (!ReferenceEquals(projection.Messages, messages))
-            {
-                historyCount = 0;
-                messages = [.. projection.Messages];
-            }
-        }
+        // Reference equality: the loop's own scaffolding (a permanent-error nudge, the
+        // structured path's coercion prompt) is never something the user said, so it never
+        // reaches IConversationMemory even though it lives in this same list.
+        var synthetic = new HashSet<AgentMessage>(ReferenceEqualityComparer.Instance);
 
         var snapshotBuilder = _trajectoryObserver is not null
-            ? new TrajectorySnapshotBuilder(Name, _trajectoryObserver)
+            ? new TrajectorySnapshotBuilder(Name, _trajectoryObserver, _timeProvider)
             : null;
 
         TResult response = default!;
+        string? endedWith = null;
         var succeeded = false;
         try
         {
-            response = _tools is not null
-                ? await ExecuteWithToolsAsync(messages, snapshotBuilder, ct).ConfigureAwait(false)
-                : await ExecuteFinalCallAsync(
-                    messages, snapshotBuilder, compactBeforeSending: false, ct).ConfigureAwait(false);
+            if (_tools is not null)
+                (response, endedWith) = await ExecuteWithToolsAsync(messages, synthetic, snapshotBuilder, ct).ConfigureAwait(false);
+            else
+                response = await ExecuteFinalCallAsync(messages, synthetic, snapshotBuilder, ct).ConfigureAwait(false);
+
             succeeded = true;
         }
         finally
@@ -231,9 +246,16 @@ internal sealed class AgentJobEngine<TState, TResult>
 
         if (_memory is not null && sessionId is not null && historyCount < messages.Count)
         {
-            var newMessages = messages.GetRange(historyCount, messages.Count - historyCount);
+            var newMessages = messages
+                .GetRange(historyCount, messages.Count - historyCount)
+                .Where(m => !synthetic.Contains(m))
+                .ToList();
             await _memory.AddAsync(sessionId, newMessages, ct).ConfigureAwait(false);
         }
+
+        // A call to a tool that ends the job was its last act, and no answer was asked for to map.
+        if (endedWith is not null)
+            return _endedByTool is null ? state : _endedByTool(state, endedWith);
 
         _onResponse?.Invoke(state, response);
         return _mapResult(state, response);
@@ -245,42 +267,95 @@ internal sealed class AgentJobEngine<TState, TResult>
     /// <see cref="_responseFormat"/> (or none, for text jobs).
     /// </summary>
     /// <remarks>
-    /// <c>compactBeforeSending</c> says whether the context strategy still has to run: <c>false</c>
-    /// on the toolless path, where assembly already compacted and re-running would emit a second
-    /// record for a single model call; <c>true</c> for the coercion round, where the tool loop has
-    /// grown the message list since — the loop compacts what it *sends* each round but never writes
-    /// the result back, so this call would otherwise ship the whole uncompacted history.
+    /// Compacts fresh from <paramref name="messages"/> every time it runs, never writing the result
+    /// back — on the toolless path this is the run's only compaction; for the coercion round it is
+    /// necessary, because the tool loop compacts what it *sends* each round but never writes the
+    /// result back either, so the message list has grown since the loop's own last compaction.
     /// </remarks>
     private async Task<TResult> ExecuteFinalCallAsync(
         List<AgentMessage> messages,
+        HashSet<AgentMessage> synthetic,
         TrajectorySnapshotBuilder? snapshotBuilder,
-        bool compactBeforeSending,
         CancellationToken ct)
     {
         var parentSpan = WorkflowTraceContext.Value?.CurrentSpan;
         await using var llmSpan = parentSpan?.StartSpan($"{Name}/{_finalCallSpanSuffix}", SpanKind.LlmCall);
 
-        IReadOnlyList<AgentMessage> outbound = messages;
-        if (compactBeforeSending && _contextStrategy is not null)
-            outbound = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
-
-        // A configured limit has to bind here too. Both tool-loop enforcement points sit inside the
-        // loop, and a job with no tools never enters it — so before this, WithContextLimit was
-        // silently inert for every toolless agent. Measured on what is actually about to be sent.
-        if (_maxContextTokens.HasValue)
-            EnforceContextLimit(outbound, toolRound: null);
-
         var request = new AgentRequest
         {
             SystemPrompt = _systemPrompt,
-            Messages = outbound,
+            Messages = await FinalCallMessagesAsync(messages, ct).ConfigureAwait(false),
             ResponseFormat = _responseFormat,
             Metadata = BuildMetadata(),
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false,
-            Temperature = _temperature
+            Temperature = _temperature,
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+            RequestFields = _requestFields
+#pragma warning restore ANNKEEXP003
         };
 
+        var text = await GenerateFinalTextAsync(request, messages, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
+
+        try
+        {
+            return _extractResult(text);
+        }
+        catch (JsonException ex)
+        {
+            // A provider that is only asked for the schema, not one that enforces it, sometimes
+            // wraps the reply in a code fence or adds a sentence of preamble — JsonReply already
+            // recovers that; a reply that still doesn't parse after that is a real defect, not a
+            // formatting slip, so only one repair round is spent on it.
+            var repair = AgentMessage.User(
+                $"Your reply was not valid JSON for the schema ({ex.Message}). Reply with the JSON object only.");
+            synthetic.Add(repair);
+            messages.Add(repair);
+
+            request = request with { Messages = await FinalCallMessagesAsync(messages, ct).ConfigureAwait(false) };
+            var repairText = await GenerateFinalTextAsync(request, messages, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
+            return _extractResult(repairText);
+        }
+    }
+
+    /// <summary>
+    /// What a final call sends: <paramref name="messages"/> compacted by the context strategy, then
+    /// held to the configured limit. Run for each call, the repair round included, since each sends
+    /// a list that has grown since the last.
+    /// </summary>
+    private async Task<IReadOnlyList<AgentMessage>> FinalCallMessagesAsync(
+        List<AgentMessage> messages, CancellationToken ct)
+    {
+        IReadOnlyList<AgentMessage> outbound = messages;
+        if (_contextStrategy is not null)
+            outbound = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
+
+        // A job with no tools never enters the tool loop, where the limit is otherwise enforced.
+        // Measured on what is actually about to be sent.
+        if (_maxContextTokens.HasValue)
+            EnforceContextLimit(outbound, toolRound: null);
+
+        return outbound;
+    }
+
+    /// <summary>Sends one request, records the reply as the assistant turn, and returns its text.</summary>
+    private async Task<string> GenerateFinalTextAsync(
+        AgentRequest request,
+        List<AgentMessage> messages,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        ISpan? llmSpan,
+        CancellationToken ct)
+    {
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
+
+        // A structured reply cut off at the limit cannot be repaired by asking again, and would
+        // otherwise surface as a JSON error that names the symptom rather than the cause.
+        if (request.ResponseFormat is not null && result.StopReason == AgentStopReason.MaxTokens)
+        {
+            throw new InvalidOperationException(
+                $"[{Name}] The reply was cut off at the output-token limit before its JSON was complete. "
+                + "Raise the model's output-token limit, or ask for less.");
+        }
+
         var text = result.Text
             ?? throw new InvalidOperationException($"[{Name}] LLM returned empty response.");
 
@@ -291,11 +366,17 @@ internal sealed class AgentJobEngine<TState, TResult>
         // never its own answer, and the next turn reloads a one-sided history.
         messages.Add(AgentMessage.Assistant(text));
 
-        return _extractResult(text);
+        return text;
     }
 
-    private async Task<TResult> ExecuteWithToolsAsync(
+    /// <summary>
+    /// The tool loop, then the answer: what the model said last, or one more call that turns it into
+    /// the schema. When a call to a tool that ends the job ran, no answer is asked for, and what the
+    /// model wrote with that call comes back as <c>EndedWith</c> instead.
+    /// </summary>
+    private async Task<(TResult Response, string? EndedWith)> ExecuteWithToolsAsync(
         List<AgentMessage> messages,
+        HashSet<AgentMessage> synthetic,
         TrajectorySnapshotBuilder? snapshotBuilder,
         CancellationToken ct)
     {
@@ -303,119 +384,140 @@ internal sealed class AgentJobEngine<TState, TResult>
         await using var llmSpan = parentSpan?.StartSpan($"{Name}/tool-loop", SpanKind.LlmCall);
         var toolRound = 0;
 
+        IReadOnlyList<AgentMessage> initialMessages = messages;
+        if (_contextStrategy is not null)
+            initialMessages = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
+
         var request = new AgentRequest
         {
             SystemPrompt = _systemPrompt,
-            Messages = messages,
+            Messages = initialMessages,
             Tools = _tools,
             Metadata = BuildMetadata(),
             StoreCompletions = WorkflowTraceContext.Value?.StoreCompletions ?? false,
-            Temperature = _temperature
+            Temperature = _temperature,
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+            RequestFields = _requestFields
+#pragma warning restore ANNKEEXP003
         };
 
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
 
+        // A call to a tool that ends the turn has run; and, per call, the answer it was given and the
+        // message that carried it.
+        var turnEnded = false;
+        string? endedWith = null;
+        var repeatedRounds = 0;
+        var answered = new Dictionary<string, (string Value, AgentMessage Message)>(StringComparer.Ordinal);
+
         while (result.RequiresAction)
         {
-            if (toolRound >= _maxToolRounds)
-                throw new InvalidOperationException(
-                    $"[{Name}] Tool-calling loop exceeded the maximum of {_maxToolRounds} rounds. " +
-                    $"Adjust the system prompt or call WithMaxToolRounds() to increase the limit.");
+            var stop = turnEnded
+                    ? (Stub: "Not executed: a call before it ended this turn.",
+                       Nudge: "Your turn has ended. Answer now with what you have done; do not call tools.",
+                       Failure: $"[{Name}] The model went on calling tools after a call ended its turn, "
+                                + "and again when asked to answer without them.")
+                : toolRound >= _maxToolRounds
+                    ? (Stub: "Not executed: the tool-call limit for this turn was reached.",
+                       Nudge: "You have reached the tool-call limit. Answer now with what you have; do not call tools.",
+                       Failure: $"[{Name}] Tool-calling loop exceeded the maximum of {_maxToolRounds} rounds. "
+                                + "Adjust the system prompt or call WithMaxToolRounds() to increase the limit.")
+                : ((string Stub, string Nudge, string Failure)?)null;
+
+            if (stop is { } why)
+            {
+                toolRound++;
+                var finished = await FinishTurnAsync(
+                    messages, synthetic, result, request, snapshotBuilder, llmSpan, toolRound,
+                    why.Stub, why.Nudge, why.Failure, runCallsThatEndTheTurn: !turnEnded, ct).ConfigureAwait(false);
+
+                if (finished is null)
+                {
+                    llmSpan?.SetAttribute("tool_rounds", toolRound.ToString());
+                    return (default!, result.Text ?? string.Empty);
+                }
+
+                result = finished;
+                break;
+            }
 
             toolRound++;
             messages.Add(AgentMessage.Assistant(
                 result.Text ?? string.Empty, result.ToolCalls));
 
             var hasNonRetryable = false;
+            var onlyRepeats = true;
 
             foreach (var call in result.ToolCalls!)
             {
-                await using var toolSpan = llmSpan?.StartSpan($"tool:{call.FunctionName}", SpanKind.ToolCall);
-                toolSpan?.SetAttribute("tool_round", toolRound.ToString());
-
-                ToolResult toolResult;
-
-                if (!TryParseToolArgs(call.Arguments, call.FunctionName, out var args, out var parseError))
+                if (turnEnded)
                 {
-                    toolSpan?.SetAttribute("tool.malformed_arguments", "true");
-                    toolResult = parseError;
-                    snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: true, call.FunctionName, call.Arguments);
+                    messages.Add(AgentMessage.ToolResult(call.Id, "Not executed: a call before it ended this turn."));
+                    continue;
                 }
-                else if (_toolExecutors!.TryGetValue(call.FunctionName, out var executor))
+
+                var (toolResult, tool, carried) = await RunCallAsync(call, toolRound, llmSpan, snapshotBuilder, ct).ConfigureAwait(false);
+
+                if (toolResult.IsError && !toolResult.IsRetryable)
+                    hasNonRetryable = true;
+
+                var answer = AgentMessage.ToolResult(call.Id, carried);
+
+                if (_maxRepeatedToolRounds is not null)
                 {
-                    toolResult = await executor.ExecuteAsync(args, ct).ConfigureAwait(false);
-                    snapshotBuilder?.RecordToolCall(
-                        hallucinated: false, faulted: toolResult.IsError, call.FunctionName, call.Arguments);
-                }
-                else
-                {
-                    var evt = new HallucinatedToolCallEvent
+                    var key = CallKey(call);
+
+                    // A repeat only if the model was sent the earlier answer: one a context strategy
+                    // withheld from the last request is sent again, and asking for it is no loop.
+                    if (answered.TryGetValue(key, out var before) && before.Value == toolResult.Value
+                        && request.Messages.Any(sent => ReferenceEquals(sent, before.Message)))
                     {
-                        RequestedToolName = call.FunctionName,
-                        RequestedKitName = _kitName,
-                        AgentId = Name,
-                        EpisodeId = snapshotBuilder?.EpisodeId ?? string.Empty,
-                        OccurredAt = TimeProvider.System.GetUtcNow(),
-                    };
-
-                    if (_hallucinationObserver is not null)
-                        await _hallucinationObserver.ReportAsync(evt, ct).ConfigureAwait(false);
-
-                    ToolMetrics.HallucinationReported.Add(1,
-                        new KeyValuePair<string, object?>("agent_id", Name),
-                        new KeyValuePair<string, object?>("kit", _kitName ?? string.Empty),
-                        new KeyValuePair<string, object?>("requested_name", call.FunctionName));
-
-                    toolSpan?.SetAttribute("tool.hallucination", "true");
-                    toolSpan?.SetAttribute("tool.hallucination.requested_name", call.FunctionName);
-
-                    toolResult = ToolResult.Error(
-                        $"Unknown tool '{call.FunctionName}': this tool is not registered. Do not call it again.");
-                    snapshotBuilder?.RecordToolCall(hallucinated: true, faulted: false, call.FunctionName, call.Arguments);
-                }
-
-                var trace = WorkflowTraceContext.Value;
-
-                await WorkflowEventReporting.ReportAsync(new AgentToolCalled
-                {
-                    WorkflowName = trace?.WorkflowName ?? string.Empty,
-                    ExecutionId = trace?.ExecutionId ?? string.Empty,
-                    AgentName = Name,
-                    ToolName = call.FunctionName,
-                    Arguments = call.Arguments,
-                    Result = toolResult.Value.Length <= AgentToolCalled.ResultCap
-                        ? toolResult.Value
-                        : toolResult.Value[..AgentToolCalled.ResultCap],
-                    ResultLength = toolResult.Value.Length,
-                    IsError = toolResult.IsError
-                }, ct).ConfigureAwait(false);
-
-                if (toolResult.IsError)
-                {
-                    toolSpan?.SetAttribute("tool.error", "true");
-                    _logger.LogWarning(
-                        "[{AgentName}] Tool '{Tool}' returned error: {Error}",
-                        Name, call.FunctionName, toolResult.Value);
-
-                    if (!toolResult.IsRetryable)
+                        answer = AgentMessage.ToolResult(
+                            call.Id, $"Answered before in this turn: {call.FunctionName} with these arguments gave this same answer.");
+                    }
+                    else
                     {
-                        toolSpan?.SetAttribute("tool.retryable", "false");
-                        hasNonRetryable = true;
+                        answered[key] = (toolResult.Value, answer);
+                        onlyRepeats = false;
                     }
                 }
 
-                toolSpan?.SetAttribute("output_length", toolResult.Value.Length.ToString());
+                messages.Add(answer);
 
-                var carried = await CapToolOutputAsync(
-                    call.FunctionName, toolResult.Value, toolSpan, ct).ConfigureAwait(false);
-                messages.Add(AgentMessage.ToolResult(call.Id, carried));
+                if (tool?.EndsTurn == true && !toolResult.IsError)
+                    turnEnded = true;
+
+                if (tool?.EndsJob == true && !toolResult.IsError)
+                {
+                    turnEnded = true;
+                    endedWith = result.Text ?? string.Empty;
+                }
+            }
+
+            if (endedWith is not null)
+            {
+                llmSpan?.SetAttribute("tool_rounds", toolRound.ToString());
+                return (default!, endedWith);
+            }
+
+            repeatedRounds = onlyRepeats ? repeatedRounds + 1 : 0;
+
+            // A model that only repeats what it was already answered is looping: asked to answer
+            // instead, it would be paid to go on, so the run ends as it does on a repeating reply.
+            if (repeatedRounds >= _maxRepeatedToolRounds)
+            {
+                throw new RepeatedOutputException(
+                    $"[{Name}] The model repeated calls already answered in this turn, {repeatedRounds} rounds in a row: "
+                    + string.Join(", ", result.ToolCalls!.Select(call => call.FunctionName).Distinct(StringComparer.Ordinal)) + ".");
             }
 
             if (hasNonRetryable)
             {
-                messages.Add(AgentMessage.User(
+                var nudge = AgentMessage.User(
                     "One or more tools returned a permanent error that will not succeed on retry. " +
-                    "Do not call those tools again. Proceed with your best answer using any information you already have."));
+                    "Do not call those tools again. Proceed with your best answer using any information you already have.");
+                synthetic.Add(nudge);
+                messages.Add(nudge);
             }
 
             // PreCompaction fails on the raw accumulated history without paying for the strategy,
@@ -444,9 +546,10 @@ internal sealed class AgentJobEngine<TState, TResult>
             // final answer into the schema. result.Text is intentionally not null-checked
             // here — ExecuteFinalCallAsync validates its own (the follow-up call's) response.
             messages.Add(AgentMessage.Assistant(result.Text ?? string.Empty));
-            messages.Add(AgentMessage.User(_coercionPrompt));
-            return await ExecuteFinalCallAsync(
-                messages, snapshotBuilder, compactBeforeSending: true, ct).ConfigureAwait(false);
+            var coercion = AgentMessage.User(_coercionPrompt);
+            synthetic.Add(coercion);
+            messages.Add(coercion);
+            return (await ExecuteFinalCallAsync(messages, synthetic, snapshotBuilder, ct).ConfigureAwait(false), null);
         }
 
         // Text path: no follow-up call, so the loop's own last response is the final answer
@@ -454,7 +557,195 @@ internal sealed class AgentJobEngine<TState, TResult>
         var text = result.Text
             ?? throw new InvalidOperationException($"[{Name}] LLM returned empty response after tool loop.");
         messages.Add(AgentMessage.Assistant(text));
-        return _extractResult(text);
+        return (_extractResult(text), null);
+    }
+
+    /// <summary>
+    /// Runs one call the model asked for — or reports it as unknown or malformed — records it, and
+    /// returns its result, the tool it reached, and the text carried back to the model.
+    /// </summary>
+    private async Task<(ToolResult Result, ToolDefinition? Tool, string Carried)> RunCallAsync(
+        AgentToolCall call, int toolRound, ISpan? llmSpan, TrajectorySnapshotBuilder? snapshotBuilder, CancellationToken ct)
+    {
+        await using var toolSpan = llmSpan?.StartSpan($"execute_tool {call.FunctionName}", SpanKind.ToolCall);
+        toolSpan?.SetAttribute("gen_ai.operation.name", "execute_tool");
+        toolSpan?.SetAttribute("gen_ai.tool.name", call.FunctionName);
+        toolSpan?.SetAttribute("gen_ai.tool.call.id", call.Id);
+        toolSpan?.SetAttribute("tool_round", toolRound);
+
+        ToolResult toolResult;
+        ToolDefinition? executor = null;
+
+        if (_toolExecutors!.TryGetValue(call.FunctionName, out var registered))
+        {
+            toolSpan?.SetAttribute("tool.execution_mode", registered.ExecutionMode.ToString().ToLowerInvariant());
+
+            if (TargetHost(registered.Endpoint) is { } target)
+                toolSpan?.SetAttribute("tool.target", target);
+        }
+
+        var started = _timeProvider.GetTimestamp();
+
+        if (!ToolDispatch.TryParseArguments(call.Arguments, call.FunctionName, out var args, out var parseError))
+        {
+            toolSpan?.SetAttribute("tool.malformed_arguments", true);
+            toolResult = parseError;
+            snapshotBuilder?.RecordToolCall(hallucinated: false, faulted: true, call.FunctionName, call.Arguments);
+        }
+        else if (registered is not null)
+        {
+            executor = registered;
+            toolResult = await ToolDispatch.InvokeAsync(executor, args, ct, _logger).ConfigureAwait(false);
+            snapshotBuilder?.RecordToolCall(
+                hallucinated: false, faulted: toolResult.IsError, call.FunctionName, call.Arguments);
+        }
+        else
+        {
+            toolResult = await UnknownTools.ReportAsync(
+                _hallucinationObserver, call.FunctionName, _kitName, Name,
+                snapshotBuilder?.EpisodeId ?? string.Empty, _timeProvider, ct).ConfigureAwait(false);
+
+            toolSpan?.SetAttribute("tool.hallucination", true);
+            toolSpan?.SetAttribute("tool.hallucination.requested_name", call.FunctionName);
+            snapshotBuilder?.RecordToolCall(hallucinated: true, faulted: false, call.FunctionName, call.Arguments);
+        }
+
+        var duration = _timeProvider.GetElapsedTime(started);
+
+        // Built only for a sink that will read it, so a run nobody streams pays nothing for it.
+        if (WorkflowEventReporting.Current is { } sink)
+        {
+            var trace = WorkflowTraceContext.Value;
+            var content = trace?.RecordContent == true;
+            var result = content ? toolResult.Recorded() : null;
+
+            await sink.ReportAsync(new AgentToolCalled
+            {
+                WorkflowName = trace?.WorkflowName ?? string.Empty,
+                ExecutionId = trace?.ExecutionId ?? string.Empty,
+                AgentName = Name,
+                ToolName = call.FunctionName,
+                CallId = call.Id,
+                Round = toolRound,
+                Duration = duration,
+                Arguments = content ? registered?.Recorded(call.Arguments) ?? call.Arguments : null,
+                Result = result is null || result.Length <= AgentToolCalled.ResultCap
+                    ? result
+                    : result[..AgentToolCalled.ResultCap],
+                ResultLength = toolResult.Value.Length,
+                IsError = toolResult.IsError
+            }, ct).ConfigureAwait(false);
+        }
+
+        if (toolResult.IsError)
+        {
+            // A tool reports its error as text, so there is no class of error to name, and the
+            // convention's value for that is "_OTHER".
+            toolSpan?.SetAttribute("error.type", "_OTHER");
+            toolSpan?.SetAttribute("tool.error", true);
+            _logger.LogWarning(
+                "[{AgentName}] Tool '{Tool}' returned error: {Error}",
+                Name, call.FunctionName, toolResult.Value);
+
+            if (!toolResult.IsRetryable)
+                toolSpan?.SetAttribute("tool.retryable", false);
+        }
+
+        toolSpan?.SetAttribute("output_length", toolResult.Value.Length);
+
+        var carried = await CapToolOutputAsync(
+            call.FunctionName, toolResult.Value, toolSpan, ct).ConfigureAwait(false);
+        return (toolResult, executor, carried);
+    }
+
+    /// <summary>
+    /// The host a remote tool is reached at, or <see langword="null"/> for a tool with no absolute
+    /// endpoint. Never the path or query: a URI can carry a key in its query.
+    /// </summary>
+    private static string? TargetHost(ToolEndpoint? endpoint) =>
+        endpoint?.Uri is { IsAbsoluteUri: true, Host: { Length: > 0 } host } ? host : null;
+
+    /// <summary>A call's tool and its arguments with their keys in order, so the same call reads the same.</summary>
+    private static string CallKey(AgentToolCall call)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(call.Arguments) ? "{}" : call.Arguments);
+
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                return call.FunctionName + "\n" + string.Join("\n", doc.RootElement.EnumerateObject()
+                    .OrderBy(p => p.Name, StringComparer.Ordinal)
+                    .Select(p => p.Name + "=" + p.Value.GetRawText()));
+        }
+        catch (JsonException)
+        {
+        }
+
+        return call.FunctionName + "\n" + call.Arguments;
+    }
+
+    /// <summary>
+    /// One last chance instead of an abrupt failure: every call the model asked for when its turn
+    /// stopped is answered with <paramref name="stub"/> so the transcript stays valid — except a call
+    /// to a tool that ends the turn or the job, which is run when <paramref name="runCallsThatEndTheTurn"/>
+    /// — then one more call with the same tools, asked not to use them. Still asking for tools after that
+    /// really is exhausted, not a fluke that one extra round would have cleared, and throws
+    /// <paramref name="failure"/>, which names why the turn stopped. <see langword="null"/>, with no call
+    /// made, when a call to a tool that ends the job ran.
+    /// </summary>
+    private async Task<AgentResponse?> FinishTurnAsync(
+        List<AgentMessage> messages,
+        HashSet<AgentMessage> synthetic,
+        AgentResponse pending,
+        AgentRequest request,
+        TrajectorySnapshotBuilder? snapshotBuilder,
+        ISpan? llmSpan,
+        int toolRound,
+        string stub,
+        string nudgeText,
+        string failure,
+        bool runCallsThatEndTheTurn,
+        CancellationToken ct)
+    {
+        messages.Add(AgentMessage.Assistant(pending.Text ?? string.Empty, pending.ToolCalls));
+
+        var ended = false;
+        var jobEnded = false;
+
+        foreach (var call in pending.ToolCalls!)
+        {
+            if (runCallsThatEndTheTurn && !ended
+                && _toolExecutors is not null
+                && _toolExecutors.TryGetValue(call.FunctionName, out var tool) && (tool.EndsTurn || tool.EndsJob))
+            {
+                var (toolResult, _, carried) = await RunCallAsync(call, toolRound, llmSpan, snapshotBuilder, ct).ConfigureAwait(false);
+                messages.Add(AgentMessage.ToolResult(call.Id, carried));
+                ended = !toolResult.IsError;
+                jobEnded = ended && tool.EndsJob;
+                continue;
+            }
+
+            messages.Add(AgentMessage.ToolResult(call.Id, stub));
+        }
+
+        if (jobEnded)
+            return null;
+
+        var nudge = AgentMessage.User(nudgeText);
+        synthetic.Add(nudge);
+        messages.Add(nudge);
+
+        IReadOnlyList<AgentMessage> requestMessages = messages;
+        if (_contextStrategy is not null)
+            requestMessages = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
+
+        request = request with { Messages = requestMessages };
+        var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
+
+        if (result.RequiresAction)
+            throw new InvalidOperationException(failure);
+
+        return result;
     }
 
     /// <summary>
@@ -508,9 +799,9 @@ internal sealed class AgentJobEngine<TState, TResult>
         if (record is null)
             return capped;
 
-        toolSpan?.SetAttribute("tool.output_capped", "true");
-        toolSpan?.SetAttribute("tool.output_chars_after", record.CharsAfter.ToString());
-        toolSpan?.SetAttribute("tool.output_recoverable", record.Recoverable ? "true" : "false");
+        toolSpan?.SetAttribute("tool.output_capped", true);
+        toolSpan?.SetAttribute("tool.output_chars_after", record.CharsAfter);
+        toolSpan?.SetAttribute("tool.output_recoverable", record.Recoverable);
 
         _logger.LogInformation(
             "[{AgentName}] Tool '{Tool}' returned {Before:N0} characters; carried {After:N0} inline ({Disposition}).",
@@ -641,83 +932,36 @@ internal sealed class AgentJobEngine<TState, TResult>
     /// answer — a routed model forwards its router's answer — so a strategy configured for one
     /// window is no longer applied blindly to whichever model the router happened to pick.
     /// </summary>
-    private ContextBudget BuildContextBudget(IReadOnlyList<AgentMessage> messages)
-    {
-        var window = ModelContextWindow.Unknown;
-        if (_model is IModelContextResolver resolver)
+    private ContextBudget BuildContextBudget(IReadOnlyList<AgentMessage> messages) =>
+        ContextBudgets.For(_model, new AgentRequest
         {
-            window = resolver.ResolveContextWindow(new AgentRequest
-            {
-                SystemPrompt = _systemPrompt,
-                Messages = messages,
-                Tools = _tools,
-                Metadata = BuildMetadata()
-            });
-        }
-
-        if (!window.IsKnown && _maxContextTokens is null)
-            return ContextBudget.Unspecified;
-
-        return new ContextBudget
-        {
-            MaxTokens = _maxContextTokens,
-            ModelContextTokens = window.ContextTokens,
-            ModelName = window.ModelName,
-            ReservedTokens = _toolSchemaTokens
-        };
-    }
+            SystemPrompt = _systemPrompt,
+            Messages = messages,
+            Tools = _tools,
+            Metadata = BuildMetadata()
+        }, _maxContextTokens, _toolSchemaTokens);
 
     /// <summary>
-    /// Parses tool-call arguments, tolerating malformed JSON from the model instead of throwing.
-    /// A parse failure produces a retryable <see cref="ToolResult.Error(string)"/> asking the
-    /// model to re-emit the call — the same self-correction shape as an unknown tool name.
-    /// </summary>
-    private static bool TryParseToolArgs(
-        string arguments,
-        string functionName,
-        out IReadOnlyDictionary<string, object?> args,
-        out ToolResult parseError)
-    {
-        try
-        {
-            args = ParseToolArgs(arguments);
-            parseError = default!;
-            return true;
-        }
-        catch (JsonException)
-        {
-            args = null!;
-            parseError = ToolResult.Error(
-                $"Invalid JSON arguments for '{functionName}'. Re-emit the call with valid JSON.");
-            return false;
-        }
-    }
-
-    private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
-    {
-        var dict = new Dictionary<string, object?>();
-        using var doc = JsonDocument.Parse(arguments);
-        foreach (var prop in doc.RootElement.EnumerateObject())
-            dict[prop.Name] = prop.Value.Clone();
-        return dict;
-    }
-
-
-    /// <summary>
-    /// Default retry predicate: HTTP 429 rate-limit errors that waiting can clear (see
-    /// <see cref="ResilientAgentModel.IsTransientRateLimit"/>) and <see cref="TimeoutException"/>.
-    /// Everything else — 4xx auth/validation errors, <see cref="GuardrailException"/>, a 429 that
-    /// says the account is out of allowance, arbitrary application exceptions — is treated as
-    /// non-retryable and rethrown on the first occurrence.
+    /// Default retry predicate: <see cref="TimeoutException"/>, and an HTTP 429 that waiting can clear
+    /// (see <see cref="ResilientAgentModel.IsTransientRateLimit"/>) <em>and</em> that states how long
+    /// to wait (see <see cref="ProviderRetryDelay"/>). Everything else — a plain 429, 4xx
+    /// auth/validation errors, <see cref="GuardrailException"/>, a 429 that says the account is out
+    /// of allowance, arbitrary application exceptions — is rethrown on the first occurrence.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// A plain 429 is the provider SDK's to retry: each adapter's SDK already does, so retrying it here
+    /// too multiplied every request. A delay stated in the error body is what an SDK does not read —
+    /// it waits by the header — so that wait is waited here.
+    /// </para>
     /// The exclusion is not a tuning choice. A depleted account answers 429 exactly as a busy one
     /// does, so without it the engine spends three round trips <em>per job</em> on a wall that will
     /// not move, and the provider's own explanation reaches the reader on the third attempt rather
     /// than the first.
     /// </remarks>
     public static bool DefaultShouldRetry(Exception ex) =>
-        ResilientAgentModel.IsTransientRateLimit(ex) || ex is TimeoutException;
+        ex is TimeoutException
+        || (ResilientAgentModel.IsTransientRateLimit(ex) && ProviderRetryDelay.From(ex) is not null);
 
     private async Task<AgentResponse> GenerateWithRetryAsync(
         AgentRequest request,
@@ -738,10 +982,18 @@ internal sealed class AgentJobEngine<TState, TResult>
                 await UsageRecording.ReportAsync(response, ct).ConfigureAwait(false);
                 if (retries > 0)
                     span?.SetAttribute("gen_ai.retry_count", retries.ToString());
+
+                // A reply that repeats itself runs to the output limit; one the model ended itself did
+                // not, whatever its last lines look like. An adapter that says nothing of why the reply
+                // stopped is checked as if it had reached the limit.
+                if (response.StopReason is AgentStopReason.MaxTokens or AgentStopReason.Unknown)
+                    RepeatedOutput.ThrowIfRepeating(response.Text);
+
                 return response;
             }
             catch (OperationCanceledException) { throw; }
             catch (GuardrailException) { throw; }
+            catch (RepeatedOutputException) { throw; }
             catch (Exception ex) when (!_shouldRetry(ex))
             {
                 throw;
@@ -757,7 +1009,7 @@ internal sealed class AgentJobEngine<TState, TResult>
                 // What the provider asked for wins over what we would have guessed. A limit measured
                 // in minutes outlives three exponential backoffs from a one-second base, so ignoring
                 // the stated delay spends every attempt before the window it is waiting for moves.
-                var stated = ProviderRetryDelay.From(ex);
+                var stated = ProviderRetryDelay.From(ex, _timeProvider);
                 var delayMs = stated is { } wait
                     ? (int)wait.TotalMilliseconds
                     : (int)(_retryBaseDelay.TotalMilliseconds * Math.Pow(2, retries - 1));

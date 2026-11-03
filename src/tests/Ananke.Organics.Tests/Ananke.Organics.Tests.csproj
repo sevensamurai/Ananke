@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;ANNKEEXP001</NoWarn>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 

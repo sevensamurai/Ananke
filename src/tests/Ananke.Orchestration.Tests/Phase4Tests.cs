@@ -4,6 +4,7 @@ using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Tools.Faults;
 using Ananke.Orchestration.Tools.Gating;
 using Ananke.Orchestration.Tools.Routing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -106,6 +107,21 @@ public class ToolPrunerTests
             ("idle_tool", ToolHealth.Healthy, HitCount: 0, LastUsed: staleDate));
         var pruner = new ToolPruner(memory, kit) { IdleTtl = TimeSpan.FromHours(1), MinHitCount = 3 };
         await pruner.TickAsync();
+        var recalled = await memory.RecallAsync("idle tool", topK: 5);
+        recalled.Any(e => e.ToolName == "idle_tool").ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task TickAsync_IdleByTheInjectedClock_IsPruned()
+    {
+        var lastUsed = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(lastUsed + TimeSpan.FromHours(2));
+        var (kit, memory) = await BuildKitAsync(
+            ("idle_tool", ToolHealth.Healthy, HitCount: 0, LastUsed: lastUsed));
+
+        var pruner = new ToolPruner(memory, kit, timeProvider: clock) { IdleTtl = TimeSpan.FromHours(1), MinHitCount = 3 };
+        await pruner.TickAsync();
+
         var recalled = await memory.RecallAsync("idle tool", topK: 5);
         recalled.Any(e => e.ToolName == "idle_tool").ShouldBeFalse();
     }

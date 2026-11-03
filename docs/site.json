@@ -54,6 +54,10 @@
                     "path": "reference/advanced-agent-features.md"
                 },
                 {
+                    "title": "Experimental APIs",
+                    "path": "reference/experimental-apis.md"
+                },
+                {
                     "title": "FAQ",
                     "path": "faq.md"
                 }
@@ -73,10 +77,6 @@
                 {
                     "title": "nnke CLI",
                     "path": "cli/nnke-tool.md"
-                },
-                {
-                    "title": "nnke-platform CLI",
-                    "path": "cli/nnke-platform-tool.md"
                 }
             ]
         },
@@ -206,6 +206,28 @@
                         "structured output",
                         "multi-provider"
                     ]
+                },
+                {
+                    "title": "Experimental APIs",
+                    "path": "reference/experimental-apis.md",
+                    "tags": [
+                        "experimental",
+                        "ANNKEEXP001",
+                        "ANNKEEXP002",
+                        "ANNKEEXP003",
+                        "plan tier",
+                        "suppress"
+                    ]
+                },
+                {
+                    "title": "Model Deprecations",
+                    "path": "reference/model-deprecations.md",
+                    "tags": [
+                        "models",
+                        "lifecycle",
+                        "ANNKE001",
+                        "deprecated"
+                    ]
                 }
             ]
         },
@@ -246,13 +268,10 @@
                     "path": "cli/nnke-tools.md",
                     "tags": [
                         "nnke",
-                        "nnke-platform",
                         "dotnet tool",
                         "cli",
                         "tooling",
                         "design",
-                        "federation",
-                        "deployment",
                         "run",
                         "serve",
                         "local execution"
@@ -275,41 +294,6 @@
                         "local execution",
                         "FED061",
                         "platform native"
-                    ]
-                },
-                {
-                    "title": "nnke-platform CLI",
-                    "path": "cli/nnke-platform-tool.md",
-                    "tags": [
-                        "nnke-platform",
-                        "dotnet tool",
-                        "federation",
-                        "deployment",
-                        "cloud",
-                        "azure",
-                        "google",
-                        "vertex-ai",
-                        "anthropic",
-                        "claude",
-                        "mesh",
-                        "organics",
-                        "adapters",
-                        "credentials",
-                        "module initializer",
-                        "install",
-                        "local-loop",
-                        "local design loop",
-                        "emulators",
-                        "local-emulated",
-                        "foundry",
-                        "gemini-enterprise",
-                        "platform-native",
-                        "FED060",
-                        "FED061",
-                        "FED062",
-                        "run",
-                        "serve",
-                        "local execution"
                     ]
                 }
             ]
@@ -530,6 +514,19 @@
                     ]
                 },
                 {
+                    "title": "17 — Local & self-hosted models",
+                    "path": "guides/17-local-models.md",
+                    "tags": [
+                        "local",
+                        "ollama",
+                        "vllm",
+                        "self-hosted",
+                        "open-weight",
+                        "privacy",
+                        "licence"
+                    ]
+                },
+                {
                     "title": "18 \u2014 Plans and Contracts",
                     "path": "guides/18-plans-and-contracts.md",
                     "tags": [
@@ -540,6 +537,17 @@
                         "long-running",
                         "decomposition",
                         "verification"
+                    ]
+                },
+                {
+                    "title": "21 — Enterprise clouds",
+                    "path": "guides/21-enterprise-clouds.md",
+                    "tags": [
+                        "bedrock",
+                        "foundry",
+                        "entra",
+                        "a2a",
+                        "byo-model-id"
                     ]
                 },
                 {

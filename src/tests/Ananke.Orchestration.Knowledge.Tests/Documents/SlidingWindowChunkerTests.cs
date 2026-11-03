@@ -57,33 +57,64 @@ public class SlidingWindowChunkerTests
     }
 
     [Test]
+    public void Chunk_AParagraphLongerThanTheWindow_IsSplitAtSentenceEnds()
+    {
+        // MaxTokens=100 -> maxChars=400; one paragraph of 30 sentences of about 60 characters each.
+        var sentences = Enumerable.Range(0, 30).Select(i => $"Sentence number {i:D2} says something about the topic at hand.").ToList();
+        var document = new ExtractedDocument([new ExtractedSection(string.Join(" ", sentences))]);
+
+        var chunks = _chunker.Chunk(document, new ChunkingOptions(MaxTokens: 100, OverlapTokens: 16));
+
+        chunks.Count.ShouldBeGreaterThan(4);
+        chunks.ShouldAllBe(c => c.Text.Length <= 400);
+        chunks.ShouldAllBe(c => c.Text.EndsWith('.'));
+        sentences.ShouldAllBe(sentence => chunks.Any(c => c.Text.Contains(sentence)));
+    }
+
+    [Test]
+    public void Chunk_ASentenceLongerThanTheWindow_IsSplitAtSpaces()
+    {
+        var words = Enumerable.Range(0, 300).Select(i => $"word{i}").ToList();
+        var document = new ExtractedDocument([new ExtractedSection(string.Join(" ", words))]);
+
+        var chunks = _chunker.Chunk(document, new ChunkingOptions(MaxTokens: 50, OverlapTokens: 0));
+
+        chunks.ShouldAllBe(c => c.Text.Length <= 200);
+        words.ShouldAllBe(word => chunks.Any(c => c.Text.Split(' ', StringSplitOptions.None).Contains(word)));
+    }
+
+    [Test]
     public void Chunk_OverlapLargerThanWindow_DoesNotThrowAndStillProgresses()
     {
         var paragraphs = Enumerable.Range(0, 4).Select(i => new string('b', 20) + i).ToArray();
         var text = string.Join("\n\n", paragraphs);
         var document = new ExtractedDocument([new ExtractedSection(text)]);
 
-        // OverlapTokens far exceeds MaxTokens (overlapChars > maxChars).
+        // OverlapTokens far exceeds MaxTokens (overlapChars > maxChars), and each paragraph is longer than the window.
         var chunks = _chunker.Chunk(document, new ChunkingOptions(MaxTokens: 5, OverlapTokens: 1000));
 
         chunks.ShouldNotBeEmpty();
-        // Every paragraph's text must still appear somewhere in the output — nothing silently dropped.
-        foreach (var para in paragraphs)
-            chunks.Any(c => c.Text.Contains(para)).ShouldBeTrue();
+        chunks.ShouldAllBe(c => c.Text.Length <= 20);
+        // Nothing silently dropped: every character of every paragraph is still in the output.
+        chunks.Sum(c => c.Text.Count(ch => ch == 'b')).ShouldBeGreaterThanOrEqualTo(paragraphs.Sum(p => p.Count(ch => ch == 'b')));
+        for (var i = 0; i < paragraphs.Length; i++)
+            chunks.Any(c => c.Text.Contains(i.ToString())).ShouldBeTrue();
     }
 
     [Test]
     public void Chunk_ConsecutiveChunks_OverlapContainsTailOfPreviousChunk()
     {
-        var paragraphs = new[] { new string('x', 50), new string('y', 50), new string('z', 50) };
+        var paragraphs = new[] { "alpha beta gamma delta epsilon", "zeta eta theta iota kappa", "lambda mu nu xi omicron pi" };
         var text = string.Join("\n\n", paragraphs);
         var document = new ExtractedDocument([new ExtractedSection(text)]);
 
-        var chunks = _chunker.Chunk(document, new ChunkingOptions(MaxTokens: 15, OverlapTokens: 15));
+        // maxChars=60, overlapChars=12 (a quarter of the window at most).
+        var chunks = _chunker.Chunk(document, new ChunkingOptions(MaxTokens: 15, OverlapTokens: 3));
 
         chunks.Count.ShouldBeGreaterThan(1);
-        // The overlap paragraph carried into chunk 2 must be the tail paragraph of chunk 1.
-        chunks[1].Text.ShouldContain(paragraphs[0]);
+        chunks.ShouldAllBe(c => c.Text.Length <= 60);
+        // Chunk 2 starts with the tail of chunk 1, from the start of a word.
+        chunks[1].Text.ShouldStartWith("iota kappa\n\nlambda");
     }
 
     [Test]

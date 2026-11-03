@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Ananke.Orchestration.Planning;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>One budget for both mechanical retries, because they are the same class of thing (R29).</b> A
+/// <b>One budget for both mechanical retries, because they are the same class of thing.</b> A
 /// reply that will not parse and a provider that fell over both mean <em>the executor produced no
 /// response</em> — nothing was applied, nothing was built, no criterion was measured, and so there is
 /// no outcome yet for anybody to deviate from. Neither is a judgement, so both may live in the loop;
@@ -21,9 +23,10 @@ namespace Ananke.Orchestration.Planning;
 /// <b>And nothing here is readable from the plan.</b> The count bounds the loop and never reaches the
 /// tree: a plan that could see how many goes a step has had is a plan whose planner can reason about
 /// it, and attempt counts are exactly the kind of infrastructure detail that starts steering
-/// decisions it has no business steering (S9).
+/// decisions it has no business steering.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanRetryPolicy
 {
     /// <summary>

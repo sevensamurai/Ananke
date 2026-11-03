@@ -1,8 +1,7 @@
 namespace Ananke.Abstractions.Providers;
 
 /// <summary>
-/// Describes how a tool's implementation is reached at runtime. Federation deployers
-/// use this to determine whether a tool can be deployed to a remote platform.
+/// Describes how a tool's implementation is reached at runtime.
 /// </summary>
 public enum ToolExecutionMode
 {

@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -10,6 +11,7 @@ namespace Ananke.Orchestration.Planning;
 /// one will paraphrase it — and a verdict that cannot be matched to the criterion it is about is a
 /// verdict about nothing.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record CriterionReview
 {
     /// <summary>Which criterion this is about, as numbered in the question.</summary>
@@ -28,6 +30,7 @@ public sealed record CriterionReview
 }
 
 /// <summary>What a reviewer answers: one finding per criterion it was shown.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record Review
 {
     /// <summary>The findings, one per criterion.</summary>
@@ -71,6 +74,7 @@ public sealed record Review
 /// sees what that left undecided.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class AgentVerifier : IVerifier
 {
     private const string DefaultPersona =

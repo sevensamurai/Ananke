@@ -180,4 +180,20 @@ public class UsageRecordingScopeTests
 
         (await recorder.ReadAsync()).Usage.InputTokens.ShouldBe(20);
     }
+
+    [Test]
+    public async Task RecordUsage_PricedTokens_StayOutOfTheUncostedTotal()
+    {
+        // A router reports a call's cost; the agent job reports the same call's tokens.
+        var recorder = new InMemoryUsageRecorder();
+        var call = new TokenUsage { InputTokens = 10, OutputTokens = 5 };
+
+        await recorder.RecordUsageAsync(new UsageRecord(TokenUsage.Zero, 0.25m));
+        await recorder.RecordUsageAsync(new UsageRecord(call, Priced: true));
+
+        var snapshot = await recorder.ReadAsync();
+        snapshot.Usage.ShouldBe(call);
+        snapshot.UncostedUsage.ShouldBe(TokenUsage.Zero);
+        snapshot.AccumulatedCost.ShouldBe(0.25m);
+    }
 }

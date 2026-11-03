@@ -6,7 +6,7 @@ namespace Ananke.Organics.Healing;
 /// <summary>
 /// Prunes cells that are older than a configurable maximum age and whose
 /// utility (executions per unit of age) has fallen below a minimum threshold.
-/// Implements the apoptosis loop (L4).
+/// Implements the apoptosis loop.
 /// </summary>
 /// <remarks>
 /// Both conditions must be satisfied: the cell must be old enough <b>and</b>

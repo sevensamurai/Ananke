@@ -32,6 +32,12 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     private readonly ConcurrentDictionary<string, Func<string, byte[], CancellationToken, Task>> _subscriptions = new();
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    // Subscription handlers run off the receive loop. They are cancelled and waited for on dispose,
+    // so none outlives the channel it was delivered by.
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly ConcurrentDictionary<Task, byte> _handlers = new();
+    private static readonly TimeSpan HandlerDrain = TimeSpan.FromSeconds(5);
+
     private const int MaxReconnectAttempts = 10;
 
     private IMqttClient? _client;
@@ -80,7 +86,9 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
                 try
                 {
                     attempt++;
-                    await Task.Delay(delay);
+
+                    // Jittered, so clients that lost the same broker do not all return at once.
+                    await Task.Delay(delay + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000)));
                     await _client.ConnectAsync(_options, CancellationToken.None);
                     _logger.LogInformation("Handoff channel reconnected after {Attempt} attempt(s)", attempt);
                     return;
@@ -271,17 +279,25 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         {
             if (topic.StartsWith(prefix, StringComparison.Ordinal))
             {
-                _ = Task.Run(async () =>
+                var running = Task.Run(async () =>
                 {
                     try
                     {
-                        await handler(topic, payload, CancellationToken.None);
+                        await handler(topic, payload, _lifetime.Token);
+                    }
+                    catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+                    {
+                        // The channel was disposed while the handler ran.
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Handoff subscription handler failed for {Topic}", topic);
                     }
                 });
+
+                _handlers.TryAdd(running, 0);
+                _ = running.ContinueWith(
+                    finished => _handlers.TryRemove(finished, out _), TaskScheduler.Default);
                 return Task.CompletedTask;
             }
         }
@@ -309,6 +325,23 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         if (_disposed) return;
         _disposed = true;
 
+        await _lifetime.CancelAsync();
+
+        var running = _handlers.Keys.ToArray();
+        if (running.Length > 0)
+        {
+            try
+            {
+                await Task.WhenAll(running).WaitAsync(HandlerDrain);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning(
+                    "{Count} handoff subscription handler(s) still running {Seconds}s after dispose",
+                    running.Length, HandlerDrain.TotalSeconds);
+            }
+        }
+
         foreach (var kvp in _pending)
             kvp.Value.TrySetCanceled();
         _pending.Clear();
@@ -321,6 +354,7 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
             _client.Dispose();
         }
 
+        _lifetime.Dispose();
         GC.SuppressFinalize(this);
     }
 }

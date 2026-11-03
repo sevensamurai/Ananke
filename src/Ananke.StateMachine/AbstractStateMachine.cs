@@ -260,7 +260,7 @@ public abstract class AbstractStateMachine<C, S, T, N>(
 
     internal async Task<TransitionResult<S>> TryExecuteTransitionAsync(string id, T transition, object? payload)
     {
-        var eventTime = payload is ITimestamped ts ? ts.EventTime : DateTimeOffset.UtcNow;
+        var eventTime = payload is ITimestamped ts ? ts.EventTime : _options.Clock.GetUtcNow();
         try
         {
             var persistedContext = await GetPersistedContextAsync(id).ConfigureAwait(false);
@@ -416,12 +416,12 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// carrying an optional payload for interrupt transitions.
     /// When the payload implements <see cref="ITimestamped"/> its
     /// <see cref="ITimestamped.EventTime"/> is used as the transition timestamp;
-    /// otherwise <see cref="DateTimeOffset.UtcNow"/> is used.
+    /// otherwise the time from <see cref="StateMachineOptions.Clock"/> is used.
     /// Blocked when OperationalStatus is Faulted.
     /// </summary>
     protected async Task<TransitionResult<S>> InternalTransitionAsync(C context, T transition, object? payload)
     {
-        var eventTime = payload is ITimestamped ts ? ts.EventTime : DateTimeOffset.UtcNow;
+        var eventTime = payload is ITimestamped ts ? ts.EventTime : _options.Clock.GetUtcNow();
         // Gate: Block transitions if Faulted
         if (OperationalStatus == OperationalStatus.Faulted)
         {
@@ -503,7 +503,8 @@ public abstract class AbstractStateMachine<C, S, T, N>(
     /// Override to add custom behavior. Default delegates to
     /// <see cref="InternalTransitionAsync(C, T, object?)"/>.
     /// When the payload implements <see cref="ITimestamped"/> its event time is used
-    /// as the attributed timestamp on the result; otherwise <see cref="DateTimeOffset.UtcNow"/> is used.
+    /// as the attributed timestamp on the result; otherwise the time from
+    /// <see cref="StateMachineOptions.Clock"/> is used.
     /// </summary>
     public virtual Task<TransitionResult<S>> TransitionAsync(C context, T transition, object? payload)
         => InternalTransitionAsync(context, transition, payload);

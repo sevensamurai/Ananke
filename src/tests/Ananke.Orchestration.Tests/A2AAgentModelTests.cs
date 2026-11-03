@@ -83,6 +83,37 @@ public class A2AAgentModelTests
     private static AgentRequest SimpleRequest(string text = "Hello") =>
         new() { Messages = [Ananke.Abstractions.Agents.AgentMessage.User(text)] };
 
+    // ── stop reason ───────────────────────────────────────────────────────────
+
+    [Test]
+    public async Task GenerateAsync_AMessageOrACompletedTask_EndedItsTurn()
+    {
+        var message = await MakeModel(new FakeA2AHandler { ResponseJson = BuildAgentMessageJson("Pong") })
+            .GenerateAsync(SimpleRequest());
+        var task = await MakeModel(new FakeA2AHandler { ResponseJson = BuildAgentTaskJson("Done") })
+            .GenerateAsync(SimpleRequest());
+
+        message.StopReason.ShouldBe(AgentStopReason.EndTurn);
+        task.StopReason.ShouldBe(AgentStopReason.EndTurn);
+    }
+
+    [Test]
+    public async Task AgentJob_ARemoteAgentThatRepliesWithRepeatedRows_ReturnsTheReply()
+    {
+        // Fixture rows, asked for: the remote agent ended its reply, so it is not read as a loop.
+        var rows = string.Concat(Enumerable.Repeat(@"0,0,0,0,0,0,0,0,0,0\n", 60));
+        var handler = new FakeA2AHandler { ResponseJson = BuildAgentMessageJson("a,b,c\\n" + rows) };
+
+        var job = Ananke.Orchestration.Agents.AgentJobFactory.Create<string>("rows", MakeModel(handler))
+            .WithPrompt(s => s)
+            .MapResult((_, reply) => reply)
+            .Build();
+
+        var reply = await job.ExecuteAsync("sixty rows of zeros").WaitAsync(TimeSpan.FromSeconds(10));
+
+        reply.ShouldEndWith(string.Concat(Enumerable.Repeat("0,0,0,0,0,0,0,0,0,0\n", 60)));
+    }
+
     // ── single-turn ───────────────────────────────────────────────────────────
 
     [Test]

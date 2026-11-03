@@ -108,6 +108,33 @@ public class AnsweringTests
         proposal.Discarded.Count.ShouldBe(2); // asked twice, and both times said the same thing
     }
 
+    // ── Asking the step to try again ──
+
+    [Test]
+    public async Task AnOptionThatAsksTheStepToTryAgain_PutsTheLineOnIt_AndLeavesItToTheNextPass()
+    {
+        // A step a check stopped asked nothing, so the line is recorded against what stopped it, and the
+        // next pass attempts the step reading it: no version is minted and no verb is added.
+        var halted = Answered(new PlanQuestion
+        {
+            Options = [new PlanOption { Summary = "try day 1 again", Answer = "leave one night free" }],
+            Picked = 1
+        });
+        var (running, store) = Choosing(halted);
+
+        var after = await running;
+
+        after.Coordination!.Result.HaltedAt.ShouldBeNull();
+        after.Coordination.Result.Tree.Lineage.Count.ShouldBe(1);
+        after.Coordination.Question.ShouldBeNull();
+
+        var day = (await store.LoadAsync("trip")).ShouldNotBeNull().Node("day-1");
+        var told = day.Answers.ShouldHaveSingleItem();
+        told.Answer.ShouldBe("leave one night free");
+        told.Asked.ShouldBe(halted.HaltReason.ShouldNotBeNull());
+        day.State.ShouldBe(StepState.Pending);
+    }
+
     // ── Saying something else ──
 
     [Test]
@@ -192,6 +219,31 @@ public class AnsweringTests
         offered.HaltReason.ShouldBe("there is not enough room");
         offered.Options.ShouldHaveSingleItem().Replan.ShouldBeTrue();
         offered.Discarded.ShouldHaveSingleItem();
+    }
+
+    [Test]
+    public async Task Asking_ReportsWhatTheSupervisorSaidTheHaltIs_EvenWhenItOfferedNothing()
+    {
+        var sink = new Collecting();
+        var store = new InMemoryPlanTreeStore();
+        await store.SaveAsync(Halted().Result.Tree);
+
+        var asked = new PlanAskingJob<Trip>(
+            "propose",
+            (_, _) => Task.FromResult(new PlanProposal
+            {
+                Options = [],
+                Summary = "The day's attempt fell short; the plan is fine."
+            }),
+            new SupervisionOptions { Store = store },
+            state => state.Coordination,
+            (state, c) => state with { Coordination = c });
+
+        using (WorkflowEventReporting.BeginScope(sink))
+            await asked.ExecuteAsync(new Trip { Coordination = Halted() });
+
+        sink.Events.OfType<PlanProposalOffered>().ShouldHaveSingleItem()
+            .Summary.ShouldBe("The day's attempt fell short; the plan is fine.");
     }
 
     // ── Cancelling ──

@@ -198,9 +198,9 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
                 IsEmpty = new IsEmptyCondition { Key = EntityIdKey }
             });
 
-        var similar = await _client.SearchAsync(
+        var similar = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: embedding,
+            query: embedding.ToArray(),
             filter: kindFilter,
             limit: 1,
             scoreThreshold: _dedupThreshold,
@@ -270,9 +270,9 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         var queryEmbedding = await _embedder.EmbedAsync(situation, ct).ConfigureAwait(false);
         var filter = BuildRecallFilter(options);
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: queryEmbedding,
+            query: queryEmbedding.ToArray(),
             filter: filter,
             limit: (ulong)options.TopK,
             payloadSelector: true,
@@ -630,9 +630,9 @@ public sealed class QdrantEmpiricalMemory : IEmpiricalMemory
         var referenceEmbedding = await _embedder.EmbedAsync(
             reference.Description.ToEmbeddingText(), ct).ConfigureAwait(false);
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: referenceEmbedding,
+            query: referenceEmbedding.ToArray(),
             limit: (ulong)preFilterK,
             payloadSelector: true,
             cancellationToken: ct).ConfigureAwait(false);

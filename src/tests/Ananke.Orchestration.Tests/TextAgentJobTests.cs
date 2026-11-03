@@ -189,7 +189,8 @@ public class TextAgentJobTests
     {
         var model = ThrowingModel.FailNTimesThenSucceed(
             failCount: 2,
-            () => new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests),
+            // States its delay: a plain 429 is the provider SDK's to retry, not the engine's.
+            () => new HttpRequestException("rate limited, please retry in 0.001s", null, HttpStatusCode.TooManyRequests),
             successText: "recovered");
 
         var agent = AgentJobFactory.Create<TextAgentState>("rate-limited", model)

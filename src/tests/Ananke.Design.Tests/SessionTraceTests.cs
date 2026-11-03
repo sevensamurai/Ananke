@@ -28,7 +28,7 @@ public class SessionTraceTests
         await using (var scope = trace.StartTrace("delivery", "e1"))
         await using (var job = scope.StartSpan("plan"))
         await using (var call = job.StartSpan("plan-node:write-index/tool-loop", SpanKind.LlmCall))
-        await using (var tool = call.StartSpan("tool:save", SpanKind.ToolCall))
+        await using (var tool = call.StartSpan("execute_tool save", SpanKind.ToolCall))
         {
             tool.SetAttribute("output_length", "42");
         }
@@ -78,7 +78,7 @@ public class SessionTraceTests
         await using (var scope = trace.StartTrace("delivery", "e1"))
         await using (var job = scope.StartSpan("plan"))
         await using (var call = job.StartSpan("plan-node:survey/tool-loop", SpanKind.LlmCall))
-        await using (var tool = call.StartSpan("tool:delete_everything", SpanKind.ToolCall))
+        await using (var tool = call.StartSpan("execute_tool delete_everything", SpanKind.ToolCall))
         {
             tool.SetAttribute("tool.hallucination", "true");
             tool.SetAttribute("tool.hallucination.requested_name", "delete_everything");
@@ -99,7 +99,7 @@ public class SessionTraceTests
         await using (var scope = trace.StartTrace("delivery", "e1"))
         await using (var job = scope.StartSpan("plan"))
         await using (var call = job.StartSpan("plan-node:survey/tool-loop", SpanKind.LlmCall))
-        await using (var tool = call.StartSpan("tool:read_changelog", SpanKind.ToolCall))
+        await using (var tool = call.StartSpan("execute_tool read_changelog", SpanKind.ToolCall))
         {
             tool.SetAttribute("output_length", "8000");
             tool.SetAttribute("tool.output_capped", "true");

@@ -60,4 +60,7 @@ public sealed record AgentResponse
 
     /// <summary>Token usage for this LLM call, if reported by the provider.</summary>
     public TokenUsage? Usage { get; init; }
+
+    /// <summary>Why the model stopped. <see cref="AgentStopReason.MaxTokens"/> means the reply is cut off.</summary>
+    public AgentStopReason StopReason { get; init; }
 }

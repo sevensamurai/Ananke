@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -26,6 +28,7 @@ namespace Ananke.Orchestration.Planning;
 /// contract, and the contract is not its to rule on.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class DeterministicVerifier : IVerifier
 {
     private readonly IReadOnlyList<IDeterministicCheck> _checks;

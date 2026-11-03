@@ -2,6 +2,7 @@ using Ananke.Abstractions.Graph;
 using Ananke.Learning.EmpiricalMemory;
 using Ananke.Learning.Knowledge.Builders;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Learning.Tests.Knowledge;
@@ -112,6 +113,23 @@ public sealed class TagCoOccurrenceBuilderTests
     }
 
     // ── helper ──────────────────────────────────────────────────────────────
+
+    [Test]
+    public async Task BuildAsync_StampsEveryEdgeFromItsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        await _memory.CommitAsync(MakeEntry("e1", ["cause/gc", "effect/oom"], [0.8f, 0.5f]));
+
+        await new TagCoOccurrenceBuilder(_memory, new FakeTimeProvider(now)).BuildAsync(_graph);
+
+        List<GraphEdge> edges =
+        [
+            .. await _graph.NeighborsAsync("entry:e1"),
+            .. await _graph.NeighborsAsync("tag:cause/gc", relation: "co_occurs"),
+        ];
+        edges.Select(e => e.Relation).Distinct().ShouldBe(["tagged", "co_occurs"], ignoreOrder: true);
+        edges.ShouldAllBe(e => e.ObservedAt == now);
+    }
 
     private static EmpiricalEntry MakeEntry(
         string id, string[] tagKeys, float[] weights) => new()

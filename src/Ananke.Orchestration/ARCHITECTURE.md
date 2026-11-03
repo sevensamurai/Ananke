@@ -69,7 +69,7 @@ detail to come back to.
 | `Ananke.Orchestration.Tracing` | `WorkflowTraceContext`, `NullTracer` |
 | `Ananke.Orchestration.Extensions` | `ServiceCollectionExtensions` |
 | `Ananke.Orchestration.Budget` | `BudgetConfig`, token usage helpers |
-| ~~`Ananke.Orchestration.Credentials` / `Translators`~~ | Moved to `Ananke.Abstractions.Providers`: `ICredentialProvider`, `IJsonSchemaTranslator`, `IModelMapper`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-agnostic credential resolution and schema/prompt translation contracts; implementations live in each `Ananke.Orchestration.{Provider}` package |
+| ~~`Ananke.Orchestration.Credentials` / `Translators`~~ | Moved to `Ananke.Abstractions.Providers`: `ICredentialProvider`, `IJsonSchemaTranslator`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-agnostic credential resolution and schema/prompt translation contracts; implementations live in each `Ananke.Orchestration.{Provider}` package |
 
 ## Key Types
 

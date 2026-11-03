@@ -33,6 +33,9 @@ public sealed class InMemoryEmbedder : IEmbeddingModel
     }
 
     /// <inheritdoc />
+    public EmbeddingModelIdentity? Identity => new("ananke", "in-memory-hash", _dims);
+
+    /// <inheritdoc />
     public Task<ReadOnlyMemory<float>> EmbedAsync(string text, CancellationToken ct = default) =>
         Task.FromResult(Embed(text));
 

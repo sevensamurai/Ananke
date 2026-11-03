@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Budget;
 using System.Diagnostics.Metrics;
 using Ananke.OpenTelemetry.Budget;
 using Microsoft.Extensions.Time.Testing;
@@ -15,10 +16,10 @@ public sealed class OpenTelemetryBudgetMeterTests
         using var budgetMeter = new OpenTelemetryBudgetMeter(
             new BudgetMeterOptions { TimeWindow = TimeSpan.FromMinutes(5) },
             clock);
-        using var meter = new Meter(Sources.Federation);
-        var tokensIn = meter.CreateCounter<long>("ananke.federation.tokens.in");
-        var tokensOut = meter.CreateCounter<long>("ananke.federation.tokens.out");
-        var usd = meter.CreateCounter<double>("ananke.federation.usd");
+        using var meter = new Meter(Sources.OrchestrationUsage);
+        var tokensIn = meter.CreateCounter<long>(UsageInstrumentNames.TokensIn);
+        var tokensOut = meter.CreateCounter<long>(UsageInstrumentNames.TokensOut);
+        var usd = meter.CreateCounter<double>(UsageInstrumentNames.Cost);
 
         Publish(tokensIn, tokensOut, usd, "drafter", 10, 20, 0.01);
         clock.Advance(TimeSpan.FromMinutes(6));
@@ -42,10 +43,10 @@ public sealed class OpenTelemetryBudgetMeterTests
                 ["reviewer"] = 30
             }
         });
-        using var meter = new Meter(Sources.Federation);
-        var tokensIn = meter.CreateCounter<long>("ananke.federation.tokens.in");
-        var tokensOut = meter.CreateCounter<long>("ananke.federation.tokens.out");
-        var usd = meter.CreateCounter<double>("ananke.federation.usd");
+        using var meter = new Meter(Sources.OrchestrationUsage);
+        var tokensIn = meter.CreateCounter<long>(UsageInstrumentNames.TokensIn);
+        var tokensOut = meter.CreateCounter<long>(UsageInstrumentNames.TokensOut);
+        var usd = meter.CreateCounter<double>(UsageInstrumentNames.Cost);
 
         Publish(tokensIn, tokensOut, usd, "writer", 20, 20, 0.01);
         Publish(tokensIn, tokensOut, usd, "reviewer", 10, 10, 0.01);
@@ -73,7 +74,7 @@ public sealed class OpenTelemetryBudgetMeterTests
     {
         KeyValuePair<string, object?>[] tags =
         [
-            new("workflow", workflow)
+            new(UsageInstrumentNames.WorkflowTag, workflow)
         ];
 
         tokensIn.Add(input, tags);

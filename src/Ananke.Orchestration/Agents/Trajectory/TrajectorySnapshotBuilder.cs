@@ -16,6 +16,7 @@ internal sealed class TrajectorySnapshotBuilder
     private readonly string _agentId;
     private readonly string _episodeId;
     private readonly DateTimeOffset _startedAt;
+    private readonly TimeProvider _timeProvider;
 
     private int _totalToolCalls;
     private int _successfulToolCalls;
@@ -34,12 +35,14 @@ internal sealed class TrajectorySnapshotBuilder
     public TrajectorySnapshotBuilder(
         string agentId,
         ITrajectoryObserver observer,
+        TimeProvider? timeProvider = null,
         string? episodeId = null)
     {
         _agentId = agentId;
         _observer = observer;
         _episodeId = episodeId ?? Guid.NewGuid().ToString("N");
-        _startedAt = DateTimeOffset.UtcNow;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _startedAt = _timeProvider.GetUtcNow();
     }
 
     public string EpisodeId => _episodeId;
@@ -116,7 +119,7 @@ internal sealed class TrajectorySnapshotBuilder
             }
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var snapshot = new TrajectorySnapshot
         {
             EpisodeId = _episodeId,

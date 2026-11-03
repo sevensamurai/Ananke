@@ -27,6 +27,7 @@ public static class EmpiricalMemoryTools
     /// selected — so a caller that knows the window passes a share of it in here. When
     /// <see langword="null"/>, recall stays count-budgeted, as before.
     /// </param>
+    /// <param name="timeProvider">Clock that stamps committed insights. Defaults to <see cref="TimeProvider.System"/>.</param>
     public static ToolKit Create(
         IEmpiricalMemory memory,
         string name = "empirical",
@@ -34,9 +35,11 @@ public static class EmpiricalMemoryTools
         string? recallDescription = null,
         string? commitDescription = null,
         string? reinforceDescription = null,
-        RecallOptions? recallOptions = null)
+        RecallOptions? recallOptions = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(memory);
+        var clock = timeProvider ?? TimeProvider.System;
         var affect = affectOptions ?? new AffectOptions();
 
         recallDescription ??=
@@ -89,6 +92,7 @@ public static class EmpiricalMemoryTools
                             return ToolResult.Error(
                                 $"Invalid kind '{kind}'. Must be one of: pattern, skill, heuristic.");
 
+                        var now = clock.GetUtcNow();
                         var entry = new EmpiricalEntry
                         {
                             Id = Guid.NewGuid().ToString("N"),
@@ -99,8 +103,8 @@ public static class EmpiricalMemoryTools
                             Confidence = affect.InitialCommitConfidence,
                             ObservationCount = 1,
                             Evidence = [],
-                            FirstObserved = DateTimeOffset.UtcNow,
-                            LastObserved = DateTimeOffset.UtcNow
+                            FirstObserved = now,
+                            LastObserved = now
                         };
 
                         var committed = await memory.CommitAsync(entry);

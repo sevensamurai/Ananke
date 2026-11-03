@@ -313,11 +313,11 @@ public sealed class OrganicHost : IAsyncDisposable
         {
             var snapshot = await _options.Monitor.GetSnapshotAsync(workflowName, ct).ConfigureAwait(false);
 
-            // L3: classify metabolism and stamp snapshot
+            // Classify metabolism and stamp snapshot
             var metabolism = _options.MetabolicThresholds.Classify(snapshot);
             snapshot = snapshot with { Metabolism = metabolism };
 
-            // L5: report to mesh aggregator
+            // Report to mesh aggregator
             _options.MeshAggregator.Report(workflowName, metabolism);
 
             var manifest = _options.ManifestFactory?.Invoke(workflowName)
@@ -333,7 +333,7 @@ public sealed class OrganicHost : IAsyncDisposable
                 WorkflowName = workflowName,
                 Snapshot = snapshot,
                 Plan = plan,
-                Timestamp = DateTimeOffset.UtcNow
+                Timestamp = _options.Clock.GetUtcNow()
             };
 
             if (OnDivisionProposed is not null)
@@ -358,8 +358,8 @@ public sealed class OrganicHost : IAsyncDisposable
                 {
                     var finalPlan = approval.RevisedPlan ?? plan;
 
-                    // Fire on background task — division may take 30+ seconds
-                    // for federation deploys. The observation loop continues.
+                    // Fire on background task — division may take 30+ seconds.
+                    // The observation loop continues.
                     var divisionTask = Task.Run(async () =>
                     {
                         try
@@ -395,14 +395,14 @@ public sealed class OrganicHost : IAsyncDisposable
                             // Remove the (now dead) parent from the capability landscape.
                             _landscape.Remove(workflowName);
 
-                            // L1: record parent death in lineage store.
+                            // Record parent death in lineage store.
                             await _options.Lineage.RecordDeathAsync(
-                                workflowName, DateTimeOffset.UtcNow, "division", ct).ConfigureAwait(false);
+                                workflowName, _options.Clock.GetUtcNow(), "division", ct).ConfigureAwait(false);
 
-                            // L5: remove parent from mesh aggregator.
+                            // Remove parent from mesh aggregator.
                             _options.MeshAggregator.Forget(workflowName);
 
-                            // L1: record child births.
+                            // Record child births.
                             var parentRecord = await _options.Lineage.GetAsync(workflowName, ct).ConfigureAwait(false);
                             var parentGeneration = parentRecord?.Generation ?? 0;
 
@@ -417,7 +417,7 @@ public sealed class OrganicHost : IAsyncDisposable
                                     WorkflowName = newManifest.Name,
                                     Domain = matchingChild?.Domain ?? newManifest.Name,
                                     Capabilities = newManifest.Jobs.Keys.ToList(),
-                                    Timestamp = DateTimeOffset.UtcNow,
+                                    Timestamp = _options.Clock.GetUtcNow(),
                                     SplitFrom = workflowName
                                 });
 
@@ -430,7 +430,7 @@ public sealed class OrganicHost : IAsyncDisposable
                                         WorkflowName = newManifest.Name,
                                         ParentCellId = workflowName,
                                         Generation = parentGeneration + 1,
-                                        BornAt = DateTimeOffset.UtcNow,
+                                        BornAt = _options.Clock.GetUtcNow(),
                                         DivisionReason = finalPlan.Reason,
                                         InheritedDomains = matchingChild is not null
                                             ? [matchingChild.Domain]

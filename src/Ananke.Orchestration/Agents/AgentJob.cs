@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Memory;
 using Ananke.Abstractions.Tools;
@@ -49,8 +51,11 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private Func<TState, TResponse, TState>? _mapResult;
         private Action<TState, TResponse>? _onResponse;
         private ToolKit? _toolKit;
-        private int _maxToolRounds = 3;
+        private ToolKit? _moreTools;
+        private int _maxToolRounds = AgentJobFactory.DefaultMaxToolRounds;
+        private int? _maxRepeatedToolRounds;
         private double? _temperature;
+        private readonly Dictionary<string, JsonNode> _requestFields = [];
         private int _maxRetryAttempts = 3;
         private TimeSpan _retryBaseDelay = TimeSpan.FromSeconds(1);
         private Func<Exception, bool>? _shouldRetry;
@@ -63,6 +68,9 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         private AgentContract? _contract;
         private ILoggerFactory? _loggerFactory;
         private ITrajectoryObserver? _trajectoryObserver;
+        private TimeProvider _timeProvider = TimeProvider.System;
+        private Func<string, TResponse>? _answerFromText;
+        private Func<TState, string, TState>? _endedByTool;
 
         public Builder(string name, IAgentModel model)
         {
@@ -94,10 +102,34 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return this;
         }
 
+        /// <summary>
+        /// Offers <paramref name="tools"/> beside whatever <see cref="WithTools"/> set, without changing
+        /// either kit. Where both have a tool of the same name, the one <see cref="WithTools"/> set is
+        /// kept.
+        /// </summary>
+        internal Builder WithMoreTools(ToolKit tools)
+        {
+            _moreTools = tools;
+            return this;
+        }
+
         public Builder WithMaxToolRounds(int max)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
             _maxToolRounds = max;
+            return this;
+        }
+
+        /// <summary>
+        /// Throws <see cref="RepeatedOutputException"/>, which ends the run, once this many rounds in a
+        /// row only repeated calls already made in this turn: the same tool, the same arguments, the
+        /// same answer. A repeated call is answered with a note that it was answered before, not with
+        /// the answer again.
+        /// </summary>
+        public Builder WithMaxRepeatedToolRounds(int max)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
+            _maxRepeatedToolRounds = max;
             return this;
         }
 
@@ -114,6 +146,22 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
         public Builder WithTemperature(double temperature)
         {
             _temperature = temperature;
+            return this;
+        }
+
+        /// <summary>
+        /// Every request this job makes also carries <paramref name="fields"/>: an endpoint's own
+        /// parameters, by their name in the request's JSON (<see cref="AgentRequest.RequestFields"/>).
+        /// Fields set before are kept unless <paramref name="fields"/> names them again.
+        /// </summary>
+        [Experimental(ExperimentalApis.RequestFields, Message = ExperimentalApis.RequestFieldsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+        public Builder WithRequestFields(IReadOnlyDictionary<string, JsonNode> fields)
+        {
+            ArgumentNullException.ThrowIfNull(fields);
+
+            foreach (var (name, value) in fields)
+                _requestFields[name] = value.DeepClone();
+
             return this;
         }
 
@@ -243,6 +291,47 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             return this;
         }
 
+        /// <summary>
+        /// Sets the clock that stamps this job's trajectory snapshots and unknown-tool reports, times
+        /// each tool call, and reads a provider's stated retry moment. Defaults to
+        /// <see cref="TimeProvider.System"/>.
+        /// </summary>
+        public Builder WithTimeProvider(TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(timeProvider);
+            _timeProvider = timeProvider;
+            return this;
+        }
+
+        /// <summary>
+        /// Takes the answer from the turn's own last text, read by <paramref name="read"/>, instead of
+        /// asking the model for it again as JSON: no schema is sent and no call follows the tool loop.
+        /// </summary>
+        /// <remarks>
+        /// For an answer the turn already gives in words. Asked again, a model has nothing new to say
+        /// and restates what it just said, and a free-text field in a JSON string has no end but the
+        /// closing quote.
+        /// </remarks>
+        public Builder WithAnswerFromText(Func<string, TResponse> read)
+        {
+            ArgumentNullException.ThrowIfNull(read);
+            _answerFromText = read;
+            return this;
+        }
+
+        /// <summary>
+        /// How the state is mapped when a call to a tool that ends the job ended it
+        /// (<see cref="ToolDefinition.EndsJob"/>), from the text the model wrote with that call. No
+        /// answer is asked for then, so <see cref="MapResult"/> is not run; with none given, the state
+        /// comes back as it went in.
+        /// </summary>
+        internal Builder WhenEndedByTool(Func<TState, string, TState> map)
+        {
+            ArgumentNullException.ThrowIfNull(map);
+            _endedByTool = map;
+            return this;
+        }
+
         public Builder OnResponse(Action<TState, TResponse> handler)
         {
             _onResponse = handler;
@@ -265,19 +354,30 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
             IHallucinationObserver? hallucinationObserver = null;
             string? kitName = null;
 
-            if (_toolKit is not null)
+            if (_toolKit is not null || _moreTools is not null)
             {
-                tools = _toolKit.Tools.Values.Select(t =>
+                var offered = new Dictionary<string, ToolDefinition>(StringComparer.Ordinal);
+
+                foreach (var (name, tool) in _moreTools?.Tools ?? new Dictionary<string, ToolDefinition>())
+                    offered[name] = tool;
+
+                foreach (var (name, tool) in _toolKit?.Tools ?? new Dictionary<string, ToolDefinition>())
+                    offered[name] = tool;
+
+                tools = offered.Values.Select(t =>
                     new AgentTool(t.Name, t.Description, t.ParametersJsonSchema)).ToList();
-                toolExecutors = _toolKit.Tools;
-                hallucinationObserver = _toolKit.HallucinationObserver;
-                kitName = _toolKit.Name;
+                toolExecutors = _moreTools is null ? _toolKit!.Tools : offered;
+                hallucinationObserver = _toolKit?.HallucinationObserver;
+                kitName = _toolKit?.Name ?? _moreTools?.Name;
             }
 
             ILogger logger = _loggerFactory?.CreateLogger($"Ananke.Orchestration.AgentJob.{_name}")
                 ?? NullLogger.Instance;
 
-            var responseFormat = new AgentResponseFormat(SchemaName(typeof(TResponse)), CachedResponseSchema);
+            var fromText = _answerFromText is not null;
+            var responseFormat = fromText
+                ? null
+                : new AgentResponseFormat(SchemaName(typeof(TResponse)), CachedResponseSchema);
 
             var engine = new AgentJobEngine<TState, TResponse>(
                 _name, _model, _promptBuilder, _mapResult, _systemPrompt,
@@ -286,14 +386,20 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
                 _maxContextTokens, _contextLimitMode, _memory, _sessionIdBuilder, _contextStrategy, logger,
                 hallucinationObserver, _trajectoryObserver, kitName,
                 responseFormat: responseFormat,
-                extractResult: text => JsonSerializer.Deserialize<TResponse>(text, JsonOptions)
+                extractResult: _answerFromText ?? (text => JsonSerializer.Deserialize<TResponse>(JsonReply.Extract(text), JsonOptions)
                     ?? throw new InvalidOperationException(
-                        $"[{_name}] Failed to deserialize response to {typeof(TResponse).Name}."),
-                finalCallSpanSuffix: "structured",
-                coercionPrompt: $"Based on everything above, provide your final response as JSON matching the {typeof(TResponse).Name} schema.",
+                        $"[{_name}] Failed to deserialize response to {typeof(TResponse).Name}.")),
+                finalCallSpanSuffix: fromText ? "plain" : "structured",
+                coercionPrompt: fromText
+                    ? null
+                    : $"Based on everything above, provide your final response as JSON matching the {typeof(TResponse).Name} schema.",
                 temperature: _temperature,
+                requestFields: _requestFields.Count == 0 ? null : new Dictionary<string, JsonNode>(_requestFields),
                 toolOutputPolicy: _toolOutputPolicy,
-                contract: _contract);
+                contract: _contract,
+                timeProvider: _timeProvider,
+                maxRepeatedToolRounds: _maxRepeatedToolRounds,
+                endedByTool: _endedByTool);
 
             return new AgentJob<TState, TResponse>(engine);
         }
@@ -314,6 +420,13 @@ public sealed class AgentJob<TState, TResponse> : IJob<TState>, IProfileAwareJob
 
 public static class AgentJobFactory
 {
+    /// <summary>
+    /// How many tool rounds a job runs before it is asked to answer without tools, when
+    /// <c>WithMaxToolRounds</c> is not called. A workflow manifest or a host snapshot that names no
+    /// <c>max_tool_rounds</c> means the same.
+    /// </summary>
+    public const int DefaultMaxToolRounds = 10;
+
     /// <summary>
     /// Creates a builder for a structured agent job that deserializes the model's response
     /// to <typeparamref name="TResponse"/> via JSON schema enforcement.

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -11,6 +13,7 @@ namespace Ananke.Orchestration.Planning;
 /// a term beyond this run has to be able to tell them apart, because one should follow and the other
 /// must not.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum PlanTermEnd
 {
     /// <summary>Somebody took it back. They wanted this, and now they want something else.</summary>
@@ -41,7 +44,7 @@ public enum PlanTermEnd
 /// versions later.
 /// </para>
 /// <para>
-/// <b>Both sentences, kept apart (R33).</b> <see cref="Said"/> is what somebody actually wrote and
+/// <b>Both sentences, kept apart.</b> <see cref="Said"/> is what somebody actually wrote and
 /// <see cref="Reading"/> is what the supervisor made of it. Everything downstream acts on the reading,
 /// which is exactly why the words it was read from have to survive next to it — a reader who cannot
 /// check one against the other has a record that looks like testimony and is partly an inference.
@@ -51,6 +54,7 @@ public enum PlanTermEnd
 /// it stopped is the part no diff could recover afterwards.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanTerm
 {
     /// <summary>Identifies it, so it can be revoked without being described again.</summary>

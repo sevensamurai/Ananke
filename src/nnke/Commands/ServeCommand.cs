@@ -30,8 +30,8 @@ namespace Ananke.Tool.Commands;
 /// </para>
 /// <para>
 /// A platform-native guard applies: any tool declaring <c>execute: platform</c> causes
-/// a fail-fast before the server starts (FED061), with a hint pointing at
-/// <c>nnke-platform</c>, which owns the platform-emulated dev loop (ADR CLI-7).
+/// a fail-fast before the server starts (FED061): the platform executes such a tool, so
+/// it cannot run here.
 /// </para>
 /// <para>
 /// This is a developer / local-testing endpoint — it binds only to <c>localhost</c>
@@ -118,8 +118,8 @@ internal static class ServeCommand
             var toolList = string.Join(", ", nativeTools);
             Emit(json, "error",
                 $"Manifest declares platform-native tool(s): {toolList}. " +
-                "These cannot run locally without a platform emulator.",
-                hint: "Use 'nnke-platform up --emulate <platform>' to run this manifest with platform-native capabilities.",
+                "These are executed by their platform and cannot run locally.",
+                hint: "Run it on its platform, or give the tool a local implementation.",
                 diagnosticCode: "FED061");
             return 4;
         }

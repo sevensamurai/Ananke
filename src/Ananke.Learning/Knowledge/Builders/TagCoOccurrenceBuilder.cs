@@ -23,8 +23,12 @@ namespace Ananke.Learning.Knowledge.Builders;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
+/// <param name="memory">Memory whose entries are projected into the graph.</param>
+/// <param name="timeProvider">Clock that stamps each edge's <see cref="GraphEdge.ObservedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory, TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     /// <summary>
     /// Scans all entries in <paramref name="graph"/>'s backing memory and upserts
     /// entry/tag nodes and co-occurrence edges into <paramref name="graph"/>.
@@ -33,6 +37,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
     {
         ArgumentNullException.ThrowIfNull(graph);
 
+        var observedAt = _timeProvider.GetUtcNow();
         var offset = 0;
         const int pageSize = 200;
 
@@ -43,7 +48,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
             if (page.Count == 0) break;
 
             foreach (var entry in page)
-                await ProcessEntryAsync(graph, entry, ct).ConfigureAwait(false);
+                await ProcessEntryAsync(graph, entry, observedAt, ct).ConfigureAwait(false);
 
             offset += page.Count;
             if (page.Count < pageSize) break;
@@ -51,7 +56,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
     }
 
     private static async Task ProcessEntryAsync(
-        IKnowledgeGraph graph, EmpiricalEntry entry, CancellationToken ct)
+        IKnowledgeGraph graph, EmpiricalEntry entry, DateTimeOffset observedAt, CancellationToken ct)
     {
         // Upsert entry node.
         await graph.UpsertNodeAsync(new GraphNode
@@ -83,6 +88,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                 Relation = "tagged",
                 Provenance = EdgeProvenance.Extracted,
                 Weight = weight,
+                ObservedAt = observedAt,
             }, ct).ConfigureAwait(false);
         }
 
@@ -105,6 +111,7 @@ public sealed class TagCoOccurrenceBuilder(IEmpiricalMemory memory)
                     Relation = "co_occurs",
                     Provenance = EdgeProvenance.Inferred,
                     Weight = coWeight,
+                    ObservedAt = observedAt,
                 };
 
                 await graph.UpsertEdgeAsync(edge, ct).ConfigureAwait(false);

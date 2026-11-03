@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using Ananke.Orchestration.Agents.Context;
 
@@ -20,6 +21,7 @@ namespace Ananke.Orchestration.Planning;
 /// a node carries no status field: a second copy is a second thing that can be stale.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanCoordination
 {
     /// <summary>How the last pass ended.</summary>
@@ -90,7 +92,7 @@ public sealed record PlanCoordination
     /// <para>
     /// <b>Read from the tree's own durable facts, in the order that answers "what actually
     /// happened."</b> A failing gate's own <see cref="CriterionVerdict.Basis"/> first — the evidence a
-    /// check produced (R28) — then a standing dispute's words, then a dead attempt's own message.
+    /// check produced — then a standing dispute's words, then a dead attempt's own message.
     /// None of these needs a halt <em>kind</em> to pick between them: at most one is ever present for
     /// a node that just halted.
     /// </para>
@@ -199,14 +201,14 @@ public sealed record PlanCoordination
     /// <para>
     /// <b>Set when a question is answered off-list, and cleared by whatever asks the next one.</b> An
     /// answer nobody listed is not a choice to apply — nothing in the loop can read prose — so it goes
-    /// back to the seat that can: the supervisor authors a fresh set of options with it in hand
-    /// (R32), and the run reaches it through the same job that asked the first time.
+    /// back to the seat that can: the supervisor authors a fresh set of options with it in hand,
+    /// and the run reaches it through the same job that asked the first time.
     /// </para>
     /// <para>
     /// <b>Verbatim, and separate from anything read out of it.</b> Whatever the supervisor concludes
     /// travels as its own options and its own rationale; this stays as the sentence somebody actually
     /// wrote, because everything downstream acts on the reading and a reader has to be able to check
-    /// it against the source (R33).
+    /// it against the source.
     /// </para>
     /// </remarks>
     public string? Said { get; init; }
@@ -249,6 +251,7 @@ public sealed record PlanCoordination
 /// matters and the one that stays true when the model behind the role changes.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanRationale
 {
     /// <summary>Who concluded it — a role name, a person, a tool.</summary>
@@ -263,26 +266,27 @@ public sealed record PlanRationale
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Two, and the hierarchy is closed so that a consumer's <c>switch</c> stays exhaustive (R30).</b>
+/// <b>Two, and the hierarchy is closed so that a consumer's <c>switch</c> stays exhaustive.</b>
 /// <see cref="ReplanPlan"/> says the plan was wrong; <see cref="Ask"/> says a person must act, whatever
 /// the reason — a step waiting on a choice, a constraint nobody in the run may relax, a step somebody
 /// wants given up. The question text carries the difference; the vocabulary does not need to.
 /// </para>
 /// <para>
 /// <b>Retiring three verbs, and where each one's case went.</b> <c>Retry</c> was cost dressed as
-/// design — a provider outage or an unparseable reply is a loop-level retry policy (E9), never a
+/// design — a provider outage or an unparseable reply is a loop-level retry policy, never a
 /// model steering, and a dispute the coordinator judged spurious was never resolved by re-running it
 /// anyway (a standing violation is only cleared by a re-ruling or a refuting check). <c>Refer</c> and
 /// <c>GiveUp</c> collapse into <see cref="Ask"/>: <em>only the owner can move the dates</em> and
 /// <em>bullet train or overnight bus</em> are both <em>a person must act</em>, and dropping a step is
 /// an authored option like any other rather than a decision shape of its own. <c>Stop</c> is not a
 /// supervisor verb either — ending a run is a person's cancel, or the planner reporting that nothing
-/// can be planned (044's R25).
+/// can be planned.
 /// </para>
 /// </remarks>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$kind")]
 [JsonDerivedType(typeof(ReplanPlan), "replan")]
 [JsonDerivedType(typeof(AskPlan), "ask")]
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public abstract record PlanDecision
 {
     private PlanDecision()
@@ -338,13 +342,13 @@ public abstract record PlanDecision
     /// <param name="options">
     /// The courses of action, authored and narrowed by the supervisor, one marked recommended. Empty
     /// is legal: it says the supervisor has nothing to propose, and the question stands on the
-    /// refusals alone (R32 — free text and cancel are never among these; whatever answers the
+    /// refusals alone (free text and cancel are never among these; whatever answers the
     /// question appends them).
     /// </param>
     /// <remarks>
     /// <b>Deliberately thin for now.</b> The full shape a person answers — authored options with a
     /// required recommendation, free text, cancel, distinguishably typed for whatever reads the
-    /// answer back — is E7's. This only needs to exist so the vocabulary closes at two; what a
+    /// answer back — is not built yet. This only needs to exist so the vocabulary closes at two; what a
     /// supervisor actually puts in <paramref name="options"/> does not change here.
     /// </remarks>
     public static PlanDecision Ask(IEnumerable<PlanOption> options) =>
@@ -404,4 +408,5 @@ public abstract record PlanDecision
 /// somebody looked and did not answer, which is not the same as nobody having been asked.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<PlanDecision> PlanSupervisor(PlanCoordination coordination, CancellationToken ct);

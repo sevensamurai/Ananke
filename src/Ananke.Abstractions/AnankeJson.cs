@@ -29,6 +29,12 @@ namespace Ananke.Abstractions;
 ///     Tool result payloads and agent-facing JSON. CamelCase, compact (not indented).
 ///     </description>
 ///   </item>
+///   <item>
+///     <term><see cref="Record"/></term>
+///     <description>
+///     A run's events as a sink keeps them. The serializer's defaults, with marked properties masked.
+///     </description>
+///   </item>
 /// </list>
 /// </para>
 /// <para>
@@ -61,6 +67,26 @@ public static class AnankeJson
     public static JsonSerializerOptions Display { get; } = Build(
         namingPolicy: JsonNamingPolicy.CamelCase,
         writeIndented: false);
+
+    /// <summary>
+    /// Record format: the serializer's default names and values, with every property marked
+    /// <see cref="RedactAttribute"/> written as <see cref="Redaction.Marker"/>.
+    /// Suitable for a sink that writes a run's events, and so its state, to where they are kept.
+    /// </summary>
+    /// <remarks>
+    /// For writing only: a masked value cannot be read back, so never use it for a checkpoint.
+    /// </remarks>
+    public static JsonSerializerOptions Record { get; } = Redaction.Masking(BuildDefaults());
+
+    private static JsonSerializerOptions BuildDefaults()
+    {
+        var opts = new JsonSerializerOptions
+        {
+            TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
+        };
+        opts.MakeReadOnly();
+        return opts;
+    }
 
     private static JsonSerializerOptions Build(JsonNamingPolicy namingPolicy, bool writeIndented)
     {

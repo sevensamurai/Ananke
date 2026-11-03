@@ -4,16 +4,17 @@ using Ananke.Abstractions.Budget;
 namespace Ananke.OpenTelemetry.Budget;
 
 /// <summary>
-/// <see cref="IBudgetMeter"/> implementation that listens to federation budget counters
-/// and aggregates them with a rolling time window.
+/// <see cref="IBudgetMeter"/> implementation that listens to the usage counters model calls publish
+/// on the <see cref="Sources.OrchestrationUsage"/> meter, and aggregates them per workflow over a
+/// rolling time window.
 /// </summary>
 public sealed class OpenTelemetryBudgetMeter : IBudgetMeter, IDisposable
 {
     private static readonly HashSet<string> SupportedInstrumentNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "ananke.federation.tokens.in",
-        "ananke.federation.tokens.out",
-        "ananke.federation.usd"
+        UsageInstrumentNames.TokensIn,
+        UsageInstrumentNames.TokensOut,
+        UsageInstrumentNames.Cost
     };
 
     private static readonly string[] SupportedRoleTagNames =
@@ -40,7 +41,7 @@ public sealed class OpenTelemetryBudgetMeter : IBudgetMeter, IDisposable
 
         _listener.InstrumentPublished = static (instrument, listener) =>
         {
-            if (instrument.Meter.Name == Sources.Federation &&
+            if (instrument.Meter.Name == Sources.OrchestrationUsage &&
                 SupportedInstrumentNames.Contains(instrument.Name))
             {
                 listener.EnableMeasurementEvents(instrument);
@@ -102,13 +103,13 @@ public sealed class OpenTelemetryBudgetMeter : IBudgetMeter, IDisposable
 
         switch (instrument.Name)
         {
-            case "ananke.federation.tokens.in":
+            case UsageInstrumentNames.TokensIn:
                 Record(role, tokensIn: ToLong(measurement), tokensOut: 0, estimatedUsd: 0m);
                 break;
-            case "ananke.federation.tokens.out":
+            case UsageInstrumentNames.TokensOut:
                 Record(role, tokensIn: 0, tokensOut: ToLong(measurement), estimatedUsd: 0m);
                 break;
-            case "ananke.federation.usd":
+            case UsageInstrumentNames.Cost:
                 Record(role, tokensIn: 0, tokensOut: 0, estimatedUsd: ToDecimal(measurement));
                 break;
         }

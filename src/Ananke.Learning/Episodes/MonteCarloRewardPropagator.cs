@@ -1,4 +1,6 @@
 using Ananke.Learning.EmpiricalMemory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Learning.Episodes;
 
@@ -15,9 +17,11 @@ namespace Ananke.Learning.Episodes;
 /// <see cref="RewardPropagationOptions.IncludeIntermediateRewards"/> is <see langword="false"/>).
 /// </remarks>
 public sealed class MonteCarloRewardPropagator(
-    RewardPropagationOptions? options = null) : IRewardPropagator
+    RewardPropagationOptions? options = null,
+    ILogger<MonteCarloRewardPropagator>? logger = null) : IRewardPropagator
 {
     private readonly RewardPropagationOptions _options = options ?? new();
+    private readonly ILogger _logger = logger ?? NullLogger<MonteCarloRewardPropagator>.Instance;
 
     /// <inheritdoc />
     public async Task<int> PropagateAsync(
@@ -47,7 +51,15 @@ public sealed class MonteCarloRewardPropagator(
         for (var t = 0; t <= T; t++)
         {
             var entry = await memory.GetAsync(steps[t].EntryId, ct);
-            if (entry is null) continue;
+            if (entry is null)
+            {
+                // Said rather than skipped silently: a step whose entry is gone gets no credit, and
+                // a run that reinforces nothing looks the same as one with nothing to reinforce.
+                _logger.LogWarning(
+                    "Episode {EpisodeId} step {Step}: memory entry {EntryId} not found; no reward propagated to it",
+                    episode.Id, t, steps[t].EntryId);
+                continue;
+            }
 
             await memory.ReinforceAsync(steps[t].EntryId, new Reinforcement
             {

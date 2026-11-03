@@ -47,6 +47,8 @@ public sealed class ToolBuilder
     private ToolExecutionMode _executionMode = ToolExecutionMode.Local;
     private ToolEndpoint? _endpoint;
     private string? _platformCapability;
+    private bool _endsTurn;
+    private bool _endsJob;
 
     /// <summary>
     /// Adds a string parameter to the tool.
@@ -97,15 +99,51 @@ public sealed class ToolBuilder
     /// same fields the answer carries cannot be handed a form the answer could not take — and a
     /// consumer is not left parsing a string the model wrote, refusing what it could not read.
     /// </remarks>
-    public ToolBuilder ParamList<T>(string name, string description, bool required = true)
-    {
-        _params.Add(new ToolParameter(
-            name,
-            description,
-            JsonType: "array",
-            IsRequired: required,
-            Items: JsonSchemaGenerator.GenerateForType(typeof(T))));
+    public ToolBuilder ParamList<T>(string name, string description, bool required = true) =>
+        ParamList(name, description, typeof(T), required);
 
+    /// <summary>
+    /// Adds a parameter that is a list of <paramref name="item"/>, for a caller that knows the entry's
+    /// type only when it runs. A string, a number or a flag is an entry of that JSON type; any other type
+    /// is a record, its schema generated as <see cref="ParamList{T}"/>'s is.
+    /// </summary>
+    /// <param name="name">Parameter name (used as the JSON property key).</param>
+    /// <param name="description">What the list is, sent to the LLM.</param>
+    /// <param name="item">The type of one entry.</param>
+    /// <param name="required">When <see langword="true"/>, included in the JSON Schema <c>required</c> array.</param>
+    public ToolBuilder ParamList(string name, string description, Type item, bool required = true)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        // A type JsonTypeFor does not know reads as "string"; only string itself is one.
+        var json = ToolArgs.JsonTypeFor(item);
+        var entry = json != "string" || item == typeof(string)
+            ? new Dictionary<string, object> { ["type"] = json }
+            : JsonSchemaGenerator.GenerateForType(item);
+
+        _params.Add(new ToolParameter(name, description, JsonType: "array", IsRequired: required, Items: entry)
+        {
+            DeclaredAs = item.MakeArrayType()
+        });
+
+        return this;
+    }
+
+    /// <summary>
+    /// Marks a call to this tool as ending the turn. See <see cref="ToolDefinition.EndsTurn"/>.
+    /// </summary>
+    public ToolBuilder EndsTurn()
+    {
+        _endsTurn = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Marks a call to this tool as ending the job. See <see cref="ToolDefinition.EndsJob"/>.
+    /// </summary>
+    internal ToolBuilder EndsJob()
+    {
+        _endsJob = true;
         return this;
     }
 
@@ -269,6 +307,8 @@ public sealed class ToolBuilder
             ExecutionMode = _executionMode,
             Endpoint = _endpoint,
             PlatformCapability = _platformCapability,
+            EndsTurn = _endsTurn,
+            EndsJob = _endsJob,
             Execute = null! // set below
         };
 

@@ -46,6 +46,7 @@ MyAction
 MyAgent
 MyContext
 MyHandler
+MyBedrockAuthHandler
 
 # --- Real demo project names not in the default (demos-excluded) scan ---
 # These ARE real folders under src/demos/**, just not picked up because demo source
@@ -66,6 +67,7 @@ ImplicitUsings
 TargetFramework
 PackageId
 PackageTags
+NoWarn
 TreatWarningsAsErrors
 VersionPrefix
 WarningsNotAsErrors
@@ -101,6 +103,9 @@ Cognitive               # "Cognitive Services User" Azure RBAC role name
 Scientist               # "AzureML Data Scientist" Azure RBAC role name
 ClawHub                 # OpenClaw/ClawHub external registry product name
 Desktop                 # "Claude Desktop" product name in a Mermaid label
+Projects                # Azure.AI.Projects.Agents SDK namespace, in the Federation release checklist
+Cloud                   # Google.Cloud.AIPlatform.V1 SDK namespace, in the Federation release checklist
+DelegatingHandler       # System.Net.Http type, named in the enterprise-clouds guide
 
 # --- External datastores / products named in ARCHITECTURE prose ---
 RedLock
@@ -155,11 +160,15 @@ Delegate       # "IJob (Agent/Delegate/SubFlow)" Mermaid participant label
 Propagation    # "Monte Carlo Reward Propagation" Mermaid node label
 Save           # "Save checkpoint" Mermaid sequence-diagram message
 Yes            # Mermaid flowchart branch-edge label
+Remote         # "Remote cell health" in the Federation slice map
+Interaction    # "Agent Interaction" Mermaid node label in the learning-cycle diagram
 
 # --- 2026-08-01: path references that are correct as written and must not resolve ---
 .vscode/mcp.json                    # file the READER creates when following McpServerDemo
 .github/workflows/pages.yml         # historical: existed at v0.7.2, superseded by website.yml
 scripts/check-nnke-deps.ps1         # historical: existed at v0.8.3, since removed
+docs/cli/nnke-platform-tool.md      # historical: existed through v0.9.0, removed with the CLI in v0.9.1
+../src/demos/06-interop-and-channels/ChannelsDemo/  # historical: removed in v0.9.1
 tools/check-architecture-graph.ps1  # ARCHITECTURE.md names it to record it NEVER EXISTED (checked full git history 2026-08-06)
 Releases/ReleaseEvent.cs            # aspirational file in a PLAN-*.md design note
 Releases/ReleaseKnowledgeSource.cs  # aspirational file in a PLAN-*.md design note
@@ -173,3 +182,4 @@ Styling        # "%% Styling" Mermaid comment in ARCHITECTURE.md
 # .cs file declares them.
 HttpClientFactory   # Google.GenAI ClientOptions.HttpClientFactory — the Google stub-transport seam
 Handlers            # Anthropic ClientOptions.Handlers — named to warn it is NOT the seam
+PlatformRecommender # historical: the roadmap's 0.8.5 row; the type was removed with Ananke.Federation in v0.9.1

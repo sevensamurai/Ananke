@@ -1,31 +1,48 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
+using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>One alternative, as the model returns it.</summary>
+/// <remarks>
+/// <b>Every field says what it is for.</b> Named and not described, a field reads as a place to
+/// comment, and a model wrote why not to give a step up into the field whose text gives it up.
+/// </remarks>
 internal sealed record ProposedOption
 {
     /// <summary>One line somebody can weigh this against the others by.</summary>
+    [Description("One line that names the problem, not a fix.")]
     public string Summary { get; init; } = string.Empty;
 
     /// <summary>Why this answers the halt.</summary>
+    [Description("Why this option, citing the finding that shows it.")]
     public string? Rationale { get; init; }
 
     /// <summary>Whether this is the one the supervisor would take.</summary>
+    [Description("True on exactly one option: the one something unattended takes.")]
     public bool Recommended { get; init; }
 
     /// <summary>
     /// Whether taking this asks for the plan to be changed, leaving what replaces it to the Planner.
     /// </summary>
+    [Description("True only on the option that asks for the plan to be changed.")]
     public bool Replan { get; init; }
 
     /// <summary>
     /// Why this step should be given up, when that is what this option is. Empty for an ordinary
     /// option.
     /// </summary>
+    [Description("Only on the option that gives the step up: why, in a line. Null on every other option.")]
     public string? Abandon { get; init; }
+
+    /// <summary>
+    /// The line the step reads on its next attempt, when this option asks it to try again.
+    /// </summary>
+    [Description("Only on the option that asks the step to try again: one line it reads on its next attempt. Null on every other option.")]
+    public string? Answer { get; init; }
 }
 
 /// <summary>Which of a step's options the supervisor would take, as the model returns it.</summary>
@@ -45,6 +62,11 @@ internal sealed record ChosenOption
 
 internal sealed record ProposedOptions
 {
+    /// <summary>What kind of problem the halt is, and why nothing would help when nothing is offered.</summary>
+    /// <remarks>First, so the model says what the halt is before it chooses what to offer.</remarks>
+    [Description("What kind of problem this halt is, citing the finding that shows it. When you offer no option, why none would help.")]
+    public string? Summary { get; init; }
+
     public IReadOnlyList<ProposedOption> Options { get; init; } = [];
 
     /// <summary>
@@ -73,6 +95,7 @@ internal sealed record ProposedOptions
 /// whatever puts the question rather than left to a supervisor to remember.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? persona = null)
 {
     /// <summary>How many alternatives are worth having: enough to be a choice, few enough to read.</summary>
@@ -178,6 +201,10 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
 
         ProposedOptions? proposed = null;
 
+        // Once per step: a step answered and stopped again goes to the Planner or is given up, rather
+        // than being told to try again for as long as the run lasts.
+        var mayTryAgain = node.Answers.Count == 0;
+
         var builder = AgentJobFactory.Create<PlanCoordination, ProposedOptions>("plan-advisor", model)
             .WithSystemPrompt(persona ?? DefaultPersona)
             .WithPrompt(halt => AgentPlanSupervisor.DescribeHalt(
@@ -194,16 +221,9 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
                 line, in the present tense, as a standing constraint. When it is unclear whether what
                 they said is an answer to this halt or a term for the run, it is an answer — a term
                 binds every version after it. Report no terms otherwise.
-
-                Reply with the options there are, at most one of each kind. One may give the step up
-                ("abandon", as above). One may ask for the plan to be changed ("replan": true). A
-                replan's rationale names the finding that makes this the plan's problem and not the
-                step's — the verdict, the constraint or the fact, quoted — and does not say how to
-                change the plan: the Planner decides that. Never both on one option. For each, a
-                one-line summary that names the problem, not a fix. Mark exactly one as recommended,
-                and say in its rationale why that one: something unattended will take it without
-                asking anybody. Do not offer stopping. If nothing would help, reply with no options.
-                """))
+                """
+                + "\n\n"
+                + Menu(mayTryAgain)))
             .MapResult((halt, produced) =>
             {
                 proposed = produced;
@@ -233,22 +253,25 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
             return new PlanProposal { Options = [], Exhausted = true };
         }
 
-        // An option that neither gives the step up nor asks for a replan says nothing, so it is not
-        // an option. A proposal that loses all of them comes back empty, which is a real answer:
-        // nothing was offered, and whoever asked still has the way out they were always going to have.
+        // An option that is none of the kinds says nothing, so it is not an option. A proposal that
+        // loses all of them comes back empty, which is a real answer: nothing was offered, and whoever
+        // asked still has the way out they were always going to have.
         var options = proposed?.Options ?? [];
 
         // One replan at most: several could only differ in the change they describe, and which change to
-        // make is the Planner's.
-        var replan = options.FirstOrDefault(o => o.Replan && o.Recommended && Refused(o) is null)
-            ?? options.FirstOrDefault(o => o.Replan && Refused(o) is null);
+        // make is the Planner's. One try again at most: the step is attempted once more, so only one line
+        // can be what it reads.
+        var replan = options.FirstOrDefault(o => o.Replan && o.Recommended && Refused(o, mayTryAgain) is null)
+            ?? options.FirstOrDefault(o => o.Replan && Refused(o, mayTryAgain) is null);
+        var tryAgain = options.FirstOrDefault(o => Answering(o) is not null && o.Recommended && Refused(o, mayTryAgain) is null)
+            ?? options.FirstOrDefault(o => Answering(o) is not null && Refused(o, mayTryAgain) is null);
 
         var usable = new List<ProposedOption>();
         var discarded = new List<string>();
 
         foreach (var option in options)
         {
-            if (Refused(option) is { } why)
+            if (Refused(option, mayTryAgain) is { } why)
             {
                 discarded.Add($"\"{Name(option)}\": {why}");
                 continue;
@@ -260,12 +283,21 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
                 continue;
             }
 
+            if (Answering(option) is not null && !ReferenceEquals(option, tryAgain))
+            {
+                discarded.Add($"\"{Name(option)}\": only one try again is offered, since the step is attempted once more");
+                continue;
+            }
+
             if (usable.Count < Most)
                 usable.Add(option);
         }
 
+        // What the supervisor said the halt is, kept whatever survived: an empty proposal says why.
+        var summary = string.IsNullOrWhiteSpace(proposed?.Summary) ? null : proposed!.Summary!.Trim();
+
         if (usable.Count == 0)
-            return new PlanProposal { Options = [], Discarded = discarded };
+            return new PlanProposal { Options = [], Discarded = discarded, Summary = summary };
 
         // Exactly one recommendation, whatever came back. A model that recommended everything, or
         // nothing, has not answered the question — and a caller reading `Recommended` must never find
@@ -277,6 +309,7 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
         return new PlanProposal
         {
             Discarded = discarded,
+            Summary = summary,
 
             // Only from an off-list answer: a term is something somebody settled, and with nobody
             // having said anything there is nothing for the supervisor to have read it out of.
@@ -291,9 +324,10 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
                 .. usable.Select((option, index) => new PlanOption
                 {
                     Summary = string.IsNullOrWhiteSpace(option.Summary)
-                        ? (option.Replan ? "Change the plan" : $"Give '{node.Id}' up")
+                        ? (option.Replan ? "Change the plan" : Answering(option) is not null ? $"Ask '{node.Id}' to try again" : $"Give '{node.Id}' up")
                         : option.Summary,
                     Abandon = Abandonment(option),
+                    Answer = Answering(option),
                     Replan = option.Replan,
                     // Attributed to the role, not to the model: the attribution that stays true when
                     // the model behind the role changes.
@@ -411,12 +445,53 @@ public sealed class AgentPlanAdvisor(SupervisionOptions supervision, string? per
     /// <b>One place, so every refusal has a reason to report.</b> Spread across filters, each guard
     /// knew why it dropped something and none of them could say.
     /// </remarks>
-    private static string? Refused(ProposedOption option) => (option.Replan, Abandonment(option) is not null) switch
-    {
-        (true, true) => "it both gives the step up and asks for a replan",
-        (false, false) => "it neither gives the step up nor asks for a replan",
-        _ => null
-    };
+    private static string? Refused(ProposedOption option, bool mayTryAgain) =>
+        (Answering(option) is not null, Abandonment(option) is not null, option.Replan) switch
+        {
+            (false, true, true) => "it both gives the step up and asks for a replan",
+            (true, true, _) => "it both asks the step to try again and gives it up",
+            (true, false, true) => "it both asks the step to try again and asks for a replan",
+            (false, false, false) => mayTryAgain
+                ? "it neither gives the step up nor asks for a replan, nor asks the step to try again"
+                : "it neither gives the step up nor asks for a replan",
+            (true, false, false) when !mayTryAgain =>
+                "the step has been answered once already, so it is not asked to try again: give it up or ask for a replan",
+            _ => null
+        };
+
+    /// <summary>
+    /// What kind of problem to say the halt is, then the kinds of option there are, and what a replan's
+    /// rationale and every option's summary say; asking the step to try again is among them only while
+    /// <paramref name="mayTryAgain"/>.
+    /// </summary>
+    private static string Menu(bool mayTryAgain) =>
+        "Say first, in \"summary\", what kind of problem this halt is, citing the finding that shows it;\n"
+        + "when you offer no option, say why none would help.\n\n"
+        + (mayTryAgain
+            ? """
+              Reply with the options there are, at most one of each kind. One may ask the step to try
+              again, with one line it reads on its next attempt ("answer"): offer it when the step could
+              meet its contract as it stands. One may give the step up ("abandon", as above). One may
+              ask for the plan to be changed ("replan": true).
+              """
+            : """
+              Reply with the options there are, at most one of each kind. The step has been answered
+              once already, so it is not asked to try again. One may give the step up ("abandon", as
+              above). One may ask for the plan to be changed ("replan": true).
+              """)
+        + "\n"
+        + """
+          A replan's rationale names the finding that makes this the plan's problem and not the
+          step's — the verdict, the constraint or the fact, quoted — and does not say how to
+          change the plan: the Planner decides that. Never two kinds on one option. For each, a
+          one-line summary that names the problem, not a fix. Mark exactly one as recommended,
+          and say in its rationale why that one: something unattended will take it without
+          asking anybody. Do not offer stopping. If nothing would help, reply with no options.
+          """;
+
+    /// <summary>The line an option asks the step to read on its next attempt, or <see langword="null"/>.</summary>
+    private static string? Answering(ProposedOption option) =>
+        string.IsNullOrWhiteSpace(option.Answer) ? null : option.Answer!.Trim();
 
     /// <summary>Something to call an option by in a refusal, whatever it filled in.</summary>
     private static string Name(ProposedOption option) =>

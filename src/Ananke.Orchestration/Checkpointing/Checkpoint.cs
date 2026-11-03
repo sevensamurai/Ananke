@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Jobs;
 
@@ -55,6 +56,15 @@ public record Checkpoint<TState>
     /// </summary>
     public IReadOnlyDictionary<string, int> LoopCounters { get; init; } = new Dictionary<string, int>();
 
+    /// <summary>
+    /// What the execution had spent against its budget at checkpoint time. Restored on resume, so a
+    /// run that pauses is bounded by one budget rather than one per leg.
+    /// </summary>
+    public decimal RunCost { get; init; }
+
+    /// <summary>The tokens the execution had used at checkpoint time. Restored on resume.</summary>
+    public TokenUsage RunUsage { get; init; } = TokenUsage.Zero;
+
     internal static Checkpoint<TState> Create(
         WorkflowExecution<TState> execution, TimeSpan? ttl = null, TimeProvider? timeProvider = null)
     {
@@ -69,6 +79,8 @@ public record Checkpoint<TState>
             History = [.. execution.History],
             Metadata = execution.Metadata,
             LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
+            RunCost = execution.EstimatedCost,
+            RunUsage = execution.CumulativeUsage,
             CreatedAt = now,
             ExpiresAt = now + (ttl ?? TimeSpan.FromDays(7))
         };
@@ -92,6 +104,8 @@ public record Checkpoint<TState>
             Metadata = execution.Metadata,
             LoopCounters = new Dictionary<string, int>(execution.LoopCounters),
             InterruptedBeforeJob = interruptedBeforeJob,
+            RunCost = execution.EstimatedCost,
+            RunUsage = execution.CumulativeUsage,
             CreatedAt = now,
             ExpiresAt = now + (ttl ?? TimeSpan.FromDays(7))
         };

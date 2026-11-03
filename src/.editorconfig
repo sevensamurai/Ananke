@@ -40,21 +40,6 @@ dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 [nnke/**/*.cs]
 dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
 
-[nnke-platform/**/*.cs]
-dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
-
-[nnke-platform-google/**/*.cs]
-dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
-
-[nnke-platform-azure/**/*.cs]
-dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
-
-[nnke-platform-anthropic/**/*.cs]
-dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
-
-[nnke-platform-all/**/*.cs]
-dotnet_diagnostic.ANANKE_ASYNC_001.severity = none
-
 # Test helpers that use private async setup methods.
 [tests/Ananke.Abstractions.Tests/Graph/BreadthFirstExpansionTests.cs]
 dotnet_diagnostic.ANANKE_ASYNC_001.severity = none

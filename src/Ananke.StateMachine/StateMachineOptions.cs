@@ -25,4 +25,10 @@ public class StateMachineOptions
     /// Maximum depth of nested interrupt transitions. Exceeding this rejects the transition. Default is 5.
     /// </summary>
     public int MaxInterruptDepth { get; set; } = 5;
+
+    /// <summary>
+    /// Clock that stamps a transition whose payload carries no event time. Default is
+    /// <see cref="TimeProvider.System"/>.
+    /// </summary>
+    public TimeProvider Clock { get; set; } = TimeProvider.System;
 }

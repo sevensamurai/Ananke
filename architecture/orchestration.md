@@ -139,7 +139,7 @@ last with `AwaitInput` + a self-loop.
 
 ## Credentials
 
-`ICredentialProvider` (in `Ananke.Orchestration.Credentials`) is the provider-agnostic runtime credential contract shared by orchestration and federation packages. Each provider package (`Ananke.Orchestration.OpenAI`, `Ananke.Orchestration.Anthropic`, `Ananke.Orchestration.Google`) ships a concrete implementation that is registered automatically via its DI extension method.
+`ICredentialProvider` (in `Ananke.Orchestration.Credentials`) is the provider-agnostic runtime credential contract for the provider packages. Each provider package (`Ananke.Orchestration.OpenAI`, `Ananke.Orchestration.Anthropic`, `Ananke.Orchestration.Google`) ships a concrete implementation that is registered automatically via its DI extension method.
 
 - `Platform` — identifies the target provider (e.g. `"openai"`, `"anthropic"`)
 - `GetCredentialAsync(ct)` — resolves the opaque credential object at runtime; secrets are never stored in manifests

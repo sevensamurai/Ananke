@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -8,6 +10,7 @@ namespace Ananke.Orchestration.Planning;
 /// the same question, and a check that accepted either would decide one of them wrongly rather than
 /// abstaining.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record CheckDefinition
 {
     /// <summary>What a criterion names to invoke it.</summary>
@@ -97,6 +100,7 @@ public sealed record CheckDefinition
 /// deliberate one.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class InvocationCheck : IDeterministicCheck
 {
     private readonly Dictionary<(string Name, int Arity), CheckDefinition> _definitions;

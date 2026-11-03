@@ -19,9 +19,11 @@ public sealed class AnthropicStubHandler : ScriptedProviderHandler
             ? StructuredJson
             : ReplyText;
 
+        var stop = Truncates ? "max_tokens" : "end_turn";
+
         return streaming
-            ? (StreamOf(content), "text/event-stream")
-            : (Message(content), "application/json");
+            ? (StreamOf(content, stop), "text/event-stream")
+            : (Message(content, stop), "application/json");
     }
 
     private static string ToolUse(string tool) => $$"""
@@ -37,20 +39,20 @@ public sealed class AnthropicStubHandler : ScriptedProviderHandler
         }
         """;
 
-    private static string Message(string content) => $$"""
+    private static string Message(string content, string stop) => $$"""
         {
           "id": "msg_conformance",
           "type": "message",
           "role": "assistant",
           "model": "claude-sonnet-5",
           "content": [ { "type": "text", "text": {{Quote(content)}} } ],
-          "stop_reason": "end_turn",
+          "stop_reason": {{Quote(stop)}},
           "stop_sequence": null,
           "usage": { "input_tokens": {{InputTokens}}, "output_tokens": {{OutputTokens}} }
         }
         """;
 
-    private static string StreamOf(string content)
+    private static string StreamOf(string content, string stop)
     {
         // input_tokens arrive on message_start, output_tokens on message_delta — the split the
         // adapter reads, and the one the API documents.
@@ -74,7 +76,8 @@ public sealed class AnthropicStubHandler : ScriptedProviderHandler
 
         events.Add(Event("content_block_stop", """{"type":"content_block_stop","index":0}"""));
         events.Add(Event("message_delta",
-            """{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":"""
+            """{"type":"message_delta","delta":{"stop_reason":""" + Quote(stop)
+            + ""","stop_sequence":null},"usage":{"output_tokens":"""
             + OutputTokens + "}}"));
         events.Add(Event("message_stop", """{"type":"message_stop"}"""));
 

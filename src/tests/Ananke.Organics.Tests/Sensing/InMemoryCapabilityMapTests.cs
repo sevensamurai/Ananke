@@ -1,4 +1,5 @@
 using Ananke.Organics.Sensing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Sensing;
@@ -39,6 +40,20 @@ public class InMemoryCapabilityMapTests
         result[0].WorkflowName.ShouldBe("cell-1");
         result[0].Domain.ShouldBe("search");
         result[0].Alive.ShouldBeTrue();
+    }
+
+    [Test]
+    public void Discover_SignalOlderThanTheTimeoutByTheClock_IsNotReturned()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(now);
+        var landscape = new InMemoryCapabilityMap(signalTimeout: TimeSpan.FromSeconds(5), clock: clock);
+        landscape.Register(MakeSignal("cell-1", "search", timestamp: now));
+
+        clock.Advance(TimeSpan.FromSeconds(6));
+
+        landscape.Discover("search").ShouldBeEmpty();
+        landscape.DiscoverAll().ShouldBeEmpty();
     }
 
     [Test]

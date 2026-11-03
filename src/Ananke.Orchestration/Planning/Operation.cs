@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -33,6 +34,7 @@ namespace Ananke.Orchestration.Planning;
 /// <see cref="ToString"/> exists for a reader and has no inverse on purpose.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record Operation
 {
     /// <summary>The operation to perform.</summary>
@@ -88,6 +90,7 @@ public sealed record Operation
 /// <c>carry(place, way)</c> are different operations, and a catalog that accepted either would apply
 /// one of them wrongly rather than refusing.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record OperationDefinition
 {
     /// <summary>What a step names to propose it.</summary>
@@ -127,6 +130,18 @@ public sealed record OperationDefinition
     /// without one renders exactly as it always has.
     /// </remarks>
     public string? Example { get; init; }
+
+    /// <summary>
+    /// The arguments that are a list, by position from zero as <see cref="Operation.Argument"/> counts
+    /// them, each with the type of one entry. Every other argument is a string.
+    /// </summary>
+    /// <remarks>
+    /// <b>A list is a list, not a string to split.</b> Offered as a tool, such an argument is an array of
+    /// the entry's schema, so the call that proposes the operation holds one entry per item, and the
+    /// operation carries the argument as the JSON the call held. Offered in a report instead, it is a
+    /// string like any other.
+    /// </remarks>
+    public IReadOnlyDictionary<int, Type> Lists { get; init; } = new Dictionary<int, Type>();
 }
 
 /// <summary>
@@ -144,6 +159,7 @@ public sealed record OperationDefinition
 /// stops there. Whether the operation succeeds is the world's to say.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class OperationCatalog
 {
     private readonly Dictionary<(string Name, int Arity), OperationDefinition> _definitions;
@@ -208,7 +224,7 @@ public sealed class OperationCatalog
     private static string Describe(OperationDefinition definition)
     {
         var line = $"  {definition.Name}({string.Join(", ", Enumerable.Range(1, definition.Arity)
-            .Select(i => $"arg{i}"))}) — {definition.Description}";
+            .Select(i => definition.Lists.ContainsKey(i - 1) ? $"arg{i} (a list)" : $"arg{i}"))}) — {definition.Description}";
 
         return definition.Example is { Length: > 0 } example
             ? $"{line}\n  One that would be accepted, exactly as written:\n{example}"

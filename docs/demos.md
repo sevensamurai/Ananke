@@ -26,7 +26,7 @@ The tables below map the guide set to the demo projects in the main repository, 
 |---|---|---|---|
 | 05 | [Streaming Chat](guides/05-streaming-chat.md) | `StreamingChatWorkflow`, `ChatSessionEvent` / `BuildStream()`, `ChatSession<S,T>`, `InMemorySessionStore`, SSE endpoints, web UI integration | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) · [PetAdoptionDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/PetAdoptionDemo) |
 | 06 | [Long-Term Memory](guides/06-memory.md) | Knowledge pipeline (extract → chunk → embed → store), `KnowledgeBase` multi-section grouping, catalog, time-decay reranking, agent-driven ingestion | [LongTermMemoryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LongTermMemoryDemo) |
-| 07 | [Human-in-the-Loop](guides/07-human-in-the-loop.md) | Interrupt before/after, checkpointing, resume with modified state, work-review gates, async review parking, budget gates | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) · [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| 07 | [Human-in-the-Loop](guides/07-human-in-the-loop.md) | Interrupt before/after, checkpointing, resume with modified state, work-review gates, async review parking, budget gates | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 
 ### Production Infrastructure
 
@@ -49,12 +49,11 @@ The tables below map the guide set to the demo projects in the main repository, 
 | 17 | [Local Models](guides/17-local-models.md) | Ollama, llama.cpp, vLLM; model classification (size, weights, licence), the effective-context-window hazard, zero-cost routing | — |
 | 18 | [Plans and Contracts](guides/18-plans-and-contracts.md) | `PlanTree` and versions, pinned `AgentContract`s, executable criteria, verification and abstention, the supervisor / Planner seats, re-ruling rather than cancelling | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
 
-### Providers & Deployment
+### Providers
 
 | # | Guide | What you'll learn | Demo |
 |---|---|---|---|
-| 20 | [Platform Recommendation](guides/20-platform-recommendation.md) | `nnke-platform eval`, platform-fit scoring, the hybrid router, local substrate for credential-free testing | [LocalPlatformLoopDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/LocalPlatformLoopDemo) |
-| 21 | [Enterprise Clouds](guides/21-enterprise-clouds.md) | Amazon Bedrock and Microsoft Foundry: SigV4 and Entra auth, endpoint choice, bring-your-own model ids, orchestrating agents over A2A | — |
+| 21 | [Enterprise Clouds](guides/21-enterprise-clouds.md) | Amazon Bedrock and Microsoft Foundry: bringing your own authentication, Entra auth, bring-your-own model ids, orchestrating agents over A2A | — |
 
 ---
 
@@ -65,7 +64,7 @@ These demos validate the longer-arc capabilities described in the [Background & 
 | Demo | What it validates | Notes |
 |---|---|---|
 | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) | Cell division end-to-end: a generalist workflow accumulates tools, structural tension is detected, a division is proposed and approved, two specialised peers are spawned, the parent is killed, and the outcome is recorded into empirical memory. | Runs with no API keys. The flagship demonstration of `Ananke.Organics`. |
-| [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) | `commit`, `recall`, `reinforce`, `contradict`, offline learning sweeps with decay and consolidation — the empirical memory loop in isolation. | Runs with no API keys. Start here before building on `IEmpiricalMemory`. |
+| [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) | `commit`, `recall`, `reinforce`, `contradict`, offline learning sweeps with decay and consolidation — the empirical memory loop in isolation. | Runs with no API keys. Start here before building on `IEmpiricalMemory`. |
 | [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) | Empirical memory accumulating game strategy over repeated self-play sessions; confidence scores shifting with wins and losses. | Demonstrates the offline learner running between sessions. |
 
 > **Honest status:** Multi-generation lineage (a specialist dividing again) and closed-loop learning (division outcomes driving the next policy decision end-to-end) are structurally wired but not yet exercised in these demos. See the [Roadmap](about/roadmap.md) for what is complete and what is ahead.
@@ -75,7 +74,6 @@ These demos validate the longer-arc capabilities described in the [Background & 
 ## Featured Walkthroughs
 
 - [Organic Kernel Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) — the flagship Organics demo: cell division from detection to spawned peers, end-to-end, no API keys.
-- [Mini Agency Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) — a Slack-backed draft-and-review application wiring `Ananke.Roles`, work-review gates, async parking, and optional OTel metrics in a realistic end-to-end flow.
 - [Multi-Agent Demo](demos/multi-agent.md) — router, worker, reviewer orchestration in one focused walkthrough.
 - [Tools Demo](demos/tools.md) — concrete ToolKit registration patterns, typed parameters, and async tools.
 - [CLI Overview](cli/overview.md) — scaffold, validate, run, and serve workflows from the terminal.

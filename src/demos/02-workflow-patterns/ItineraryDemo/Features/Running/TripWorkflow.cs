@@ -1,4 +1,5 @@
 using Ananke.Orchestration;
+using Ananke.Orchestration.Budget;
 using Ananke.Orchestration.Checkpointing;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Workflows;
@@ -49,6 +50,7 @@ internal static class TripWorkflow
         PlanTree plan,
         InvocationCheck validate,
         bool autopilot,
+        decimal budget,
         Narration narration)
     {
         var executor = new PlanNodeAgentRunner(new PlanNodeAgentOptions
@@ -84,6 +86,10 @@ internal static class TripWorkflow
             .WithPlanner(planner)
             .MaxChangesOfPlan(ChangesAllowed)
             .Build()
-            .UseCheckpointing(new InMemoryCheckpointStore());
+            .UseCheckpointing(new InMemoryCheckpointStore())
+            // The run's log keeps every tool call with what it was asked and what came back.
+            .RecordContent(true)
+            // No flat rates: every role's model reports what each of its calls cost.
+            .WithBudget(new BudgetConfig { MaxCost = budget });
     }
 }

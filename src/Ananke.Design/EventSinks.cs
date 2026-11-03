@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Ananke.Abstractions;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
 
@@ -64,8 +65,10 @@ public sealed class JsonLinesEventSink : IWorkflowEventSink, IDisposable
     /// <inheritdoc />
     public ValueTask ReportAsync(WorkflowEvent evt, CancellationToken ct = default)
     {
+#pragma warning disable ANNKEEXP001 // The plan tier is this assembly's own; this type stays usable without it
         if (evt is PlanEvent or AgentToolCalled)
-            _writer.WriteLine(JsonSerializer.Serialize(new { type = evt.GetType().Name, @event = (object)evt }));
+#pragma warning restore ANNKEEXP001
+            _writer.WriteLine(JsonSerializer.Serialize(new { type = evt.GetType().Name, @event = (object)evt }, AnankeJson.Record));
 
         return ValueTask.CompletedTask;
     }

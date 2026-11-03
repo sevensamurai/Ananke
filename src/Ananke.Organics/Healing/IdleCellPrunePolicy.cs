@@ -4,7 +4,7 @@ namespace Ananke.Organics.Healing;
 
 /// <summary>
 /// Prunes cells that have been idle (received no executions) for longer than
-/// a configurable threshold. Implements the apoptosis loop (L4).
+/// a configurable threshold. Implements the apoptosis loop.
 /// </summary>
 /// <remarks>
 /// The policy reads the last-active time from <see cref="HealthSnapshot.LastRequestAt"/>.

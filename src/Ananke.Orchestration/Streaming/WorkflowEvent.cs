@@ -200,11 +200,27 @@ public sealed record AgentToolCalled : WorkflowEvent
     /// <summary>The tool it asked for.</summary>
     public required string ToolName { get; init; }
 
-    /// <summary>The arguments, as the model wrote them.</summary>
-    public required string Arguments { get; init; }
+    /// <summary>The id the model gave the call, which its result is sent back under.</summary>
+    public required string CallId { get; init; }
 
-    /// <summary>What came back, or the error, cut to <see cref="ResultCap"/> characters.</summary>
-    public required string Result { get; init; }
+    /// <summary>The tool round the call was made in, counted from 1.</summary>
+    public required int Round { get; init; }
+
+    /// <summary>How long the call took, from reading its arguments to having its result.</summary>
+    public required TimeSpan Duration { get; init; }
+
+    /// <summary>
+    /// The arguments, as the model wrote them; <see langword="null"/> unless the workflow records
+    /// content (<c>Workflow.RecordContent</c>).
+    /// </summary>
+    /// <remarks>A call with no arguments recorded is an empty string, not <see langword="null"/>.</remarks>
+    public required string? Arguments { get; init; }
+
+    /// <summary>
+    /// What came back, or the error, cut to <see cref="ResultCap"/> characters; <see langword="null"/>
+    /// unless the workflow records content (<c>Workflow.RecordContent</c>).
+    /// </summary>
+    public required string? Result { get; init; }
 
     /// <summary>How long the whole result was.</summary>
     public required int ResultLength { get; init; }

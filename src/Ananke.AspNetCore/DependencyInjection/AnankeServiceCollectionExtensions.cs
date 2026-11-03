@@ -11,7 +11,7 @@ public static class AnankeServiceCollectionExtensions
     /// <summary>
     /// Registers core Ananke services and returns an <see cref="IAnankeBuilder"/>
     /// for opt-in registration of additional subsystems (organic host,
-    /// model providers, knowledge stores, federation).
+    /// model providers, knowledge stores).
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <param name="configure">Optional delegate to configure top-level <see cref="AnankeOptions"/>.</param>

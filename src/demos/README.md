@@ -36,10 +36,7 @@ See [`secrets.json.template`](./secrets.json.template) for the full key referenc
 | 04 | [OrganicKernelDemo](#organickerneldemo) | Organic growth · complexity sensing · division · approval gate · memory feedback | None (all simulated) |
 | 05 | [AgenticWebDemo](#agenticwebdemo) | ASP.NET Core streaming chat · tool-calling agent · trade approval HITL | OpenAI · BetterStack (optional) |
 | 05 | [PetAdoptionDemo](#petadoptiondemo) | Full-stack RAG app · stateful phases · SSE streaming · mid-gen interrupts · voice/photo | OpenAI or Gemini · Docker (optional) |
-| 05 | [MiniAgencyDemo](#miniagencydemo) | Slack-backed drafter/reviewer agency · work-review gates · human reaction approval | Local OpenAI-compatible endpoint · Slack app |
 | 06 | [AgentToAgentProtocolDemo](#agenttoagentprotocoldemo) | A2A server · agent card · C# + Python clients · cross-language interop | None |
-| 06 | [ChannelsDemo](#channelsdemo) | Ananke agent as a Discord or Slack bot · `IPlatformMessageHandler` | OpenAI · Discord or Slack bot token |
-| 06 | [LocalPlatformLoopDemo](#localplatformloopdemo) | Local design loop · validate → deploy → run against three emulated clouds · mirrors `nnke-platform eval` | None |
 | 06 | [McpServerDemo](#mcpserverdemo) | MCP server exposing Ananke tools and a workflow to VS Code / Claude Desktop | None |
 
 ---
@@ -258,21 +255,6 @@ Full-stack pet adoption assistant demonstrating advanced Ananke features in a we
 
 ---
 
-#### MiniAgencyDemo
-
-**[`05-applications/MiniAgencyDemo`](./05-applications/MiniAgencyDemo)** · [`README`](./05-applications/MiniAgencyDemo/README.md)
-
-A Slack-backed two-stage agency wiring `Ananke.Roles` and work-review gates:
-
-- A drafter role generates the first response; an LLM reviewer checks the draft
-- A reaction window lets a human in the Slack channel approve or reject the review with an emoji
-- `roles.json` and `build-and-review.ananke.yml` are wired through `StudioHostBuilder`; the review loop itself lives in `MiniAgencyMessageHandler`
-- Optional rolling-window budget gate and OTel-style token metrics
-
-**Secrets required:** `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, and a local OpenAI-compatible endpoint (Ollama, LM Studio, vLLM)
-
----
-
 ### 06 — Interop & Channels
 
 #### AgentToAgentProtocolDemo
@@ -289,43 +271,6 @@ An Ananke agent exposed as an **A2A-compliant HTTP server** called from two inde
 
 ---
 
-#### ChannelsDemo
-
-**[`06-interop-and-channels/ChannelsDemo`](./06-interop-and-channels/ChannelsDemo)**
-
-An Ananke tool-calling agent deployed as a **Discord or Slack bot** using `Ananke.Platforms`:
-
-```bash
-dotnet run -- --platform discord
-dotnet run -- --platform slack
-```
-
-- `AddAnankeDiscord` / `AddAnankeSlack` register the platform adapters in the DI container
-- `IPlatformMessageHandler` implementations (`DiscordAgentHandler`, `SlackAgentHandler`) handle incoming messages
-- `IConversationMemory` preserves conversation context across turns (1-hour TTL)
-- Tools exposed: `current_time`, `echo`
-
-**Secrets required:** `OpenAI:ApiKey` + `Discord:BotToken` (Discord) or `Slack:BotToken` + `Slack:AppToken` (Slack)
-
----
-
-#### LocalPlatformLoopDemo
-
-**[`06-interop-and-channels/LocalPlatformLoopDemo`](./06-interop-and-channels/LocalPlatformLoopDemo)** · [`README`](./06-interop-and-channels/LocalPlatformLoopDemo/README.md)
-
-The **local design loop**: a workflow declaring three `PlatformNative` capabilities
-(`code_execution`, `web_search`, `memory_bank`) runs validate → deploy → run in-process against three
-emulated cloud targets (`local-emulated:azure-ai`, `:claude`, `:vertex-ai`) — no API keys, no cloud
-SDKs, no network required for the core loop.
-
-- `DefaultPlatformNativeExecutors.Register()` wires every built-in emulator; each tool's own README
-  states whether its tier is real (bash subprocess, DuckDuckGo Lite over HTTP) or in-process
-- Shows `foundry → azure-ai` alias resolution (`FED060`) and stub-coverage warnings (`FED062`)
-- Mirrors what `nnke-platform eval` does from the CLI, via `PlatformRecommender.Evaluate` in-process
-
-**Secrets required:** None
-
----
 
 #### McpServerDemo
 

@@ -2,6 +2,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Abstractions.Trajectory;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Tools;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -163,6 +164,56 @@ public class TrajectorySnapshotBuilderTests
         events.Count.ShouldBe(1);
         events[0].EpisodeId.ShouldBe(snapshots[0].EpisodeId);
     }
+
+    // ── The job's clock ──────────────────────────────────────────────────────
+
+    private static readonly DateTimeOffset ClockNow = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public async Task WithTimeProvider_TextJob_StampsSnapshotAndUnknownToolFromIt()
+    {
+        var snapshots = new List<TrajectorySnapshot>();
+        var events = new List<Ananke.Abstractions.Tools.HallucinatedToolCallEvent>();
+        var kit = new ToolKit("ops")
+            .AddTool("real_tool", "Real", () => ToolResult.Ok("ok"))
+            .WithHallucinationObserver(new CapturingHallucinationObserver(events));
+        var model = new SequencedToolModel(
+            new AgentResponse { Text = string.Empty, ToolCalls = [new AgentToolCall("c1", "ghost", "{}")] },
+            new AgentResponse { Text = "done" });
+
+        var agent = AgentJobFactory.Create<string>("clocked", model)
+            .WithPrompt(s => s)
+            .WithTools(kit)
+            .WithTrajectoryObserver(new CapturingObserver(snapshots))
+            .WithTimeProvider(new FakeTimeProvider(ClockNow))
+            .MapResult((_, text) => text)
+            .Build();
+
+        await agent.ExecuteAsync("go").WaitAsync(TimeSpan.FromSeconds(10));
+
+        snapshots.Single().CapturedAt.ShouldBe(ClockNow);
+        snapshots.Single().Duration.ShouldBe(TimeSpan.Zero);
+        events.Single().OccurredAt.ShouldBe(ClockNow);
+    }
+
+    [Test]
+    public async Task WithTimeProvider_StructuredJob_StampsSnapshotFromIt()
+    {
+        var snapshots = new List<TrajectorySnapshot>();
+
+        var agent = AgentJobFactory.Create<string, Answer>("clocked", SimulatedModel.Fixed("""{"Value":"x"}"""))
+            .WithPrompt(s => s)
+            .WithTrajectoryObserver(new CapturingObserver(snapshots))
+            .WithTimeProvider(new FakeTimeProvider(ClockNow))
+            .MapResult((_, a) => a.Value)
+            .Build();
+
+        await agent.ExecuteAsync("go").WaitAsync(TimeSpan.FromSeconds(10));
+
+        snapshots.Single().CapturedAt.ShouldBe(ClockNow);
+    }
+
+    private sealed record Answer(string Value);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

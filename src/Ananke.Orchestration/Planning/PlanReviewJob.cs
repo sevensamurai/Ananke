@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Jobs;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -28,6 +29,7 @@ namespace Ananke.Orchestration.Planning;
 /// <param name="supervision">The supervision whose store and clock the review's halt is recorded through.</param>
 /// <param name="read">Where the plan's progress is in state.</param>
 /// <param name="write">How to put it back.</param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanReviewJob<TState>(
     string name,
     PlanReviewer review,

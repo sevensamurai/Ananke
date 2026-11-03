@@ -24,8 +24,12 @@ namespace Ananke.Learning.Knowledge.Builders;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
+/// <param name="episodeStore">Store whose episodes are projected into the graph.</param>
+/// <param name="timeProvider">Clock that stamps each edge's <see cref="GraphEdge.ObservedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore, TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     /// <summary>
     /// Scans all episodes and upserts trajectory nodes and edges into
     /// <paramref name="graph"/>.
@@ -34,6 +38,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
     {
         ArgumentNullException.ThrowIfNull(graph);
 
+        var observedAt = _timeProvider.GetUtcNow();
         var offset = 0;
         const int pageSize = 200;
 
@@ -44,7 +49,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
             if (page.Count == 0) break;
 
             foreach (var episode in page)
-                await ProcessEpisodeAsync(graph, episode, ct).ConfigureAwait(false);
+                await ProcessEpisodeAsync(graph, episode, observedAt, ct).ConfigureAwait(false);
 
             offset += page.Count;
             if (page.Count < pageSize) break;
@@ -52,7 +57,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
     }
 
     private static async Task ProcessEpisodeAsync(
-        IKnowledgeGraph graph, Episode episode, CancellationToken ct)
+        IKnowledgeGraph graph, Episode episode, DateTimeOffset observedAt, CancellationToken ct)
     {
         // Upsert episode node.
         await graph.UpsertNodeAsync(new GraphNode
@@ -80,6 +85,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
                 ToId = EpisodeId(episode.Id),
                 Relation = "step_of",
                 Provenance = EdgeProvenance.Extracted,
+                ObservedAt = observedAt,
             }, ct).ConfigureAwait(false);
 
             // entry[n-1] → entry[n]
@@ -91,6 +97,7 @@ public sealed class EpisodeTrajectoryBuilder(IEpisodeStore episodeStore)
                     ToId = entryNodeId,
                     Relation = "follows",
                     Provenance = EdgeProvenance.Extracted,
+                    ObservedAt = observedAt,
                 }, ct).ConfigureAwait(false);
             }
 

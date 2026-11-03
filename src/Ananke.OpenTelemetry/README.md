@@ -66,7 +66,7 @@ services.AddTracingPipeline(o =>
 ## Features
 
 - **One-liner setup** — `AddTracingPipeline()` wires resource, sources, exporter, and `IWorkflowTracer`
-- **Budget listener** — `AddBudgetMeter()` listens to `ananke.federation.tokens.in`, `ananke.federation.tokens.out`, and `ananke.federation.usd`
+- **Budget listener** — `AddBudgetMeter()` reads what model calls consume, per workflow: every call publishes `ananke.usage.tokens.in`, `ananke.usage.tokens.out` and, when a cost-resolving router prices it, `ananke.usage.cost`, on the `Sources.OrchestrationUsage` meter with a `workflow` tag. To export the same numbers, add `Sources.OrchestrationUsage` to your OpenTelemetry metrics pipeline
 - **BetterStack** — built-in `UseBetterStack(token)` convenience method
 - **Any OTLP backend** — `UseOtlp(endpoint, headers)` for Jaeger, Grafana Tempo, etc.
 - **Multiple activity sources** — orchestration tracing by default, add state machine tracing with `AddSource()`

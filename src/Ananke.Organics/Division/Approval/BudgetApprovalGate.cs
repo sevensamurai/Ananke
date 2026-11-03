@@ -3,10 +3,16 @@ namespace Ananke.Organics.Division.Approval;
 /// <summary>
 /// <see cref="IDivisionApprovalGate"/> that blocks division when a workflow exceeds a token cap.
 /// </summary>
+/// <param name="budgetMeter">Meter that reports what the parent workflow has spent.</param>
+/// <param name="tokenCap">Tokens the parent workflow may spend before division is blocked.</param>
+/// <param name="clock">Clock that stamps each approval's <see cref="DivisionApproval.ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
 public sealed class BudgetApprovalGate(
     IBudgetMeter budgetMeter,
-    long tokenCap) : IDivisionApprovalGate
+    long tokenCap,
+    TimeProvider? clock = null) : IDivisionApprovalGate
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     /// <inheritdoc />
     public Task<DivisionApproval> ReviewAsync(
         DivisionPlan plan,
@@ -25,11 +31,13 @@ public sealed class BudgetApprovalGate(
         {
             return Task.FromResult(DivisionApproval.Reject(
                 reason: $"Division blocked: {role} has consumed {totalTokens} tokens in the current window, meeting or exceeding cap {tokenCap}.",
-                reviewedBy: "budget-meter"));
+                reviewedBy: "budget-meter",
+                clock: _clock));
         }
 
         return Task.FromResult(DivisionApproval.Approve(
             reason: $"Budget within cap: {role} has consumed {totalTokens} tokens in the current window against cap {tokenCap}.",
-            reviewedBy: "budget-meter"));
+            reviewedBy: "budget-meter",
+                clock: _clock));
     }
 }

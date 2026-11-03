@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Organics.Division;
 using Ananke.Orchestration.Tools;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Organics.Kernel.Snapshots;
 
@@ -118,7 +119,7 @@ public sealed class WorkflowSnapshotBuilder
         string jobName,
         string modelAlias = "default",
         string? systemPrompt = null,
-        int maxToolRounds = 3)
+        int maxToolRounds = AgentJobFactory.DefaultMaxToolRounds)
     {
         _jobs[jobName] = new JobSnapshot
         {

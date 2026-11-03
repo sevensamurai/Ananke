@@ -3,6 +3,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
+using Ananke.Orchestration.Tests.Fakes;
 using Ananke.Orchestration.Tools;
 using Shouldly;
 
@@ -161,12 +162,13 @@ public class SupervisorToolsTests
             """{"options":[{"summary":"Split it","replan":true,"recommended":true}]}""");
 
         using (WorkflowEventReporting.BeginScope(sink))
+        using (RecordingContent.Begin())
             await new AgentPlanAdvisor(WithTools(model)).ProposeAsync(Halted());
 
         var called = sink.Events.OfType<AgentToolCalled>().ShouldHaveSingleItem();
         called.AgentName.ShouldBe("plan-advisor");
         called.ToolName.ShouldBe("check_day");
-        called.Arguments.ShouldContain("market");
+        called.Arguments.ShouldNotBeNull().ShouldContain("market");
         called.Result.ShouldBe("scored market");
         called.IsError.ShouldBeFalse();
     }

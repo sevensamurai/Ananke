@@ -300,7 +300,7 @@ public class CandidateApplicationTests
 
         var result = await executor.ExecuteAsync("patch", (ctx, _) =>
         {
-            seen.Add((ctx.Rejection?.Candidate.ToString(), ctx.Rejection?.Finding));
+            seen.Add((ctx.Rejection?.Candidate?.ToString(), ctx.Rejection?.Finding));
             return Task.FromResult(new NodeOutcome
             {
                 Candidate = new Operation { Name = "gibberish" }

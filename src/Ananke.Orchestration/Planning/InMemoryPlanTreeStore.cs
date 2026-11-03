@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -9,6 +10,7 @@ namespace Ananke.Orchestration.Planning;
 /// Trees are immutable records, so handing the same instance to two readers is safe and no copy is
 /// made on the way out.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class InMemoryPlanTreeStore : IPlanTreeStore
 {
     private readonly ConcurrentDictionary<string, PlanTree> _plans = new(StringComparer.Ordinal);

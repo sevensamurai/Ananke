@@ -3,6 +3,7 @@ using Ananke.Learning.EmpiricalMemory;
 using Ananke.Learning.Episodes;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 
 namespace Ananke.Learning.Tests;
@@ -275,5 +276,36 @@ public class MonteCarloRewardPropagatorTests
         var step2 = await _memory.GetAsync("ep-6_entry_2");
         step2.ShouldNotBeNull();
         step2.Evidence.ShouldContain(e => e.Contains("return:1.000"));
+    }
+
+    [Test]
+    public async Task PropagateAsync_AStepWhoseEntryIsGone_IsSkippedWithAWarning()
+    {
+        var logger = new CollectingLogger();
+        var episode = new Episode
+        {
+            Id = "ep-gone",
+            Steps = [new EpisodeStep { StepIndex = 0, EntryId = "no-such-entry" }],
+            TerminalReward = 1f,
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow
+        };
+
+        var reinforced = await new MonteCarloRewardPropagator(logger: logger).PropagateAsync(episode, _memory);
+
+        reinforced.ShouldBe(0);
+        logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Warning && entry.Message.Contains("no-such-entry"));
+    }
+
+    private sealed class CollectingLogger : ILogger<MonteCarloRewardPropagator>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

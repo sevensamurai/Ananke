@@ -301,6 +301,8 @@ public class UndefinedJobNameAnalyzerTests
             using Ananke.Orchestration.Planning;
             using Ananke.Orchestration.Workflows;
 
+            #pragma warning disable ANNKEEXP001 // the plan tier is experimental; a consumer suppresses it
+
             class Program
             {
                 void Build(SupervisionOptions supervision, Func<string, PlanTree> plan)

@@ -247,6 +247,29 @@ public class TokenUsageTests
     }
 
     [Test]
+    public void Add_ReasoningCachedTokensAndCost_AreSummedWhereBothCarryThem_AndKeptWhereOneDoes()
+    {
+        var reported = new TokenUsage { InputTokens = 10, OutputTokens = 5, ReasoningTokens = 3, CachedInputTokens = 6, Cost = 0.25m };
+        var also = new TokenUsage { InputTokens = 10, OutputTokens = 5, ReasoningTokens = 1, CachedInputTokens = 2, Cost = 0.5m };
+        var silent = new TokenUsage { InputTokens = 10, OutputTokens = 5 };
+
+        var both = reported.Add(also);
+        both.ReasoningTokens.ShouldBe(4);
+        both.CachedInputTokens.ShouldBe(8);
+        both.Cost.ShouldBe(0.75m);
+
+        var one = silent.Add(reported);
+        one.ReasoningTokens.ShouldBe(3);
+        one.CachedInputTokens.ShouldBe(6);
+        one.Cost.ShouldBe(0.25m);
+
+        var neither = silent.Add(silent);
+        neither.ReasoningTokens.ShouldBeNull();
+        neither.CachedInputTokens.ShouldBeNull();
+        neither.Cost.ShouldBeNull();
+    }
+
+    [Test]
     public void Zero_HasAllZeroFields()
     {
         TokenUsage.Zero.InputTokens.ShouldBe(0);

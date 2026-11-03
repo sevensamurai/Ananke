@@ -1,8 +1,10 @@
 using Ananke.Orchestration.Agents;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>What a reviewer made of finished work.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanReview
 {
     /// <summary>Whether the work is what the plan was for.</summary>
@@ -65,9 +67,11 @@ public sealed record PlanReview
 /// from the change-of-plan budget, so nothing can reject indefinitely.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<PlanReview> PlanReviewer(PlanCoordination coordination, CancellationToken ct);
 
 /// <summary>Capacity the work was granted and did not use.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanUnspent
 {
     /// <summary>What is left, in the words of whoever noticed it.</summary>
@@ -101,6 +105,7 @@ internal sealed record ReviewedWork
 /// reason the advisor does: a reviewer that cannot check anything can only agree with what it is
 /// shown, and what it is shown was written by the work.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class AgentPlanReviewer(SupervisionOptions supervision, string? persona = null)
 {
     private const string DefaultPersona =

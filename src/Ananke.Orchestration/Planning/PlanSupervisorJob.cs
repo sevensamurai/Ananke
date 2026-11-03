@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Streaming;
 using Ananke.Orchestration.Tracing;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -39,6 +40,7 @@ namespace Ananke.Orchestration.Planning;
 /// <param name="coordinate">Who decides.</param>
 /// <param name="read">Where the last pass's outcome is in state.</param>
 /// <param name="write">How to put the decision back.</param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanSupervisorJob<TState>(
     string name,
     SupervisionOptions supervision,
@@ -95,7 +97,7 @@ public sealed class PlanSupervisorJob<TState>(
 
         // A person giving a step up now calls AbandonAsync directly — the same door DisputeAsync and
         // AskAsync already use — rather than going through a PlanDecision shape of its own; GiveUp
-        // folds into Ask/Replan in the vocabulary (R30), not into a third thing this job applies. A
+        // folds into Ask/Replan in the vocabulary, not into a third thing this job applies. A
         // replan with no contract is the Planner's to write — this delegate-coordinator form has no
         // Planner downstream of it, so there is nothing to apply here.
         if (decision is PlanDecision.ReplanPlan { Contract: { } contract } rerule)

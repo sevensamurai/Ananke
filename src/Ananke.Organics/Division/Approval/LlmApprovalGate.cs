@@ -26,10 +26,14 @@ namespace Ananke.Organics.Division.Approval;
 /// Optional system prompt override. When <see langword="null"/>, a default
 /// prompt that explains the reviewer role is used.
 /// </param>
+/// <param name="clock">Clock that stamps each approval's <see cref="DivisionApproval.ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
 public sealed class LlmApprovalGate(
     IAgentModel model,
-    string? systemPrompt = null) : IDivisionApprovalGate
+    string? systemPrompt = null,
+    TimeProvider? clock = null) : IDivisionApprovalGate
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     private const string DefaultSystemPrompt = """
         You are a division supervisor for an autonomous agent kernel. Your job is to
         review proposed cell division plans and decide whether they should proceed.
@@ -98,23 +102,23 @@ public sealed class LlmApprovalGate(
             """;
     }
 
-    private static DivisionApproval ParseResponse(string text)
+    private DivisionApproval ParseResponse(string text)
     {
         if (text.StartsWith("APPROVED", StringComparison.OrdinalIgnoreCase))
         {
             var reason = text.Length > 9 ? text[9..].TrimStart(':', ' ') : "LLM approved";
-            return DivisionApproval.Approve(reason, reviewedBy: "llm-supervisor");
+            return DivisionApproval.Approve(reason, reviewedBy: "llm-supervisor", clock: _clock);
         }
 
         if (text.StartsWith("REJECTED", StringComparison.OrdinalIgnoreCase))
         {
             var reason = text.Length > 9 ? text[9..].TrimStart(':', ' ') : "LLM rejected";
-            return DivisionApproval.Reject(reason, reviewedBy: "llm-supervisor");
+            return DivisionApproval.Reject(reason, reviewedBy: "llm-supervisor", clock: _clock);
         }
 
         // Unstructured response — treat as rejection with full explanation.
         return DivisionApproval.Reject(
             reason: $"LLM response did not follow expected format: {text}",
-            reviewedBy: "llm-supervisor");
+            reviewedBy: "llm-supervisor", clock: _clock);
     }
 }

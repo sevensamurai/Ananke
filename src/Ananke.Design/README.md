@@ -101,7 +101,7 @@ var models = new ModelResolver()
 | Ask (input turn) | `ask(name)` | `.AwaitInput("name")` |
 | Conditional pause | `interrupt(name, when)` · `ask(name, when)` | `.InterruptWhen("name", when)` · `.AwaitInputWhen("name", when)` — **exported and parsed, never built**: the condition is code |
 
-Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/Ananke/blob/main/docs/workflow-dsl.md)**
+Full syntax reference: **[docs/workflow-dsl.md](https://github.com/sevensamurai/Ananke/blob/main/docs/reference/workflow-dsl.md)**
 
 ## What is included
 

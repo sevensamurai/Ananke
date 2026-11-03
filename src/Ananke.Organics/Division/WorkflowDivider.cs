@@ -21,12 +21,6 @@ namespace Ananke.Organics.Division;
 /// children are torn down and the parent survives — no partial division.
 /// </para>
 /// <para>
-/// For federated divisions (where <see cref="ChildSpec.TargetPlatform"/> is set),
-/// the divider is transparent — it calls <see cref="IWorkflowHost.StartAsync"/> and
-/// the underlying host (e.g. <c>FederatedWorkflowHost</c>) routes each child to
-/// the appropriate platform automatically.
-/// </para>
-/// <para>
 /// <b>Design note — routing after division:</b> The current implementation spawns
 /// children and kills the parent, but does <b>not</b> handle request routing to
 /// the new cells. After division, incoming requests that targeted the parent need
@@ -129,7 +123,7 @@ public sealed class WorkflowDivider(
                     WorkflowName = child.Name,
                     ParentCellId = plan.ParentWorkflow,
                     Generation = parentGeneration + 1,
-                    BornAt = DateTimeOffset.UtcNow,
+                    BornAt = _options.Clock.GetUtcNow(),
                     DivisionReason = plan.Reason,
                     InheritedDomains = [child.Domain]
                 }, ct).ConfigureAwait(false);
@@ -340,13 +334,13 @@ public sealed class WorkflowDivider(
         CancellationToken ct)
     {
         var timeout = _options.HealthConfirmationTimeout;
-        var deadline = DateTimeOffset.UtcNow + timeout;
+        var deadline = _options.Clock.GetUtcNow() + timeout;
 
         var pending = new HashSet<string>(childNames);
 
         while (pending.Count > 0)
         {
-            if (DateTimeOffset.UtcNow > deadline)
+            if (_options.Clock.GetUtcNow() > deadline)
                 throw new TimeoutException(
                     $"Division health confirmation timed out after {timeout.TotalSeconds}s. " +
                     $"Children not yet active: [{string.Join(", ", pending)}]");
@@ -358,7 +352,7 @@ public sealed class WorkflowDivider(
                 pending.Remove(name);
 
             if (pending.Count > 0)
-                await Task.Delay(TimeSpan.FromMilliseconds(50), ct).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromMilliseconds(50), _options.Clock, ct).ConfigureAwait(false);
         }
     }
 }

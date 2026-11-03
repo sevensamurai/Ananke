@@ -26,9 +26,11 @@ public sealed class GeminiStubHandler : ScriptedProviderHandler
             ? StructuredJson
             : ReplyText;
 
+        var finish = Truncates ? "MAX_TOKENS" : "STOP";
+
         return streaming
-            ? (StreamOf(content), "text/event-stream")
-            : (GenerateContent(content), "application/json");
+            ? (StreamOf(content, finish), "text/event-stream")
+            : (GenerateContent(content, finish), "application/json");
     }
 
     private static string FunctionCall(string tool) =>
@@ -36,10 +38,10 @@ public sealed class GeminiStubHandler : ScriptedProviderHandler
         + Quote(tool) + ",\"args\":{}}}],\"role\":\"model\"},\"index\":0,\"finishReason\":\"STOP\"}],"
         + Usage(OutputTokens) + "}";
 
-    private static string GenerateContent(string content) =>
-        $"{{{Candidate(content)},{Usage(OutputTokens)}}}";
+    private static string GenerateContent(string content, string finish) =>
+        $"{{{Candidate(content, finish)},{Usage(OutputTokens)}}}";
 
-    private static string StreamOf(string content)
+    private static string StreamOf(string content, string finish)
     {
         var words = content.Split(' ');
 
@@ -47,16 +49,16 @@ public sealed class GeminiStubHandler : ScriptedProviderHandler
             "data: {" + Candidate(i == 0 ? word : " " + word) + "}");
 
         // Usage lands on the final chunk, as it does on the wire.
-        var final = "data: {" + Candidate(string.Empty, finished: true) + "," + Usage(OutputTokens) + "}";
+        var final = "data: {" + Candidate(string.Empty, finish) + "," + Usage(OutputTokens) + "}";
 
         return Sse([.. events, final]);
     }
 
-    private static string Candidate(string text, bool finished = false)
+    private static string Candidate(string text, string? finish = null)
     {
         var parts = text.Length == 0 ? "[]" : $"[{{\"text\":{Quote(text)}}}]";
-        var finish = finished ? ",\"finishReason\":\"STOP\"" : string.Empty;
-        return $"\"candidates\":[{{\"content\":{{\"parts\":{parts},\"role\":\"model\"}},\"index\":0{finish}}}]";
+        var reason = finish is null ? string.Empty : $",\"finishReason\":{Quote(finish)}";
+        return $"\"candidates\":[{{\"content\":{{\"parts\":{parts},\"role\":\"model\"}},\"index\":0{reason}}}]";
     }
 
     private static string Usage(int candidateTokens) =>

@@ -1,3 +1,4 @@
+using Ananke.Orchestration.Agents;
 using Ananke.Organics.Kernel.Snapshots;
 using Ananke.Orchestration.Tools;
 using Shouldly;
@@ -115,6 +116,7 @@ public class WorkflowSnapshotBuilderTests
             .Build();
 
         snap.Jobs["handle-request"].SystemPrompt.ShouldBe("Be helpful");
+        snap.Jobs["handle-request"].MaxToolRounds.ShouldBe(AgentJobFactory.DefaultMaxToolRounds);
     }
 
     [Test]

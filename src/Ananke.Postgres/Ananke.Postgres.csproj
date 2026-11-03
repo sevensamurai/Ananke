@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Ananke.Postgres</PackageId>
+    <Description>PostgreSQL provider for Ananke — IKnowledgeStore and IKnowledgeCatalog on Postgres with pgvector for embedding search, full-text search for keywords, hybrid ranking, jsonb metadata filters and real deletes.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Knowledge\Ananke.Orchestration.Knowledge.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Postgres.Tests" />
+  </ItemGroup>
+
+</Project>

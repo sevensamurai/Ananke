@@ -184,6 +184,35 @@ var job = new AgentJob<MyState, MyResponse>
     .Build();
 ```
 
+### A tool that ends the turn, and rounds that only repeat
+
+A tool marked `EndsTurn()` ends the turn once it is called without error: the rest of its round is not
+run, nor any call after it, and the model is asked to answer. It is for a call that is the turn's whole
+point, such as a proposal; a plan step's operation tools are marked so. `WithMaxRepeatedToolRounds(n)`
+answers a call that repeats one already made in the turn, with the same arguments and the same answer,
+with a note that it was answered before. After `n` rounds in a row of nothing else, the job throws
+`RepeatedOutputException`, which ends the run. A repeat whose earlier answer a context strategy left
+out of the last request is answered again, and does not count. Both are off unless set.
+
+Without `WithMaxToolRounds`, a job runs up to `AgentJobFactory.DefaultMaxToolRounds` (10) rounds. At the
+limit it gets one more call, asked to answer without tools, and throws only if it still calls one.
+
+```csharp
+var edits = new ToolKit("edits")
+    .AddTool("propose", "Propose the change, in a line.", b => b
+        .Param<string>("change", "The change.")
+        .EndsTurn()
+        .OnExecute(args => ToolResult.Ok("Proposed.")));
+
+var job = new AgentJob<MyState, MyResponse>
+    .Builder("edit", model)
+    .WithTools(edits)
+    .WithMaxToolRounds(30)
+    .WithMaxRepeatedToolRounds(2)
+    .MapResult((s, r) => s with { Result = r.Text })
+    .Build();
+```
+
 ---
 
 ## Merging ToolKits

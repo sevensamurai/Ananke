@@ -7,6 +7,8 @@ using Ananke.Abstractions.Agents;
 using Ananke.Organics.Division;
 using Ananke.Organics.Sensing;
 using Ananke.TestHelpers;
+using Microsoft.Extensions.Time.Testing;
+using Ananke.Organics.Kernel.Lineage;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Division;
@@ -260,6 +262,21 @@ public class WorkflowDividerTests
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
+
+    [Test]
+    public async Task DivideAsync_StampsChildBirthsFromTheOptionsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var lineage = new InMemoryLineageStore();
+        await StartParentAsync("parent");
+        var divider = new WorkflowDivider(_host, _landscape, _factory,
+            new DivisionOptions { Clock = new FakeTimeProvider(now) }, lineage);
+
+        await divider.DivideAsync(BuildTwoChildPlan(), BuildParentManifest(), new StubEmpiricalMemory())
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        (await lineage.GetAsync("child-search"))!.BornAt.ShouldBe(now);
+    }
 
     private WorkflowDivider CreateDivider(bool simulate = false) =>
         new(_host, _landscape, _factory, new DivisionOptions { Simulate = simulate });

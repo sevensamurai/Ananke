@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Ananke.Organics.Division;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Organics.Kernel.Snapshots;
 
@@ -82,7 +83,7 @@ public static class HostSnapshotExporter
                     sb.AppendLine($"        type: {job.Type}");
                     if (job.ModelAlias is not null)
                         sb.AppendLine($"        model: {job.ModelAlias}");
-                    if (job.MaxToolRounds != 3)
+                    if (job.MaxToolRounds != AgentJobFactory.DefaultMaxToolRounds)
                         sb.AppendLine($"        max_tool_rounds: {job.MaxToolRounds}");
                     if (job.SystemPrompt is not null)
                     {
@@ -190,7 +191,7 @@ public static class HostSnapshotExporter
         string? jobType = null;
         string? jobModelAlias = null;
         string? jobSystemPrompt = null;
-        var jobMaxToolRounds = 3;
+        var jobMaxToolRounds = AgentJobFactory.DefaultMaxToolRounds;
         var inSystemPrompt = false;
         var promptLines = new List<string>();
 
@@ -234,7 +235,7 @@ public static class HostSnapshotExporter
             jobType = null;
             jobModelAlias = null;
             jobSystemPrompt = null;
-            jobMaxToolRounds = 3;
+            jobMaxToolRounds = AgentJobFactory.DefaultMaxToolRounds;
         }
 
         void FlushCell()

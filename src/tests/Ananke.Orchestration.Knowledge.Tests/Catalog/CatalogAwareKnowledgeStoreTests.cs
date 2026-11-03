@@ -186,4 +186,107 @@ public class CatalogAwareKnowledgeStoreTests
         var freshResult = results.Single(r => r.Id == "fresh");
         freshResult.Score.ShouldBeGreaterThan(oldResult.Score);
     }
+
+    private static readonly DateTimeOffset ClockNow = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public async Task UpsertAsync_StampsTheCatalogEntryFromTheClock()
+    {
+        var store = new CatalogAwareKnowledgeStore(_inner, _catalog, timeProvider: new FixedClock(ClockNow));
+
+        await store.UpsertAsync(
+        [
+            new KnowledgeDocument { Id = "a1", Text = "alpha one", Metadata = new Dictionary<string, string> { ["source"] = "doc-a" } }
+        ]);
+
+        (await _catalog.GetAsync("doc-a"))!.IndexedAt.ShouldBe(ClockNow);
+    }
+
+    [Test]
+    public async Task SearchAsync_WithDecayOptions_MeasuresAgeByTheClock()
+    {
+        await _inner.UpsertAsync(
+        [
+            new KnowledgeDocument { Id = "doc", Text = "shared search topic", Metadata = new Dictionary<string, string> { ["source"] = "doc" } }
+        ]);
+        await _catalog.IndexAsync(new CatalogEntry
+        {
+            Source = "doc",
+            Summary = "",
+            Keywords = [],
+            IndexedAt = ClockNow,
+            ChunkCount = 1
+        });
+        var raw = (await _inner.SearchAsync("shared search topic")).Single().Score;
+        var decayed = new CatalogAwareKnowledgeStore(_inner, _catalog,
+            decayOptions: new TimeDecayOptions { HalfLifeDays = 1, FloorWeight = 0f },
+            timeProvider: new FixedClock(ClockNow.AddDays(1)));
+
+        var result = (await decayed.SearchAsync("shared search topic")).Single();
+
+        result.Score.ShouldBe(raw / 2, tolerance: 0.001f);
+    }
+
+    [Test]
+    public async Task UpsertAsync_ChunksCarryTheDocumentsDate_TheEntryKeepsItAsEffectiveAt()
+    {
+        var store = new CatalogAwareKnowledgeStore(_inner, _catalog, timeProvider: new FixedClock(ClockNow));
+
+        await store.UpsertAsync(
+        [
+            new KnowledgeDocument
+            {
+                Id = "a1",
+                Text = "alpha one",
+                Metadata = new Dictionary<string, string> { ["source"] = "doc-a", ["effective_at"] = "2026-10-30T00:00:00.0000000+00:00" },
+            }
+        ]);
+
+        var entry = (await _catalog.GetAsync("doc-a"))!;
+        entry.EffectiveAt.ShouldBe(new DateTimeOffset(2026, 10, 30, 0, 0, 0, TimeSpan.Zero));
+        entry.IndexedAt.ShouldBe(ClockNow);
+    }
+
+    [Test]
+    public async Task UpsertAsync_ADateThatDoesntParse_LeavesEffectiveAtEmpty()
+    {
+        await _store.UpsertAsync(
+        [
+            new KnowledgeDocument { Id = "a1", Text = "alpha", Metadata = new Dictionary<string, string> { ["source"] = "doc-a", ["effective_at"] = "soon" } }
+        ]);
+
+        (await _catalog.GetAsync("doc-a"))!.EffectiveAt.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task SearchAsync_WithDecayOptions_AgesADocumentFromItsOwnDate()
+    {
+        await _inner.UpsertAsync(
+        [
+            new KnowledgeDocument { Id = "doc", Text = "shared search topic", Metadata = new Dictionary<string, string> { ["source"] = "doc" } }
+        ]);
+        // Indexed just now, but written a day before: decay counts the day.
+        await _catalog.IndexAsync(new CatalogEntry
+        {
+            Source = "doc",
+            Summary = "",
+            Keywords = [],
+            IndexedAt = ClockNow,
+            EffectiveAt = ClockNow.AddDays(-1),
+            ChunkCount = 1
+        });
+        var raw = (await _inner.SearchAsync("shared search topic")).Single().Score;
+        var decayed = new CatalogAwareKnowledgeStore(_inner, _catalog,
+            decayOptions: new TimeDecayOptions { HalfLifeDays = 1, FloorWeight = 0f },
+            timeProvider: new FixedClock(ClockNow));
+
+        var result = (await decayed.SearchAsync("shared search topic")).Single();
+
+        result.Score.ShouldBe(raw / 2, tolerance: 0.001f);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 }

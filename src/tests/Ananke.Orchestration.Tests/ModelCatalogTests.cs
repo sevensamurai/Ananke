@@ -261,13 +261,29 @@ public class ModelCatalogTests
         var profile = ModelCatalog.Anthropic.ClaudeSonnet4_6.ToProfile(new FakeModel());
 
         profile.Status.ShouldBe(ModelStatus.Legacy);
-        profile.ReplacedBy.ShouldBe(Models.Anthropic.Sonnet5);
+        profile.ReplacedBy.ShouldBe(Models.Anthropic.Sonnet55);
+    }
+
+    [TestCase(Models.Anthropic.Sonnet5, Models.Anthropic.Sonnet55)]
+    [TestCase(Models.Anthropic.Opus5, Models.Anthropic.Opus55)]
+    [TestCase(Models.Anthropic.Fable5, Models.Anthropic.Fable51)]
+    public void ToProfile_Claude5Template_IsLegacyAndNamesItsPointRelease(string model, string replacement)
+    {
+        var template = new[]
+        {
+            ModelCatalog.Anthropic.ClaudeSonnet5, ModelCatalog.Anthropic.ClaudeOpus5, ModelCatalog.Anthropic.ClaudeFable5
+        }.Single(t => t.Name == model);
+
+        var profile = template.ToProfile(new FakeModel());
+
+        profile.Status.ShouldBe(ModelStatus.Legacy);
+        profile.ReplacedBy.ShouldBe(replacement);
     }
 
     [Test]
     public void ToProfile_CurrentTemplate_HasNoReplacedBy()
     {
-        var profile = ModelCatalog.Anthropic.ClaudeFable5.ToProfile(new FakeModel());
+        var profile = ModelCatalog.Anthropic.ClaudeFable5_1.ToProfile(new FakeModel());
 
         profile.Status.ShouldBe(ModelStatus.Current);
         profile.ReplacedBy.ShouldBeNull();

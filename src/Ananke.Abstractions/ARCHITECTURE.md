@@ -44,7 +44,7 @@ None. This project has zero NuGet or project references.
 | `Ananke.Abstractions.Memory` | `IConversationMemory` |
 | `Ananke.Abstractions.Tools` | `IToolMemory`, `ToolMemoryEntry`, `ToolHealth` |
 | `Ananke.Abstractions.Tools.Routing` | `ISmartToolRouter`, `ToolRoutingRequest`, `ToolRoutingDecision`, `RoutingConfidence`, `InvalidRoutingDecisionException` |
-| `Ananke.Abstractions.Providers` | `ICredentialProvider`, `IJsonSchemaTranslator`, `IModelMapper`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-agnostic credential resolution and schema/prompt translation contracts; implementations live in each `Ananke.Orchestration.{Provider}` package |
+| `Ananke.Abstractions.Providers` | `ICredentialProvider`, `IJsonSchemaTranslator`, `ISystemPromptCompiler`, `IToolSchemaTranslator`, `SystemPromptBuilder` — provider-agnostic credential resolution and schema/prompt translation contracts; implementations live in each `Ananke.Orchestration.{Provider}` package |
 | `Ananke.Abstractions.Graph` | `IKnowledgeGraph`, `GraphNode`, `GraphEdge`, `EdgeProvenance`, `ICentralityScorer`, `ICommunityDetector`, graph algorithms |
 | `Ananke.Abstractions.Tracing` | `IWorkflowTracer` |
 

@@ -25,6 +25,9 @@
 - [Empirical Memory](docs/guides/15-empirical-memory.md): `IEmpiricalMemory`, patterns / skills / heuristics, confidence tracking, `QdrantEmpiricalMemory`
 - [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md): `AffectOptions`, `OfflineLearnerOptions`, domain-specific configuration
 - [Agentic Patterns](docs/guides/16-agentic-patterns.md): `AgenticPattern.ReviewCritique`, `IterativeRefinement`, `Router`, `Handoff`
+- [Local & Self-Hosted Models](docs/guides/17-local-models.md): Ollama, vLLM, llama.cpp and LM Studio through the OpenAI-shaped adapter, model classification, licence policy, zero-cost routing
+- [Plans and Contracts](docs/guides/18-plans-and-contracts.md): `Workflow.Supervise`, `AgenticPattern.SupervisedPlan`, contracts, adjudication, budgets. Experimental (`ANNKEEXP001`)
+- [Enterprise Clouds](docs/guides/21-enterprise-clouds.md): Amazon Bedrock and Microsoft Foundry through the OpenAI and Anthropic adapters with your own authentication
 
 ## Reference
 
@@ -32,6 +35,8 @@
 - [Feature Index](docs/reference/features.md): Every feature, package, and demo in one table
 - [Tools Reference](docs/reference/tools-reference.md): Full `ToolKit` API, parameter types, `ToolResult`, MCP/A2A exposure
 - [Advanced Agent Features Reference](docs/reference/advanced-agent-features.md): Decorator API, cache/retry configuration
+- [Experimental APIs](docs/reference/experimental-apis.md): `ANNKEEXP001` (the plan tier), `ANNKEEXP002` (OpenAI credential overloads), how to suppress
+- [Model Deprecations](docs/reference/model-deprecations.md): model lifecycle stages and the `ANNKE001`–`ANNKE003` build diagnostics
 
 ## CLI Tooling (`nnke`)
 

@@ -151,7 +151,7 @@ public sealed class RoutedAgentModel : IStreamingAgentModel, IModelContextResolv
             return Task.CompletedTask;
 
         var rates = _costResolver.ResolveCostRates(request);
-        return UsageRecording.ReportCostAsync(rates.EstimateCost(response.Usage), ct);
+        return UsageRecording.ReportCostAsync(rates.EstimateCost(response.Usage), response, ct);
     }
 }
 

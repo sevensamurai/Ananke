@@ -18,6 +18,7 @@
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="Shouldly" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
 
   <ItemGroup>

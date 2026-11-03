@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Agents.Context;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -20,6 +21,7 @@ namespace Ananke.Orchestration.Planning;
 /// knows, it reads from the tree.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNode
 {
     /// <summary>Identifier, unique within the plan.</summary>
@@ -30,6 +32,29 @@ public sealed record PlanNode
 
     /// <summary>What this node was asked to do, and what would count as having done it.</summary>
     public required AgentContract Contract { get; init; }
+
+    /// <summary>
+    /// How hard the step reasons, as a word its runner writes into its requests, such as <c>high</c>.
+    /// <see langword="null"/>, the default, names none, and the model's own default applies.
+    /// </summary>
+    /// <remarks>
+    /// Read by nothing in the plan tier: the word is the provider's, and only a runner told how to write
+    /// it into a request (<see cref="PlanNodeAgentOptions{TAnswer}.EffortFields"/>) sends it. It is not
+    /// part of the contract, so a change of plan that re-rules the node keeps it.
+    /// </remarks>
+    public string? Effort { get; init; }
+
+    /// <summary>
+    /// What the step may change, as the domain names it — a file, a booking. Empty, the default, names
+    /// nothing and confines nothing.
+    /// </summary>
+    /// <remarks>
+    /// Read by nothing in the plan tier: an applier reads it off the node it is handed
+    /// (<see cref="PlanNodeContext.Node"/>), places what the step proposed in these, and refuses what
+    /// lands anywhere else — so an operation need not name again what the plan already grounded. Not
+    /// part of the contract, so a change of plan that re-rules the node keeps it.
+    /// </remarks>
+    public IReadOnlyList<string> Touches { get; init; } = [];
 
     /// <summary>Children, in execution order. Execution is sequential, so the order is meaningful.</summary>
     public IReadOnlyList<string> ChildIds { get; init; } = [];
@@ -217,6 +242,7 @@ public sealed record PlanNode
 /// which is the same objection this design makes to a status field.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record NodeReading
 {
     /// <summary>When the node ran.</summary>
@@ -259,6 +285,10 @@ public sealed record NodeReading
     /// </remarks>
     public string? Summary { get; init; }
 
+    /// <summary>What the node found, each with where it can be checked again. The last run's, like
+    /// <see cref="Summary"/>.</summary>
+    public IReadOnlyList<NodeFinding> Findings { get; init; } = [];
+
     /// <summary>Whether the node saw the whole of its surroundings.</summary>
     public bool SawEverything => OmittedAncestors == 0 && OmittedRecords == 0;
 }
@@ -269,6 +299,7 @@ public sealed record NodeReading
 /// re-verify somehow — the same reason the corpus records one against a verified entry, and the
 /// reason the two shapes match: a node's verdict is what later *becomes* a verified record.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record CriterionVerdict
 {
     /// <summary>The acceptance criterion this verdict is about, verbatim.</summary>
@@ -309,6 +340,7 @@ public sealed record CriterionVerdict
 /// It is the only account of why the attempt died, and rewriting it into something tidier would
 /// replace evidence with a summary of evidence by something that was not there.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record NodeFailure
 {
     /// <summary>What the failure said, verbatim.</summary>
@@ -327,7 +359,7 @@ public sealed record NodeFailure
     /// </para>
     /// <para>
     /// <b>A classification, never a count.</b> How many times a step has been attempted stays out of
-    /// the tree on purpose (S9): a plan that could read it is a plan whose planner can reason about
+    /// the tree on purpose: a plan that could read it is a plan whose planner can reason about
     /// infrastructure. This says something different — that the halt cannot be answered by asking
     /// anybody in this run — and it is here so the loop can stop rather than escalate into seats that
     /// will fail the same way.
@@ -344,6 +376,7 @@ public sealed record NodeFailure
 /// already established that each of these is admissible; whoever answers is choosing between them,
 /// not being asked to invent one.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record NodeQuestion
 {
     /// <summary>What needs deciding, in a line somebody can answer.</summary>
@@ -363,6 +396,7 @@ public sealed record NodeQuestion
 }
 
 /// <summary>Where a step, or a whole plan, stands.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum StepState
 {
     /// <summary>Not settled yet.</summary>
@@ -379,6 +413,7 @@ public enum StepState
 }
 
 /// <summary>What a node was told when it asked. A decision, never a verdict.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanAnswer
 {
     /// <summary>The question, as it was asked.</summary>
@@ -402,6 +437,7 @@ public sealed record PlanAnswer
 /// failed, and the two lead somewhere completely different — one is a choice somebody made and can be
 /// held to, the other is work that went wrong.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanAbandonment
 {
     /// <summary>Why the work is being given up.</summary>
@@ -419,6 +455,7 @@ public sealed record PlanAbandonment
 /// Whether the contract really is wrong is not the node's call — it belongs to whoever authored the
 /// criterion. What the node owns is the observation and the duty to return rather than route around it.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanViolation
 {
     /// <summary>The criterion the node believes is wrong or unmeetable.</summary>
@@ -449,6 +486,7 @@ public sealed record PlanViolation
 /// distinction <see cref="PlanNode.Failure"/> is written to preserve.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum NodeLifecycle
 {
     /// <summary>Nobody has attempted it.</summary>
@@ -483,6 +521,7 @@ public enum NodeLifecycle
 /// verdicts — where it is exact — and a status word that tried to carry it would be a worse copy of
 /// something already written down.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum ContractOutcome
 {
     /// <summary>Not every criterion holds, or not every child's does.</summary>

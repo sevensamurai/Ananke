@@ -5,7 +5,7 @@
 
 This is infrastructure for the inner loop — the same philosophy as the framework itself. Validate topology at build time, run without credentials, and give AI coding tools a machine-readable inspection surface so they can help rather than guess.
 
-For the shared rationale behind the CLI split and the high-level difference between `nnke` and `nnke-platform`, start with [CLI Overview](overview.md).
+For why the tool exists and how it fits with the framework, start with [CLI Overview](overview.md).
 
 ---
 
@@ -406,7 +406,6 @@ nnke mcp-server
 - [Learning Path](../learning-path.md)
 - [Demos](../demos.md)
 - [nnke Tools Overview](nnke-tools.md)
-- [nnke-platform Tool Companion](nnke-platform-tool.md)
 - [01 — Getting Started](../guides/01-getting-started.md)
 - [13 — Design Tooling](../guides/13-design-tooling.md)
 - [Workflow DSL](../reference/workflow-dsl.md)

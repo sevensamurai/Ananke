@@ -11,7 +11,9 @@ namespace Ananke.Orchestration.Knowledge.Catalog;
 public static class KnowledgeCatalogTools
 {
     /// <summary>
-    /// Creates a <see cref="ToolKit"/> with <c>browse_catalog</c> and <c>discover_sources</c> tools.
+    /// Creates a <see cref="ToolKit"/> with <c>browse_catalog</c>, <c>discover_sources</c> and <c>list_documents</c>
+    /// tools. <c>list_documents</c> lists every document whose header field has a value (every plan, with its status),
+    /// newest first by the document's own date, from the fields ingestion kept on each entry.
     /// </summary>
     /// <param name="catalog">The knowledge catalog to expose to agents.</param>
     /// <param name="name">Name for the returned <see cref="ToolKit"/>. Default is <c>"knowledge_catalog"</c>.</param>
@@ -61,7 +63,48 @@ public static class KnowledgeCatalogTools
                     return FormatDiscoverResults(results);
                 },
                 paramName: "query",
-                paramDescription: "Natural language query describing the topic to find relevant sources for");
+                paramDescription: "Natural language query describing the topic to find relevant sources for")
+            .AddTool(
+                "list_documents",
+                "List every document whose header field has a value, such as every document of a type, newest first, " +
+                "with its date, its header fields and what supersedes it. Use this for a roundup (the status of every " +
+                "plan) rather than a search, which returns only the closest few.",
+                tool => tool
+                    .Param("field", "The header field to match, such as 'Type' or 'Status'")
+                    .Param("value", "The value it must have, such as 'plan'; compared without case")
+                    .OnExecute(async (args, ct) =>
+                    {
+                        var entries = await catalog.BrowseAsync(new CatalogBrowseOptions
+                        {
+                            Field = args.Get("field"),
+                            Value = args.Get("value"),
+                            Order = CatalogBrowseOrder.EffectiveAt,
+                            Limit = 200,
+                        }, ct);
+                        return FormatListResults(entries);
+                    }));
+    }
+
+    private static string FormatListResults(IReadOnlyList<CatalogEntry> entries)
+    {
+        if (entries.Count == 0)
+            return "No document has that field and value.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"{entries.Count} document(s), newest first:");
+        foreach (var entry in entries)
+        {
+            var date = (entry.EffectiveAt ?? entry.IndexedAt).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var fields = string.Join(" · ", entry.Fields.Select(f => $"{f.Key}: {f.Value}"));
+            sb.Append($"• {entry.Source} — {date}");
+            if (fields.Length > 0)
+                sb.Append($" — {fields}");
+            if (entry.SupersededBy is not null)
+                sb.Append($" — Superseded by: {entry.SupersededBy}");
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
     }
 
     private static string FormatBrowseResults(IReadOnlyList<CatalogEntry> entries)

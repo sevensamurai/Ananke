@@ -41,7 +41,9 @@ public sealed class SessionTrace : IWorkflowTracer
 {
     private readonly Action<string>? _write;
     private readonly TimeProvider _time;
+#pragma warning disable ANNKEEXP001 // The plan tier is this assembly's own; this type stays usable without it
     private readonly PlanNarrator _narrator = new();
+#pragma warning restore ANNKEEXP001
     private readonly List<string> _lines = [];
     private readonly Lock _gate = new();
 
@@ -127,6 +129,9 @@ public sealed class SessionTrace : IWorkflowTracer
         private readonly string? _agent;
         private readonly Dictionary<string, string> _attributes = new(StringComparer.Ordinal);
 
+        /// <summary>A tool call's span is named <c>execute_tool {tool}</c>.</summary>
+        private const string ToolSpanPrefix = "execute_tool ";
+
         private Exception? _error;
 
         public Span(SessionTrace trace, string name, SpanKind kind, int depth, string? agent = null)
@@ -201,7 +206,7 @@ public sealed class SessionTrace : IWorkflowTracer
         private string Under() => _agent is null ? "" : $"{_agent}: ";
 
         private string ToolName() =>
-            _name.StartsWith("tool:", StringComparison.Ordinal) ? _name[5..] : _name;
+            _name.StartsWith(ToolSpanPrefix, StringComparison.Ordinal) ? _name[ToolSpanPrefix.Length..] : _name;
 
         /// <summary>
         /// What became of a tool call, and what the framework did about it.

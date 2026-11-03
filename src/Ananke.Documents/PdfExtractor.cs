@@ -1,4 +1,6 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Orchestration.Knowledge.Documents;
 using UglyToad.PdfPig;
@@ -16,8 +18,10 @@ namespace Ananke.Documents;
 /// Currently powered by PdfPig. The implementation library is an internal detail —
 /// consuming code depends only on <see cref="IDocumentExtractor"/>.
 /// </remarks>
-public sealed class PdfExtractor : IDocumentExtractor
+public sealed class PdfExtractor(ILogger<PdfExtractor>? logger = null) : IDocumentExtractor
 {
+    private readonly ILogger _logger = logger ?? NullLogger<PdfExtractor>.Instance;
+
     private const double ParagraphGapMultiplier = 2.5;
     private const double HeadingFontSizeMultiplier = 1.15;
 
@@ -67,7 +71,7 @@ public sealed class PdfExtractor : IDocumentExtractor
         return new ExtractedDocument(sections, documentMetadata);
     }
 
-    private static PageResult ConvertPageToMarkdown(Page page)
+    private PageResult ConvertPageToMarkdown(Page page)
     {
         var emptyResult = new PageResult(string.Empty, [], []);
 
@@ -196,7 +200,7 @@ public sealed class PdfExtractor : IDocumentExtractor
         return result;
     }
 
-    private static List<HyperlinkRegion> BuildHyperlinkLookup(Page page)
+    private List<HyperlinkRegion> BuildHyperlinkLookup(Page page)
     {
         try
         {
@@ -205,9 +209,11 @@ public sealed class PdfExtractor : IDocumentExtractor
                 .Select(h => new HyperlinkRegion(h.Uri!, h.Bounds))
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
-            // Some PDFs have malformed annotation data
+            // Some PDFs have malformed annotation data. The text is still extracted; only the
+            // page's links are lost, and that is said rather than swallowed.
+            _logger.LogWarning(ex, "Page {Page}: malformed link annotations; its hyperlinks are skipped", page.Number);
             return [];
         }
     }

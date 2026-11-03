@@ -31,7 +31,7 @@ namespace Ananke.Abstractions.Agents;
 /// error</b> — stronger than a runtime catalog lookup, which returns a string no analyzer can
 /// inspect. A star moved to a <b>Legacy</b> model does not break the build (Legacy carries no
 /// <see cref="ObsoleteAttribute"/>); <c>StarredModelTests</c> covers that gap. The choice cannot be
-/// derived from <c>ModelCatalog</c>'s tiers — <c>claude-opus-5</c> and <c>claude-fable-5</c> are
+/// derived from <c>ModelCatalog</c>'s tiers — <c>claude-opus-5-5</c> and <c>claude-fable-5-1</c> are
 /// identical on both intelligence and speed — so it is recorded here on purpose.
 /// </para>
 /// </remarks>
@@ -133,7 +133,7 @@ public static class Models
         public const string Gpt56Luna = "gpt-5.6-luna";
 
         /// <summary>The OpenAI model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
-        public const string Starred = Gpt56Terra;
+        public const string Starred = Gpt56Luna;
     }
 
     /// <summary>
@@ -157,17 +157,26 @@ public static class Models
         /// <summary>Claude Haiku 4.5 — current generation, fastest, most compact.</summary>
         public const string Haiku45 = "claude-haiku-4-5";
 
-        /// <summary>Claude Sonnet 5 — current generation, balanced performance and speed.</summary>
+        /// <summary>Claude Sonnet 5 — legacy, balanced performance and speed, still fully supported.</summary>
         public const string Sonnet5 = "claude-sonnet-5";
 
-        /// <summary>Claude Opus 5 — current generation, complex agentic coding and enterprise work.</summary>
+        /// <summary>Claude Opus 5 — legacy, complex agentic coding and enterprise work, still fully supported.</summary>
         public const string Opus5 = "claude-opus-5";
 
-        /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
+        /// <summary>Claude Fable 5 — legacy Mythos-class frontier model, complex reasoning, still fully supported.</summary>
         public const string Fable5 = "claude-fable-5";
 
+        /// <summary>Claude Sonnet 5.5 — current generation, the best combination of speed and intelligence.</summary>
+        public const string Sonnet55 = "claude-sonnet-5-5";
+
+        /// <summary>Claude Opus 5.5 — current generation, long-running agentic coding and knowledge work.</summary>
+        public const string Opus55 = "claude-opus-5-5";
+
+        /// <summary>Claude Fable 5.1 — current generation, demanding reasoning and long-horizon agentic work.</summary>
+        public const string Fable51 = "claude-fable-5-1";
+
         /// <summary>The Anthropic model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
-        public const string Starred = Sonnet5;
+        public const string Starred = Sonnet55;
     }
 
     /// <summary>Google Gemini model identifiers. Already short wire names.</summary>

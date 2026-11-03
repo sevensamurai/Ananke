@@ -10,6 +10,8 @@ using Ananke.Organics.Kernel.Snapshots;
 using Ananke.Organics.Division;
 using Ananke.Organics.Division.Approval;
 using Ananke.Organics.Sensing;
+using Microsoft.Extensions.Time.Testing;
+using Ananke.Organics.Kernel.Lineage;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Kernel;
@@ -252,6 +254,42 @@ public class OrganicHostDivisionTests
         sw.Stop();
 
         sw.ElapsedMilliseconds.ShouldBeLessThan(3_000);
+    }
+
+    [Test]
+    public async Task Division_IsStampedByTheOptionsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var lineage = new InMemoryLineageStore();
+        await lineage.RecordBirthAsync(new CellLineage
+        {
+            CellId = "test",
+            WorkflowName = "test",
+            Generation = 0,
+            BornAt = now - TimeSpan.FromDays(1)
+        });
+        DivisionSignal? proposed = null;
+        var divisionDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var host = new OrganicHost(_cellHost, _landscape, new OrganicGrowthOptions
+        {
+            Policy = AlwaysDividePolicy("test"),
+            Monitor = new WorkflowExecutionMonitor(),
+            EvaluationInterval = 1,
+            Divider = new SlowDivider(0),
+            SharedMemory = new StubEmpiricalMemory(),
+            Lineage = lineage,
+            Clock = new FakeTimeProvider(now)
+        });
+        host.OnDivisionProposed += signal => { proposed = signal; return Task.CompletedTask; };
+        host.OnDivisionCompleted += _ => { divisionDone.TrySetResult(); return Task.CompletedTask; };
+        host.Register("test", MakeKit("a"));
+
+        host.ObserveExecution("test", await RunWorkflow("test"));
+        await divisionDone.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        proposed!.Timestamp.ShouldBe(now);
+        (await lineage.GetAsync("test"))!.DiedAt.ShouldBe(now);
     }
 
     // -- Helpers -----------------------------------------------------

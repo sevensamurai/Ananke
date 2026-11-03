@@ -71,7 +71,7 @@ public sealed record ComplexitySnapshot
     /// <summary>Average cost per execution. Secondary signal, not a division trigger.</summary>
     public decimal AvgCostPerExecution { get; init; }
 
-    // ── Metabolic (L3 — nullable so existing producers compile unchanged) ──
+    // ── Metabolic (nullable, so a producer may leave them unset) ──
 
     /// <summary>
     /// Average tokens consumed per execution across the sample window.

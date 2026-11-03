@@ -7,13 +7,16 @@ namespace Ananke.OpenTelemetry;
 /// <see cref="IWorkflowTracer"/> backed by <see cref="System.Diagnostics.ActivitySource"/>.
 /// Each trace maps to a root <see cref="Activity"/>, each span to a child <see cref="Activity"/>.
 /// </summary>
-public sealed class ActivitySourceTracer(string? sourceName = null) : IWorkflowTracer
+public sealed class ActivitySourceTracer(string? sourceName = null) : IWorkflowTracer, IDisposable
 {
     public const string DefaultSourceName = Sources.Orchestration;
 
     private readonly ActivitySource _source = new(sourceName ?? DefaultSourceName);
 
     public ActivitySource Source => _source;
+
+    /// <summary>Disposes the <see cref="Source"/>, which releases it from its listeners.</summary>
+    public void Dispose() => _source.Dispose();
 
     public ITrace StartTrace(string workflowName, string executionId, IDictionary<string, string>? metadata = null)
     {
@@ -65,6 +68,10 @@ public sealed class ActivitySourceTracer(string? sourceName = null) : IWorkflowT
         }
 
         public void SetAttribute(string key, string value) => activity?.SetTag(key, value);
+
+        public void SetAttribute(string key, long value) => activity?.SetTag(key, value);
+
+        public void SetAttribute(string key, bool value) => activity?.SetTag(key, value);
 
         public void RecordError(Exception exception)
         {

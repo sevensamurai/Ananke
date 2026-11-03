@@ -10,8 +10,10 @@ namespace Ananke.Orchestration.Knowledge;
 /// topics the knowledge base covers. Populate manually at ingest time, or generate
 /// automatically via <see cref="Documents.DocumentSummarizer.AutoDescribeAsync"/>.
 /// </param>
+/// <param name="Records">Number of records stored by <see cref="Documents.DocumentProcessor.Records"/>; 0 without it.</param>
 public sealed record ProcessingResult(
     int Sections,
     int Chunks,
     string Source,
-    string Description = "");
+    string Description = "",
+    int Records = 0);

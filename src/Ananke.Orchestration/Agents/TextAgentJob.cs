@@ -49,7 +49,8 @@ public sealed class TextAgentJob<TState> : IJob<TState>, IProfileAwareJob
         private Func<TState, string, TState>? _mapResult;
         private Action<TState, string>? _onResponse;
         private ToolKit? _toolKit;
-        private int _maxToolRounds = 3;
+        private int _maxToolRounds = AgentJobFactory.DefaultMaxToolRounds;
+        private int? _maxRepeatedToolRounds;
         private double? _temperature;
         private int _maxRetryAttempts = 3;
         private TimeSpan _retryBaseDelay = TimeSpan.FromSeconds(1);
@@ -63,6 +64,7 @@ public sealed class TextAgentJob<TState> : IJob<TState>, IProfileAwareJob
         private AgentContract? _contract;
         private ILoggerFactory? _loggerFactory;
         private ITrajectoryObserver? _trajectoryObserver;
+        private TimeProvider _timeProvider = TimeProvider.System;
 
         internal Builder(string name, IAgentModel model)
         {
@@ -102,6 +104,19 @@ public sealed class TextAgentJob<TState> : IJob<TState>, IProfileAwareJob
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
             _maxToolRounds = max;
+            return this;
+        }
+
+        /// <summary>
+        /// Throws <see cref="RepeatedOutputException"/>, which ends the run, once this many rounds in a
+        /// row only repeated calls already made in this turn: the same tool, the same arguments, the
+        /// same answer. A repeated call is answered with a note that it was answered before, not with
+        /// the answer again.
+        /// </summary>
+        public Builder WithMaxRepeatedToolRounds(int max)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
+            _maxRepeatedToolRounds = max;
             return this;
         }
 
@@ -173,6 +188,18 @@ public sealed class TextAgentJob<TState> : IJob<TState>, IProfileAwareJob
         {
             ArgumentNullException.ThrowIfNull(observer);
             _trajectoryObserver = observer;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the clock that stamps this job's trajectory snapshots and unknown-tool reports, times
+        /// each tool call, and reads a provider's stated retry moment. Defaults to
+        /// <see cref="TimeProvider.System"/>.
+        /// </summary>
+        public Builder WithTimeProvider(TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(timeProvider);
+            _timeProvider = timeProvider;
             return this;
         }
 
@@ -297,7 +324,9 @@ public sealed class TextAgentJob<TState> : IJob<TState>, IProfileAwareJob
                 coercionPrompt: null,
                 temperature: _temperature,
                 toolOutputPolicy: _toolOutputPolicy,
-                contract: _contract);
+                contract: _contract,
+                timeProvider: _timeProvider,
+                maxRepeatedToolRounds: _maxRepeatedToolRounds);
 
             return new TextAgentJob<TState>(engine);
         }

@@ -39,6 +39,12 @@ public class TerminalProviderErrorTests
             "Your credit balance is too low to access the Anthropic API.")).ShouldBeTrue();
 
     [Test]
+    public void Is_AReplyThatRepeatsItself_IsTerminal() =>
+        // Asked again, the same model is as likely to repeat itself again: the run ends instead.
+        TerminalProviderError.Is(new InvalidOperationException(
+            "[agent] step failed.", new RepeatedOutputException("The reply repeats itself."))).ShouldBeTrue();
+
+    [Test]
     public void Is_TheProviderExceptionWrapped_IsStillFound()
     {
         // What a caller actually catches: the engine's own exception around the SDK's.
@@ -268,7 +274,9 @@ public class TerminalProviderErrorTests
     {
         public Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default) =>
             throw new HttpRequestException(
-                "Rate limit reached for requests per minute.", null, HttpStatusCode.TooManyRequests);
+                // States its delay: a plain 429 is the provider SDK's to retry, not the engine's.
+                "Rate limit reached for requests per minute. Please retry in 0.01s.", null,
+                HttpStatusCode.TooManyRequests);
 
         public async IAsyncEnumerable<AgentStreamChunk> GenerateStreamAsync(
             AgentRequest request, [EnumeratorCancellation] CancellationToken ct = default)

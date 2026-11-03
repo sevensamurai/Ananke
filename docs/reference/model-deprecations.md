@@ -43,12 +43,15 @@ categorically different from production code drifting onto one.
 
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
-| `claude-sonnet-5` | `Sonnet5` | Current | — |
-| `claude-opus-5` | `Opus5` | Current | — |
-| `claude-fable-5` | `Fable5` | Current | — |
+| `claude-sonnet-5-5` | `Sonnet55` | Current | — |
+| `claude-opus-5-5` | `Opus55` | Current | — |
+| `claude-fable-5-1` | `Fable51` | Current | — |
 | `claude-haiku-4-5` | `Haiku45` | Current | — |
-| `claude-sonnet-4-6` | `Sonnet46` | Legacy | `Sonnet5` |
-| `claude-opus-4-8` | `Opus48` | Legacy | `Opus5` |
+| `claude-sonnet-5` | `Sonnet5` | Legacy | `Sonnet55` |
+| `claude-opus-5` | `Opus5` | Legacy | `Opus55` |
+| `claude-fable-5` | `Fable5` | Legacy | `Fable51` |
+| `claude-sonnet-4-6` | `Sonnet46` | Legacy | `Sonnet55` |
+| `claude-opus-4-8` | `Opus48` | Legacy | `Opus55` |
 
 ### OpenAI
 

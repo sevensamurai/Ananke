@@ -1,3 +1,4 @@
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Usage;
 
 namespace Ananke.Orchestration.Budget;
@@ -63,10 +64,18 @@ public readonly record struct BudgetVerdict(
 /// </para>
 /// <para>Safe for concurrent callers: fork branches evaluate in parallel.</para>
 /// </remarks>
+/// <param name="recorder">Where every call in the run records its usage.</param>
+/// <param name="baseline">The recorder's total when this runner started.</param>
+/// <param name="budget">The ceilings, or <see langword="null"/> for none.</param>
+/// <param name="carriedCost">What the execution spent before this runner started — a resumed run's
+/// earlier legs, restored from its checkpoint.</param>
+/// <param name="carriedUsage">The tokens those legs used.</param>
 internal sealed class BudgetGate(
     IUsageRecorder recorder,
     UsageSnapshot baseline,
-    BudgetConfig? budget)
+    BudgetConfig? budget,
+    decimal carriedCost = 0m,
+    TokenUsage? carriedUsage = null)
 {
     // 0 = not yet warned. Interlocked rather than a lock so exactly one concurrent branch can
     // observe each crossing, which is what makes a warning fire once per execution.
@@ -104,12 +113,15 @@ internal sealed class BudgetGate(
         // One read, two questions. Re-reading for the period figure would let the two answers
         // disagree while branches are recording.
         var absolute = await recorder.ReadAsync(ct).ConfigureAwait(false);
-        var runTotals = absolute.Since(baseline);
+        var sinceStart = absolute.Since(baseline);
+        var runTotals = carriedUsage is { } carried
+            ? sinceStart with { Usage = sinceStart.Usage.Add(carried) }
+            : sinceStart;
 
         if (budget is null)
             return new BudgetVerdict(runTotals, 0m, 0m, BudgetState.Within, BudgetLimitKind.None);
 
-        var runCost = CostOf(runTotals);
+        var runCost = carriedCost + CostOf(sinceStart);
         var periodCost = budget.PeriodCostLimit is null ? 0m : CostOf(absolute);
 
         // A limit beats a warning, and the period beats the run: being out of budget for the

@@ -1,6 +1,6 @@
-# Architecture: Interop — MCP, A2A, Skills, Platforms
+# Architecture: Interop — MCP, A2A, Skills
 
-> Part of the [Architecture Guide](../ARCHITECTURE.md). Covers protocol bridges, external skill catalog, and messaging platform adapters.
+> Part of the [Architecture Guide](../ARCHITECTURE.md). Covers protocol bridges and the external skill catalog.
 
 ---
 
@@ -85,34 +85,3 @@ flowchart LR
 | `SkillScore` | Success rate, vote count, last used |
 | `ToolKitSkillExtensions` | `toolkit.AddFromCatalogAsync()` convenience methods |
 | `SkillCatalogMemorySync` | Synchronises discovered skill catalog entries into `IToolMemory` so the smart router can recall and score them across sessions |
-
----
-
-## Messaging Platforms
-
-`Ananke.Platforms` provides abstractions for bridging agents to messaging platforms. Depends on `Ananke.Orchestration`.
-
-```mermaid
-flowchart LR
-    SLACK[Slack] --> ADAPTER[IMessagePlatformAdapter<br/>Slack impl]
-    DISCORD[Discord] --> ADAPTER2[IMessagePlatformAdapter<br/>Discord impl]
-    ADAPTER --> BRIDGE[StreamingMessageBridge]
-    ADAPTER2 --> BRIDGE
-    BRIDGE --> HANDLER[ConversationalMessageHandler<br/>IPlatformMessageHandler]
-    HANDLER --> AGENT[StreamingChatWorkflow]
-    AGENT --> SINK[IPlatformResponseSink]
-    SINK --> ADAPTER
-    SINK --> ADAPTER2
-```
-
-| Type | Assembly | Purpose |
-|---|---|---|
-| `IMessagePlatformAdapter` | Platforms | Receive messages from a platform |
-| `IPlatformResponseSink` | Platforms | Send responses back to the platform |
-| `IPlatformMessageHandler` | Platforms | Process incoming platform messages |
-| `ConversationalMessageHandler` | Platforms | Default handler with session management |
-| `PlatformMessage` | Platforms | Normalized incoming message |
-| `StreamingMessageBridge` | Platforms | Bridge streaming agent output to platform sink |
-| `SessionKeyBuilder` | Platforms | Build session keys from platform context |
-| `Ananke.Platforms.Slack` | Platforms.Slack | Slack-specific adapter |
-| `Ananke.Platforms.Discord` | Platforms.Discord | Discord-specific adapter |

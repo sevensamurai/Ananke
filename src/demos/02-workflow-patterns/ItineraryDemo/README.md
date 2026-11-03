@@ -38,6 +38,26 @@ it is actually free and plans the rest of the window around it.
 Either way the console ends with the recommended stays, and `run.log` next to it holds the same
 lines.
 
+**A budget bounds the whole run.** Every call either role makes is priced at that role's declared
+rates, and the run stops when what it has spent passes `--budget` (default 1.00, in the rates'
+currency). It is checked between jobs, so the run stops after the job that passed it, and what it
+reports spending can be over the ceiling by that one job. Over budget, it ends with *"Stopped: the trip reached its budget of … before it was
+planned."* and the plan as it stood. Either way the last lines say what was spent, on planning and on
+the proposal. An attended run is bounded by the same budget across every pause.
+
+**The traveller's proposal is checked before it is handed over.** After a plan that completes, one
+model drafts the proposal from the recommended stays, and the other checks every place, date and stay
+it names against them, listing each that does not match. The draft is rewritten until the check
+approves it, or for at most three rounds, and the console says which. The review is paid from what
+the plan left of the budget, and the proposal is written to `proposal.md` — with anything the check
+still found wrong, when it never approved.
+
+**The spend is read a second way, from the metrics.** Every model call publishes the tokens it used,
+and a priced call its cost, on the `Ananke.Orchestration.Usage` meter, tagged with its workflow. The
+run registers an `OpenTelemetryBudgetMeter` before the first call and reads it back at the end: the
+line after *"Spent …"* is *"The usage meter read …"*, with the planning and proposal workflows'
+cost and tokens. Both roles are priced per call, so the two figures should agree.
+
 ## Prerequisites
 
 The demo needs a real model to author and run the plan — nothing is scripted. Set one of the
@@ -49,6 +69,15 @@ OPENAI_API_KEY=sk-...        (or)        GOOGLE_API_KEY=...
 
 Optionally pin the model ids with `OPENAI_MODEL` / `GEMINI_MODEL`, or per role with
 `ANANKE_DEMO_EXECUTOR_MODEL` and `ANANKE_DEMO_SUPERVISOR_MODEL`.
+
+The run is budgeted, so it also needs each role's price, per million tokens, from your provider's
+current prices — Ananke carries no price list. Without them the run says what to set and does not
+start:
+
+```
+ANANKE_DEMO_EXECUTOR_INPUT_PER_MILLION=...     ANANKE_DEMO_EXECUTOR_OUTPUT_PER_MILLION=...
+ANANKE_DEMO_SUPERVISOR_INPUT_PER_MILLION=...   ANANKE_DEMO_SUPERVISOR_OUTPUT_PER_MILLION=...
+```
 
 ## Commands
 
@@ -94,6 +123,7 @@ dotnet run --project src/demos/02-workflow-patterns/ItineraryDemo -- --verify
 | `openai` \| `google` \| `auto` | Chooses the provider (`auto` is the default). |
 | `--hitl` | Puts a person at each pause instead of taking the supervisor's recommendation inline. |
 | `--plan <file>` | Which plan file to load, relative to the built demo (default `plan/trip.yml`). |
+| `--budget <amount>` | What the whole run may spend, in the currency the rates are declared in (default `1.00`). |
 | `--verify` | Checks the plan and the service without running a model. |
 
 ## Reading a run
@@ -125,4 +155,5 @@ The console shows the shape of the run and clips long sentences a model wrote. E
 | `plan/service.json` | The route places lie along, what each place offers, and the nights a stay is free. |
 | `runs/<timestamp>/run.log` | Everything the run printed, unabridged. |
 | `runs/<timestamp>/itinerary.json` | The recommended stays, one entry per step that is done. |
+| `runs/<timestamp>/proposal.md` | What the traveller is told, and what the check still found wrong if it never approved. |
 | `runs/<timestamp>/events.jsonl` | Every plan event and tool call, one JSON object per line. |

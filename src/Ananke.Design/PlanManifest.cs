@@ -1,5 +1,7 @@
+using Ananke.Orchestration;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Planning;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Design;
 
@@ -51,6 +53,7 @@ namespace Ananke.Design;
 ///         goal: Stream rendered pages straight to storage.
 /// </code>
 /// </example>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanManifest
 {
     /// <summary>The plan's identifier, from the <c>plan:</c> field. Also the root node's id.</summary>
@@ -80,11 +83,15 @@ public sealed record PlanManifest
     /// rather than one version per level. Use <see cref="ToCurrentTree"/> for the plan as it now
     /// stands, or apply revisions yourself when the run reaches the point that justified them.
     /// </remarks>
-    public PlanTree ToTree(TimeProvider? timeProvider = null) => PlanTree.Create(
-        Plan,
-        Root.ToContract(),
-        Root.Children.Select(c => c.ToSpec()),
-        timeProvider);
+    public PlanTree ToTree(TimeProvider? timeProvider = null) => Root.WithTouches(
+        Root.WithEfforts(
+            PlanTree.Create(
+                Plan,
+                Root.ToContract(),
+                Root.Children.Select(c => c.ToSpec()),
+                timeProvider),
+            Plan),
+        Plan);
 
     /// <summary>
     /// Builds the plan as it now stands: version one with every revision applied, in order.
@@ -101,6 +108,7 @@ public sealed record PlanManifest
 }
 
 /// <summary>One work item in a declared decomposition.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeManifest
 {
     /// <summary>
@@ -121,6 +129,18 @@ public sealed record PlanNodeManifest
     /// <summary>What holds for the whole of it, from <c>constraints:</c>.</summary>
     public IReadOnlyList<string> Constraints { get; init; } = [];
 
+    /// <summary>
+    /// How hard the step reasons, from <c>effort:</c>, such as <c>high</c>; <see langword="null"/> names
+    /// none. Not part of the contract (<see cref="PlanNode.Effort"/>).
+    /// </summary>
+    public string? Effort { get; init; }
+
+    /// <summary>
+    /// What the step may change, from <c>touches:</c>, such as the files it edits; empty names nothing.
+    /// Not part of the contract (<see cref="PlanNode.Touches"/>).
+    /// </summary>
+    public IReadOnlyList<string> Touches { get; init; } = [];
+
     /// <summary>Its decomposition, in execution order, from <c>children:</c>.</summary>
     public IReadOnlyList<PlanNodeManifest> Children { get; init; } = [];
 
@@ -137,9 +157,40 @@ public sealed record PlanNodeManifest
         Id ?? throw new InvalidOperationException("A child node needs an id."),
         ToContract(),
         [.. Children.Select(c => c.ToSpec())]);
+
+    /// <summary>
+    /// <paramref name="tree"/> with the effort this node and every node below it names, on the node of
+    /// the same id; <paramref name="id"/> is this node's, which at the root is the plan's.
+    /// </summary>
+    internal PlanTree WithEfforts(PlanTree tree, string id)
+    {
+        if (Effort is { } effort)
+            tree = tree.WithEffort(id, effort);
+
+        foreach (var child in Children)
+            tree = child.WithEfforts(tree, child.Id ?? throw new InvalidOperationException("A child node needs an id."));
+
+        return tree;
+    }
+
+    /// <summary>
+    /// <paramref name="tree"/> with what this node and every node below it touches, on the node of the
+    /// same id; <paramref name="id"/> is this node's, which at the root is the plan's.
+    /// </summary>
+    internal PlanTree WithTouches(PlanTree tree, string id)
+    {
+        if (Touches.Count > 0)
+            tree = tree.WithTouches(id, Touches);
+
+        foreach (var child in Children)
+            tree = child.WithTouches(tree, child.Id ?? throw new InvalidOperationException("A child node needs an id."));
+
+        return tree;
+    }
 }
 
 /// <summary>A re-ruling: what changed about a node's contract, and why.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanRevisionManifest
 {
     /// <summary>The node re-ruled, from <c>node:</c>.</summary>
@@ -180,7 +231,7 @@ public sealed record PlanRevisionManifest
     {
         ArgumentNullException.ThrowIfNull(tree);
 
-        return tree.Rerule(
+        tree = tree.Rerule(
             Node,
             ToContract(),
             Reason,
@@ -190,6 +241,19 @@ public sealed record PlanRevisionManifest
                     c.Id ?? throw new InvalidOperationException("A replacement child needs an id."),
                     c.ToContract())),
             timeProvider);
+
+        // The children it names, each with the effort and the touches it names; a child that names
+        // none keeps its own.
+        foreach (var child in Children)
+        {
+            if (child.Effort is { } effort)
+                tree = tree.WithEffort(child.Id!, effort);
+
+            if (child.Touches.Count > 0)
+                tree = tree.WithTouches(child.Id!, child.Touches);
+        }
+
+        return tree;
     }
 
     /// <summary>

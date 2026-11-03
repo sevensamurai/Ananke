@@ -33,8 +33,11 @@ namespace Ananke.Organics.Division;
 /// Optional failure classifier for distinguishing upstream errors from workflow
 /// errors. Default: new <see cref="FailureClassifier"/> with built-in patterns.
 /// </param>
-public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassifier? classifier = null) : IHealthMonitor
+/// <param name="clock">Clock that stamps records and snapshots. Default: <see cref="TimeProvider.System"/>.</param>
+public sealed class WorkflowExecutionMonitor(
+    int windowSize = 50, FailureClassifier? classifier = null, TimeProvider? clock = null) : IHealthMonitor
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly FailureClassifier _classifier = classifier ?? new FailureClassifier();
     private readonly ConcurrentDictionary<string, StructuralProfile> _profiles = new();
     private readonly ConcurrentDictionary<string, SlidingWindow> _windows = new();
@@ -66,7 +69,7 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
             JobFrequencies = execution.History
                 .GroupBy(j => j.JobName)
                 .ToDictionary(g => g.Key, g => g.Count()),
-            RecordedAt = DateTimeOffset.UtcNow,
+            RecordedAt = _clock.GetUtcNow(),
             Failed = execution.IsFailure,
             Origin = _classifier.Classify(execution)
         });
@@ -96,7 +99,7 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
             RoutingEntropy = entropy,
             AvgLatencyMs = avgLatency,
             AvgCostPerExecution = avgCost,
-            MeasuredAt = DateTimeOffset.UtcNow
+            MeasuredAt = _clock.GetUtcNow()
         });
     }
 
@@ -108,7 +111,7 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
         if (!_windows.TryGetValue(workflowName, out var window))
             return Task.FromResult<HealthSnapshot?>(null);
 
-        return Task.FromResult(window.ComputeHealth(workflowName));
+        return Task.FromResult(window.ComputeHealth(workflowName, _clock.GetUtcNow()));
     }
 
     private sealed record ExecutionRecord
@@ -126,10 +129,14 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
         private readonly object _lock = new();
         private readonly LinkedList<ExecutionRecord> _records = new();
 
+        // Kept apart from the window, which drops its oldest records.
+        private DateTimeOffset? _firstRecordedAt;
+
         public void Add(ExecutionRecord record)
         {
             lock (_lock)
             {
+                _firstRecordedAt ??= record.RecordedAt;
                 _records.AddLast(record);
                 while (_records.Count > maxSize)
                     _records.RemoveFirst();
@@ -166,14 +173,16 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
             return (avgLatency, avgCost, entropy);
         }
 
-        public HealthSnapshot? ComputeHealth(string workflowName)
+        public HealthSnapshot? ComputeHealth(string workflowName, DateTimeOffset measuredAt)
         {
             List<ExecutionRecord> snapshot;
+            DateTimeOffset firstRecordedAt;
             lock (_lock)
             {
                 if (_records.Count < 3)
                     return null;
                 snapshot = [.. _records];
+                firstRecordedAt = _firstRecordedAt!.Value;
             }
 
             var failed = snapshot.Where(r => r.Failed).ToList();
@@ -194,7 +203,9 @@ public sealed class WorkflowExecutionMonitor(int windowSize = 50, FailureClassif
                 LatencyTrendSlope = latencySlope,
                 CostTrendSlope = costSlope,
                 WindowSize = snapshot.Count,
-                MeasuredAt = DateTimeOffset.UtcNow
+                MeasuredAt = measuredAt,
+                LastRequestAt = snapshot[^1].RecordedAt,
+                ObservedSince = firstRecordedAt
             };
         }
 

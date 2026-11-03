@@ -17,8 +17,11 @@ namespace Ananke.Organics.Topology.Reporting;
 ///   <item><c>COLONY_REPORT.md</c> — markdown summary for operators.</item>
 /// </list>
 /// </remarks>
-public sealed class ColonyReportExporter
+/// <param name="clock">Clock that stamps the snapshot. Default: <see cref="TimeProvider.System"/>.</param>
+public sealed class ColonyReportExporter(TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -52,7 +55,7 @@ public sealed class ColonyReportExporter
 
     // ── Snapshot builder ─────────────────────────────────────────────
 
-    private static async Task<ColonySnapshot> BuildSnapshotAsync(
+    private async Task<ColonySnapshot> BuildSnapshotAsync(
         IKnowledgeGraph graph,
         IReadOnlyList<GodNode> godNodes,
         CancellationToken ct)
@@ -93,7 +96,7 @@ public sealed class ColonyReportExporter
 
         return new ColonySnapshot
         {
-            GeneratedAt = DateTimeOffset.UtcNow,
+            GeneratedAt = _clock.GetUtcNow(),
             NodeCount = nodeCount,
             EdgeCount = edgeCount,
             GodNodes = godNodes.Select(g => new GodNodeEntry

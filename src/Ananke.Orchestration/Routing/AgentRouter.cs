@@ -1,5 +1,4 @@
 using Ananke.Orchestration.Workflows;
-using System.Text.Json;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Tools;
@@ -85,10 +84,13 @@ public sealed class AgentRouter<TState> : IRouter<TState>
 
             foreach (var call in response.ToolCalls!)
             {
-                var args = ParseToolArgs(call.Arguments);
-                var toolResult = _toolExecutors.TryGetValue(call.FunctionName, out var exec)
-                    ? await exec.ExecuteAsync(args, ct)
-                    : ToolResult.Error($"Unknown tool: {call.FunctionName}");
+                ToolResult toolResult;
+                if (!ToolDispatch.TryParseArguments(call.Arguments, call.FunctionName, out var args, out var parseError))
+                    toolResult = parseError;
+                else
+                    toolResult = _toolExecutors.TryGetValue(call.FunctionName, out var exec)
+                        ? await exec.ExecuteAsync(args, ct)
+                        : ToolResult.Error($"Unknown tool: {call.FunctionName}");
                 messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
             }
 
@@ -132,15 +134,6 @@ public sealed class AgentRouter<TState> : IRouter<TState>
                 return option;
 
         return null;
-    }
-
-    private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
-    {
-        var dict = new Dictionary<string, object?>();
-        using var doc = JsonDocument.Parse(arguments);
-        foreach (var prop in doc.RootElement.EnumerateObject())
-            dict[prop.Name] = prop.Value.Clone();
-        return dict;
     }
 
     /// <summary>Fluent builder for <see cref="AgentRouter{TState}"/>.</summary>

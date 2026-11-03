@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace Ananke.Orchestration.Planning;
@@ -18,6 +19,7 @@ namespace Ananke.Orchestration.Planning;
 /// not quietly share a file.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class FilePlanTreeStore : IPlanTreeStore
 {
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };

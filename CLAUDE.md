@@ -84,10 +84,9 @@ must hold in every session goes here, not in auto-memory.
 - **`STATUS.md` is one screen.** It links to trackers and ADRs and repeats neither; one sentence
   per cell. Update it when a large piece of work lands or when asked, not continuously.
 - **One tracker per iteration** (a few days to a week): `internals/design/<yyyyMMdd>-plan-<name>.md`,
-  at most ~150 lines and ~5 steps, each step committable on its own. When the iteration ends, mark
+  at most ~250 lines and ~5 steps, each step committable on its own. When the iteration ends, mark
   the tracker **Closed** in its header and take it out of STATUS's *In flight*.
-- A tracker says what to do; an ADR says why. Open an ADR before an architectural change and keep
-  it under ~250 lines.
+- A tracker says what to do; an ADR says why. Open an ADR before an architectural change.
 - **Check every code-level instruction against the source before writing it into a plan.** A plan
   that is confidently wrong gets followed.
 - **Ids carry their document** — `048·R50`, not a bare `R50`. Letters are reused across documents.
@@ -111,4 +110,11 @@ must hold in every session goes here, not in auto-memory.
 - Downstream repos (Zenzique, PoC-*) take the NuGet packages at a version bump and decide from the
   release notes; there is no cross-repo CI. Call out behaviour changes and public API breaks in
   `releases/vX.Y.Z.md`.
+- **Before 1.0, a release may break the public API or change behaviour.** Each break is called out
+  in its notes, under *Breaking changes* or as a ⚠ under *Upgrading*.
+- **nuget.org cannot delete a package; it can deprecate and unlist one.** A package dropped before
+  1.0 has every published version deprecated before the notes that drop it are published.
+  **At 1.0:** unlist every version of each dropped package, and deprecate — not unlist — every
+  version below 1.0 of the packages that ship, reason *Legacy*, with a message pointing at the 1.0
+  notes. The account owner does both; the steps are in `internals/nuget-deprecation-0.9.1.md`.
 - `VersionPrefix` in `src/Directory.Build.props` is bumped last, at release time.

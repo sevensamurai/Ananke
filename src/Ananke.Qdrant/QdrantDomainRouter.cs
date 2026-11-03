@@ -67,9 +67,9 @@ public sealed class QdrantDomainRouter : IDomainRouter
 
         var queryVector = await _embedder.EmbedAsync(userMessage, ct).ConfigureAwait(false);
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: queryVector,
+            query: queryVector.ToArray(),
             limit: 1,
             payloadSelector: true,
             cancellationToken: ct).ConfigureAwait(false);

@@ -1,7 +1,10 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Ananke.Abstractions.Agents;
 using OpenAI;
 using OpenAI.Chat;
@@ -43,7 +46,7 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
     /// <remarks>
     /// Ananke deliberately takes the policy rather than any vendor's credential type: nothing here
     /// references <c>Azure.Identity</c>, <c>AWSSDK</c>, or any other SDK, so an organisation can
-    /// plug in an identity source Ananke has never heard of. SeeD2.
+    /// plug in an identity source Ananke has never heard of.
     /// </remarks>
     /// <param name="authenticationPolicy">
     /// Policy that authenticates each request. <see cref="BearerTokenPolicy"/> covers the common
@@ -51,6 +54,7 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
     /// </param>
     /// <param name="model">Model name, or the deployment name for endpoints that alias models.</param>
     /// <param name="endpoint">Custom API base URL, or <see langword="null"/> for the default OpenAI endpoint.</param>
+    [Experimental(ExperimentalApis.OpenAICredentials, Message = ExperimentalApis.OpenAICredentialsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public static OpenAIChatAgentModel Create(
         AuthenticationPolicy authenticationPolicy, string model, Uri? endpoint = null)
     {
@@ -80,6 +84,7 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
     /// <param name="scope">Token scope requested from <paramref name="tokenProvider"/>.</param>
     /// <param name="model">Model name, or the deployment name for endpoints that alias models.</param>
     /// <param name="endpoint">Custom API base URL, or <see langword="null"/> for the default OpenAI endpoint.</param>
+    [Experimental(ExperimentalApis.OpenAICredentials, Message = ExperimentalApis.OpenAICredentialsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public static OpenAIChatAgentModel Create(
         AuthenticationTokenProvider tokenProvider, string scope, string model, Uri? endpoint = null)
     {
@@ -88,6 +93,40 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
 
         return Create(new BearerTokenPolicy(tokenProvider, scope), model, endpoint);
     }
+
+    /// <summary>
+    /// The same model, with every request also carrying <paramref name="fields"/>: an OpenAI-compatible
+    /// endpoint's own parameters, by their name in the request's JSON, such as OpenRouter's
+    /// <c>provider</c> and <c>session_id</c>. Fields this model already carries are kept unless
+    /// <paramref name="fields"/> names them again; the model it is called on is left as it was.
+    /// </summary>
+    /// <exception cref="ArgumentException">A name is not one field of the request's top level.</exception>
+    [Experimental(ExperimentalApis.OpenAIRequestFields, Message = ExperimentalApis.OpenAIRequestFieldsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public OpenAIChatAgentModel WithRequestFields(IReadOnlyDictionary<string, JsonNode> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+
+        var carried = new Dictionary<string, BinaryData>(RequestFields);
+
+        foreach (var (name, value) in fields)
+            carried[FieldName(name, nameof(fields))] = BinaryData.FromString(value.ToJsonString());
+
+        return new OpenAIChatAgentModel(_client) { RequestFields = carried };
+    }
+
+    /// <summary>The fields every request carries beside the ones this adapter writes, as JSON by name.</summary>
+    private IReadOnlyDictionary<string, BinaryData> RequestFields { get; init; } = new Dictionary<string, BinaryData>();
+
+    /// <summary>
+    /// <paramref name="name"/>, when it names one field, so it can be written as the path <c>$.name</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">It does not.</exception>
+    private static string FieldName(string name, string paramName) =>
+        name.Length > 0 && !char.IsAsciiDigit(name[0]) && name.All(c => char.IsAsciiLetterOrDigit(c) || c == '_')
+            ? name
+            : throw new ArgumentException(
+                $"'{name}' is not one field of the request: name a top-level field, such as 'provider', and put what is under it in its value.",
+                paramName);
 
     public async Task<AgentResponse> GenerateAsync(AgentRequest request, CancellationToken ct = default)
     {
@@ -110,7 +149,9 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
 
         var completion = result.Value;
 
-        if (completion.FinishReason == ChatFinishReason.ToolCalls)
+        // By the calls themselves, as the streaming path does: some compatible servers finish a tool
+        // call with "stop", and the same reply must not mean a tool call on one path and text on the other.
+        if (completion.ToolCalls.Count > 0)
         {
             var toolCalls = completion.ToolCalls
                 .Select(tc => new AgentToolCall(
@@ -121,14 +162,16 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             {
                 Text = completion.Content.FirstOrDefault()?.Text,
                 ToolCalls = toolCalls,
-                Usage = MapUsage(completion.Usage)
+                Usage = MapUsage(completion.Usage),
+                StopReason = AgentStopReason.ToolCalls
             };
         }
 
         return new AgentResponse
         {
             Text = completion.Content.FirstOrDefault()?.Text,
-            Usage = MapUsage(completion.Usage)
+            Usage = MapUsage(completion.Usage),
+            StopReason = MapStopReason(completion.FinishReason)
         };
     }
 
@@ -142,6 +185,7 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
         var fullText = new StringBuilder();
         var toolCallBuilders = new Dictionary<int, (string id, string name, StringBuilder args)>();
         ChatTokenUsage? streamUsage = null;
+        ChatFinishReason? finishReason = null;
 
         // Established separately, because the same rejection arrives here — on the first chunk — and
         // an iterator cannot yield from inside a try/catch. Same fix, same one retry.
@@ -152,6 +196,9 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             // Usage is reported on the final streaming chunk
             if (update.Usage is not null)
                 streamUsage = update.Usage;
+
+            if (update.FinishReason is { } finished)
+                finishReason = finished;
             foreach (var part in update.ContentUpdate)
             {
                 if (part.Text is { Length: > 0 })
@@ -208,17 +255,49 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             {
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
                 ToolCalls = toolCalls,
-                Usage = MapUsage(streamUsage)
+                Usage = MapUsage(streamUsage),
+                StopReason = toolCalls is not null ? AgentStopReason.ToolCalls : MapStopReason(finishReason)
             }
         };
     }
+
+    private static AgentStopReason MapStopReason(ChatFinishReason? reason) => reason switch
+    {
+        ChatFinishReason.Stop => AgentStopReason.EndTurn,
+        ChatFinishReason.Length => AgentStopReason.MaxTokens,
+        ChatFinishReason.ToolCalls or ChatFinishReason.FunctionCall => AgentStopReason.ToolCalls,
+        ChatFinishReason.ContentFilter => AgentStopReason.ContentFilter,
+        _ => AgentStopReason.Unknown
+    };
 
     private static TokenUsage? MapUsage(ChatTokenUsage? usage) =>
         usage is null ? null : new TokenUsage
         {
             InputTokens = usage.InputTokenCount,
-            OutputTokens = usage.OutputTokenCount
+            OutputTokens = usage.OutputTokenCount,
+            ReasoningTokens = usage.OutputTokenDetails?.ReasoningTokenCount,
+            CachedInputTokens = usage.InputTokenDetails?.CachedTokenCount,
+            Cost = ReportedCost(usage)
         };
+
+    /// <summary>
+    /// The <c>cost</c> an endpoint such as OpenRouter reports in a call's usage, or <see langword="null"/>
+    /// when there is none.
+    /// </summary>
+    /// <remarks>
+    /// The SDK has no member for it, and keeps a field it does not know with the usage, so the field is
+    /// read back from the usage written as JSON.
+    /// </remarks>
+    private static decimal? ReportedCost(ChatTokenUsage usage)
+    {
+        using var json = JsonDocument.Parse(ModelReaderWriter.Write(usage).ToMemory());
+
+        return json.RootElement.TryGetProperty("cost", out var cost)
+            && cost.ValueKind == JsonValueKind.Number
+            && cost.TryGetDecimal(out var value)
+                ? value
+                : null;
+    }
 
     private static List<ChatMessage> MapMessages(AgentRequest request)
     {
@@ -398,13 +477,16 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
 #pragma warning restore OPENAI001
     }
 
-    private static ChatCompletionOptions BuildOptions(AgentRequest request)
+    private ChatCompletionOptions BuildOptions(AgentRequest request)
     {
         var options = new ChatCompletionOptions { StoredOutputEnabled = request.StoreCompletions };
 
         // Only when set: null must reach the provider as "absent", not as 0.
         if (request.Temperature is { } temperature)
             options.Temperature = (float)temperature;
+
+        if (request.MaxOutputTokens is { } maxOutputTokens)
+            options.MaxOutputTokenCount = maxOutputTokens;
 
         if (request.Tools is { Count: > 0 })
         {
@@ -433,6 +515,19 @@ public sealed class OpenAIChatAgentModel(ChatClient client) : IStreamingAgentMod
             foreach (var (key, value) in request.Metadata)
                 options.Metadata[key] = value;
         }
+
+        // The request's own fields after the model's, so a field both name is the request's.
+        var fields = new Dictionary<string, BinaryData>(RequestFields);
+
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+        foreach (var (name, value) in request.RequestFields ?? new Dictionary<string, JsonNode>())
+            fields[FieldName(name, nameof(request))] = BinaryData.FromString(value.ToJsonString());
+#pragma warning restore ANNKEEXP003
+
+#pragma warning disable SCME0001 // JsonPatch is experimental in System.ClientModel
+        foreach (var (name, value) in fields)
+            options.Patch.Set(Encoding.UTF8.GetBytes($"$.{name}"), value);
+#pragma warning restore SCME0001
 
         return options;
     }

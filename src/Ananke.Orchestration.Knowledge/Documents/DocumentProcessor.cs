@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -50,6 +51,43 @@ public sealed class DocumentProcessor
         _logger = loggerFactory?.CreateLogger<DocumentProcessor>()
             ?? NullLogger<DocumentProcessor>.Instance;
     }
+
+    /// <summary>
+    /// How each document's header is read, if at all. When set, the fields it names go at the top of every chunk's text
+    /// and into its metadata, and the date field becomes <see cref="DocumentHeaderOptions.EffectiveAtKey"/>.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public DocumentHeaderOptions? Headers { get; init; }
+
+    /// <summary>
+    /// A step run after a document's chunks are stored, that replaces its records with those read from it, if any.
+    /// It is given the header's fields, so a record can take the document's date.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public IDocumentRecords? Records { get; init; }
+
+    /// <summary>
+    /// Patterns, by the kind of thing each finds, whose matches in a chunk's text are written into its metadata as links,
+    /// <c>entity:{kind}:{match}</c>, with no model call: <c>card</c> → card keys such as <c>ZEN-6</c>, say. A pattern with
+    /// a group named <c>key</c> links what the group matched. <c>DocumentStructureBuilder</c> turns them into
+    /// <c>mentions</c> edges.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public IReadOnlyDictionary<string, System.Text.RegularExpressions.Regex>? LinkPatterns { get; init; }
+
+    /// <summary>
+    /// Section headings, compared without case, whose sections are left out of chunks and records: an
+    /// <c>Authors' Addresses</c>, an attendee list, a template's checklist. The header is read before they are dropped.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public IReadOnlyList<string>? DropSections { get; init; }
+
+    /// <summary>
+    /// Applied to each section's text before chunking and records, after the header is read: page footers, form feeds.
+    /// None by default.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public Func<string, string>? CleanText { get; init; }
 
     /// <summary>
     /// Fetches the document from <paramref name="uri"/>, extracts text, chunks, embeds,
@@ -162,7 +200,11 @@ public sealed class DocumentProcessor
         _logger.LogDebug("Extracted {SectionCount} section(s) from '{SourceId}'",
             extracted.Sections.Count, sourceId);
 
-        // 3. Chunk
+        // 3. Read the header from the document as extracted, then shape what is chunked and handed to records
+        var (prefix, headerFields, kept) = ReadHeader(extracted, tags);
+        extracted = Shaped(extracted);
+
+        // 4. Chunk
         var chunks = _chunker.Chunk(extracted);
 
         if (chunks.Count == 0)
@@ -173,13 +215,24 @@ public sealed class DocumentProcessor
 
         _logger.LogDebug("Chunked '{SourceId}' into {ChunkCount} chunk(s)", sourceId, chunks.Count);
 
-        // 4. Delete existing chunks for this source (clean re-index)
+        // 5. Delete existing chunks for this source (clean re-index)
         await _store.DeleteAsync(new KnowledgeFilter { ["source"] = sourceId }, ct);
 
-        // 5. Build documents with metadata
+        // 6. Build documents with metadata, and the header's fields when the host asked for them
         var documents = chunks.Select((c, i) =>
         {
             var metadata = new Dictionary<string, string>(c.Metadata) { ["source"] = sourceId };
+            foreach (var (key, value) in headerFields)
+                metadata.TryAdd(key, value);
+#pragma warning disable ANNKEEXP004 // LinkPatterns and the header keys are experimental; using them here is the processor's own business.
+            if (kept.Count > 0)
+                metadata[DocumentHeaderOptions.HeaderFieldsKey] = System.Text.Json.JsonSerializer.Serialize(kept);
+            if (LinkPatterns is { Count: > 0 } patterns)
+            {
+                foreach (var (key, value) in DocumentLinks.Find(patterns, c.Text))
+                    metadata.TryAdd(key, value);
+            }
+#pragma warning restore ANNKEEXP004
 
             if (description is { Length: > 0 })
                 metadata["description"] = description;
@@ -193,13 +246,18 @@ public sealed class DocumentProcessor
             return new KnowledgeDocument
             {
                 Id = $"{sourceId}:chunk:{i}",
-                Text = c.Text,
+                Text = prefix is null ? c.Text : $"{prefix}\n{c.Text}",
                 Metadata = metadata
             };
         }).ToList();
 
-        // 6. Upsert
+        // 7. Upsert
         await _store.UpsertAsync(documents, ct);
+
+        // 8. Records, when the host asked for them: after the chunks, from the same document and header.
+#pragma warning disable ANNKEEXP004 // Records is experimental; calling it here is the processor's own business.
+        var records = Records is null ? 0 : await Records.ExtractAsync(sourceId, extracted, headerFields, ct);
+#pragma warning restore ANNKEEXP004
 
         _logger.LogInformation(
             "Processed '{SourceId}': {SectionCount} sections, {ChunkCount} chunks stored",
@@ -209,7 +267,61 @@ public sealed class DocumentProcessor
             Sections: extracted.Sections.Count,
             Chunks: documents.Count,
             Source: sourceId,
-            Description: description ?? string.Empty);
+            Description: description ?? string.Empty,
+            Records: records);
     }
 
+    /// <summary>
+    /// The line that goes on top of each chunk (<c>[Title: … · Date: …]</c>), and the fields that go into its metadata
+    /// with the date as <see cref="DocumentHeaderOptions.EffectiveAtKey"/>; nothing when <see cref="Headers"/> isn't set.
+    /// </summary>
+#pragma warning disable ANNKEEXP004 // Headers is experimental; reading it here is the processor's own business.
+    private (string? Prefix, IReadOnlyDictionary<string, string> Fields, IReadOnlyList<string> Kept) ReadHeader(
+        ExtractedDocument extracted, IReadOnlyDictionary<string, string>? tags)
+    {
+        if (Headers is not { } headers)
+            return (null, new Dictionary<string, string>(), []);
+
+        // What the document says, then what the caller knows about it (metadata kept beside it), compared without case.
+        var read = new Dictionary<string, string>(headers.Read(extracted), StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in tags ?? new Dictionary<string, string>())
+            read.TryAdd(key, value);
+
+        var kept = headers.Fields.Where(read.ContainsKey).ToList();
+        var fields = kept.ToDictionary(key => key, key => read[key], StringComparer.Ordinal);
+        if (headers.DateField is { } dateField
+            && read.TryGetValue(dateField, out var dateText)
+            && (headers.ParseDate ?? DocumentHeaders.DateIn)(dateText) is { } date)
+        {
+            fields[DocumentHeaderOptions.EffectiveAtKey] = date.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (headers.SupersededBy?.Invoke(read) is { Count: > 0 } supersededBy)
+            fields[DocumentHeaderOptions.SupersededByKey] = string.Join(", ", supersededBy);
+
+        if (headers.Replaces?.Invoke(read) is { Count: > 0 } replaces)
+            fields[DocumentHeaderOptions.ReplacesSourcesKey] = System.Text.Json.JsonSerializer.Serialize(replaces);
+
+        foreach (var updated in headers.Updates?.Invoke(read) ?? [])
+            fields[$"{DocumentLinks.Prefix}{DocumentHeaderOptions.UpdatesKind}:{updated}"] = $"{DocumentHeaderOptions.UpdatesKind}:{updated}";
+
+        var shown = kept.Select(key => $"{key}: {read[key]}").ToList();
+        return (shown.Count == 0 ? null : $"[{string.Join(" · ", shown)}]", fields, kept);
+    }
+
+    /// <summary>The document with <see cref="DropSections"/> left out and <see cref="CleanText"/> applied.</summary>
+    private ExtractedDocument Shaped(ExtractedDocument extracted)
+    {
+        if (DropSections is not { Count: > 0 } && CleanText is null)
+            return extracted;
+
+        var drop = new HashSet<string>(DropSections ?? [], StringComparer.OrdinalIgnoreCase);
+        var sections = extracted.Sections
+            .Where(s => s.SectionTitle is null || !drop.Contains(s.SectionTitle.Trim()))
+            .Select(s => CleanText is null ? s : s with { Text = CleanText(s.Text) })
+            .Where(s => !string.IsNullOrWhiteSpace(s.Text))
+            .ToList();
+        return extracted with { Sections = sections };
+    }
+#pragma warning restore ANNKEEXP004
 }

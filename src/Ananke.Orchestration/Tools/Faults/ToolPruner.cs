@@ -26,6 +26,7 @@ public sealed class ToolPruner : IAsyncDisposable
     private readonly IToolMemory _memory;
     private readonly ToolKit _kit;
     private readonly TimeSpan _checkInterval;
+    private readonly TimeProvider _timeProvider;
 
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
@@ -52,16 +53,19 @@ public sealed class ToolPruner : IAsyncDisposable
     /// <param name="memory">The tool memory to remove pruned entries from.</param>
     /// <param name="kit">The kit whose tools are tracked (pinned tools are exempt).</param>
     /// <param name="checkInterval">How often the background loop runs. Defaults to 1 h.</param>
+    /// <param name="timeProvider">Clock for idle time and the loop's wait. Defaults to <see cref="TimeProvider.System"/>.</param>
     public ToolPruner(
         IToolMemory memory,
         ToolKit kit,
-        TimeSpan? checkInterval = null)
+        TimeSpan? checkInterval = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(memory);
         ArgumentNullException.ThrowIfNull(kit);
         _memory = memory;
         _kit = kit;
         _checkInterval = checkInterval ?? TimeSpan.FromHours(1);
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>Starts the background pruning loop.</summary>
@@ -97,7 +101,7 @@ public sealed class ToolPruner : IAsyncDisposable
         {
             try
             {
-                await Task.Delay(_checkInterval, ct).ConfigureAwait(false);
+                await Task.Delay(_checkInterval, _timeProvider, ct).ConfigureAwait(false);
                 await TickAsync(ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { break; }
@@ -110,7 +114,7 @@ public sealed class ToolPruner : IAsyncDisposable
     /// </summary>
     public async Task TickAsync(CancellationToken ct = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var pinned = _kit.PinnedToolNames;
 
         foreach (var toolName in _kit.Tools.Keys)

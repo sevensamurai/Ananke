@@ -5,6 +5,7 @@ using Ananke.Learning.Features;
 using Ananke.Learning.Skills;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Learning.Tests;
@@ -214,6 +215,19 @@ public class SkillPackagingTests
         var manifest = await reader.ReadManifestAsync();
         manifest.TotalEntries.ShouldBe(0);
         manifest.TotalEpisodes.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ManifestCreatedAt_ComesFromTheClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        _packager = new SkillPackager(new FakeTimeProvider(now));
+
+        var (_, stream) = await ExportToStreamAsync();
+
+        await using var reader = await _format.CreateReaderAsync(stream);
+        await foreach (var _ in reader.ReadEntriesAsync()) { }
+        (await reader.ReadManifestAsync()).CreatedAt.ShouldBe(now);
     }
 
     // ── Import: options ──────────────────────────────────────────

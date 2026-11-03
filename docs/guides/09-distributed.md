@@ -239,8 +239,6 @@ docker compose up -d    # starts Qdrant, MQTT, and Redis
 | [10 — Observability](10-observability.md) | OpenTelemetry tracing across distributed services |
 | [11 — Advanced Agents](11-advanced-agents.md) | Production resilience and caching |
 
-**Also see:** [ChannelsDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/ChannelsDemo) — deploy a tool-calling agent as a Discord or Slack bot using `Ananke.Platforms` adapters.
-
 ---
 
 ← [Back to Learning Path](../learning-path.md)

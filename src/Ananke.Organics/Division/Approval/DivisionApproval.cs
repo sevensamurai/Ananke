@@ -30,27 +30,40 @@ public sealed record DivisionApproval
     public DateTimeOffset ReviewedAt { get; init; } = DateTimeOffset.UtcNow;
 
     /// <summary>Create an approval that accepts the plan as-is.</summary>
-    public static DivisionApproval Approve(string reason, string? reviewedBy = null) => new()
+    /// <param name="reason">Why the plan is approved.</param>
+    /// <param name="reviewedBy">Who reviewed it.</param>
+    /// <param name="clock">Clock that stamps <see cref="ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+    public static DivisionApproval Approve(string reason, string? reviewedBy = null, TimeProvider? clock = null) => new()
     {
         IsApproved = true,
         Reason = reason,
-        ReviewedBy = reviewedBy
+        ReviewedBy = reviewedBy,
+        ReviewedAt = (clock ?? TimeProvider.System).GetUtcNow()
     };
 
     /// <summary>Create a rejection that blocks the division.</summary>
-    public static DivisionApproval Reject(string reason, string? reviewedBy = null) => new()
+    /// <param name="reason">Why the plan is rejected.</param>
+    /// <param name="reviewedBy">Who reviewed it.</param>
+    /// <param name="clock">Clock that stamps <see cref="ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+    public static DivisionApproval Reject(string reason, string? reviewedBy = null, TimeProvider? clock = null) => new()
     {
         IsApproved = false,
         Reason = reason,
-        ReviewedBy = reviewedBy
+        ReviewedBy = reviewedBy,
+        ReviewedAt = (clock ?? TimeProvider.System).GetUtcNow()
     };
 
     /// <summary>Create an approval with a revised plan.</summary>
-    public static DivisionApproval Revise(DivisionPlan revisedPlan, string reason, string? reviewedBy = null) => new()
+    /// <param name="revisedPlan">The plan to divide by instead.</param>
+    /// <param name="reason">Why the plan was revised.</param>
+    /// <param name="reviewedBy">Who reviewed it.</param>
+    /// <param name="clock">Clock that stamps <see cref="ReviewedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+    public static DivisionApproval Revise(DivisionPlan revisedPlan, string reason, string? reviewedBy = null, TimeProvider? clock = null) => new()
     {
         IsApproved = true,
         RevisedPlan = revisedPlan,
         Reason = reason,
-        ReviewedBy = reviewedBy
+        ReviewedBy = reviewedBy,
+        ReviewedAt = (clock ?? TimeProvider.System).GetUtcNow()
     };
 }

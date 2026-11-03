@@ -8,8 +8,9 @@ namespace Ananke.Organics.Sensing;
 /// <see cref="SignalChanged"/> when the stress ratio changes by more than
 /// <paramref name="signalDelta"/> (default: 0.05).
 /// </summary>
-public sealed class InMemoryMeshAggregator(double signalDelta = 0.05) : IMeshAggregator
+public sealed class InMemoryMeshAggregator(double signalDelta = 0.05, TimeProvider? clock = null) : IMeshAggregator
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly ConcurrentDictionary<string, MetabolicSignal> _states = new();
     private double _lastEmittedRatio = -1;
 
@@ -47,7 +48,7 @@ public sealed class InMemoryMeshAggregator(double signalDelta = 0.05) : IMeshAgg
             TotalCells = total,
             StressedCells = stressed,
             StarvedCells = starved,
-            SampledAt = DateTimeOffset.UtcNow
+            SampledAt = _clock.GetUtcNow()
         };
     }
 

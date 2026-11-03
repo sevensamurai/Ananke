@@ -170,7 +170,7 @@ IHealingPolicy.EvaluateAsync(health, complexity)
 ### Sensing and routing
 
 ```
-Cell heartbeat → ICapabilityMap.RegisterAsync(cellId, domains, tools)
+Cell heartbeat → ICapabilityMap.Register(WorkflowSignal)
                 → IMeshAggregator.Report(cellId, MetabolicSignal)
 
 Incoming message → IRequestRouter.RouteAsync(userMessage)
@@ -246,7 +246,7 @@ Workflow calls ReviewAsync(item)
   → WorkReviewDecision { Outcome = Pending, Comment = parkingId } is returned immediately
   → workflow runner checkpoints and yields the thread
 
-Reviewer clicks Approve / Revise / Reject (e.g. via SlackApprovalCallback)
+Reviewer answers Approve / Revise / Reject (e.g. from a chat message button)
   → ParkingCallbackWorkReviewGate.ResumeAsync(parkingId, decision) is called
   → store entry is removed (CompleteAsync)
   → any in-process waiter on the original ReviewAsync call is resolved
@@ -265,11 +265,11 @@ separate out-parameter.
 | `InMemoryWorkReviewParkingStore` | Default in-process implementation. Thread-safe; state is lost on restart. |
 | `ParkingCallbackWorkReviewGate` | Gate implementation. Exposes `ReviewAsync` (parks) and `ResumeAsync` (resolves). |
 
-### Typical wiring with Slack
+### Typical wiring
 
 1. Workflow calls `ReviewAsync` — receives `Pending` + `parkingId`.
-2. Application posts `SlackApprovalBlocks.Build(workItem)` to the review channel, embedding the `parkingId` in the message metadata or block value.
-3. Reviewer clicks a button → `SlackApprovalCallback.HandleInteractionAsync` resolves the decision.
+2. Application posts the request to its reviewers through its own channel, carrying the `parkingId`.
+3. The reviewer's answer comes back to the application as a `WorkReviewDecision`.
 4. Application calls `gate.ResumeAsync(parkingId, decision)`.
 5. Workflow continues with the resolved `WorkReviewDecision`.
 
