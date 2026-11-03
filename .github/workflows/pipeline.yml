@@ -61,6 +61,9 @@ jobs:
       github.repository == 'sevensamurai/Ananke' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # OIDC token for NuGet trusted publishing
 
     steps:
       - name: Checkout code
@@ -79,17 +82,23 @@ jobs:
           dotnet build src/Ananke.slnx --configuration Release
           dotnet pack src/Ananke.slnx --configuration Release --no-build --output ./packages
 
+      - name: NuGet login (trusted publishing)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Publish Ananke packages to NuGet
         run: |
           for pkg in ./packages/Ananke*.nupkg; do
-            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
       - name: Publish nnke tools to NuGet
         # Covers: nnke
         run: |
           for pkg in ./packages/nnke*.nupkg; do
-            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ secrets.NUGET_NNKE }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
       - name: Read version from Directory.Build.props
