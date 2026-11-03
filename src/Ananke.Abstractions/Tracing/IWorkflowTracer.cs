@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Ananke.Abstractions.Tracing;
 
 public enum SpanKind
@@ -36,6 +38,21 @@ public interface ISpan : IAsyncDisposable
     ISpan StartSpan(string name, SpanKind kind = SpanKind.Job);
 
     void SetAttribute(string key, string value);
+
+    /// <summary>
+    /// Sets a numeric attribute.
+    /// Default implementation formats it invariantly and calls <see cref="SetAttribute(string, string)"/>;
+    /// override in tracing backends that keep an attribute's type.
+    /// </summary>
+    void SetAttribute(string key, long value) =>
+        SetAttribute(key, value.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>
+    /// Sets a flag attribute.
+    /// Default implementation calls <see cref="SetAttribute(string, string)"/> with <c>"true"</c> or
+    /// <c>"false"</c>; override in tracing backends that keep an attribute's type.
+    /// </summary>
+    void SetAttribute(string key, bool value) => SetAttribute(key, value ? "true" : "false");
 
     void RecordError(Exception exception);
 

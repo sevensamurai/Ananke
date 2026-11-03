@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -23,25 +25,30 @@ namespace Ananke.Orchestration.Planning;
 /// than beside it, so nothing downstream has to hold two lists in step.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanOption
 {
     /// <summary>One line a person can weigh this against the others by.</summary>
     public required string Summary { get; init; }
 
     /// <summary>
-    /// What to tell a step that is waiting to be told something, when that is what this option is.
+    /// What to tell the step, when that is what this option is: an answer to what it asked, or the
+    /// line a step that asked nothing reads when it tries again.
     /// </summary>
     /// <remarks>
     /// <para>
     /// <b>An option gives the step up, asks for a replan, or answers — never two of the three.</b>
     /// Answering says the plan is right and a choice inside the work has been made. Taking an answer
     /// <b>mints no version and re-words no criterion</b> — which is the whole of what a local fix
-    /// means, and the cheapest thing this seat does.
+    /// means, and the cheapest thing this seat does. The step is attempted again on the next pass,
+    /// reading it.
     /// </para>
     /// <para>
-    /// <b>The step supplied these, not the supervisor.</b> It found the admissible values by querying
-    /// the facts; what it could not do is weigh them, so what is asked of the supervisor is a
-    /// recommendation and nothing else.
+    /// <b>When the step left options, it supplied these, not the supervisor.</b> It found the
+    /// admissible values by querying the facts; what it could not do is weigh them, so what is asked of
+    /// the supervisor is a recommendation and nothing else. A step that left none may be asked to try
+    /// again once, with a line the supervisor writes; answered and stopped again, it is not asked a
+    /// second time.
     /// </para>
     /// </remarks>
     public string? Answer { get; init; }
@@ -69,8 +76,8 @@ public sealed record PlanOption
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>R32: dropping one step is an authored option.</b> It used to be a refusal — <em>none of
-    /// these, and give this up</em> — which made it the one course of action a person could take that
+    /// <b>Dropping one step is an authored option.</b> As a refusal — <em>none of
+    /// these, and give this up</em> — it would be the one course of action a person could take that
     /// the supervisor never had to think about, weigh against the others, or say whether it was the
     /// one it would take. Here it is an option like any other: it competes, it can be recommended,
     /// and an unattended run can take it.
@@ -110,6 +117,7 @@ public sealed record PlanOption
 /// options</em>, and they are not the same question however similar the call looks.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanProposal
 {
     /// <summary>The alternatives, in the order they should be shown.</summary>
@@ -120,6 +128,17 @@ public sealed record PlanProposal
 
     /// <summary>Nothing was proposed, so there is nothing to choose between.</summary>
     public bool Empty => Options.Count == 0;
+
+    /// <summary>
+    /// What kind of problem the supervisor says the halt is, citing the finding that shows it — and,
+    /// when it offered nothing, why nothing would help. <see langword="null"/> when it said nothing.
+    /// </summary>
+    /// <remarks>
+    /// <b>An empty proposal is not a role with no ideas.</b> Asked only for options, a supervisor that
+    /// judged none of the kinds it may offer would help had nowhere to say so, and an empty list read
+    /// the same whatever it had concluded.
+    /// </remarks>
+    public string? Summary { get; init; }
 
     /// <summary>
     /// The supervisor ran out of tool rounds before it answered, rather than finishing with nothing.
@@ -145,9 +164,9 @@ public sealed record PlanProposal
     /// are different problems with different fixes.
     /// </para>
     /// <para>
-    /// <b>Empty with reasons is the interesting case.</b> A proposal that is empty and says nothing
-    /// was a role with no ideas; one that is empty and lists three refusals was a role with ideas
-    /// that the wiring would not take.
+    /// <b>Empty with reasons is the interesting case.</b> A proposal that is empty with no refusals
+    /// says in <see cref="Summary"/> why nothing would help; one that is empty and lists three refusals
+    /// was a role with ideas that the wiring would not take.
     /// </para>
     /// </remarks>
     public IReadOnlyList<string> Discarded { get; init; } = [];
@@ -187,6 +206,7 @@ public sealed record PlanProposal
 /// it must not be is a program parsing the contract's prose to work out what the alternatives are.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<PlanProposal> PlanAdvisor(PlanCoordination coordination, CancellationToken ct);
 
 /// <summary>
@@ -197,7 +217,7 @@ public delegate Task<PlanProposal> PlanAdvisor(PlanCoordination coordination, Ca
 /// <para>
 /// <b>It carried two values and now carries one, and losing the second is the ruling.</b>
 /// <em>Give this step up</em> used to live here, beside <em>stop</em>, because a person with no
-/// acceptable option had no other way to say it. R32 puts it back where it belongs: <b>dropping one
+/// acceptable option had no other way to say it. It belongs elsewhere: <b>dropping one
 /// step is an authored option</b> — <see cref="PlanOption.Abandon"/> — offered by the supervisor like
 /// any other, weighed against the others, and picked rather than refused into.
 /// </para>
@@ -209,6 +229,7 @@ public delegate Task<PlanProposal> PlanAdvisor(PlanCoordination coordination, Ca
 /// and is never in the list.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum PlanRefusal
 {
     /// <summary>Stop the run and leave the plan as it stands. The person has taken the decision.</summary>
@@ -223,7 +244,7 @@ public enum PlanRefusal
 /// <b>Neither refusal is one of the <see cref="Options"/>.</b> They are separate answers, so that a
 /// supervisor cannot fail to offer them and a caller cannot forget to append them. A person with no
 /// acceptable option still needs a way out, and making that structural rather than conventional is
-/// the whole of R3.
+/// the point.
 /// </para>
 /// <para>
 /// <b>Outstanding is the load-bearing state.</b> A question nobody has answered must not let the run
@@ -232,6 +253,7 @@ public enum PlanRefusal
 /// deciding on somebody's behalf while appearing to consult them.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanQuestion
 {
     /// <summary>The alternatives, in the order they were shown.</summary>
@@ -267,7 +289,7 @@ public sealed record PlanQuestion
     /// which is exactly the case a narrowed list has to survive.
     /// </para>
     /// <para>
-    /// <b>Kept verbatim, and it outlives being read</b> (R33). Everything downstream acts on the
+    /// <b>Kept verbatim, and it outlives being read.</b> Everything downstream acts on the
     /// supervisor's reading of it, so the sentence it read has to stay beside that reading rather than
     /// being replaced by it.
     /// </para>

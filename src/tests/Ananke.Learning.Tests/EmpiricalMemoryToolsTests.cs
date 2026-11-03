@@ -3,6 +3,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Learning;
 using Ananke.Learning.EmpiricalMemory;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Learning.Tests;
@@ -77,6 +78,23 @@ public class EmpiricalMemoryToolsTests
         result.Value.ShouldContain("Entry committed");
         result.Value.ShouldContain("kind: Pattern");
         _memory.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CommitTool_StampsTheEntryFromTheClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var kit = EmpiricalMemoryTools.Create(_memory, timeProvider: new FakeTimeProvider(now));
+
+        await kit.Tools["commit_insight"].ExecuteAsync(new Dictionary<string, object?>
+        {
+            ["description"] = "High CPU correlates with slow queries",
+            ["kind"] = "pattern"
+        });
+
+        var entry = (await _memory.BrowseAsync(0, 10)).Single();
+        entry.FirstObserved.ShouldBe(now);
+        entry.LastObserved.ShouldBe(now);
     }
 
     [Test]

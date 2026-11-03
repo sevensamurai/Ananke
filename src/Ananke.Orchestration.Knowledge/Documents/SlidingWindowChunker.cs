@@ -4,9 +4,10 @@ namespace Ananke.Orchestration.Knowledge.Documents;
 /// Default <see cref="IDocumentChunker"/> that splits Markdown text using a sliding window.
 /// Prefers Markdown heading boundaries (<c># ...</c>) as natural break points, falling back
 /// to paragraph boundaries within heading sections. This produces chunks that align with
-/// the document's logical structure.
+/// the document's logical structure. A paragraph longer than the window is split at sentence ends, and a sentence
+/// longer than the window at spaces, so no chunk is longer than the window and an embedder reads all of it.
 /// </summary>
-public sealed class SlidingWindowChunker : IDocumentChunker
+public sealed partial class SlidingWindowChunker : IDocumentChunker
 {
     /// <inheritdoc />
     public IReadOnlyList<DocumentChunk> Chunk(ExtractedDocument document, ChunkingOptions? options = null)
@@ -15,7 +16,8 @@ public sealed class SlidingWindowChunker : IDocumentChunker
         options ??= new ChunkingOptions();
 
         var maxChars = options.MaxTokens * 4;
-        var overlapChars = options.OverlapTokens * 4;
+        // The overlap is at most a quarter of the window, so a chunk with it still fits the window.
+        var overlapChars = Math.Min(options.OverlapTokens * 4, maxChars / 4);
         var chunks = new List<DocumentChunk>();
 
         foreach (var section in document.Sections)
@@ -90,28 +92,38 @@ public sealed class SlidingWindowChunker : IDocumentChunker
 
         var currentChunk = new List<string>();
         var currentLength = 0;
+        var onlyOverlap = false;
 
-        foreach (var para in paragraphs)
+        var pieceChars = maxChars - overlapChars;
+        foreach (var para in paragraphs.SelectMany(p => p.Length > pieceChars ? SplitLong(p, pieceChars) : [p]))
         {
-            var paraLength = para.Length;
+            // The blank line that joins it to what is already in the chunk counts too.
+            var paraLength = para.Length + (currentChunk.Count > 0 ? 2 : 0);
 
             if (currentLength + paraLength > maxChars && currentChunk.Count > 0)
             {
-                chunks.Add(CreateChunk(currentChunk, metadata));
+                // A chunk holding only the previous chunk's tail would repeat it; the tail is dropped instead.
+                if (!onlyOverlap)
+                    chunks.Add(CreateChunk(currentChunk, metadata));
 
-                var overlap = BuildOverlap(currentChunk, overlapChars);
+                var overlap = onlyOverlap ? string.Empty : BuildOverlap(currentChunk, overlapChars);
                 currentChunk = [];
                 currentLength = 0;
+                onlyOverlap = false;
 
-                if (overlap.Length > 0)
+                paraLength = para.Length;
+                if (overlap.Length > 0 && overlap.Length + 2 + paraLength <= maxChars)
                 {
                     currentChunk.Add(overlap);
                     currentLength = overlap.Length;
+                    paraLength += 2;
+                    onlyOverlap = true;
                 }
             }
 
             currentChunk.Add(para);
             currentLength += paraLength;
+            onlyOverlap = false;
         }
 
         if (currentChunk.Count > 0)
@@ -122,23 +134,73 @@ public sealed class SlidingWindowChunker : IDocumentChunker
         List<string> paragraphs, Dictionary<string, string> metadata) =>
         new(string.Join("\n\n", paragraphs).Trim(), metadata);
 
+    /// <summary>The previous chunk's last <paramref name="overlapChars"/> characters at most, from the start of a word.</summary>
     private static string BuildOverlap(List<string> paragraphs, int overlapChars)
     {
         if (overlapChars <= 0) return string.Empty;
 
-        var totalLength = 0;
-        var startIndex = paragraphs.Count;
+        var text = string.Join("\n\n", paragraphs);
+        if (text.Length <= overlapChars)
+            return text;
 
-        for (var i = paragraphs.Count - 1; i >= 0; i--)
+        var start = text.Length - overlapChars;
+        var space = text.IndexOfAny([' ', '\n'], start);
+        return (space < 0 ? text[start..] : text[(space + 1)..]).Trim();
+    }
+
+    /// <summary>
+    /// A paragraph longer than <paramref name="maxChars"/> as pieces of whole sentences, each at most that long; a
+    /// sentence longer than that is cut at spaces, or at the limit when it has none.
+    /// </summary>
+    private static IEnumerable<string> SplitLong(string paragraph, int maxChars)
+    {
+        string[] sentences;
+        try
         {
-            totalLength += paragraphs[i].Length;
-            startIndex = i;
-            if (totalLength >= overlapChars)
-                break;
+            sentences = SentenceEnd().Split(paragraph);
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            sentences = [paragraph];
         }
 
-        return string.Join("\n\n", paragraphs.Skip(startIndex));
+        var piece = new System.Text.StringBuilder();
+        foreach (var sentence in sentences.SelectMany(s => s.Length > maxChars ? SplitAtSpaces(s, maxChars) : [s]))
+        {
+            if (piece.Length > 0 && piece.Length + 1 + sentence.Length > maxChars)
+            {
+                yield return piece.ToString();
+                piece.Clear();
+            }
+            if (piece.Length > 0)
+                piece.Append(' ');
+            piece.Append(sentence);
+        }
+        if (piece.Length > 0)
+            yield return piece.ToString();
     }
+
+    private static IEnumerable<string> SplitAtSpaces(string text, int maxChars)
+    {
+        var start = 0;
+        while (start < text.Length)
+        {
+            var end = Math.Min(start + maxChars, text.Length);
+            if (end < text.Length)
+            {
+                var space = text.LastIndexOf(' ', end, end - start);
+                if (space > start)
+                    end = space;
+            }
+            yield return text[start..end].Trim();
+            start = end;
+            while (start < text.Length && text[start] == ' ')
+                start++;
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<=[.!?…][""'”’)\]]?)\s+(?=\S)", System.Text.RegularExpressions.RegexOptions.None, matchTimeoutMilliseconds: 250)]
+    private static partial System.Text.RegularExpressions.Regex SentenceEnd();
 
     private static List<string> SplitParagraphs(string text)
     {

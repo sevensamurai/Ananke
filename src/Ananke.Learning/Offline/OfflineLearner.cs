@@ -442,12 +442,12 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         return neighbors.Average(n => n.Score);
     }
 
-    private static ReadOnlyMemory<float> ComputeCentroid(List<ReadOnlyMemory<float>> embeddings)
+    internal static ReadOnlyMemory<float> ComputeCentroid(List<ReadOnlyMemory<float>> embeddings)
     {
         if (embeddings.Count == 0) return ReadOnlyMemory<float>.Empty;
         if (embeddings.Count == 1) return embeddings[0];
 
-        var dim = embeddings[0].Length;
+        var dim = CommonLength(embeddings);
         var result = new float[dim];
 
         foreach (var emb in embeddings)
@@ -464,12 +464,12 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
         return result;
     }
 
-    private static ReadOnlyMemory<float> WeightedAverage(
+    internal static ReadOnlyMemory<float> WeightedAverage(
         List<(ReadOnlyMemory<float> Embedding, float Weight)> items)
     {
         if (items.Count == 0) return ReadOnlyMemory<float>.Empty;
 
-        var dim = items[0].Embedding.Length;
+        var dim = CommonLength(items.Select(item => item.Embedding));
         var result = new float[dim];
         var totalWeight = 0f;
 
@@ -481,13 +481,34 @@ public sealed class OfflineLearner : IOfflineLearner, ILearningCycleTrigger
             totalWeight += weight;
         }
 
-        if (totalWeight > 0)
-        {
-            for (var i = 0; i < dim; i++)
-                result[i] /= totalWeight;
-        }
+        // Weights that sum to nothing leave nothing to weight by: the plain mean is what is left.
+        if (totalWeight <= 0)
+            return ComputeCentroid([.. items.Select(item => item.Embedding)]);
+
+        for (var i = 0; i < dim; i++)
+            result[i] /= totalWeight;
 
         return result;
+    }
+
+    /// <summary>The length every embedding shares, or an exception naming the two that differ.</summary>
+    private static int CommonLength(IEnumerable<ReadOnlyMemory<float>> embeddings)
+    {
+        int? length = null;
+
+        foreach (var embedding in embeddings)
+        {
+            length ??= embedding.Length;
+
+            if (embedding.Length != length)
+            {
+                throw new ArgumentException(
+                    $"Embeddings of different lengths cannot be averaged: {length} and {embedding.Length}.",
+                    nameof(embeddings));
+            }
+        }
+
+        return length ?? 0;
     }
 
     private static float CosineSimilarity(ReadOnlySpan<float> a, ReadOnlySpan<float> b)

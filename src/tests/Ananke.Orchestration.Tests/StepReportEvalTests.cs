@@ -5,6 +5,7 @@ using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.OpenAI;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
+using Ananke.Orchestration.Tests.Fakes;
 using Ananke.Orchestration.Tools;
 using Shouldly;
 
@@ -115,6 +116,7 @@ public class StepReportEvalTests
             NodeOutcome outcome;
 
             using (WorkflowEventReporting.BeginScope(calls))
+            using (RecordingContent.Begin())
                 outcome = await Once(scenario).ConfigureAwait(false);
 
             var matches = Matches(scenario, outcome);

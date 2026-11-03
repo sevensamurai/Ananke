@@ -10,8 +10,11 @@ namespace Ananke.Learning.Skills;
 /// Pages through <see cref="IEmpiricalMemory.BrowseAsync(int, int, EmpiricalKind?, string?, CancellationToken)"/> on export,
 /// applying quality gates per entry.
 /// </summary>
-public sealed class SkillPackager : ISkillPackager
+/// <param name="timeProvider">Clock that stamps an export's manifest. Defaults to <see cref="TimeProvider.System"/>.</param>
+public sealed class SkillPackager(TimeProvider? timeProvider = null) : ISkillPackager
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     private const int PageSize = 100;
 
     /// <inheritdoc />
@@ -73,7 +76,7 @@ public sealed class SkillPackager : ISkillPackager
         {
             TotalEntries = entriesExported,
             TotalEpisodes = episodesExported,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = _timeProvider.GetUtcNow()
         }, ct);
 
         return new SkillExportResult

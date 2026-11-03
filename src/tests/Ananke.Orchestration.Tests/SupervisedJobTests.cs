@@ -447,6 +447,7 @@ public class SupervisedJobTests
     /// <summary>A model that answers every node with the same report.</summary>
     private static IAgentModel Reports() => SimulatedAgentModel.Json(new PlanNodeReport
     {
-        Summary = "did the work"
+        Summary = "did the work",
+        Done = true
     });
 }

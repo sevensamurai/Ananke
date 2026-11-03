@@ -292,6 +292,74 @@ public class MultiModelBudgetTests
         exec.CumulativeUsage.InputTokens.ShouldBe(6000); // 5000 + 1000
     }
 
+    [Test]
+    public async Task WithBudget_RouterCalledOutsideAnAgentJob_KeepsOtherJobsAtFlatRates()
+    {
+        // A summarizer, keyword extractor or approval gate calls the router directly: the router
+        // reports the call's cost, and no agent job reports its tokens.
+        var router = new CapabilityModelRouter()
+            .AddModel(new ModelProfile
+            {
+                Name = "routed",
+                Model = new CostAwareModel(inputTokens: 1000, outputTokens: 500),
+                Capabilities = ModelCapability.TextGeneration,
+                CostPer1KInputTokens = 0.001m,
+                CostPer1KOutputTokens = 0.003m
+            }).ToAgentModel();
+
+        var plainJob = AgentJobFactory.Create<MultiState, MultiResponse>("plain",
+                new CostAwareModel(inputTokens: 1000, outputTokens: 500))
+            .WithPrompt(_ => "test")
+            .MapResult((s, r) => s with { Text = r.Answer ?? "" })
+            .Build();
+
+        var exec = await new Workflow<MultiState>("router-outside-job")
+            .Job("plain", plainJob)
+            .Job("direct", async (s, ct) =>
+            {
+                var response = await router.GenerateAsync(
+                    new AgentRequest { Messages = [AgentMessage.User("summarize")] }, ct);
+                return s with { Text = response.Text ?? "" };
+            })
+            .Chain("plain", "direct", Workflow.End)
+            .WithBudget(maxCost: 1.0m, costPer1KInputTokens: 0.01m, costPer1KOutputTokens: 0.03m)
+            .RunAsync(new MultiState());
+
+        exec.Status.ShouldBe(ExecutionStatus.Completed);
+        // Plain job at flat rates: 0.01 + 0.015 = 0.025. Direct call at its rates: 0.001 + 0.0015 = 0.0025.
+        exec.EstimatedCost.ShouldBe(0.0275m);
+    }
+
+    [Test]
+    public async Task WithBudget_JobOnRouterWithFlatRates_PricesTheCallOnce()
+    {
+        var router = new CapabilityModelRouter()
+            .AddModel(new ModelProfile
+            {
+                Name = "routed",
+                Model = new CostAwareModel(inputTokens: 1000, outputTokens: 500),
+                Capabilities = ModelCapability.TextGeneration | ModelCapability.StructuredOutput,
+                CostPer1KInputTokens = 0.001m,
+                CostPer1KOutputTokens = 0.003m
+            });
+
+        var job = AgentJobFactory.Create<MultiState, MultiResponse>("routed", router)
+            .WithPrompt(_ => "test")
+            .MapResult((s, r) => s with { Text = r.Answer ?? "" })
+            .Build();
+
+        var exec = await new Workflow<MultiState>("router-flat-rates")
+            .Job("routed", job)
+            .Then("routed", Workflow.End)
+            .WithBudget(maxCost: 1.0m, costPer1KInputTokens: 0.01m, costPer1KOutputTokens: 0.03m)
+            .RunAsync(new MultiState());
+
+        exec.Status.ShouldBe(ExecutionStatus.Completed);
+        // At the router's rates only: 0.001 + 0.0015. Flat rates on top would add 0.025.
+        exec.EstimatedCost.ShouldBe(0.0025m);
+        exec.CumulativeUsage.InputTokens.ShouldBe(1000);
+    }
+
     // ── WithBudget(maxCost) overload validation ─────────────────
 
     [Test]

@@ -41,15 +41,15 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 │   demos, CLI (nnke), ASP.NET Core hosts                     │
 ├─────────────────────────────────────────────────────────────┤
 │                  High-Level Capabilities                    │
-│   Federation · Organics · Platforms · Skills · MCP · A2A    │
+│   Organics · Skills · MCP · A2A                             │
 ├─────────────────────────────────────────────────────────────┤
 │                    Core Engine Layer                         │
 │   Orchestration · Learning · StateMachine · Knowledge       │
 │   Design · Documents                                        │
 ├─────────────────────────────────────────────────────────────┤
-│                  Provider Adapters                           │
+│                  Model Providers                             │
 │   Orchestration.OpenAI · Orchestration.Anthropic            │
-│   Orchestration.Google · Federation.* · Qdrant              │
+│   Orchestration.Google · Qdrant                             │
 ├─────────────────────────────────────────────────────────────┤
 │                    Infrastructure                            │
 │   Redis · MQTT · OpenTelemetry                              │
@@ -73,19 +73,14 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 | **Design** | `Ananke.Design` | YAML manifest import, Mermaid export. Depends on Orchestration. |
 | **Documents** | `Ananke.Documents` | PDF/Markdown extractors (`IDocumentExtractor`). Depends on Knowledge. |
 | **Providers** | `Ananke.Orchestration.OpenAI`, `.Anthropic`, `.Google` | LLM provider implementations of `IAgentModel`/`IStreamingAgentModel`. Depend on Abstractions + Orchestration. |
-| **Providers (auth-only)** | `Ananke.Orchestration.Bedrock` | Amazon Bedrock auth and endpoint construction — no third wire format. Depends on Abstractions + the OpenAI and Anthropic provider packages, whose adapters it points at Bedrock's endpoints. |
-| **Conformance** | `Ananke.Orchestration.Conformance`, `.Conformance.NUnit` | Shared scenarios every `IStreamingAgentModel`/`IToolSchemaTranslator`/`IJsonSchemaTranslator` adapter must satisfy. The contract depends on Abstractions alone; the NUnit fixtures add only that and the contract itself. |
 | **Interop** | `Ananke.MCP`, `Ananke.A2A` | Protocol bridges (MCP server, A2A agent-to-agent). Depend on Orchestration. |
 | **Skills** | `Ananke.Skills` | External skill catalog (OpenClaw). Depends on Orchestration. |
-| **Platforms** | `Ananke.Platforms`, `.Platforms.Slack`, `.Platforms.Discord` | Messaging platform adapters. Platforms depends on Orchestration; Slack depends on Organics + Platforms; Discord depends on Orchestration + Platforms. |
 | **Organics** | `Ananke.Organics` | Self-organizing colony architecture (cell division, sensing, routing). Depends on Learning + Design. |
-| **Roles** | `Ananke.Roles` | Studio host builder, role catalog, workflow registry. Depends on Design + Organics + Platforms + Platforms.Slack. |
 | **Tool.Shared** | `Ananke.Tool.Shared` | Shared tool primitives reused by organic hosts and CLI tools. Depends on Organics. |
-| **Federation** | `Ananke.Federation`, `.Federation.Anthropic`, `.Federation.Google`, `.Federation.Azure`, `.Federation.LocalEmulators` | Cross-cloud deployment, monitoring, hybrid routing. Depends on Abstractions + Organics + Design. Sub-packages bind to their respective provider. |
 | **Graph** | `Ananke.Graph.Abstractions`, `Ananke.Graph.Memgraph` | Knowledge graph abstraction layer and Memgraph DB adapter. Depend on Abstractions. |
-| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant` | External service adapters implementing Abstractions interfaces. Redis + Qdrant also depend on Orchestration / Knowledge / Learning. |
+| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant`, `Ananke.Postgres`, `Ananke.Embeddings.Onnx` | External service adapters implementing Abstractions interfaces. Redis + Qdrant also depend on Orchestration / Knowledge / Learning; Postgres on Knowledge; the ONNX embedder on Abstractions only. |
 | **Web** | `Ananke.AspNetCore` | SSE streaming, session management, organic host registration. Depends on Orchestration + Organics + StateMachine. |
-| **Tooling** | `nnke` (design CLI), `nnke-platform` (federation CLI), `nnke-platform-azure`, `nnke-platform-google`, `nnke-platform-anthropic`, `nnke-platform-all` (adapter companions), `Ananke.Analyzers` | Design-time and federation CLIs; independently published adapter companion tools; Roslyn analyzers. |
+| **Tooling** | `nnke` (design CLI), `Ananke.Analyzers` | Design-time CLI; Roslyn analyzers. |
 | **Meta** | `Ananke` | Meta-package that bundles everything. |
 
 ---
@@ -106,27 +101,15 @@ graph TD
     OPENAI["Ananke.Orchestration.OpenAI"]
     ANTHRO["Ananke.Orchestration.Anthropic"]
     GOOGLE["Ananke.Orchestration.Google"]
-    BEDROCK["Ananke.Orchestration.Bedrock"]
 
-    CONFORM["Ananke.Orchestration.Conformance"]
-    CONFORM_NUNIT["Ananke.Orchestration.Conformance.NUnit"]
 
     MCP["Ananke.MCP"]
     A2A["Ananke.A2A"]
     SKILLS["Ananke.Skills"]
-    PLAT["Ananke.Platforms"]
-    PLAT_SLACK["Ananke.Platforms.Slack"]
-    PLAT_DISCORD["Ananke.Platforms.Discord"]
 
     ORG["Ananke.Organics"]
-    ROLES["Ananke.Roles"]
     TOOL_SHARED["Ananke.Tool.Shared"]
 
-    FED["Ananke.Federation"]
-    FED_ANTHRO["Ananke.Federation.Anthropic"]
-    FED_GOOGLE["Ananke.Federation.Google"]
-    FED_AZURE["Ananke.Federation.Azure"]
-    FED_LOCAL["Ananke.Federation.LocalEmulators"]
 
     GRAPH_ABS["Ananke.Graph.Abstractions"]
     GRAPH_MG["Ananke.Graph.Memgraph"]
@@ -135,6 +118,8 @@ graph TD
     MQTT["Ananke.MQTT"]
     OTEL["Ananke.OpenTelemetry"]
     QDRANT["Ananke.Qdrant"]
+    ONNX["Ananke.Embeddings.Onnx"]
+    PG["Ananke.Postgres"]
 
     ASP["Ananke.AspNetCore"]
 
@@ -157,42 +142,17 @@ graph TD
     ANTHRO --> ORCH
     GOOGLE --> ABS
     GOOGLE --> ORCH
-    BEDROCK --> ABS
-    BEDROCK --> OPENAI
-    BEDROCK --> ANTHRO
 
-    %% Conformance
-    CONFORM --> ABS
-    CONFORM_NUNIT --> CONFORM
 
     %% Interop & extensions
     MCP --> ORCH
     A2A --> ORCH
     SKILLS --> ORCH
-    PLAT --> ORCH
-    PLAT_SLACK --> PLAT
-    PLAT_SLACK --> ORG
-    PLAT_DISCORD --> PLAT
-    PLAT_DISCORD --> ORCH
 
     %% Higher-order
     ORG --> LEARN
     ORG --> DESIGN
     TOOL_SHARED --> ORG
-    ROLES --> DESIGN
-    ROLES --> ORG
-    ROLES --> PLAT
-    ROLES --> PLAT_SLACK
-    FED --> ABS
-    FED --> ORG
-    FED --> DESIGN
-    FED_ANTHRO --> FED
-    FED_ANTHRO --> ANTHRO
-    FED_GOOGLE --> FED
-    FED_GOOGLE --> GOOGLE
-    FED_AZURE --> FED
-    FED_AZURE --> OPENAI
-    FED_LOCAL --> FED
 
     %% Graph extensions
     GRAPH_ABS --> ABS
@@ -207,8 +167,11 @@ graph TD
     QDRANT --> ABS
     QDRANT --> KNOW
     QDRANT --> LEARN
+    ONNX --> ABS
+    PG --> ABS
+    PG --> KNOW
 
-    %% Web
+    %% ASP.NET Core
     ASP --> ORCH
     ASP --> ORG
     ASP --> SM
@@ -224,7 +187,7 @@ graph TD
     class KNOW,ORCH,SM,LEARN,DESIGN,DOCS core
     class OPENAI,ANTHRO,GOOGLE provider
     class REDIS,MQTT,OTEL,QDRANT infra
-    class ORG,FED,FED_ANTHRO,FED_GOOGLE,FED_AZURE,FED_LOCAL,ROLES,TOOL_SHARED,MCP,A2A,SKILLS,PLAT,PLAT_SLACK,PLAT_DISCORD,GRAPH_ABS,GRAPH_MG,ASP high
+    class ORG,TOOL_SHARED,MCP,A2A,SKILLS,GRAPH_ABS,GRAPH_MG,ASP high
 ```
 
 ### Critical Dependency Rule
@@ -289,18 +252,6 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 | `Division/` | `...Division` | `IDivisionPolicy`, `IWorkflowDivider`, `WorkflowDivider`, `ThresholdDivisionPolicy` |
 | `Division/Approval/` | `...Division.Approval` | `IDivisionApprovalGate`, `LlmApprovalGate`, `AutoApprovalGate` |
 | `Sensing/` | `...Sensing` | `ICapabilityMap`, `IRequestRouter`, `KeywordRequestRouter` |
-
-### Ananke.Federation
-
-| Folder | Namespace | Purpose |
-|---|---|---|
-| `Deployment/` | `...Deployment` | `IFederationDeployer`, `IDeploymentRegistry`, `DeploymentRecord` |
-| `Validation/` | `...Validation` | `IDeployabilityValidator`, `IPlatformValidator`, `IModelMapper` |
-| `Monitoring/` | `...Monitoring` | `IRemoteCellMonitor`, `RemoteMetricsTracker`, `RemoteCellHealth` |
-| `Hosting/` | `...Hosting` | `FederatedWorkflowHost`, `HybridRouter`, `FederatedComplexityMonitor` |
-| `Prompts/` | `...Prompts` | `ISystemPromptCompiler`, `ManifestSystemPromptCompiler` |
-| `Division/` | `...Division` | `FederatedDivisionPolicy`, `PlatformDivisionApprovalGate` |
-| `Credentials/` | `...Credentials` | `IFederationCredentialProvider` |
 
 ---
 
@@ -428,7 +379,6 @@ These are the **interface boundaries** that define the system. Any redesign shou
 | `IDivisionPolicy` | Organics | When to split a workflow | `ThresholdDivisionPolicy`, `ExperienceDrivenDivisionPolicy` |
 | `IWorkflowDivider` | Organics | How to split a workflow | ToolKit cluster strategy |
 | `ICapabilityMap` | Organics | Track workflow capabilities | `InMemoryCapabilityMap` |
-| `IFederationDeployer` | Federation | Deploy to cloud platforms | Anthropic/Google/Azure impls |
 | `ISkillCatalog` | Skills | External tool discovery | `OpenClawCatalog` |
 
 ---
@@ -459,11 +409,6 @@ These are the **interface boundaries** that define the system. Any redesign shou
 | `Ananke.Design.Tests` | YAML import, Mermaid export |
 | `Ananke.Documents.Tests` | PDF/Markdown extraction |
 | `Ananke.Organics.Tests` | Colony, division, sensing |
-| `Ananke.Platforms.Tests` | Platform adapter bridging |
-| `Ananke.Federation.Tests` | Deployment, validation, monitoring |
-| `Ananke.Federation.Google.Tests` | Google/Vertex AI federation |
-| `Ananke.Federation.Anthropic.Tests` | Anthropic/Claude federation |
-| `Ananke.Federation.Azure.Tests` | Azure federation |
 | `Ananke.Integration.Tests` | Cross-cutting integration scenarios |
 
 ---
@@ -478,16 +423,12 @@ For deeper architectural detail on each vertical, see:
 | [architecture/agents.md](architecture/agents.md) | Agent model abstraction, provider adapters, middleware pipeline, model routing |
 | [architecture/knowledge.md](architecture/knowledge.md) | Knowledge pipeline, vector stores, catalog, document processing, linking |
 | [architecture/learning.md](architecture/learning.md) | Empirical memory, episodes, offline learning, skill packaging, exploration |
-| [architecture/organics-federation.md](architecture/organics-federation.md) | Organic colony, cell division, federation, cross-cloud deployment |
+| [architecture/organics.md](architecture/organics.md) | Organic colony, cell division |
 | [architecture/infrastructure.md](architecture/infrastructure.md) | Redis, MQTT, Qdrant, OpenTelemetry, ASP.NET Core integration |
-| [architecture/interop.md](architecture/interop.md) | MCP server, A2A protocol, external skill catalog, platform adapters |
-| [architecture/federation-credentials.md](architecture/federation-credentials.md) | Credential types, rotation, `IFederationCredentialProvider` per platform |
+| [architecture/interop.md](architecture/interop.md) | MCP server, A2A protocol, external skill catalog |
 
 ---
 
-*Last updated: 2026-08-06 (v0.8.8+). The dependency graph is **not** currently verified by a script.
-`tools/check-architecture-graph.ps1`, referenced here since v0.8.5, was never actually built —
-checked `git log --all --full-history` and every release tag from v0.8.0 through v0.8.8: it never
-existed in this repository. The reference traced to a same-day architecture review's planned backlog
-item that this footer described as already done. Neither CI workflow (`pipeline.yml`, `website.yml`)
-runs an equivalent check. Verify by hand after any `.csproj` change.*
+*Last updated: 2026-08-06 (v0.8.8+). The dependency graph is **not** verified by a script, and
+neither CI workflow (`pipeline.yml`, `website.yml`) runs an equivalent check. Verify it by hand
+after any `.csproj` change.*

@@ -442,6 +442,76 @@ public class PlanExecutionTests
     }
 
     [Test]
+    public async Task Execute_TheReading_KeepsWhatTheNodeFound()
+    {
+        var store = await Seeded();
+
+        await new PlanExecutor(store).ExecuteAsync("plan", (ctx, _) => Task.FromResult(new NodeOutcome
+        {
+            Findings = [new NodeFinding { Claim = $"{ctx.Node.Id} reads one file", Source = $"{ctx.Node.Id}.py:1" }]
+        }));
+
+        var tree = await store.LoadAsync("plan");
+
+        tree!.Node("parse").LastRead!.Findings.Single().ShouldBe(
+            new NodeFinding { Claim = "parse reads one file", Source = "parse.py:1" });
+        tree.Node("render").LastRead!.Findings.Single().Source.ShouldBe("render.py:1");
+    }
+
+    [Test]
+    public async Task Execute_AFindingWithNoSource_IsRetried_AndTheStepIsShownWhatItSaid()
+    {
+        var store = await Seeded();
+        var unsourced = new NodeFinding { Claim = "the input is CSV", Source = " " };
+        var seen = new List<NodeRejection?>();
+
+        await new PlanExecutor(store).ExecuteAsync("plan", (ctx, _) =>
+        {
+            if (ctx.Node.Id == "parse")
+                seen.Add(ctx.Rejection);
+
+            return Task.FromResult(new NodeOutcome
+            {
+                Findings = ctx.Rejection is null
+                    ? [unsourced]
+                    : [unsourced with { Source = "input.csv:1" }]
+            });
+        });
+
+        seen.Count.ShouldBe(2);
+        seen[0].ShouldBeNull();
+        var rejection = seen[1].ShouldNotBeNull();
+        rejection.Candidate.ShouldBeNull();
+        rejection.Findings.ShouldBe([unsourced]);
+        rejection.Finding.ShouldContain("source");
+
+        var tree = await store.LoadAsync("plan");
+        tree!.Node("parse").LastRead!.Findings.Single().Source.ShouldBe("input.csv:1");
+    }
+
+    [Test]
+    public async Task Execute_AFindingThatNeverNamesASource_FailsTheStep_AfterItsAttempts()
+    {
+        var store = await Seeded();
+        var attempts = 0;
+
+        var result = await new PlanExecutor(store).ExecuteAsync("plan", (ctx, _) =>
+        {
+            if (ctx.Node.Id == "parse")
+                attempts++;
+
+            return Task.FromResult(new NodeOutcome
+            {
+                Findings = [new NodeFinding { Claim = "the input is CSV" }]
+            });
+        });
+
+        attempts.ShouldBe(PlanRetryPolicy.Default.Attempts);
+        result.HaltedAt.ShouldBe("parse");
+        result.Tree.Node("parse").Failure.ShouldNotBeNull().Message.ShouldContain("source");
+    }
+
+    [Test]
     public async Task Execute_ARunnerThatDescribesNothing_LeavesNoAccountRatherThanAnEmptyOne()
     {
         // A shell check and a person need offer no prose. "It said nothing" and "it said the empty
@@ -579,6 +649,42 @@ public class PlanExecutionTests
         projection.Text.ShouldContain("Render");                   // its own contract
         projection.OmittedAncestors.ShouldBe(0);
         projection.OmittedVerdicts.ShouldBe(0);
+    }
+
+    [Test]
+    public void Project_ASiblingThatRanAndWhoseCriteriaPassed_IsListedAsMet_AndOneNotYetRunAsPending()
+    {
+        var tree = Tree()
+            .WithReading("parse", new NodeReading { At = T0, PlanVersion = 1, ProjectedTokens = 10 })
+            .WithVerdict("parse", Verdict("the parser round-trips", passed: true));
+
+        var text = PlanTreeProjection.Project(tree, "render").Text;
+
+        text.ShouldContain("- parse: Parse [the parser round-trips] — Met");
+        text.ShouldNotContain("- parse: Parse [the parser round-trips] — Pending");
+
+        PlanTreeProjection.Project(tree, "parse").Text
+            .ShouldContain("- render: Render [output matches the golden file] — Pending");
+    }
+
+    [Test]
+    public void Project_ASiblingThatRanAndWhoseCriterionFailed_IsListedAsUnmet()
+    {
+        var tree = Tree()
+            .WithReading("parse", new NodeReading { At = T0, PlanVersion = 1, ProjectedTokens = 10 })
+            .WithVerdict("parse", Verdict("the parser round-trips", passed: false));
+
+        PlanTreeProjection.Project(tree, "render").Text
+            .ShouldContain("- parse: Parse [the parser round-trips] — Unmet");
+    }
+
+    [Test]
+    public void Project_ASiblingSettledByAChoice_IsListedWithWhatWasChosen()
+    {
+        var tree = Tree().WithState("parse", StepState.Done, "the streaming parser");
+
+        PlanTreeProjection.Project(tree, "render").Text
+            .ShouldContain("- parse: Parse [the parser round-trips] — Done: the streaming parser");
     }
 
     [Test]

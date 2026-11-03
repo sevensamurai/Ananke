@@ -1,6 +1,10 @@
 <!-- topic: plans-and-contracts, tags: plan, contract, verification, supervision, long-running, decomposition, verification -->
 # 18 — Plans and Contracts
 
+> ⚠ **The plan tier is experimental.** Its types and entry points are marked `[Experimental]` with the
+> id `ANNKEEXP001`, and may change in any release. Suppress the id to use them — see
+> [Experimental APIs](../reference/experimental-apis.md).
+
 Long-running work does not fit in one context window, and it does not fit in one job either.
 `AgentContract` and `PlanTree` are how work that spans many steps keeps its goal, its constraints and
 its evidence — without any of it being handed from step to step in a message.
@@ -260,6 +264,105 @@ work. Measured, that mattered: asked to say which kind of halt it was having, a 
 `Applier`, and only then runs the checks. So the world's answer arrives at the loop as a value rather
 than as prose for a model to read and classify.
 
+**It may report what it found, if it says where.** `PlanNodeReport.Findings` is a list of `NodeFinding`
+— a `Claim` and a `Source`: a URL, a file and line, a package and version, a command — and the
+`Quotes` the claim rests on, each exactly as the source holds it, so a consumer can look for them there
+without reading them out of the sentence. Unlike `Summary`,
+findings travel on as data, onto `NodeOutcome`, the node's `NodeReading` and `PlanNodeReported`, because
+each names where anybody can check it again. A finding with a blank `Source` is refused the way a
+malformed candidate is — the step is retried and shown what it reported (`NodeRejection.Findings`) — and
+the refusal looks at form only, never at what the source says.
+
+**It may propose by calling the operation.** A step with tools answers twice: its tool rounds, then a
+reply turned into the report — and a proposal written in prose can be lost on the way. With
+`OperationsAsTools = true` and `Operations` set, each operation is also offered as a tool. A call records
+the operation, applies nothing and ends the step: no report is asked for, the call is the candidate,
+shape-checked and applied exactly as above, and what the model wrote with the call is the `Summary`. A
+report asked for after the call would write the operation out again, and a copy of a diff is not the
+diff. A step that calls none answers as it would without them. An argument an
+`OperationDefinition` names in `Lists` is offered as a list of its entry type rather than a string, and
+reaches the operation as the JSON the call held, so the applier reads entries rather than splitting
+text.
+
+```csharp
+var runner = new PlanNodeAgentRunner(new PlanNodeAgentOptions
+{
+    Model = model,
+    Operations = catalog,
+    OperationsAsTools = true
+});
+```
+
+**A step that changes nothing can be asked for less.** What a node is asked to fill is the type of its
+answer, and `PlanNodeAgentRunner` asks for a `PlanNodeReport` — an operation, a flag, options. A step
+whose part is to look things up and report them is better asked for exactly that: run it with
+`PlanNodeAgentRunner<PlanNodeFindings>`, whose answer is a `Summary` and `Findings` and nothing else.
+Asked for an operation with none to choose from, a model writes one, and the gate spends a retry
+refusing it.
+
+```csharp
+var research = new PlanNodeAgentRunner<PlanNodeFindings>(new PlanNodeAgentOptions<PlanNodeFindings>
+{
+    Model = model,
+    ConfigureFor = (job, _) => job.WithTools(lookups)
+});
+```
+
+**A step that reports findings can give them by calling.** A step with tools that answers in words is
+asked for the same answer again as JSON, in one more call — and that call is sent without the tools, so
+it no longer starts as the tool rounds' requests did and a provider's prompt cache does not hold it. With
+`AnswerAsTool = true`, `PlanNodeFindings` is also offered as a tool, `report_findings`, whose parameters
+are its `Summary` and `Findings`. A call is the step's answer and ends its job; nothing is asked after
+it, and its findings go to the gate like any others. A call whose findings cannot be read is answered
+with why and the step goes on; a step that calls none answers as it would without the tool.
+
+```csharp
+var research = new PlanNodeAgentRunner<PlanNodeFindings>(new PlanNodeAgentOptions<PlanNodeFindings>
+{
+    Model = model,
+    AnswerAsTool = true,
+    ConfigureFor = (job, _) => job.WithTools(lookups)
+});
+```
+
+**A step that proposes by calling can answer in words alone.** With `OperationsAsTools`, the call is the
+proposal, so a report with a slot for an operation asks for it twice. `PlanNodeAgentRunner<PlanNodeProposal>`
+has no such slot: a step that calls nothing is read from its last words, never asked for them as JSON.
+
+```csharp
+var drafting = new PlanNodeAgentRunner<PlanNodeProposal>(new PlanNodeAgentOptions<PlanNodeProposal>
+{
+    Model = model,
+    Operations = catalog,
+    OperationsAsTools = true
+});
+```
+
+An answer is any type implementing `IPlanNodeAnswer`: `ToOutcome()` says what it means to the executor,
+and a static `Instructions(operations)` how a node is told to fill it in. An answer that is nothing but the
+step's words gives a static `FromText`, and the runner reads it from the turn's last text instead of asking
+for JSON. An answer a step can give by calling gives a static `Tool`, offered with `AnswerAsTool`; a runner
+whose answer has none refuses the option. A different kind of step is a different answer type, not a branch in the runner; whatever the
+answer's type, a call to an operation tool ends the step and is its candidate.
+
+**A step can name how hard it reasons.** A node's `Effort`, such as `high`, is a word the plan tier
+reads nothing into and the runner writes into the step's requests: `EffortFields` says which fields of
+the endpoint's own an effort is, for the model the runner runs on. A step that names an effort, run by
+a runner with no `EffortFields`, is refused before any call rather than run at the model's default.
+The fields are experimental, under `ANNKEEXP003` (see
+[experimental APIs](../reference/experimental-apis.md)).
+
+```csharp
+var drafting = new PlanNodeAgentRunner(new PlanNodeAgentOptions
+{
+    Model = model,
+    EffortFields = effort => new Dictionary<string, JsonNode>
+    {
+        ["reasoning"] = new JsonObject { ["effort"] = effort }   // OpenRouter's
+    }
+});
+```
+
 Note also what the runner does *not* let you do: `Configure` runs first and the contract and prompt
 are applied last, so a caller cannot unpin the contract by supplying their own prompt.
 
@@ -291,6 +394,7 @@ root:
       goal: Understand what already exists before designing anything.
       criteria:
         - Every existing render path is accounted for.
+      effort: high
       children:
         - id: survey-pipeline
           goal: Map the current report pipeline end to end.
@@ -314,6 +418,15 @@ var manifest = PlanManifest.Load("plan.yml");
 var asWritten = manifest.ToTree();          // version one
 var asItStands = manifest.ToCurrentTree();  // every revision applied, lineage and all
 ```
+
+`effort:` is a step's `Effort`, and not part of its contract: a revision that re-rules a step keeps
+it, and a child a revision names takes the one it names.
+
+`touches:` is the same kind of field: `Touches`, a list of what the step may change, as the domain names
+it — the files it edits, the bookings it holds. The plan tier reads nothing into it. An applier reads it
+off the node it is handed (`context.Node.Touches`), places what the step proposed in those things and
+refuses what lands anywhere else, so an operation need not name again what the plan already grounded.
+A Planner sets it with `AuthoredStep.Touches`; a step it names nothing for keeps what it touched.
 
 **`revisions:` is the half that matters.** A format that could state only the original decomposition
 would describe a plan's first version — and the interesting thing about a plan is what changed and
@@ -604,6 +717,18 @@ what halted.
 **At most one replan, and it names the problem, not the fix.** Several replans could only differ in
 the change they describe, and which change to make is the Planner's. A replan's rationale quotes
 the finding that makes the halt the plan's.
+
+**A step that asked nothing may be asked to try again, once.** When the step left no options — a
+check stopped it — `AgentPlanAdvisor` may offer an `Answer` of its own: one line the step reads on its
+next attempt, recorded against what stopped it. Taking it mints no version; the next pass attempts the
+step. A step that has been answered once and stops again is not offered it, so its next halt goes to
+the Planner or gives the step up. Each field of an option the advisor fills is described in its
+schema, so text explaining why *not* to give a step up does not land in the field that gives it up.
+
+**The advisor says what the halt is before it offers anything.** `PlanProposal.Summary` is what kind
+of problem the supervisor says the halt is, citing the finding — and, when it offers nothing, why
+nothing would help. `PlanProposalOffered` carries it, and the narrator writes it under the halt as
+`says:`, so an empty proposal is never only an empty list.
 
 The advisor is shown `PlanTreeProjection.Lineage`: each earlier version's steps and criteria, and
 why it was replaced.
@@ -1013,7 +1138,7 @@ await foreach (var evt in workflow.StreamAsync(state))
 | Event | Reports |
 |---|---|
 | `PlanNodeStarted` | a node is about to run, and what the projection showed it |
-| `PlanNodeReported` | what the node said it did |
+| `PlanNodeReported` | what the node said it did, and what it found |
 | `PlanNodeDisputed` | a node returned rather than routing around a contract it believes is wrong |
 | `PlanNodeFailed` | an attempt did not finish — retries exhausted, a tool fault, a reply that would not parse |
 | `PlanNodeVerified` | the ruling, what was abstained on, the score, whether a bound was passed |
@@ -1105,8 +1230,10 @@ the narration rather than about the plan, and the tree deliberately holds neithe
 
 It also narrates what the supervisor offered (`PlanProposalOffered`) and what the Planner wrote
 (`PlanReauthored.Authored`), and each line about a halt names the plan version. An agent's tool
-calls reach the same stream as `AgentToolCalled`: the job, the tool, its arguments, and its result
-cut to `AgentToolCalled.ResultCap` characters.
+calls reach the same stream as `AgentToolCalled`: the job, the tool, the call's id, round and
+duration, and how long its result was. Its arguments, and its result cut to
+`AgentToolCalled.ResultCap` characters, are on the event only when the workflow calls
+`RecordContent(true)`; without them a narrated call reads *"search → 8 characters"*.
 
 For a run that needs its own words in the middle of the shipped ones, `Describe` takes one event at
 a time and returns `null` when it has nothing to add — anything that is not a plan event, and a
@@ -1268,6 +1395,7 @@ reading?.PlanVersion;         // the plan version in force when it ran
 reading?.ProjectedTokens;     // how big the view it was given was
 reading?.SawEverything;       // false when the budget forced omissions
 reading?.Summary;             // what the node said it did, in its own words
+reading?.Findings;            // what it found, each with where to check it again
 ```
 
 **`Summary` is narration, and never evidence.** Nothing derives from it, no status depends on it, and
@@ -1388,10 +1516,15 @@ recover, and who concluded what to do about it is the only part that was never o
 | `PlanReviewJob<TState>` | Runs the review when nothing is left to run, and turns a rejection into a halt |
 | `PlanNodeRunner` | Delegate that runs one node |
 | `PlanNodeContext` | What a node is given — all of it out of the tree |
-| `NodeOutcome` | What a node produced: a `Candidate` to apply, and narration. `NodeOutcome.Nothing` for neither |
+| `NodeOutcome` | What a node produced: a `Candidate` to apply, narration, and `Findings`. `NodeOutcome.Nothing` for none of them |
+| `NodeFinding` | Something a node found — a `Claim` — and its `Source`, where anybody can check it again. Refused by the gate when the source is blank |
 | `PlanRunResult` | Facts about one pass that the tree does not record |
-| `PlanNodeAgentRunner` | Runs a node as an agent job with its contract pinned |
-| `PlanNodeReport` | What the agent answers: a `Summary`, and an `Operation` it proposes. No verdict, no dispute, no question |
+| `PlanNodeAgentRunner` | Runs a node as an agent job with its contract pinned, answering a `PlanNodeReport` |
+| `PlanNodeAgentRunner<TAnswer>` | The same, answering any `IPlanNodeAnswer` |
+| `IPlanNodeAnswer` | What a node answers: the shape it fills, how it is told to fill it (`Instructions`), and the `NodeOutcome` it means (`ToOutcome`) |
+| `PlanNodeFindings` | An answer with no operation, flag or options: a `Summary` and `Findings` |
+| `PlanNodeProposal` | An answer for a step that proposes by calling: a `Summary`, read from its last words |
+| `PlanNodeReport` | What the agent answers: a `Summary`, an `Operation` it proposes, and `Findings` with their sources. No verdict, no dispute, no question |
 | `IVerifier` | Rules on whether a node met its contract, from outside the node; `CannotDecide` answers what it could not rule on, before anything runs |
 | `AgentVerifier` | A model on the `reviewer` role, ruling from the record on what the checks abstained from |
 | `DeterministicVerifier` | Rules from `IDeterministicCheck` gates only, and abstains elsewhere |

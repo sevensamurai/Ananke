@@ -8,6 +8,7 @@ using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Routing;
 using Ananke.Orchestration.Streaming;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Workflows;
 
@@ -111,6 +112,7 @@ public sealed class Workflow<TState>
     private ICheckpointStore? _checkpointStore;
     private IWorkflowTracer? _tracer;
     private bool _storeCompletions;
+    private bool _recordContent;
     private Dictionary<string, string>? _metadata;
     private BudgetConfig? _budget;
     private WorkflowDefinition<TState>? _cachedDefinition;
@@ -430,6 +432,7 @@ public sealed class Workflow<TState>
     ///     .Then("deliver", Workflow.End);
     /// </code>
     /// </example>
+    [Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public Workflow<TState> Supervise(
         string name,
         Func<TState, PlanTree> plan,
@@ -468,6 +471,7 @@ public sealed class Workflow<TState>
     ///     .Then("deliver", Workflow.End);
     /// </code>
     /// </example>
+    [Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public Workflow<TState> Supervise(
         string name,
         PlanTree plan,
@@ -483,6 +487,7 @@ public sealed class Workflow<TState>
     /// Registers a supervised plan the workflow already has, and outputs a type-safe
     /// <see cref="JobRef"/>.
     /// </summary>
+    [Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public Workflow<TState> Supervise(
         string name,
         PlanTree plan,
@@ -498,6 +503,7 @@ public sealed class Workflow<TState>
     /// <summary>
     /// Registers a supervised plan as a job and outputs a type-safe <see cref="JobRef"/>.
     /// </summary>
+    [Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public Workflow<TState> Supervise(
         string name,
         Func<TState, PlanTree> plan,
@@ -816,6 +822,19 @@ public sealed class Workflow<TState>
     }
 
     /// <summary>
+    /// Controls whether each tool call's arguments and result are recorded on
+    /// <see cref="Streaming.AgentToolCalled"/>. Default is <c>false</c>: the event still carries the
+    /// call's id, round, duration, result length and whether it failed, with <see langword="null"/>
+    /// for its arguments and result. What the model is sent is the same either way.
+    /// </summary>
+    public Workflow<TState> RecordContent(bool enabled)
+    {
+        ThrowIfFrozen();
+        _recordContent = enabled;
+        return this;
+    }
+
+    /// <summary>
     /// Attaches workflow-level key/value metadata that flows into
     /// <see cref="WorkflowExecution{TState}.Metadata"/>, checkpoints, and trace attributes.
     /// Useful for correlation IDs, tenant IDs, and user context.
@@ -981,7 +1000,7 @@ public sealed class Workflow<TState>
                     "so per-call rates are available.");
         }
 
-        // D15: fail closed. A period ceiling backed by the default in-memory recorder would
+        // Fail closed. A period ceiling backed by the default in-memory recorder would
         // reset on every process start, so a crash-loop would re-spend the month indefinitely
         // with nothing reporting a problem. Refuse the configuration instead.
         if (_budget?.PeriodCostLimit is not null && _usageRecorder is null)
@@ -1003,7 +1022,7 @@ public sealed class Workflow<TState>
         CancellationToken ct = default)
     {
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder, recordContent: _recordContent);
         return await runner.RunAsync(definition, initialState, ct);
     }
 
@@ -1030,7 +1049,7 @@ public sealed class Workflow<TState>
         CancellationToken ct = default)
     {
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder, recordContent: _recordContent);
         return runner.StreamAsync(definition, initialState, options, ct);
     }
 
@@ -1045,7 +1064,7 @@ public sealed class Workflow<TState>
             ?? throw new InvalidOperationException($"No checkpoint found for execution '{executionId}'.");
 
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder, recordContent: _recordContent);
         return await runner.ResumeAsync(definition, checkpoint, ct);
     }
 
@@ -1068,7 +1087,7 @@ public sealed class Workflow<TState>
             ?? throw new InvalidOperationException($"No checkpoint found for execution '{executionId}'.");
 
         var definition = Build();
-        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder);
+        var runner = _runner ?? new WorkflowRunner(_checkpointStore, tracer: _tracer, storeCompletions: _storeCompletions, usageRecorder: _usageRecorder, recordContent: _recordContent);
         return await runner.ResumeAsync(definition, checkpoint, stateTransform, ct);
     }
 
@@ -1116,7 +1135,7 @@ public sealed class Workflow<TState>
         foreach (var (_, descriptor) in _jobs)
         {
             if (descriptor.Job is ISubFlowConfiguration subflow)
-                subflow.ConfigureInfrastructure(_checkpointStore, _tracer, _storeCompletions);
+                subflow.ConfigureInfrastructure(_checkpointStore, _tracer, _storeCompletions, _recordContent);
         }
     }
 }

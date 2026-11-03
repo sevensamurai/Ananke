@@ -12,7 +12,8 @@ namespace Ananke.Orchestration.Jobs;
 /// </summary>
 internal interface ISubFlowConfiguration
 {
-    void ConfigureInfrastructure(ICheckpointStore? checkpointStore, IWorkflowTracer? tracer, bool storeCompletions);
+    void ConfigureInfrastructure(
+        ICheckpointStore? checkpointStore, IWorkflowTracer? tracer, bool storeCompletions, bool recordContent);
 }
 
 /// <summary>
@@ -42,6 +43,7 @@ public sealed class SubFlowJob<TParent, TChild> : IJob<TParent>, ISubFlowConfigu
     private ICheckpointStore? _checkpointStore;
     private IWorkflowTracer? _tracer;
     private bool _storeCompletions = true;
+    private bool _recordContent;
 
     public string Name { get; }
 
@@ -66,11 +68,12 @@ public sealed class SubFlowJob<TParent, TChild> : IJob<TParent>, ISubFlowConfigu
     }
 
     void ISubFlowConfiguration.ConfigureInfrastructure(
-        ICheckpointStore? checkpointStore, IWorkflowTracer? tracer, bool storeCompletions)
+        ICheckpointStore? checkpointStore, IWorkflowTracer? tracer, bool storeCompletions, bool recordContent)
     {
         _checkpointStore = checkpointStore;
         _tracer = tracer;
         _storeCompletions = storeCompletions;
+        _recordContent = recordContent;
     }
 
     public async Task<TParent> ExecuteAsync(TParent state, CancellationToken ct)
@@ -91,13 +94,14 @@ public sealed class SubFlowJob<TParent, TChild> : IJob<TParent>, ISubFlowConfigu
             foreach (var descriptor in definition.Jobs.Values)
             {
                 if (descriptor.Job is ISubFlowConfiguration nested)
-                    nested.ConfigureInfrastructure(_checkpointStore, _tracer, _storeCompletions);
+                    nested.ConfigureInfrastructure(_checkpointStore, _tracer, _storeCompletions, _recordContent);
             }
 
             var runner = new WorkflowRunner(
                 _checkpointStore,
                 tracer: _tracer,
-                storeCompletions: _storeCompletions);
+                storeCompletions: _storeCompletions,
+                recordContent: _recordContent);
 
             var execution = await runner.RunAsync(definition, childState, ct);
 

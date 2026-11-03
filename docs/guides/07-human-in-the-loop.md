@@ -377,22 +377,8 @@ await gate.ResumeAsync(parkingId, WorkReviewDecision.Approve("Looks good", revie
 
 ### Surfacing the review request
 
-Use `WorkItemReviewNotifier` (in `Ananke.Platforms`) to post the notification to any channel before parking:
-
-```csharp
-var notifier = new WorkItemReviewNotifier(responseSink);
-await notifier.NotifyAsync(
-    workItemId: item.Id,
-    title:      item.Title,
-    kind:       item.Kind.ToString(),
-    payload:    item.Payload,
-    channelId:  "C_REVIEWERS",
-    threadId:   null);
-// Then park:
-var outcome = await gate.ReviewAsync(item, ct);
-```
-
-The notifier is transport-neutral — it calls `IPlatformResponseSink.SendMessageAsync` and works with any platform. Slack-specific rendering (Block Kit approval buttons via `SlackApprovalBlocks`) is handled by the Slack response sink or a decorator.
+The gate does not notify anyone. Post the request through your own channel — chat, email, a
+web dashboard — before parking, and resume the gate when the decision comes back.
 
 ---
 

@@ -10,6 +10,12 @@
     <InternalsVisibleTo Include="Ananke.Design.Tests" />
   </ItemGroup>
 
+  <!-- The plan manifest types carry the plan tier's [Experimental] id and message, defined once in
+       Ananke.Orchestration. -->
+  <ItemGroup>
+    <Compile Include="..\Ananke.Orchestration\ExperimentalApis.cs" Link="ExperimentalApis.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>

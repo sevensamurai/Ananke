@@ -196,4 +196,19 @@ public class FileUsageRecorderTests
 
         (await recorder.ReadAsync()).AccumulatedCost.ShouldBe(0m, "15 August starts a new period");
     }
+
+    [Test]
+    public async Task RecordUsage_PricedTokens_StayOutOfTheUncostedTotal()
+    {
+        using var recorder = Recorder(ClockAt(2026, 8, 10));
+        var call = new TokenUsage { InputTokens = 10, OutputTokens = 5 };
+
+        await recorder.RecordUsageAsync(new UsageRecord(TokenUsage.Zero, 0.25m));
+        await recorder.RecordUsageAsync(new UsageRecord(call, Priced: true));
+
+        var snapshot = await recorder.ReadAsync();
+        snapshot.Usage.ShouldBe(call);
+        snapshot.UncostedUsage.ShouldBe(TokenUsage.Zero);
+        snapshot.AccumulatedCost.ShouldBe(0.25m);
+    }
 }

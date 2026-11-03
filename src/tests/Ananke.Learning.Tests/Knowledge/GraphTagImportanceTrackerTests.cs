@@ -4,6 +4,8 @@ using Ananke.Learning.EmpiricalMemory;
 using Ananke.Learning.Knowledge.Analytics;
 using Ananke.Learning.Knowledge.Builders;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Time.Testing;
+using Ananke.Learning.Features;
 using Shouldly;
 
 namespace Ananke.Learning.Tests.Knowledge;
@@ -51,6 +53,22 @@ public sealed class GraphTagImportanceTrackerTests
 
         // Bridge should rank above trivially low — it is not at zero.
         map.Importances["bridge"].ShouldBeGreaterThan(0f);
+    }
+
+    [Test]
+    public async Task ComputedAt_ComesFromTheOptionsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var graph = new InMemoryKnowledgeGraph();
+        var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder(), dedupThreshold: 1.1f);
+        for (var i = 0; i < 12; i++)
+            await memory.CommitAsync(MakeEntry($"e{i}", ["hub", $"leaf{i}"], [0.9f, 0.5f]));
+        await new TagCoOccurrenceBuilder(memory).BuildAsync(graph);
+
+        var map = await new GraphTagImportanceTracker(
+            graph, new TagImportanceOptions { Clock = new FakeTimeProvider(now) }).ComputeAsync(memory);
+
+        map!.ComputedAt.ShouldBe(now);
     }
 
     [Test]

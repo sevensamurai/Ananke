@@ -1,11 +1,11 @@
-<!-- topic: cli-overview, tags: nnke, nnke-platform, dotnet-tool, cli, scaffold, validate, mermaid, run, serve, mcp, local-execution -->
+<!-- topic: cli-overview, tags: nnke, dotnet-tool, cli, scaffold, validate, mermaid, run, serve, mcp, local-execution -->
 # CLI Overview
 
-Ananke ships two CLI tools because design-time workflow work and platform operations are different jobs.
+Ananke ships one CLI tool, `nnke`, for design-time workflow work.
 
-`nnke` exists to make the inner loop faster: scaffold projects, validate manifests, inspect topology, search docs, and work well with MCP-enabled editors. `nnke-platform` exists for the outer loop: deploy remote workflows, inspect live health, compare platforms, and manage federation operations.
+`nnke` exists to make the inner loop faster: scaffold projects, validate manifests, inspect topology, search docs, and work well with MCP-enabled editors.
 
-→ **Full reference:** [nnke CLI](nnke-tool.md) · [nnke-platform CLI](nnke-platform-tool.md)
+→ **Full reference:** [nnke CLI](nnke-tool.md)
 
 ---
 
@@ -15,8 +15,6 @@ Starting with an agentic framework is usually not blocked by runtime code first.
 
 That is why `nnke` exists. It shortens the path from idea to runnable project and gives both humans and AI coding tools a machine-readable way to inspect and validate Ananke workflows.
 
-`nnke-platform` solves a different problem. Once workflows leave the local process, you need deployment status, platform credentials, health checks, metrics, teardown, and a federated operational view. Those concerns should not bloat the local design-time tool, so they live in a separate CLI.
-
 ---
 
 ## Which Tool Does What
@@ -24,7 +22,6 @@ That is why `nnke` exists. It shortens the path from idea to runnable project an
 At a high level:
 - **Ananke** is the runtime framework.
 - **`nnke`** is the design-time and diagnostics CLI.
-- **`nnke-platform`** is the federation and deployment operations CLI.
 - **Copilot / Claude / other MCP clients** become more useful when they can call `nnke` directly instead of guessing.
 
 | Concern | Tool |
@@ -34,27 +31,21 @@ At a high level:
 | Search docs, patterns, and diagnostics | `nnke` |
 | Run a manifest locally | `nnke` |
 | Use MCP for agentic editing support | `nnke` |
-| Deploy to cloud platforms | `nnke-platform` |
-| Inspect live deployment health and status | `nnke-platform` |
-| Compare platforms, trends, and federation state | `nnke-platform` |
-| Manage deployment credentials and teardown | `nnke-platform` |
 
-If you are still shaping a workflow, start with `nnke`. If you are operating a remote workflow across platforms, reach for `nnke-platform`.
+Ananke has no deployment CLI. A workflow runs in your own process.
 
 ---
 
-## Install the tools
+## Install the tool
 
 ```bash
 dotnet tool install -g nnke
-dotnet tool install -g nnke-platform   # optional: needed only for cloud deployment
 ```
 
 Verify:
 
 ```bash
 nnke --version
-nnke-platform --version
 ```
 
 ---
@@ -114,17 +105,3 @@ Starts a local HTTP server that accepts workflow trigger requests. Useful for te
   }
 }
 ```
-
----
-
-## Deploy with `nnke-platform`
-
-```bash
-nnke-platform login --platform azure
-nnke-platform deploy my-agent.ananke.yml --platform azure
-nnke-platform status --workflow my-agent
-```
-
-`nnke-platform` handles credentials, cloud-native deployments, replica scaling, rollbacks, and federation mesh management.
-
-→ [Full nnke-platform reference](nnke-platform-tool.md)

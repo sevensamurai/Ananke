@@ -16,7 +16,7 @@ namespace Ananke.Orchestration.Agents.Routing;
 /// <see cref="Undeclared"/>, and a model that declares nothing stays unroutable rather than being
 /// assumed to do anything — see <see cref="ModelProfile.Undeclared"/>. The danger this guards
 /// against is not a profile over-claiming; it is Ananke quietly assuming that tool calling or vision
-/// will work. SeeD9.
+/// will work.
 /// </para>
 /// </remarks>
 public enum ModelTier

@@ -9,8 +9,10 @@ namespace Ananke.Learning.EntityMemory;
 /// </summary>
 /// <param name="inner">The shared knowledge store.</param>
 /// <param name="entityId">The entity to scope to.</param>
+#pragma warning disable ANNKEEXP004 // implements the experimental listing
 public sealed class EntityScopedKnowledgeStore(
-    IKnowledgeStore inner, string entityId) : IKnowledgeStore
+    IKnowledgeStore inner, string entityId) : IListableKnowledgeStore
+#pragma warning restore ANNKEEXP004
 {
     internal const string EntityIdMetadataKey = "entity_id";
 
@@ -48,6 +50,19 @@ public sealed class EntityScopedKnowledgeStore(
 
         return inner.DeleteAsync(scopedFilter, ct);
     }
+
+    /// <inheritdoc />
+#pragma warning disable ANNKEEXP004 // lists through the experimental listing
+    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+    {
+        if (inner is not IListableKnowledgeStore listable)
+            throw new NotSupportedException($"The store this one scopes ({inner.GetType().Name}) can't list.");
+
+        var scopedFilter = CopyFilter(filter);
+        scopedFilter[EntityIdMetadataKey] = entityId;
+        return listable.ListAsync(scopedFilter, limit, ct);
+    }
+#pragma warning restore ANNKEEXP004
 
     private static KnowledgeFilter CopyFilter(KnowledgeFilter? source)
     {

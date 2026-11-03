@@ -66,11 +66,11 @@ StateMachine.Create<S, T>(initialState, b => b
 
 FireAsync(transition, payload?)               (StateMachine<S, T>)
 TransitionAsync(context, transition)          (AbstractStateMachine<C, S, T, N> — adds:)
-  → Acquire distributed lock (context.Id)
-  → Load persisted state
-  → Evaluate guards
-  → Execute actions + middleware
-  → Persist new state
-  → Release lock
-  → Return TransitionResult<S>
+  → acquire the distributed lock (context.Id)
+  → load the persisted state
+  → check the guards
+  → run the actions and middleware
+  → save the new state
+  → release the lock
+  → return TransitionResult<S>
 ```

@@ -7,17 +7,12 @@ namespace Ananke.Tool.Commands;
 /// All subcommands operate on file-backed or in-process state without requiring
 /// cloud SDK dependencies — consistent with the lean <c>nnke</c> footprint.
 /// </summary>
-/// <remarks>
-/// For federation-level mesh management (deploy, teardown, remote health),
-/// use <c>nnke-platform mesh</c> instead.
-/// </remarks>
 internal static class MeshCommand
 {
     public static Command Create()
     {
         var command = new Command("mesh",
-            "Inspect organic mesh state — cells, lineage, memory, and signals. " +
-            "For federation ops, use nnke-platform.");
+            "Inspect organic mesh state — cells, lineage, memory, and signals.");
 
         command.Add(MeshStatusCommand.Create());
         command.Add(CellTraceCommand.Create());

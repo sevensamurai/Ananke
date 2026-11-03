@@ -1,17 +1,24 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using System.Text.Json.Nodes;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Middleware;
+using Ananke.Orchestration.Tools;
 
 namespace Ananke.Orchestration.Planning;
 
-/// <summary>How a plan node is run as an agent job.</summary>
+/// <summary>How a plan node is run as an agent job answering <typeparamref name="TAnswer"/>.</summary>
 /// <remarks>
 /// Deliberately small. Everything a job builder can already configure — tools, a context strategy, a
 /// tool-output policy, retries — is reachable through <see cref="Configure"/> rather than restated
 /// here, so this type does not become a second copy of the builder that drifts from it.
 /// </remarks>
-public sealed record PlanNodeAgentOptions
+/// <typeparam name="TAnswer">What the node answers: the shape it is asked to fill.</typeparam>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public record PlanNodeAgentOptions<TAnswer>
+    where TAnswer : class, IPlanNodeAnswer
 {
     /// <summary>The model, or a router, the node's job runs against.</summary>
     public required IAgentModel Model { get; init; }
@@ -28,9 +35,9 @@ public sealed record PlanNodeAgentOptions
     /// <remarks>
     /// Order matters and is not configurable: whatever this sets, the contract and the prompt are
     /// applied afterwards and win. A caller that could overwrite them could unpin the contract, and
-    /// then R2 would hold only for callers who remembered.
+    /// the pinned contract would hold only for callers who remembered.
     /// </remarks>
-    public Action<AgentJob<PlanNodeContext, PlanNodeReport>.Builder>? Configure { get; init; }
+    public Action<AgentJob<PlanNodeContext, TAnswer>.Builder>? Configure { get; init; }
 
     /// <summary>
     /// The same, told which node it is configuring.
@@ -52,11 +59,50 @@ public sealed record PlanNodeAgentOptions
     /// </remarks>
     public OperationCatalog? Operations { get; init; }
 
-    public Action<AgentJob<PlanNodeContext, PlanNodeReport>.Builder, PlanNodeContext>? ConfigureFor
+    /// <summary>
+    /// Offers each of <see cref="Operations"/> as a tool too. A call records the operation, applies
+    /// nothing and ends the step's job: the call is its candidate, and no report is asked for. A step
+    /// that calls none answers as it would without them.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why a step would need it.</b> A step with tools answers twice: its tool rounds, then a reply
+    /// turned into the report. A proposal written in prose has to survive that turning, and can be
+    /// lost on the way; a call is structured before it happens. A report asked for after the call
+    /// writes the operation out again, and a copy is not the call. Off by default, and with no
+    /// <see cref="Operations"/> it does nothing.
+    /// </remarks>
+    public bool OperationsAsTools { get; init; }
+
+    /// <summary>
+    /// Offers the answer as a tool too, for an answer that has one (<see cref="IPlanNodeAnswer.Tool"/>).
+    /// A call is the step's answer and ends its job, and no answer is asked for after it. A step that
+    /// calls it not answers as it would without it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why a step would need it.</b> A step with tools that answers in words is asked for the same
+    /// answer again as JSON, in one more call sent without the tools: the answer is written twice, and
+    /// a request without the tools no longer starts as the tool rounds' did, so a provider's prompt
+    /// cache does not hold it. A call gives the answer once, in a request that is the tool rounds' own.
+    /// Off by default.
+    /// </remarks>
+    public bool AnswerAsTool { get; init; }
+
+    public Action<AgentJob<PlanNodeContext, TAnswer>.Builder, PlanNodeContext>? ConfigureFor
     {
         get;
         init;
     }
+
+    /// <summary>
+    /// The fields a step's effort is written as, for the model this runner runs on, such as
+    /// OpenRouter's <c>reasoning</c>. Every request of a step that names an effort
+    /// (<see cref="PlanNode.Effort"/>) carries them.
+    /// </summary>
+    /// <remarks>
+    /// <see langword="null"/> when this runner has no way to write one. A step that names an effort is
+    /// then refused before any call, rather than run at the model's default.
+    /// </remarks>
+    public Func<string, IReadOnlyDictionary<string, JsonNode>>? EffortFields { get; init; }
 
 
     /// <summary>
@@ -72,6 +118,10 @@ public sealed record PlanNodeAgentOptions
     /// <summary>Clock used to stamp verdicts and disputes.</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 }
+
+/// <summary>How a plan node is run as an agent job that proposes: it answers a <see cref="PlanNodeReport"/>.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public sealed record PlanNodeAgentOptions : PlanNodeAgentOptions<PlanNodeReport>;
 
 /// <summary>
 /// Runs a plan node as an agent job: the contract is pinned into every request the node makes, the
@@ -102,10 +152,15 @@ public sealed record PlanNodeAgentOptions
 /// is no object alive across two nodes for a result to hide in.
 /// </para>
 /// </remarks>
-public sealed class PlanNodeAgentRunner(PlanNodeAgentOptions options)
+/// <typeparam name="TAnswer">
+/// What the node answers. It decides what the node is asked for and what that means to the executor
+/// (<see cref="IPlanNodeAnswer"/>); the runner decides neither.
+/// </typeparam>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public sealed class PlanNodeAgentRunner<TAnswer>(PlanNodeAgentOptions<TAnswer> options)
+    where TAnswer : class, IPlanNodeAnswer
 {
-    private readonly PlanNodeAgentOptions _options =
-        options ?? throw new ArgumentNullException(nameof(options));
+    private readonly PlanNodeAgentOptions<TAnswer> _options = Checked(options);
 
     /// <summary>This runner as the delegate <see cref="PlanExecutor"/> takes.</summary>
     public PlanNodeRunner AsRunner() => RunAsync;
@@ -115,13 +170,50 @@ public sealed class PlanNodeAgentRunner(PlanNodeAgentOptions options)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        PlanNodeReport? report = null;
+        TAnswer? answer = null;
+        string? endedWith = null;
 
-        var builder = AgentJobFactory.Create<PlanNodeContext, PlanNodeReport>(
+        var builder = AgentJobFactory.Create<PlanNodeContext, TAnswer>(
             $"plan-node:{context.Node.Id}", _options.Model);
+
+        // Before the caller's configuration, so a caller can still read the answer another way.
+        if (TAnswer.FromText is { } read)
+            builder.WithAnswerFromText(said => (TAnswer)read(said));
 
         _options.Configure?.Invoke(builder);
         _options.ConfigureFor?.Invoke(builder, context);
+
+        // After the caller's configuration, so the effort the step names is the one its requests carry.
+        if (context.Node.Effort is { } effort)
+        {
+            var fields = _options.EffortFields?.Invoke(effort) ?? throw new InvalidOperationException(
+                $"'{context.Node.Id}' names the effort '{effort}', and this runner has no way to write one "
+                + "into a request: give its options EffortFields.");
+
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+            builder.WithRequestFields(fields);
+#pragma warning restore ANNKEEXP003
+        }
+
+        Operation? called = null;
+        TAnswer? answeredByCall = null;
+        ToolKit? calls = null;
+
+        if (_options.OperationsAsTools && _options.Operations is { } catalog)
+            calls = OperationTools(catalog, operation => called = operation);
+
+        if (_options.AnswerAsTool && TAnswer.Tool(given => answeredByCall = (TAnswer)given) is { } answering)
+            calls = calls is null ? answering : calls.Merge(answering);
+
+        if (calls is not null)
+        {
+            builder.WithMoreTools(calls)
+                .WhenEndedByTool((state, said) =>
+                {
+                    endedWith = said;
+                    return state;
+                });
+        }
 
         if (!string.IsNullOrWhiteSpace(_options.Persona))
             builder.WithSystemPrompt(_options.Persona);
@@ -134,26 +226,121 @@ public sealed class PlanNodeAgentRunner(PlanNodeAgentOptions options)
             .WithPrompt(BuildPrompt)
             .MapResult((state, produced) =>
             {
-                report = produced;
+                answer = produced;
                 return state;
             })
             .Build();
 
-        await job.ExecuteAsync(context, ct).ConfigureAwait(false);
+        try
+        {
+            await job.ExecuteAsync(context, ct).ConfigureAwait(false);
+        }
+        // A step that has proposed has done its work; what fails after its call loses only the step's
+        // account of it, so the proposal goes to the gate on its own. A step that answered by its call
+        // has given its whole answer. A guardrail stops the step instead: what it blocked is not
+        // something a proposal may outlive.
+        catch (Exception ex) when ((called is not null || answeredByCall is not null)
+                                   && ex is not (OperationCanceledException or GuardrailException)
+                                   && !TerminalProviderError.Is(ex))
+        {
+            return called is not null ? new NodeOutcome { Candidate = called } : answeredByCall!.ToOutcome();
+        }
 
         // What a node said it did goes on the event stream and no further — reported by the executor
         // from the outcome, for every runner shape rather than only for this one. The candidate goes
         // to the executor's shape gate and, once past it, to whatever the supervision applies it
         // with; this type never touches the world itself.
-        return report is null
-            ? NodeOutcome.Nothing
-            : new NodeOutcome
+        //
+        // A step that called its operation ended there, whatever its answer's shape: the call is its
+        // proposal, as it was made, and what it wrote with the call its account of it.
+        if (called is not null)
+            return new NodeOutcome { Summary = string.IsNullOrWhiteSpace(endedWith) ? null : endedWith.Trim(), Candidate = called };
+
+        // A step that gave its answer by calling ended there, and the call carried all of it.
+        if (answeredByCall is not null)
+            return answeredByCall.ToOutcome();
+
+        return answer is null ? NodeOutcome.Nothing : answer.ToOutcome();
+    }
+
+    /// <summary>
+    /// <paramref name="options"/>, once they can run <typeparamref name="TAnswer"/>: an answer that is
+    /// proposed only by calling needs operations offered as tools, or no step could propose.
+    /// </summary>
+    private static PlanNodeAgentOptions<TAnswer> Checked(PlanNodeAgentOptions<TAnswer> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (TAnswer.RequiresOperationsAsTools && !(options.OperationsAsTools && options.Operations is not null))
+        {
+            throw new ArgumentException(
+                $"{typeof(TAnswer).Name} is proposed by calling an operation: give the options Operations and set "
+                + $"{nameof(PlanNodeAgentOptions<TAnswer>.OperationsAsTools)}.",
+                nameof(options));
+        }
+
+        if (options.AnswerAsTool && TAnswer.Tool(_ => { }) is null)
+        {
+            throw new ArgumentException(
+                $"{typeof(TAnswer).Name} has no tool a step could give it by: leave "
+                + $"{nameof(PlanNodeAgentOptions<TAnswer>.AnswerAsTool)} off.",
+                nameof(options));
+        }
+
+        return options;
+    }
+
+    /// <summary>
+    /// Each operation in <paramref name="catalog"/> as a tool whose call is handed to
+    /// <paramref name="record"/>, applies nothing and ends the job.
+    /// </summary>
+    /// <remarks>
+    /// One tool per name: a catalog may define a name at more than one arity, and a tool name is unique.
+    /// Arguments past the fewest any definition of it takes are optional, and the shape gate rules on
+    /// the arity as it does for any candidate. An argument a definition names as a list is offered as
+    /// one, and reaches the operation as the JSON the call held.
+    /// </remarks>
+    private static ToolKit OperationTools(OperationCatalog catalog, Action<Operation> record)
+    {
+        var kit = new ToolKit("operations");
+
+        foreach (var named in catalog.Definitions.GroupBy(d => d.Name, StringComparer.Ordinal))
+        {
+            var most = named.Max(d => d.Arity);
+            var fewest = named.Min(d => d.Arity);
+            var description = string.Join(" Or: ", named.Select(d => d.Description));
+
+            kit.AddTool(named.Key, $"Propose this operation. {description} The call is your proposal and ends your turn; it is applied after.", b =>
             {
-                Summary = report.Summary,
-                Candidate = report.Operation,
-                Done = report.Done,
-                Options = report.Options
-            };
+                b.EndsJob();
+
+                for (var i = 1; i <= most; i++)
+                {
+                    var at = i - 1;
+
+                    if (named.Select(d => d.Lists.GetValueOrDefault(at)).FirstOrDefault(entry => entry is not null) is { } entry)
+                        b.ParamList($"arg{i}", $"Argument {i}, a list, as the operation describes it.", entry, required: i <= fewest);
+                    else
+                        b.Param<string>($"arg{i}", $"Argument {i}, as the operation describes it.", required: i <= fewest);
+                }
+
+                b.OnExecute(args =>
+                {
+                    var given = Enumerable.Range(1, most).Select(i => args.GetOrDefault($"arg{i}")).ToList();
+
+                    while (given.Count > 0 && given[^1] is null)
+                        given.RemoveAt(given.Count - 1);
+
+                    record(new Operation { Name = named.Key, Arguments = [.. given.Select(a => a ?? string.Empty)] });
+
+                    // The step does not read this: its job ends at the call. A conversation kept
+                    // across steps does, so it says only what happened.
+                    return ToolResult.Ok($"Proposed {named.Key}.");
+                });
+            });
+        }
+
+        return kit;
     }
 
     /// <summary>
@@ -210,59 +397,51 @@ public sealed class PlanNodeAgentRunner(PlanNodeAgentOptions options)
         // spent an ADR taking judgement out of. What to do next is already in the contract below.
         if (context.Rejection is { } rejection)
         {
-            text.Append("# Your last attempt could not be used\n\n").Append("You proposed:\n\n> ")
-                .Append(rejection.Candidate.ToString()).Append("\n\nIt could not be used: ")
-                .Append(rejection.Finding).Append("\n\n");
+            text.Append("# Your last attempt could not be used\n\n");
+
+            if (rejection.Candidate is { } candidate)
+                text.Append("You proposed:\n\n> ").Append(candidate.ToString()).Append("\n\n");
+
+            if (rejection.Findings.Count > 0)
+            {
+                text.Append("You reported:\n\n");
+                foreach (var finding in rejection.Findings)
+                    text.Append("> ").Append(finding.Claim).Append('\n');
+                text.Append('\n');
+            }
+
+            text.Append("It could not be used: ").Append(rejection.Finding).Append("\n\n");
         }
 
-        text.Append("# Your turn\n\n");
+        text.Append("# Your turn\n\n").Append(TAnswer.Instructions(_options.Operations));
 
-        // Without operations there is nothing to apply, so the step only reports what it found.
-        text.Append(_options.Operations is null
-            ? "Look up what your contract asks for with your tools, and say what you found in a sentence or two.\n\n"
-            : "Propose the change that would satisfy your contract. You do not perform it yourself: "
-              + "something outside you applies it, then checks whether it worked. Leave it out only if "
-              + "this step has nothing of its own to change. Then say what you propose, or why nothing "
-              + "needs to change, in a sentence or two.\n\n");
-
-        text.Append("Set \"Done\" to true when what you found meets your contract, and false when it does ")
-            .Append("not. List in \"Options\" the choices you found, one short line each that names the ")
-            .Append("choice so a person can pick it: when \"Done\" is true, every choice that meets the ")
-            .Append("contract; when it is false, every choice that comes close — the same thing on a smaller ")
-            .Append("scale, on other dates or in another version, where the results show one. Take options ")
-            .Append("only from what your tools returned — never advice, never a reason, and never something ")
-            .Append("you did not look up — and keep the order the results gave them. Do not choose between ")
-            .Append("them; whoever reads them decides. Why goes in your summary, not in \"Options\". If ")
-            .Append("nothing comes close, leave \"Options\" empty.");
-
-        // What may be proposed, rather than an invitation to invent one. A step asked for an
-        // operation "in its own words" writes something plausible and unrecognised, and the run
-        // spends a shape rejection discovering it.
-        if (_options.Operations is { } catalog)
+        if (_options.AnswerAsTool && TAnswer.Tool(_ => { }) is { } answering)
         {
-            text.Append(" If you could not do it, propose nothing.\n\n")
-                // Proposing is the whole of a step's part here, and its contract cannot be met while
-                // it proposes: nothing has applied the change or checked it yet. Read the other way,
-                // a step that proposed correctly reports it is not done, and the executor drops the
-                // candidate it just made. Said only where operations exist — a step that reports
-                // findings answers the question the advisor asks, which is a different one.
-                .Append("Proposing a change is doing your part, so set \"Done\" to true when you ")
-                .Append("propose one: something outside you applies it and checks it afterwards, and ")
-                .Append("until that has happened no contract about the change can be met. Set ")
-                .Append("\"Done\" to false only when you could not do your part at all — a tool or a ")
-                .Append("service failed, what was asked was not clear enough to act on, or there is ")
-                .Append("nothing you can propose.\n\n")
-                // The proposal is the operation, so a step that proposed has nothing left to offer
-                // anyone a choice between. Said here because a run put the whole apply_diff call
-                // into an option, which a person would have been asked to pick between.
-                .Append("When you propose a change, leave \"Options\" empty: the proposal is the ")
-                .Append("operation, and there is nothing there for anyone to choose between. Options ")
-                .Append("belong to the case where you could not do your part — one short line each, ")
-                .Append("in words somebody can act on, never a diff and never an operation.\n\n")
-                .Append("The operations that exist. Choose one and give its name and ")
-                .Append("arguments exactly:\n\n").Append(catalog.Legend());
+            text.Append("\n\nGive your answer by calling ")
+                .Append(string.Join(" or ", answering.Tools.Keys))
+                .Append(": the call is your answer and ends your turn.");
         }
 
         return text.ToString();
     }
+}
+
+/// <summary>
+/// Runs a plan node as an agent job that proposes: it answers a <see cref="PlanNodeReport"/>. The
+/// shape every node had before a step could be asked for less.
+/// </summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public sealed class PlanNodeAgentRunner(PlanNodeAgentOptions options)
+{
+    private readonly PlanNodeAgentRunner<PlanNodeReport> _runner = new(options);
+
+    /// <summary>This runner as the delegate <see cref="PlanExecutor"/> takes.</summary>
+    public PlanNodeRunner AsRunner() => _runner.AsRunner();
+
+    /// <summary>Runs one node and turns what it reported into an outcome.</summary>
+    public Task<NodeOutcome> RunAsync(PlanNodeContext context, CancellationToken ct = default) =>
+        _runner.RunAsync(context, ct);
+
+    /// <summary>The node's turn-one prompt.</summary>
+    internal string BuildPrompt(PlanNodeContext context) => _runner.BuildPrompt(context);
 }

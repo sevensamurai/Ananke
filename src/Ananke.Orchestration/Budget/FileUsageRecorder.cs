@@ -72,6 +72,7 @@ public sealed class FileUsageRecorder : IUsageRecorder, IDisposable
         {
             var path = CurrentPath();
             var totals = await ReadFileAsync(path, ct).ConfigureAwait(false);
+            var uncosted = record.ModelCost is null && !record.Priced;
 
             await WriteFileAsync(path, totals with
             {
@@ -79,10 +80,8 @@ public sealed class FileUsageRecorder : IUsageRecorder, IDisposable
                 OutputTokens = totals.OutputTokens + record.Usage.OutputTokens,
                 // Tokens that arrived with no per-call rate must be kept apart, or a budget
                 // cannot price them at flat rates later.
-                UncostedInputTokens = totals.UncostedInputTokens +
-                    (record.ModelCost is null ? record.Usage.InputTokens : 0),
-                UncostedOutputTokens = totals.UncostedOutputTokens +
-                    (record.ModelCost is null ? record.Usage.OutputTokens : 0),
+                UncostedInputTokens = totals.UncostedInputTokens + (uncosted ? record.Usage.InputTokens : 0),
+                UncostedOutputTokens = totals.UncostedOutputTokens + (uncosted ? record.Usage.OutputTokens : 0),
                 AccumulatedCost = totals.AccumulatedCost + (record.ModelCost ?? 0m),
                 HasModelBasedCost = totals.HasModelBasedCost || record.ModelCost is not null
             }, ct).ConfigureAwait(false);

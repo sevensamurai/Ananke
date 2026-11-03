@@ -20,7 +20,8 @@ namespace Ananke.Orchestration.Agents.Context;
 /// <para>
 /// When the total is under the threshold, the original list is returned unchanged.
 /// The <see cref="RecentMessageCount"/> controls how many trailing messages are
-/// always preserved (not summarized).
+/// always preserved (not summarized) — fewer when that boundary would otherwise
+/// keep a tool result whose call was summarized away, which a provider rejects.
 /// </para>
 /// </remarks>
 /// <example>
@@ -105,26 +106,33 @@ public sealed class SummarizingContextStrategy : IContextStrategy
             return ContextProjection.Unchanged(messages, applied);
 
         var systemTokens = systemPrompt is not null ? _tokenCounter.EstimateTokens(systemPrompt) : 0;
+        var messageCosts = new int[messages.Count];
         var total = systemTokens;
-        var shadowedTokens = 0;
         for (var i = 0; i < messages.Count; i++)
         {
-            var cost = _tokenCounter.EstimateTokens(messages[i]);
-            total += cost;
-            if (i < messages.Count - _recentMessageCount)
-                shadowedTokens += cost;
+            messageCosts[i] = _tokenCounter.EstimateTokens(messages[i]);
+            total += messageCosts[i];
         }
 
         if (total <= applied)
             return ContextProjection.Unchanged(messages, applied);
 
-        // Split: old messages to summarize, recent messages to keep
+        // Split: old messages to summarize, recent messages to keep. A tool result kept
+        // without the assistant call that produced it is a request no provider accepts, so
+        // any such orphan at the front of "recent" moves into the summarized half instead.
         var splitIndex = messages.Count - _recentMessageCount;
+        while (splitIndex < messages.Count - 1 && messages[splitIndex].Role == AgentRole.Tool)
+            splitIndex++;
+
+        var shadowedTokens = 0;
+        for (var i = 0; i < splitIndex; i++)
+            shadowedTokens += messageCosts[i];
+
         var oldMessages = new List<AgentMessage>(splitIndex);
         for (var i = 0; i < splitIndex; i++)
             oldMessages.Add(messages[i]);
 
-        var recentMessages = new List<AgentMessage>(_recentMessageCount);
+        var recentMessages = new List<AgentMessage>(messages.Count - splitIndex);
         for (var i = splitIndex; i < messages.Count; i++)
             recentMessages.Add(messages[i]);
 

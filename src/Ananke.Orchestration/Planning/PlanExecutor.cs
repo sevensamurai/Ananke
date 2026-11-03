@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
@@ -11,6 +12,7 @@ namespace Ananke.Orchestration.Planning;
 /// message history. If one were added, the design would quietly become a handoff again and the tree
 /// would become a log of it.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNodeContext
 {
     /// <summary>The plan it belongs to.</summary>
@@ -49,10 +51,16 @@ public sealed record PlanNodeContext
     public NodeRejection? Rejection { get; init; }
 }
 
-/// <summary>What a runner said about a rejected candidate, for the retry that follows it.</summary>
-/// <param name="Candidate">The rejected candidate, verbatim — never summarised.</param>
+/// <summary>What a runner said that could not be used, for the retry that follows it.</summary>
+/// <param name="Candidate">The rejected candidate, verbatim — never summarised. <see langword="null"/>
+/// when what was refused was not a candidate.</param>
 /// <param name="Finding">Why it could not be used, verbatim — the world's or the gate's own words.</param>
-public sealed record NodeRejection(Operation Candidate, string Finding);
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public sealed record NodeRejection(Operation? Candidate, string Finding)
+{
+    /// <summary>The findings refused for naming no source, verbatim.</summary>
+    public IReadOnlyList<NodeFinding> Findings { get; init; } = [];
+}
 
 /// <summary>What a node produced: verdicts against its criteria, and what it says it did.</summary>
 /// <remarks>
@@ -61,6 +69,7 @@ public sealed record NodeRejection(Operation Candidate, string Finding);
 /// <see cref="PlanExecutor.DisputeAsync"/>, an external call rather than something this type can
 /// carry.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record NodeOutcome
 {
     /// <summary>Verdicts recorded against this node's acceptance criteria.</summary>
@@ -103,11 +112,15 @@ public sealed record NodeOutcome
     /// <summary>Every option the node found, as it reported it.</summary>
     public IReadOnlyList<string> Options { get; init; } = [];
 
+    /// <summary>What the node found about the world, each with where it can be checked again.</summary>
+    public IReadOnlyList<NodeFinding> Findings { get; init; } = [];
+
     /// <summary>Nothing to record. A node that decomposed and did no checking of its own.</summary>
     public static NodeOutcome Nothing { get; } = new();
 }
 
 /// <summary>Runs one node. Anything can implement it — an agent job, a shell check, a person.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<NodeOutcome> PlanNodeRunner(PlanNodeContext context, CancellationToken ct);
 
 /// <summary>
@@ -122,15 +135,17 @@ public delegate Task<NodeOutcome> PlanNodeRunner(PlanNodeContext context, Cancel
 /// <para>
 /// <b>May still find the candidate unusable, and that is also a shape fact, never a verdict on the
 /// work.</b> "This does not read as an operation I recognise" is a fair rejection; "that place does
-/// not exist" is not (S8) — the candidate reaches the world regardless of whether its target is
+/// not exist" is not — the candidate reaches the world regardless of whether its target is
 /// real, and what the world says about it becomes ordinary evidence for the acceptance gate to find
 /// on its own next read, never something this delegate decides by refusing to apply it.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<PlanApplication> PlanCandidateApplier(
     Operation candidate, PlanNodeContext context, CancellationToken ct);
 
 /// <summary>Whether a candidate was understood well enough to act on, and what to say if not.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanApplication
 {
     /// <summary>Whether the candidate parsed into a real operation and was applied.</summary>
@@ -165,6 +180,7 @@ public sealed record PlanApplication
 /// per node rather than a log of them.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanRunResult
 {
     /// <summary>The tree as it stands after the pass, verdicts written back.</summary>
@@ -228,6 +244,7 @@ public sealed record PlanRunResult
 /// that ran out of room printed the same word, and neither of them said whether anybody was waiting
 /// on an answer.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum PlanRunOutcome
 {
     /// <summary>The run stopped and something outside it has to move before it can go on.</summary>
@@ -283,6 +300,7 @@ public enum PlanRunOutcome
 /// and only a halt reaches whoever could do something about it.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanExecutor(
     IPlanTreeStore store,
     TimeProvider? timeProvider = null,
@@ -423,7 +441,8 @@ public sealed class PlanExecutor(
             // What a node said it did, reported for every runner shape rather than only for the one
             // that happens to be an agent. A step that is a program, a command or a person has an
             // account of itself too, and a narration missing it reads as a plan that did nothing.
-            if (outcome.Summary is { Length: > 0 } summary)
+            // A step that only found something has an account of itself too.
+            if (outcome.Summary is { Length: > 0 } || outcome.Findings.Count > 0)
             {
                 await Report(new PlanNodeReported
                 {
@@ -432,7 +451,8 @@ public sealed class PlanExecutor(
                     PlanId = planId,
                     PlanVersion = tree!.Current.Number,
                     NodeId = nodeId,
-                    Summary = summary
+                    Summary = outcome.Summary ?? string.Empty,
+                    Findings = outcome.Findings
                 }).ConfigureAwait(false);
             }
 
@@ -456,7 +476,8 @@ public sealed class PlanExecutor(
                 ProjectedTokens = projection.EstimatedTokens,
                 OmittedAncestors = projection.OmittedAncestors,
                 OmittedRecords = projection.OmittedVerdicts,
-                Summary = string.IsNullOrWhiteSpace(outcome.Summary) ? null : outcome.Summary
+                Summary = string.IsNullOrWhiteSpace(outcome.Summary) ? null : outcome.Summary,
+                Findings = outcome.Findings
             });
 
             // An attempt that finished is the direct answer to one that did not. A dispute is not
@@ -628,10 +649,10 @@ public sealed class PlanExecutor(
     /// <summary>
     /// Runs <paramref name="runner"/>, retrying mechanically while its candidate fails the shape
     /// gate, and throwing once it gives up — caught by <see cref="ExecuteAsync"/> exactly like any
-    /// other attempt that produced nothing to evaluate (S0, S9's same family of thing).
+    /// other attempt that produced nothing to evaluate.
     /// </summary>
     /// <remarks>
-    /// <b>Every retry carries exactly the three things §2.3 allows, and nothing this loop wrote.</b>
+    /// <b>Every retry carries exactly three things, and nothing this loop wrote.</b>
     /// The contract is already pinned into <paramref name="context"/>; the rejected candidate and the
     /// finding travel in <see cref="PlanNodeContext.Rejection"/>, verbatim, because the runner is
     /// stateless between attempts and the tree does not remember shape failures — only settled facts.
@@ -674,6 +695,22 @@ public sealed class PlanExecutor(
                 // last one said — the count lives in this sentence and nowhere a plan can read it.
                 throw new PlanAttemptsExhaustedException(
                     $"could not be run: {attempt} attempts, {ex.Message}", ex);
+            }
+
+            // A finding is evidence only because it says where it can be checked again, so one that
+            // names no source is a shape failure, retried like a malformed candidate. Form only: what a
+            // source says is never looked at here.
+            if (outcome.Findings.Where(f => string.IsNullOrWhiteSpace(f.Source)).ToList() is { Count: > 0 } unsourced)
+            {
+                var refused = unsourced.Count == 1
+                    ? "1 finding names no source."
+                    : $"{unsourced.Count} findings name no source.";
+
+                if (attempt >= _retries.Attempts)
+                    throw new PlanShapeRejectedException(refused);
+
+                rejection = new NodeRejection(null, refused) { Findings = unsourced };
+                continue;
             }
 
             // No candidate at all is not a shape failure. Plenty of nodes — anything that only
@@ -804,8 +841,16 @@ public sealed class PlanExecutor(
     /// contract it still has; what changed is that a choice inside the work has been made, by somebody
     /// entitled to make it. The next attempt reads it off the node.
     /// </remarks>
-    public async Task<PlanTree> AnswerAsync(
-        string planId, string nodeId, string answer, string by, CancellationToken ct = default)
+    public Task<PlanTree> AnswerAsync(
+        string planId, string nodeId, string answer, string by, CancellationToken ct = default) =>
+        AnswerAsync(planId, nodeId, answer, by, unasked: null, ct);
+
+    /// <summary>
+    /// The same, for a node that may have asked nothing: <paramref name="unasked"/> is then what it is
+    /// answered about — why it stopped — and it is attempted again on the next pass.
+    /// </summary>
+    internal async Task<PlanTree> AnswerAsync(
+        string planId, string nodeId, string answer, string by, string? unasked, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(answer);
         ArgumentException.ThrowIfNullOrWhiteSpace(by);
@@ -813,11 +858,13 @@ public sealed class PlanExecutor(
         var tree = await store.LoadAsync(planId, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"No plan '{planId}' in the store.");
 
-        var question = tree.Node(nodeId).Question
-            ?? throw new InvalidOperationException(
+        var question = tree.Node(nodeId).Question;
+
+        if (question is null && string.IsNullOrWhiteSpace(unasked))
+            throw new InvalidOperationException(
                 $"'{nodeId}' was answered \"{answer}\" and is not waiting to be told anything.");
 
-        var asked = question.Asks;
+        var asked = question?.Asks ?? unasked!;
 
         var answered = tree.WithAnswer(nodeId, new PlanAnswer
         {
@@ -828,9 +875,9 @@ public sealed class PlanExecutor(
         });
 
         // Choosing one of the options a step left after doing its task settles the step on it. Any
-        // other answer — to a question the step raised itself, or to one it left after it could not
-        // do its task — leaves the step to be attempted again.
-        answered = question.Done
+        // other answer — to a question the step raised itself, to one it left after it could not do
+        // its task, or to a step that asked nothing — leaves the step to be attempted again.
+        answered = question is { Done: true }
             && question.Options.FirstOrDefault(o => string.Equals(o.Trim(), answer.Trim(), StringComparison.OrdinalIgnoreCase))
                 is { } chosen
             ? answered.WithState(nodeId, StepState.Done, chosen)
@@ -1089,9 +1136,18 @@ public sealed class PlanExecutor(
         // Read once, here. Everything below asks the replacement children two questions — what the
         // new version holds, and what nothing can decide about it — and a caller is entitled to hand
         // this in as a query that only enumerates once.
-        var replacement = children?.Select(c => (c.Id, c.Contract)).ToList();
+        var steps = children?.ToList();
+        var replacement = steps?.Select(c => (c.Id, c.Contract)).ToList();
 
         var reruled = tree.Rerule(nodeId, contract, reason, replacement, _time, rationale);
+
+        // What each step it writes touches; a step that names nothing keeps what it touched before.
+        foreach (var step in steps ?? [])
+        {
+            if (step.Touches.Count > 0)
+                reruled = reruled.WithTouches(step.Id, step.Touches);
+        }
+
         await store.SaveAsync(reruled, ct).ConfigureAwait(false);
 
         var (workflowName, executionId) = PlanEvent.Identity();

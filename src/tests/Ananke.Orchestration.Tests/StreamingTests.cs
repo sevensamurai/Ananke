@@ -1,5 +1,7 @@
+using Ananke.Orchestration.Execution;
 using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Streaming;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -28,6 +30,25 @@ public class StreamingTests
 
         events.OfType<WorkflowCompleted<CounterState>>().Count().ShouldBe(1);
         events.OfType<WorkflowCompleted<CounterState>>().First().Result.Success.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task StreamAsync_Events_AreStampedByTheRunnersClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var events = new List<WorkflowEvent>();
+
+        await foreach (var evt in new Workflow<CounterState>("stream-clocked")
+            .Job("a", (s, _) => Task.FromResult(s with { Value = 1 }))
+            .Then("a", Workflow.End)
+            .UseRunner(new WorkflowRunner(timeProvider: new FakeTimeProvider(now)))
+            .StreamAsync(new CounterState()))
+        {
+            events.Add(evt);
+        }
+
+        events.ShouldNotBeEmpty();
+        events.ShouldAllBe(e => e.Timestamp == now);
     }
 
     [Test]

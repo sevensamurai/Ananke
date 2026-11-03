@@ -3,6 +3,7 @@ using System.Net;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Middleware;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests;
@@ -82,6 +83,15 @@ public class ProviderRetryDelayTests
     }
 
     [Test]
+    public void From_AnSdkThatStatesAMoment_MeasuresItOnTheGivenClock()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 9, 29, 12, 0, 0, TimeSpan.Zero));
+
+        ProviderRetryDelay.From(new RetryAt(clock.GetUtcNow().AddSeconds(30)), clock)
+            .ShouldBe(TimeSpan.FromSeconds(30));
+    }
+
+    [Test]
     public void From_AZeroDelay_SaysNothing() =>
         ProviderRetryDelay.From(new Exception("""{"retryDelay":"0s"}""")).ShouldBeNull();
 
@@ -149,6 +159,11 @@ public class ProviderRetryDelayTests
             await Task.Yield();
             yield return new AgentStreamChunk { TextDelta = "ok" };
         }
+    }
+
+    private sealed class RetryAt(DateTimeOffset retryAfter) : Exception("rate limited")
+    {
+        public DateTimeOffset RetryAfter { get; } = retryAfter;
     }
 
     private sealed class RateLimited(TimeSpan retryAfter, string message) : Exception(message)

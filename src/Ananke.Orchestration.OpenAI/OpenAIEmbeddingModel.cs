@@ -29,11 +29,25 @@ public sealed class OpenAIEmbeddingModel(EmbeddingClient client) : IEmbeddingMod
         if (endpoint is not null)
         {
             var options = new OpenAIClientOptions { Endpoint = endpoint };
-            return new OpenAIEmbeddingModel(new EmbeddingClient(model, credential, options));
+            return new OpenAIEmbeddingModel(new EmbeddingClient(model, credential, options))
+            {
+                ModelName = model,
+                ProviderName = endpoint.Host,
+            };
         }
 
-        return new OpenAIEmbeddingModel(new EmbeddingClient(model, credential));
+        return new OpenAIEmbeddingModel(new EmbeddingClient(model, credential)) { ModelName = model };
     }
+
+    /// <inheritdoc />
+    /// <remarks>Known when the model was made by <see cref="Create"/>; a model made from a client alone says nothing.</remarks>
+    public EmbeddingModelIdentity? Identity => ModelName is null ? null : new(ProviderName, ModelName);
+
+    /// <summary>The model's name, as given to <see cref="Create"/>.</summary>
+    internal string? ModelName { get; init; }
+
+    /// <summary>The identity's provider: <c>openai</c>, or the host of the endpoint given to <see cref="Create"/>.</summary>
+    internal string ProviderName { get; init; } = "openai";
 
     /// <inheritdoc />
     public async Task<ReadOnlyMemory<float>> EmbedAsync(string text, CancellationToken ct = default)

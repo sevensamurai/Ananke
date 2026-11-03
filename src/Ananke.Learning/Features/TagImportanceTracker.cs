@@ -86,7 +86,7 @@ public sealed class TagImportanceTracker(
         {
             Importances = importances,
             EntriesAnalyzed = entriesWithValence,
-            ComputedAt = DateTimeOffset.UtcNow
+            ComputedAt = _options.Clock.GetUtcNow()
         };
     }
 }

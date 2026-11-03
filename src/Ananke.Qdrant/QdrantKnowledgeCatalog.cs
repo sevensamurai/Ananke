@@ -18,7 +18,7 @@ namespace Ananke.Qdrant;
 /// <para>
 /// Catalog metadata is stored as Qdrant payload fields:
 /// <c>source</c>, <c>keywords</c> (comma-separated), <c>category</c>,
-/// <c>indexed_at</c> (ISO 8601), <c>chunk_count</c>, and optional <c>superseded_by</c>.
+/// <c>indexed_at</c> (ISO 8601), optional <c>effective_at</c>, <c>chunk_count</c>, and optional <c>superseded_by</c>.
 /// </para>
 /// </remarks>
 public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
@@ -28,8 +28,14 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
     private const string KeywordsPayloadKey = "keywords";
     private const string CategoryPayloadKey = "category";
     private const string IndexedAtPayloadKey = "indexed_at";
+    private const string EffectiveAtPayloadKey = "effective_at";
+    private const string ReplacesPayloadKey = "replaces";
     private const string ChunkCountPayloadKey = "chunk_count";
     private const string SupersededByPayloadKey = "superseded_by";
+    private const string FieldsPayloadKey = "fields";
+
+    /// <summary>The payload key holding each header field as <c>key=value</c>, lower case, so browsing can match one.</summary>
+    internal const string FieldValuesPayloadKey = "field_values";
 
     private readonly QdrantClient _client;
     private readonly IEmbeddingModel _embedder;
@@ -75,18 +81,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
         var embeddingText = BuildEmbeddingText(entry);
         var embedding = await _embedder.EmbedAsync(embeddingText, ct).ConfigureAwait(false);
 
-        var payload = new Dictionary<string, Value>
-        {
-            [TextPayloadKey] = embeddingText,
-            [SourcePayloadKey] = entry.Source,
-            [KeywordsPayloadKey] = string.Join(",", entry.Keywords),
-            [CategoryPayloadKey] = entry.Category,
-            [IndexedAtPayloadKey] = entry.IndexedAt.ToUnixTimeSeconds(),
-            [ChunkCountPayloadKey] = entry.ChunkCount.ToString(),
-            [SupersededByPayloadKey] = entry.SupersededBy is not null
-                ? new Value { StringValue = entry.SupersededBy }
-                : new Value { NullValue = default }
-        };
+        var payload = BuildPayload(entry, embeddingText);
 
         var point = new PointStruct
         {
@@ -141,9 +136,9 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             Must = { Conditions.IsNull(SupersededByPayloadKey) }
         };
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: queryEmbedding,
+            query: queryEmbedding.ToArray(),
             filter: filter,
             limit: (ulong)topK,
             payloadSelector: true,
@@ -169,6 +164,11 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
         if (options.Category is not null)
         {
             filter.Must.Add(Conditions.MatchKeyword(CategoryPayloadKey, options.Category));
+        }
+
+        if (options.Field is not null)
+        {
+            filter.Must.Add(Conditions.MatchKeyword(FieldValuesPayloadKey, FieldValue(options.Field, options.Value ?? "")));
         }
 
         if (options.NotOlderThan is not null)
@@ -198,7 +198,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
 
         return scrollResponse.Result
             .Select(MapRetrievedPoint)
-            .OrderByDescending(e => e.IndexedAt)
+            .OrderByDescending(e => options.Order == CatalogBrowseOrder.EffectiveAt ? e.EffectiveAt ?? e.IndexedAt : e.IndexedAt)
             .ToList();
     }
 
@@ -269,7 +269,34 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
         return $"{entry.Summary}\nKeywords: {keywords}\nCategory: {entry.Category}";
     }
 
-    private static CatalogEntry MapPayload(IReadOnlyDictionary<string, Value> payload)
+    /// <summary>The point's payload for <paramref name="entry"/>, read back by <see cref="MapPayload"/>.</summary>
+    internal static Dictionary<string, Value> BuildPayload(CatalogEntry entry, string embeddingText) => new()
+    {
+        [TextPayloadKey] = embeddingText,
+        [SourcePayloadKey] = entry.Source,
+        [KeywordsPayloadKey] = string.Join(",", entry.Keywords),
+        [CategoryPayloadKey] = entry.Category,
+        [IndexedAtPayloadKey] = entry.IndexedAt.ToUnixTimeSeconds(),
+        [EffectiveAtPayloadKey] = entry.EffectiveAt is { } effectiveAt
+            ? new Value { IntegerValue = effectiveAt.ToUnixTimeSeconds() }
+            : new Value { NullValue = default },
+        [ChunkCountPayloadKey] = entry.ChunkCount.ToString(),
+        [ReplacesPayloadKey] = System.Text.Json.JsonSerializer.Serialize(entry.Replaces),
+        [FieldsPayloadKey] = System.Text.Json.JsonSerializer.Serialize(entry.Fields),
+        [FieldValuesPayloadKey] = new Value
+        {
+            ListValue = new ListValue { Values = { entry.Fields.Select(f => new Value { StringValue = FieldValue(f.Key, f.Value) }) } },
+        },
+        [SupersededByPayloadKey] = entry.SupersededBy is not null
+            ? new Value { StringValue = entry.SupersededBy }
+            : new Value { NullValue = default }
+    };
+
+    /// <summary>A header field as <see cref="FieldValuesPayloadKey"/> holds it: <c>key=value</c>, lower case.</summary>
+    private static string FieldValue(string key, string value) =>
+        $"{key.ToLowerInvariant()}={value.ToLowerInvariant()}";
+
+    internal static CatalogEntry MapPayload(IReadOnlyDictionary<string, Value> payload)
     {
         var source = payload.TryGetValue(SourcePayloadKey, out var s) ? s.StringValue : string.Empty;
         var keywords = payload.TryGetValue(KeywordsPayloadKey, out var kw)
@@ -288,6 +315,11 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             else if (ts.KindCase == Value.KindOneofCase.StringValue && DateTimeOffset.TryParse(ts.StringValue, out var parsed))
                 indexedAt = parsed;
         }
+
+        DateTimeOffset? effectiveAt = payload.TryGetValue(EffectiveAtPayloadKey, out var ea)
+                                      && ea.KindCase == Value.KindOneofCase.IntegerValue
+            ? DateTimeOffset.FromUnixTimeSeconds(ea.IntegerValue)
+            : null;
 
         var chunkCount = payload.TryGetValue(ChunkCountPayloadKey, out var cc)
                          && int.TryParse(cc.StringValue, out var count)
@@ -311,6 +343,13 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
             Keywords = keywords,
             Category = category,
             IndexedAt = indexedAt,
+            EffectiveAt = effectiveAt,
+            Replaces = payload.TryGetValue(ReplacesPayloadKey, out var rp) && rp.KindCase == Value.KindOneofCase.StringValue
+                ? System.Text.Json.JsonSerializer.Deserialize<string[]>(rp.StringValue) ?? []
+                : [],
+            Fields = payload.TryGetValue(FieldsPayloadKey, out var fp) && fp.KindCase == Value.KindOneofCase.StringValue
+                ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(fp.StringValue) ?? []
+                : [],
             ChunkCount = chunkCount,
             SupersededBy = supersededBy
         };

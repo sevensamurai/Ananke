@@ -80,12 +80,17 @@ public sealed class InMemoryKnowledgeCatalog : IKnowledgeCatalog
             .Where(e => options.Category is null
                         || string.Equals(e.Category, options.Category, StringComparison.OrdinalIgnoreCase))
             .Where(e => options.NotOlderThan is null || e.IndexedAt >= options.NotOlderThan)
-            .OrderByDescending(e => e.IndexedAt)
+            .Where(e => options.Field is null || HasField(e, options.Field, options.Value))
+            .OrderByDescending(e => options.Order == CatalogBrowseOrder.EffectiveAt ? e.EffectiveAt ?? e.IndexedAt : e.IndexedAt)
             .Take(options.Limit)
             .ToList();
 
         return Task.FromResult<IReadOnlyList<CatalogEntry>>(results);
     }
+
+    private static bool HasField(CatalogEntry entry, string field, string? value) =>
+        entry.Fields.Any(f => string.Equals(f.Key, field, StringComparison.OrdinalIgnoreCase)
+                              && string.Equals(f.Value, value, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Returns the number of entries currently in the catalog.</summary>
     public int Count => _entries.Count;

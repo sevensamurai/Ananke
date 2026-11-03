@@ -4,6 +4,7 @@ using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
 using Ananke.Organics.Memory;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Memory;
@@ -307,6 +308,21 @@ public class RememberedPlanTermsTests
     };
 
     /// <summary>Settles a term in one run, through the event the plan tier already raises.</summary>
+    [Test]
+    public async Task ASettledTerm_IsStampedByTheClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var memory = new InMemoryEmpiricalMemory(new InMemoryEmbedder());
+        var remembering = new RememberedPlanTerms(memory, clock: new FakeTimeProvider(now));
+
+        await Settle(remembering, "trip-january");
+
+        var entry = await memory.GetAsync("trip-january:t1");
+        entry.ShouldNotBeNull();
+        entry.FirstObserved.ShouldBe(now);
+        entry.LastObserved.ShouldBe(now);
+    }
+
     private static async Task Settle(RememberedPlanTerms remembering, string planId)
     {
         await remembering.Sink().ReportAsync(new PlanTermCommitted

@@ -62,7 +62,8 @@ public static class ServiceCollectionExtensions
             return new WorkflowRunner(store, tracer: tracer,
                 storeCompletions: options.StoreCompletionsEnabled,
                 loggerFactory: loggerFactory,
-                checkpointTtl: options.CheckpointTtl);
+                checkpointTtl: options.CheckpointTtl,
+                recordContent: options.RecordContentEnabled);
         });
 
         if (options.MemoryCleanupInterval is { } interval)
@@ -147,6 +148,7 @@ public class OrchestrationOptions
 {
     internal bool UseInMemoryCheckpoints { get; private set; }
     internal bool StoreCompletionsEnabled { get; private set; }
+    internal bool RecordContentEnabled { get; private set; }
     internal TimeSpan CheckpointTtl { get; private set; } = TimeSpan.FromDays(7);
     internal TimeSpan? MemoryCleanupInterval { get; private set; }
 
@@ -163,6 +165,17 @@ public class OrchestrationOptions
     public OrchestrationOptions StoreCompletions(bool enabled)
     {
         StoreCompletionsEnabled = enabled;
+        return this;
+    }
+
+    /// <summary>
+    /// Controls whether each tool call's arguments and result are recorded on
+    /// <see cref="Streaming.AgentToolCalled"/>, for every workflow the registered runner runs.
+    /// Default is <c>false</c>. See <c>Workflow.RecordContent</c>.
+    /// </summary>
+    public OrchestrationOptions RecordContent(bool enabled)
+    {
+        RecordContentEnabled = enabled;
         return this;
     }
 

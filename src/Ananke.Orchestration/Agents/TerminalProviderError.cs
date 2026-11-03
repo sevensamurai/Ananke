@@ -4,7 +4,8 @@ namespace Ananke.Orchestration.Agents;
 
 /// <summary>
 /// Whether a provider error is one that waiting cannot fix — a depleted account rather than a busy
-/// one — even though it arrived looking exactly like a rate limit.
+/// one — even though it arrived looking exactly like a rate limit; or a reply that repeats itself
+/// (<see cref="RepeatedOutputException"/>), which asking again would pay for twice.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -64,7 +65,8 @@ public static class TerminalProviderError
 
     /// <summary>
     /// Whether <paramref name="exception"/> — or anything it wraps — says the account cannot serve
-    /// this call at all, as opposed to not right now.
+    /// this call at all, as opposed to not right now, or is a <see cref="RepeatedOutputException"/>, a
+    /// <see cref="CallTimeoutException"/> or a refusal by a spending limit.
     /// </summary>
     /// <remarks>
     /// Read the same way a rate limit is: down the exception chain, from the message, because the
@@ -77,6 +79,9 @@ public static class TerminalProviderError
         if (ProviderRetryDelay.From(exception) is not null)
             return false;
 
+        if (IsRepeatOrTimeout(exception))
+            return true;
+
         for (var current = exception; current is not null; current = current.InnerException)
         {
             var message = current.Message;
@@ -88,6 +93,24 @@ public static class TerminalProviderError
                 return false;
 
             if (Depleted.IsMatch(message))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="exception"/>, or anything it wraps, is a <see cref="RepeatedOutputException"/>
+    /// or a <see cref="CallTimeoutException"/>: the terminal errors known by their type rather than read
+    /// from a provider's message, so they mean the same wherever they surface.
+    /// </summary>
+    internal static bool IsRepeatOrTimeout(Exception? exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+#pragma warning disable ANNKEEXP004 // The spending limit is experimental; a refusal it makes is terminal all the same.
+            if (current is RepeatedOutputException or CallTimeoutException or SpendingLimitExceededException)
+#pragma warning restore ANNKEEXP004
                 return true;
         }
 

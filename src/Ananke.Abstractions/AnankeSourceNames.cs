@@ -51,8 +51,8 @@ public static class AnankeSourceNames
     public const string EmpiricalMemoryMeter = "Ananke.EmpiricalMemory";
 
     /// <summary>
-    /// <c>Meter</c> name for <c>Ananke.Federation</c> remote cell metrics
-    /// (tokens/exec, tool-calls/exec, error rate per deployment).
+    /// <c>Meter</c> name for what model calls consume: the instruments named in
+    /// <see cref="Budget.UsageInstrumentNames"/>, tagged with the workflow that made the call.
     /// </summary>
-    public const string Federation = "Ananke.Federation";
+    public const string OrchestrationUsage = "Ananke.Orchestration.Usage";
 }

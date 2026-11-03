@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Simulation;
 using Ananke.Orchestration.Planning;
@@ -84,6 +86,40 @@ public class PlanAdvisorTests
     }
 
     [Test]
+    public async Task ASupervisorWithNothingToOffer_SaysWhyNothingWouldHelp()
+    {
+        // Asked only for options, a supervisor that judged none of its kinds would help had nowhere to
+        // say so: eight of a product's empty proposals read the same, whatever it had concluded.
+        var proposal = await Advisor(JsonSerializer.Serialize(new
+        {
+            summary = "The step's own attempt fell short; nothing in the plan stops a retry.",
+            options = Array.Empty<object>()
+        })).ProposeAsync(Halted());
+
+        proposal.Empty.ShouldBeTrue();
+        proposal.Summary.ShouldBe("The step's own attempt fell short; nothing in the plan stops a retry.");
+    }
+
+    [Test]
+    public async Task TheAsk_AsksFirstWhatKindOfProblemTheHaltIs()
+    {
+        string? prompt = null;
+        string? schema = null;
+
+        await Capturing(Options(), request =>
+        {
+            prompt = string.Join('\n', request.Messages.Select(m => m.Content));
+            schema = request.ResponseFormat?.JsonSchema;
+        }).ProposeAsync(Halted());
+
+        prompt.ShouldNotBeNull().ShouldContain("in \"summary\"");
+
+        var first = JsonNode.Parse(schema.ShouldNotBeNull())!["properties"]!.AsObject().First();
+        first.Key.ShouldBe("Summary");
+        ((string?)first.Value!["description"]).ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
     public void APlanThatDidNotHalt_HasNothingToOfferAlternativesTo()
     {
         var settled = new PlanCoordination
@@ -160,6 +196,73 @@ public class PlanAdvisorTests
         var kept = proposal.Options.ShouldHaveSingleItem();
         kept.Summary.ShouldBe("Shift the dates");
         kept.Recommended.ShouldBeTrue();
+    }
+
+    // ── Asking the step to try again ──
+
+    [Test]
+    public async Task AStepThatAskedNothing_MayBeAskedToTryAgain_WithALineItReadsNextTime()
+    {
+        string? prompt = null;
+
+        var proposal = await Capturing(
+            Options(new { summary = "The parse stopped short", answer = "Parse both dialects.", recommended = true }),
+            request => prompt = string.Join('\n', request.Messages.Select(m => m.Content)))
+            .ProposeAsync(Halted());
+
+        prompt.ShouldNotBeNull().ShouldContain("(\"answer\")");
+
+        var option = proposal.Options.ShouldHaveSingleItem();
+        option.Answer.ShouldBe("Parse both dialects.");
+        option.Replan.ShouldBeFalse();
+        option.Abandon.ShouldBeNull();
+        option.Recommended.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task AStepAlreadyAnswered_IsNotAskedToTryAgain_AndAnOptionThatDoesIsRefusedSayingWhy()
+    {
+        // Once per step: a step that fails again after being answered goes to the Planner, or is given
+        // up, rather than being told to try again for as long as the run lasts.
+        string? prompt = null;
+        var halted = Halted();
+        var answered = halted with
+        {
+            Result = halted.Result with
+            {
+                Tree = halted.Result.Tree.WithAnswer("parse", new PlanAnswer
+                {
+                    Asked = "the parser does not round-trip",
+                    Answer = "Parse both dialects.",
+                    By = PlanCoordination.Answerer,
+                    At = T0
+                })
+            }
+        };
+
+        var proposal = await Capturing(
+            Options(new { summary = "The parse stopped short", answer = "Parse both dialects.", recommended = true }),
+            request => prompt = string.Join('\n', request.Messages.Select(m => m.Content)))
+            .ProposeAsync(answered);
+
+        prompt.ShouldNotBeNull().ShouldNotContain("(\"answer\")");
+        proposal.Options.ShouldBeEmpty();
+        proposal.Discarded.ShouldNotBeEmpty();
+        proposal.Discarded.ShouldAllBe(d => d.Contains("answered once already"));
+    }
+
+    [Test]
+    public async Task TheAsk_DescribesEveryFieldOfAnOption()
+    {
+        // Named and not described, a field reads as a place to comment: a run's advisor twice wrote why
+        // not to give a step up into the field whose text gives it up.
+        string? schema = null;
+
+        await Capturing(Options(), request => schema = request.ResponseFormat?.JsonSchema).ProposeAsync(Halted());
+
+        var fields = JsonNode.Parse(schema.ShouldNotBeNull())!["properties"]!["Options"]!["items"]!["properties"]!.AsObject();
+        fields.Select(field => field.Key).ShouldContain("Answer");
+        fields.ShouldAllBe(field => !string.IsNullOrWhiteSpace((string?)field.Value!["description"]));
     }
 
     [Test]
@@ -346,6 +449,18 @@ public class PlanAdvisorTests
     }
 
     // ── Fixtures ──
+
+    /// <summary>An advisor whose supervisor answers <paramref name="reply"/>, showing each request to <paramref name="seen"/>.</summary>
+    private static AgentPlanAdvisor Capturing(string reply, Action<AgentRequest> seen) =>
+        new(new SupervisionOptions
+        {
+            Supervisor = new SimulatedAgentModel(request =>
+            {
+                seen(request);
+                return reply;
+            }),
+            Store = new InMemoryPlanTreeStore()
+        });
 
     private static AgentPlanAdvisor Advisor(string reply) =>
         new(new SupervisionOptions

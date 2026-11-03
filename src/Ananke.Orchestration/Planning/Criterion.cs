@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Ananke.Orchestration.Planning;
@@ -25,6 +26,7 @@ namespace Ananke.Orchestration.Planning;
 /// which is what plan admission is for.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record Criterion
 {
     /// <summary>The check to run.</summary>

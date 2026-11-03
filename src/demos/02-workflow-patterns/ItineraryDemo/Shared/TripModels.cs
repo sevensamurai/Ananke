@@ -1,3 +1,4 @@
+using System.Globalization;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Google;
@@ -24,6 +25,16 @@ namespace ItineraryDemo.Shared;
 internal sealed record TripModels(
     IAgentModel Executor, IAgentModel Supervisor, RoleModel ExecutorRole, RoleModel SupervisorRole)
 {
+    /// <summary>
+    /// What to set before the run can be budgeted, or <see langword="null"/> when both roles are priced.
+    /// </summary>
+    /// <remarks>
+    /// <b>Rates are declared, never looked up.</b> The framework carries no price list — any figure it
+    /// shipped would be wrong for somebody — so each role's rates come from the <c>.env</c>, and a run
+    /// without them refuses to start rather than guessing what it spends.
+    /// </remarks>
+    public string? Unpriced { get; init; }
+
     public string ExecutorName => ExecutorRole.Id;
 
     public string SupervisorName => SupervisorRole.Id;
@@ -91,7 +102,7 @@ internal sealed record TripModels(
         pin the ids with OPENAI_MODEL / GEMINI_MODEL, or per role with ANANKE_DEMO_EXECUTOR_MODEL
         and ANANKE_DEMO_SUPERVISOR_MODEL.
 
-        Then: dotnet run --project src/demos/02-workflow-patterns/ItineraryDemo -- [{string.Join(" | ", Providers)}] [--hitl] [--plan <file>] [--verify]
+        Then: dotnet run --project src/demos/02-workflow-patterns/ItineraryDemo -- [{string.Join(" | ", Providers)}] [--hitl] [--plan <file>] [--budget <amount>] [--verify]
         """;
 
     /// <remarks>
@@ -118,12 +129,80 @@ internal sealed record TripModels(
             "supervisor", EnvKeys.Get("ANANKE_DEMO_SUPERVISOR_MODEL"), "ANANKE_DEMO_SUPERVISOR_MODEL",
             fallback, sharedName, standard);
 
+        var executorRates = Rates("EXECUTOR");
+        var supervisorRates = Rates("SUPERVISOR");
+
+        if (executorRates is null || supervisorRates is null)
+        {
+            return new TripModels(
+                Bind(create(executor.Id, key), executor.Id),
+                Bind(create(supervisor.Id, key), supervisor.Id),
+                executor,
+                supervisor)
+            {
+                Unpriced = Pricing(executor.Id, supervisor.Id)
+            };
+        }
+
         return new TripModels(
-            Bind(create(executor.Id, key), executor.Id),
-            Bind(create(supervisor.Id, key), supervisor.Id),
+            Priced(create(executor.Id, key), executor.Id, executorRates),
+            Priced(create(supervisor.Id, key), supervisor.Id, supervisorRates),
             executor,
             supervisor);
     }
+
+    /// <summary>
+    /// A role's declared rates, per million tokens as providers publish them, or <see langword="null"/>
+    /// when either is missing or unreadable.
+    /// </summary>
+    private static ModelCostRates? Rates(string role)
+    {
+        var input = PerMillion($"ANANKE_DEMO_{role}_INPUT_PER_MILLION");
+        var output = PerMillion($"ANANKE_DEMO_{role}_OUTPUT_PER_MILLION");
+
+        return input is { } i && output is { } o ? new ModelCostRates(i / 1000m, o / 1000m) : null;
+    }
+
+    private static decimal? PerMillion(string name) =>
+        decimal.TryParse(EnvKeys.Get(name), NumberStyles.Number, CultureInfo.InvariantCulture, out var rate)
+            && rate >= 0
+            ? rate
+            : null;
+
+    /// <summary>
+    /// The model behind a router that knows its rates, so each call reports its own cost to the budget.
+    /// </summary>
+    /// <remarks>
+    /// The one profile is also the fallback, so a request the profile's capabilities do not list still
+    /// reaches the model it would have reached unpriced.
+    /// </remarks>
+    private static IAgentModel Priced(IAgentModel model, string id, ModelCostRates rates)
+    {
+        var profile = ModelCatalog.TryGet(id) is { } known
+            ? known.ToProfile(model, rates)
+            : new ModelProfile
+            {
+                Name = id,
+                Model = model,
+                Capabilities = ModelCapability.TextGeneration,
+                CostPer1KInputTokens = rates.CostPer1KInputTokens,
+                CostPer1KOutputTokens = rates.CostPer1KOutputTokens
+            };
+
+        return new CapabilityModelRouter().AddModel(profile).WithFallback(profile).ToAgentModel();
+    }
+
+    private static string Pricing(string executorId, string supervisorId) =>
+        $"""
+        This run is bounded by a budget, and a budget needs each model's price. Ananke carries no
+        price list, so declare each role's rates — per million tokens, from your provider's current
+        prices — in the .env at the workspace root:
+
+            ANANKE_DEMO_EXECUTOR_INPUT_PER_MILLION=...     ANANKE_DEMO_EXECUTOR_OUTPUT_PER_MILLION=...     ({executorId})
+            ANANKE_DEMO_SUPERVISOR_INPUT_PER_MILLION=...   ANANKE_DEMO_SUPERVISOR_OUTPUT_PER_MILLION=...   ({supervisorId})
+
+        --budget <amount> sets the ceiling, in the same currency; it defaults to {Options.BudgetByDefault:0.00}.
+        """;
 
     /// <summary>Tells the model which model it is, when the catalogue knows the id.</summary>
     /// <remarks>

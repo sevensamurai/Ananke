@@ -36,7 +36,21 @@ public readonly record struct ToolResult(string Value, bool IsError)
     /// Use this to return structured data from tools without manual string formatting.
     /// </summary>
     public static ToolResult Json<T>(T value) =>
-        new(JsonSerializer.Serialize(value, JsonOptions), IsError: false);
+        new(JsonSerializer.Serialize(value, JsonOptions), IsError: false) { WrittenFrom = (value, typeof(T)) };
+
+    /// <summary>
+    /// The value <see cref="Json{T}"/> wrote <see cref="Value"/> from, and the type it wrote it as;
+    /// <see langword="null"/> for a result given as text.
+    /// </summary>
+    internal (object? Value, Type Type)? WrittenFrom { get; init; }
+
+    /// <summary>
+    /// The value as a record holds it: a typed result written again as <see cref="Value"/> was, with
+    /// its marked properties masked.
+    /// </summary>
+    internal string Recorded() => WrittenFrom is { } written
+        ? JsonSerializer.Serialize(written.Value, written.Type, Redaction.Masking(JsonOptions))
+        : Value;
 
     public static implicit operator ToolResult(string value) => Ok(value);
 }
@@ -142,7 +156,11 @@ public record ToolParameter(
     string JsonType = "string",
     IReadOnlyList<string>? Examples = null,
     bool IsRequired = false,
-    IReadOnlyDictionary<string, object>? Items = null);
+    IReadOnlyDictionary<string, object>? Items = null)
+{
+    /// <summary>The type of the parameter's value, when it was declared from one.</summary>
+    internal Type? DeclaredAs { get; init; }
+}
 
 public record ToolDefinition
 {
@@ -153,9 +171,24 @@ public record ToolDefinition
     /// <summary>
     /// How the tool's implementation is reached at runtime. Defaults to
     /// <see cref="ToolExecutionMode.Local"/> (in-process delegate).
-    /// Federation deployers inspect this to determine deployability.
     /// </summary>
     public ToolExecutionMode ExecutionMode { get; init; } = ToolExecutionMode.Local;
+
+    /// <summary>
+    /// Whether a call to this tool ends the turn: the rest of its round is not run, nor is any call
+    /// after it, and the model is asked to answer. A call to it is still run when the round limit is
+    /// reached, unless the turn has already ended.
+    /// </summary>
+    public bool EndsTurn { get; init; }
+
+    /// <summary>
+    /// Whether a call to this tool ends the job: the rest of its round is not run, nor is any call
+    /// after it, and the model is not called again. The job's state is mapped from the text the model
+    /// wrote with the call (<c>AgentJob.Builder.WhenEndedByTool</c>), and its turn is kept in memory as
+    /// any other. A call to it is still run when the round limit is reached, unless the turn has
+    /// already ended.
+    /// </summary>
+    internal bool EndsJob { get; init; }
 
     /// <summary>
     /// Network endpoint for remote-backed tools (<see cref="ToolExecutionMode.Callback"/>,
@@ -196,6 +229,19 @@ public record ToolDefinition
 
     public Task<ToolResult> ExecuteAsync(IReadOnlyDictionary<string, object?> args, CancellationToken ct = default) =>
         Execute(args, ct);
+
+    /// <summary>
+    /// A call's arguments as a record holds them: the value of each parameter declared from a type,
+    /// with its marked properties masked.
+    /// </summary>
+    internal string Recorded(string arguments)
+    {
+        var declared = Parameters
+            .Where(parameter => parameter.DeclaredAs is not null)
+            .ToDictionary(parameter => parameter.Name, parameter => parameter.DeclaredAs!, StringComparer.Ordinal);
+
+        return declared.Count == 0 ? arguments : Redaction.Mask(arguments, declared);
+    }
 
     /// <summary>
     /// Projects this definition into a schema-only <see cref="ProviderTool"/> for use with

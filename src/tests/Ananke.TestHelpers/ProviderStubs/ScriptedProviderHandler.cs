@@ -34,6 +34,14 @@ public abstract class ScriptedProviderHandler : HttpMessageHandler
     /// <summary>The text every canned reply carries, as two whitespace-separated words.</summary>
     protected const string ReplyText = "conformance ok";
 
+    /// <summary>
+    /// Answers as if the reply reached the output-token limit, with the provider's own stop value.
+    /// </summary>
+    public bool Truncates { get; init; }
+
+    /// <summary>The body of the last request the adapter sent.</summary>
+    public string? LastRequestBody { get; private set; }
+
     /// <summary>The object a structured-output request is answered with.</summary>
     protected const string StructuredJson = """{"result":"ok"}""";
 
@@ -44,6 +52,7 @@ public abstract class ScriptedProviderHandler : HttpMessageHandler
             ? string.Empty
             : await request.Content.ReadAsStringAsync(cancellationToken);
 
+        LastRequestBody = body;
         var (payload, mediaType) = Respond(request, body);
 
         return new HttpResponseMessage(HttpStatusCode.OK)

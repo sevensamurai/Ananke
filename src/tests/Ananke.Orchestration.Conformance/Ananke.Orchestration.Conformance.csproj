@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Ananke's conformance suite, as test code. A library rather than a test project, so the
+       adapters' own test projects can reference it: it carries NUnit but neither
+       Microsoft.NET.Test.Sdk nor NUnit3TestAdapter, and the tests run where the fixtures are
+       subclassed.
+
+       The scenarios in the project root and in Planning/ reference no test framework: each is a
+       named delegate and every assertion is Shouldly. The NUnit fixtures over them are in NUnit/
+       and Planning/NUnit/. -->
+  <PropertyGroup>
+    <!-- Uses the plan tier, which is [Experimental]. -->
+    <NoWarn>$(NoWarn);ANNKEEXP001</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

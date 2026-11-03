@@ -417,7 +417,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         if (!_stateWork.TryGetValue(state, out var work))
             return;
 
-        // Deliberately NOT derived from any caller's token (Q31, read 2026-08-18). This CTS scopes
+        // Deliberately NOT derived from any caller's token. This CTS scopes
         // the state's background work to the *state's* lifetime — it is cancelled on state exit,
         // which is how leaving a state stops whatever that state was doing. A caller's token
         // answers a different question ("abandon my call"), and linking the two would let a

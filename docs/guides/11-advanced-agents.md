@@ -268,6 +268,30 @@ seam where tool routing adapts from real outcomes instead of a fixed configurati
 
 ---
 
+## Spending Limits (`SpendingLimit`)
+
+A workflow's `WithBudget` stops a workflow between jobs. Model calls made directly, outside a workflow — an
+ingestion step that extracts from every document, say — are held by a `SpendingLimit` instead (experimental:
+`ANNKEEXP004`):
+
+```csharp
+#pragma warning disable ANNKEEXP004
+var limit = new SpendingLimit(
+    maxCost: 1.00m,
+    maxCappedReplies: 3,
+    fallbackRates: ModelCostRates.PerMillion(input: 0.03m, output: 0.09m));
+
+var extractor = model.WithSpendingLimit(limit).WithCallTimeout(TimeSpan.FromMinutes(3));
+```
+
+- Every model wrapped with the same `SpendingLimit` spends from it.
+- Cost is what the provider reports, or the tokens priced at `fallbackRates`; a call with neither is counted in
+  `UnpricedCalls`, which a cost limit can't see.
+- `maxCappedReplies` counts replies cut at their output limit (`AgentStopReason.MaxTokens`): a model writing until it
+  is stopped, such as one repeating a schema it can't keep to, is stopped after a few.
+- Once a limit is reached, the **next** call is refused with `SpendingLimitExceededException`, which is terminal and
+  not retried. The call that crossed the limit keeps its answer; its tokens are already paid for.
+
 ## Composing Decorators
 
 Both decorators implement `IStreamingAgentModel` and stack naturally.

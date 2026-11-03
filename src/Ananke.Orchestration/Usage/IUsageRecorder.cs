@@ -11,7 +11,13 @@ namespace Ananke.Orchestration.Usage;
 /// Per-call cost when model-specific rates are available (a cost-resolving router).
 /// <c>null</c> when only token counts are known.
 /// </param>
-public readonly record struct UsageRecord(TokenUsage Usage, decimal? ModelCost = null);
+/// <param name="Priced">
+/// Whether another record already carries the cost of <paramref name="Usage"/> — the agent job
+/// reporting the tokens of a call a cost-resolving router priced. Priced tokens stay out of the
+/// uncosted total, so a budget does not also price them at flat rates.
+/// </param>
+public readonly record struct UsageRecord(
+    TokenUsage Usage, decimal? ModelCost = null, bool Priced = false);
 
 /// <summary>
 /// An immutable point-in-time total. Never a live reference into recorder state —
@@ -80,10 +86,9 @@ public sealed record UsageSnapshot
 /// holds, assigns, or reaches through an accumulator.
 /// </summary>
 /// <remarks>
-/// Replaces the earlier <c>TokenUsageCapture</c>, which exposed a mutable accumulator
-/// through an ambient reference that callers assigned. Correctness then depended on every
-/// caller preserving that reference's identity — an unstated contract, and one that fork
-/// branches and sub-workflows both broke. SeePart B.
+/// Callers report what a call consumed and never hold the total: an accumulator reached through
+/// an ambient reference would depend on every fork branch and sub-workflow preserving that
+/// reference's identity.
 /// <para>
 /// Implementations must be safe for concurrent callers: fork branches record in parallel.
 /// </para>

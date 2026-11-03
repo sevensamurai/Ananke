@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Streaming;
 using Ananke.Orchestration.Tracing;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -59,6 +60,7 @@ namespace Ananke.Orchestration.Planning;
 /// </code>
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class AccountedSupervisorJob<TState>(
     IJob<TState> inner,
     Func<TState, PlanCoordination?> read,

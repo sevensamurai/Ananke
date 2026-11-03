@@ -13,6 +13,7 @@ public sealed class InMemoryCapabilityMap : ICapabilityMap
 {
     private readonly ConcurrentDictionary<string, WorkflowSignal> _signals = new();
     private readonly TimeSpan _signalTimeout;
+    private readonly TimeProvider _clock;
 
     // Per-cell registration signal channels — buffered so signals written before
     // WhenRegisteredAsync is called are never lost.
@@ -26,9 +27,11 @@ public sealed class InMemoryCapabilityMap : ICapabilityMap
     /// Maximum age of a signal before the cell is considered dead.
     /// Defaults to 30 seconds.
     /// </param>
-    public InMemoryCapabilityMap(TimeSpan? signalTimeout = null)
+    /// <param name="clock">Clock a signal's age is measured against. Defaults to <see cref="TimeProvider.System"/>.</param>
+    public InMemoryCapabilityMap(TimeSpan? signalTimeout = null, TimeProvider? clock = null)
     {
         _signalTimeout = signalTimeout ?? TimeSpan.FromSeconds(30);
+        _clock = clock ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
@@ -63,7 +66,7 @@ public sealed class InMemoryCapabilityMap : ICapabilityMap
     public IReadOnlyList<SensedCapability> Discover(string domain)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(domain);
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.GetUtcNow();
 
         return _signals.Values
             .Where(s => s.Domain.Equals(domain, StringComparison.OrdinalIgnoreCase)
@@ -75,7 +78,7 @@ public sealed class InMemoryCapabilityMap : ICapabilityMap
     /// <inheritdoc />
     public IReadOnlyList<SensedCapability> DiscoverAll()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.GetUtcNow();
 
         return _signals.Values
             .Where(s => (now - s.Timestamp) <= _signalTimeout)

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Ananke.Orchestration.Agents.Context;
 
@@ -22,6 +23,7 @@ namespace Ananke.Orchestration.Planning;
 /// announce itself reads as completeness.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanTreeProjection
 {
     /// <summary>What one projection decided.</summary>
@@ -222,10 +224,7 @@ public static class PlanTreeProjection
                 if (step.Contract.AcceptanceCriteria.Count > 0)
                     text.Append(" [").Append(string.Join(", ", step.Contract.AcceptanceCriteria)).Append(']');
 
-                text.Append(" — ").AppendLine(
-                    step.Id == nodeId ? "this step"
-                    : step.Result is { } result ? $"{step.State}: {result}"
-                    : step.State.ToString());
+                text.Append(" — ").AppendLine(step.Id == nodeId ? "this step" : Standing(tree, step));
             }
 
             text.AppendLine();
@@ -235,5 +234,28 @@ public static class PlanTreeProjection
         text.AppendLine(node.Contract.Render());
 
         return text.ToString();
+    }
+
+    /// <summary>Where a sibling stands, as the step reading the list needs it.</summary>
+    /// <remarks>
+    /// <see cref="StepState"/> moves off <see cref="StepState.Pending"/> only for a choice, a block or
+    /// a skip; a step settled by its verdicts keeps it. So once a step has run, what it achieved is
+    /// read from the tree, and a step not yet attempted reads as pending even when it has no criteria
+    /// — which <see cref="PlanTree.OutcomeOf"/> would call met before it runs.
+    /// </remarks>
+    private static string Standing(PlanTree tree, PlanNode step)
+    {
+        if (step.Result is { } result)
+            return $"{step.State}: {result}";
+
+        if (step.State is not StepState.Pending)
+            return step.State.ToString();
+
+        return tree.LifecycleOf(step.Id) switch
+        {
+            NodeLifecycle.Planned => nameof(StepState.Pending),
+            NodeLifecycle.Completed => tree.OutcomeOf(step.Id).ToString(),
+            var lifecycle => lifecycle.ToString()
+        };
     }
 }

@@ -1,4 +1,5 @@
 using Ananke.Organics.Division;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Organics.Kernel.Snapshots;
 
@@ -94,7 +95,7 @@ public sealed record JobSnapshot
     public string? SystemPrompt { get; init; }
 
     /// <summary>Maximum tool-calling rounds.</summary>
-    public int MaxToolRounds { get; init; } = 3;
+    public int MaxToolRounds { get; init; } = AgentJobFactory.DefaultMaxToolRounds;
 }
 
 /// <summary>Snapshot of a model alias declaration within a cell.</summary>

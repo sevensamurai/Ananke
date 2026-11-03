@@ -17,10 +17,4 @@ public sealed record ChildSpec
 
     /// <summary>Optional system prompt override for this child's agent jobs.</summary>
     public string? SystemPromptOverride { get; init; }
-
-    /// <summary>
-    /// Optional target platform for this child (e.g. <c>"azure"</c>, <c>"vertex-ai"</c>).
-    /// When <see langword="null"/>, the child runs on the local host.
-    /// </summary>
-    public string? TargetPlatform { get; init; }
 }

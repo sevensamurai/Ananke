@@ -80,6 +80,62 @@ public class PlanCheckpointRoundTripTests
     }
 
     [Test]
+    public void ACoordination_WhoseStepFoundSomething_RoundTripsItsFindings()
+    {
+        var found = new NodeFinding { Claim = "the parser accepts CSV", Source = "parse.py:12" };
+        var coordination = Halted();
+        coordination = coordination with
+        {
+            Result = coordination.Result with
+            {
+                Tree = coordination.Result.Tree.WithReading("parse", new NodeReading
+                {
+                    At = T0,
+                    PlanVersion = 1,
+                    ProjectedTokens = 8,
+                    Findings = [found]
+                })
+            }
+        };
+
+        var json = JsonSerializer.Serialize(coordination);
+        var roundTripped = JsonSerializer.Deserialize<PlanCoordination>(json).ShouldNotBeNull();
+
+        roundTripped.Result.Tree.Node("parse").LastRead.ShouldNotBeNull().Findings.ShouldBe([found]);
+    }
+
+    [Test]
+    public void ACoordination_WhoseStepFoundSomething_RoundTripsWhatItQuotes()
+    {
+        var found = new NodeFinding
+        {
+            Claim = "The changelog is included in the docs.",
+            Source = "docs/source/changes.rst:17",
+            Quotes = [".. include:: ../../CHANGELOG"]
+        };
+        var coordination = Halted();
+        coordination = coordination with
+        {
+            Result = coordination.Result with
+            {
+                Tree = coordination.Result.Tree.WithReading("parse", new NodeReading
+                {
+                    At = T0,
+                    PlanVersion = 1,
+                    ProjectedTokens = 8,
+                    Findings = [found]
+                })
+            }
+        };
+
+        var roundTripped = JsonSerializer.Deserialize<PlanCoordination>(JsonSerializer.Serialize(coordination)).ShouldNotBeNull();
+
+        var read = roundTripped.Result.Tree.Node("parse").LastRead.ShouldNotBeNull().Findings.ShouldHaveSingleItem();
+        read.Quotes.ShouldBe([".. include:: ../../CHANGELOG"]);
+        read.ShouldBe(found);
+    }
+
+    [Test]
     public void ACoordination_CarryingAnOutstandingQuestion_RoundTripsThroughJson()
     {
         var coordination = Halted() with

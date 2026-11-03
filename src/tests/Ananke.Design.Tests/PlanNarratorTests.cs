@@ -120,6 +120,18 @@ public class PlanNarratorTests
             .ShouldContain("one stay … (900 characters)");
 
     [Test]
+    public void Describe_AToolCallWithoutContent_SaysHowLongTheResultWas() =>
+        new PlanNarrator(lines: PlanNarratorLines.ToolCalls)
+            .Describe(ToolCalled() with { Arguments = null, Result = null })
+            .ShouldBe("      tool plan-node:design: search → 8 characters");
+
+    [Test]
+    public void Describe_AToolCallThatErroredWithoutContent_SaysSo() =>
+        new PlanNarrator(lines: PlanNarratorLines.ToolCalls)
+            .Describe(ToolCalled() with { Arguments = null, Result = null, IsError = true })
+            .ShouldBe("      tool plan-node:design: search → error, 8 characters");
+
+    [Test]
     public void Describe_AToolCallThatErrored_SaysSo() =>
         new PlanNarrator(lines: PlanNarratorLines.ToolCalls)
             .Describe(ToolCalled() with { Result = "nowhere called 'x'", ResultLength = 18, IsError = true })!
@@ -131,6 +143,9 @@ public class PlanNarratorTests
         ExecutionId = "e",
         AgentName = "plan-node:design",
         ToolName = "search",
+        CallId = "call-1",
+        Round = 1,
+        Duration = TimeSpan.FromSeconds(1),
         Arguments = """{"place":"hakone"}""",
         Result = "one stay",
         ResultLength = 8
@@ -368,6 +383,26 @@ public class PlanNarratorTests
         line!.ShouldContain("supervisor asked about 'hakone' (version 2): only 2027-04-07 is free");
         line!.ShouldContain("refused: \"shift it\"");
         line!.ShouldContain("→ Hakone has one free night (only 2027-04-07 is free)");
+    }
+
+    [Test]
+    public void Describe_WhatTheSupervisorSaidTheHaltIs_IsUnderTheHalt_AndAboveNothingToOffer()
+    {
+        var line = new PlanNarrator().Describe(new PlanProposalOffered
+        {
+            WorkflowName = "w",
+            ExecutionId = "e",
+            PlanId = "p",
+            PlanVersion = 2,
+            NodeId = "hakone",
+            HaltReason = "only 2027-04-07 is free",
+            Summary = "The step's attempt fell short; nothing in the plan stops a retry."
+        });
+
+        line.ShouldNotBeNull();
+        var lines = line.Split('\n');
+        lines.ShouldContain(l => l.Contains("says: The step's attempt fell short; nothing in the plan stops a retry."));
+        Array.FindIndex(lines, l => l.Contains("says:")).ShouldBeLessThan(Array.FindIndex(lines, l => l.Contains("nothing to offer")));
     }
 
     [Test]

@@ -71,8 +71,7 @@ public sealed class McpToolInvoker
             var result = await clients[serverIndex]
                 .CallToolAsync(toolName, mcpArgs, cancellationToken: ct)
                 .ConfigureAwait(false);
-            var text = ExtractText(result);
-            return result.IsError == true ? ToolResult.Error(text) : ToolResult.Ok(text);
+            return McpToolResults.From(result);
         };
     }
 
@@ -166,15 +165,5 @@ public sealed class McpToolInvoker
         foreach (var (key, value) in args)
             dict[key] = value;
         return dict;
-    }
-
-    private static string ExtractText(ModelContextProtocol.Protocol.CallToolResult result)
-    {
-        if (result.Content is null || result.Content.Count == 0)
-            return string.Empty;
-
-        return string.Concat(
-            result.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>()
-                .Select(b => b.Text));
     }
 }

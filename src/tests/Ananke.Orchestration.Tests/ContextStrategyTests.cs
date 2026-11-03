@@ -121,6 +121,27 @@ public class ContextStrategyTests
         result[0].Content.ShouldBe("must keep");
     }
 
+    // ── SlidingWindowContextStrategy: tool-call boundaries ───────
+
+    [Test]
+    public async Task SlidingWindow_CutFallsAfterToolCall_DropsOrphanedToolResults()
+    {
+        var messages = new List<AgentMessage>
+        {
+            AgentMessage.User("q"),
+            AgentMessage.Assistant(new string('a', 800), [new AgentToolCall("t1", "ping", "{}")]),
+            AgentMessage.ToolResult("t1", "pong"),
+            AgentMessage.User("follow up"),
+        };
+
+        // Narrow enough that the cut would otherwise fall between the tool call and its result.
+        var strategy = new SlidingWindowContextStrategy(maxTokens: 120);
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
+
+        result.ShouldNotBeEmpty();
+        result[0].Role.ShouldNotBe(AgentRole.Tool);
+    }
+
     // ── SlidingWindowContextStrategy: system prompt ──────────────
 
     [Test]
@@ -269,6 +290,31 @@ public class ContextStrategyTests
 
         result.Count.ShouldBe(2); // 1 summary + 1 recent
         summarizer.CallCount.ShouldBe(1);
+    }
+
+    // ── SummarizingContextStrategy: tool-call boundaries ─────────
+
+    [Test]
+    public async Task Summarizing_SplitFallsAfterToolCall_KeepsNoOrphanedToolResult()
+    {
+        var summarizer = new StaticSummarizerModel("summary");
+        // recentMessageCount: 2 would naturally keep [ToolResult, User] — an orphan, since the
+        // assistant message carrying the tool call falls one short into the summarized half.
+        var strategy = new SummarizingContextStrategy(
+            summarizer, thresholdTokens: 10, recentMessageCount: 2);
+
+        var messages = new List<AgentMessage>
+        {
+            AgentMessage.User("old 1 " + new string('x', 100)),
+            AgentMessage.Assistant("calling", [new AgentToolCall("t1", "ping", "{}")]),
+            AgentMessage.ToolResult("t1", "pong"),
+            AgentMessage.User("follow up"),
+        };
+
+        var result = (await strategy.ApplyAsync(messages, null, ContextBudget.Unspecified)).Messages;
+
+        result.ShouldNotContain(m => m.Role == AgentRole.Tool);
+        result[^1].Content.ShouldBe("follow up");
     }
 
     // ── SummarizingContextStrategy: validation ───────────────────

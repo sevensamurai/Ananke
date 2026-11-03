@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Text;
 
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>How a <see cref="ProcessCheck"/> runs its command.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record ProcessCheckOptions
 {
     /// <summary>The executable to run — <c>dotnet</c>, <c>make</c>, a script.</summary>
@@ -52,6 +54,7 @@ public sealed record ProcessCheckOptions
 /// line itself, so the record says how to run it again by hand.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class ProcessCheck : IDeterministicCheck
 {
     /// <summary>

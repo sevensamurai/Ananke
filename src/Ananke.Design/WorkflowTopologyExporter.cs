@@ -4,6 +4,7 @@ using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Routing;
 using Ananke.Orchestration.Tools;
 using System.Text;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Design;
 
@@ -143,7 +144,7 @@ public static class WorkflowTopologyExporter
                 }
             }
 
-            if (job.MaxToolRounds != 3)
+            if (job.MaxToolRounds != AgentJobFactory.DefaultMaxToolRounds)
                 sb.AppendLine($"    max_tool_rounds: {job.MaxToolRounds}");
         }
 

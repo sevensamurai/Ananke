@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Nodes;
+
 namespace Ananke.Abstractions.Agents;
 
 /// <summary>Describes a tool the model can invoke during generation.</summary>
@@ -64,4 +67,41 @@ public sealed record AgentRequest
     /// </para>
     /// </remarks>
     public double? Temperature { get; init; }
+
+    /// <summary>
+    /// The most tokens the reply may use. <see langword="null"/> leaves the adapter's own default.
+    /// </summary>
+    /// <remarks>
+    /// A reply that reaches it stops with <see cref="AgentStopReason.MaxTokens"/>, and is cut off.
+    /// </remarks>
+    public int? MaxOutputTokens { get; init; }
+
+    /// <summary>
+    /// Fields this request carries beside the ones its adapter writes: an endpoint's own parameters, by
+    /// their name in the request's JSON, such as OpenRouter's <c>reasoning</c>. <see langword="null"/>, the
+    /// default, carries none.
+    /// </summary>
+    /// <remarks>
+    /// An adapter for an OpenAI-compatible endpoint sends them after any its model carries, so a field
+    /// named here wins over the model's of the same name. An adapter with no way to send them refuses a
+    /// request that carries any (<see cref="ThrowIfRequestFields"/>), rather than drop them.
+    /// </remarks>
+    [Experimental(ExperimentalApis.RequestFields, Message = ExperimentalApis.RequestFieldsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public IReadOnlyDictionary<string, JsonNode>? RequestFields { get; init; }
+
+    /// <summary>
+    /// Throws when this request carries fields of an endpoint's own, for an adapter that has no way to
+    /// send them.
+    /// </summary>
+    /// <param name="adapter">The adapter, as the message names it, such as <c>The Gemini adapter</c>.</param>
+    /// <exception cref="NotSupportedException">It carries one or more; the message names each.</exception>
+    [Experimental(ExperimentalApis.RequestFields, Message = ExperimentalApis.RequestFieldsMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public void ThrowIfRequestFields(string adapter)
+    {
+        if (RequestFields is { Count: > 0 } fields)
+        {
+            throw new NotSupportedException(
+                $"{adapter} sends no fields of an endpoint's own, and this request carries {string.Join(", ", fields.Keys.Select(name => $"'{name}'"))}.");
+        }
+    }
 }

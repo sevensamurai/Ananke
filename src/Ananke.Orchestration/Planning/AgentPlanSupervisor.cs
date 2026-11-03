@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -10,6 +11,7 @@ namespace Ananke.Orchestration.Planning;
 /// and criteria — not for a status, a priority or an estimate, none of which anything in this tier
 /// would read.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanRevision
 {
     /// <summary>What the work item should now achieve.</summary>
@@ -46,6 +48,7 @@ public sealed record PlanRevision
 /// The iteration bound carries over for the same reason.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class AgentPlanSupervisor(SupervisionOptions supervision, string? persona = null)
 {
     /// <summary>Enough rounds to try a candidate, be told it does not work, and try another.</summary>
@@ -104,7 +107,7 @@ public sealed class AgentPlanSupervisor(SupervisionOptions supervision, string? 
             // A coordinator that ran out of rounds decided nothing, which the halt standing already
             // expresses. Faulting instead ends the run at the halt with a message about tool
             // budgets — true, and about the framework rather than about the plan. Asking with nothing
-            // to offer is the honest way to say so now that Stop is not a verb (R30) — the run pauses
+            // to offer is the honest way to say so now that Stop is not a verb — the run pauses
             // rather than looping, and a person's cancel or refusal is what ends it.
             return PlanDecision.Ask([]);
         }

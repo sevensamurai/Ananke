@@ -3,7 +3,7 @@ namespace Ananke.Abstractions.Providers;
 /// <summary>
 /// Resolves runtime credentials for a specific LLM/platform provider.
 /// Implementations live in <c>Ananke.Orchestration.{Provider}</c> and are consumed
-/// by both the matching agent model and by <c>Ananke.Federation.{Provider}</c> via DI.
+/// by the matching agent model via DI.
 /// </summary>
 /// <remarks>
 /// The interface is intentionally provider-agnostic: it does not leak vendor SDK types.

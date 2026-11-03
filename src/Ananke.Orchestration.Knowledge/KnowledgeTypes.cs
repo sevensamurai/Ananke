@@ -1,6 +1,10 @@
 namespace Ananke.Orchestration.Knowledge;
 
 /// <summary>Search mode for knowledge store queries.</summary>
+/// <remarks>
+/// A store that cannot search in a mode throws <see cref="NotSupportedException"/> rather than search in another.
+/// <see cref="InMemoryKnowledgeStore"/> supports all three; the Qdrant store supports <see cref="Dense"/> only.
+/// </remarks>
 public enum SearchMode
 {
     /// <summary>Dense vector similarity search (cosine / dot-product).</summary>
@@ -64,6 +68,20 @@ public sealed record SearchOptions
 
     /// <summary>Search strategy. Default is <see cref="SearchMode.Dense"/>.</summary>
     public SearchMode Mode { get; init; } = SearchMode.Dense;
+
+    /// <summary>
+    /// At most this many results from one document (one <c>source</c>), so a question that needs several documents
+    /// isn't answered from the first one alone. A store ranks more candidates to fill <see cref="TopK"/>. Default is no
+    /// limit.
+    /// </summary>
+    public int? MaxPerSource { get; init; }
+
+    /// <summary>
+    /// With <see cref="MaxPerSource"/>, a document's chunks come back as one result, their texts joined in rank order,
+    /// so <see cref="TopK"/> counts documents and each brings up to <see cref="MaxPerSource"/> passages. Default is
+    /// <see langword="false"/>: each chunk is a result of its own.
+    /// </summary>
+    public bool JoinPerSource { get; init; }
 }
 
 /// <summary>

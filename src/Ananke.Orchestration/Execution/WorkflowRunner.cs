@@ -26,6 +26,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
     private readonly IReadOnlyList<IWorkflowJobMiddleware<object>> _middlewares;
     private readonly IWorkflowTracer _tracer;
     private readonly bool _storeCompletions;
+    private readonly bool _recordContent;
     private readonly ILogger<WorkflowRunner> _logger;
     private readonly TimeSpan _checkpointTtl;
     private readonly TimeProvider _timeProvider;
@@ -38,13 +39,15 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         ILoggerFactory? loggerFactory = null,
         TimeSpan? checkpointTtl = null,
         TimeProvider? timeProvider = null,
-        IUsageRecorder? usageRecorder = null)
+        IUsageRecorder? usageRecorder = null,
+        bool recordContent = false)
     {
         _usageRecorder = usageRecorder;
         _checkpointStore = checkpointStore;
         _middlewares = middlewares?.ToList() ?? [];
         _tracer = tracer ?? NullTracer.Instance;
         _storeCompletions = storeCompletions;
+        _recordContent = recordContent;
         _logger = loggerFactory?.CreateLogger<WorkflowRunner>()
             ?? NullLogger<WorkflowRunner>.Instance;
         _checkpointTtl = checkpointTtl ?? TimeSpan.FromDays(7);
@@ -165,7 +168,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         // branch, nested runner and job below it. Nothing is handed a writer; everything reports to
         // whatever sink the flow it is running in has — including work that has never heard of a
         // workflow channel.
-        using var reporting = WorkflowEventReporting.BeginScope(new ChannelEventSink(channel.Writer));
+        using var reporting = WorkflowEventReporting.BeginScope(new ChannelEventSink(channel.Writer, _timeProvider));
 
         // Not the owner means an outer stream is already being read from this flow, and the rule is
         // that the outermost reader wins — which is what carries a sub-workflow's events up to the
@@ -225,7 +228,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         // without one, so it inherits its parent's and the parent's budget sees the child's
         // spend. Only then the per-run default.
         var usageRecorder = _usageRecorder ?? UsageRecording.Current ?? new InMemoryUsageRecorder();
-        using var usageScope = UsageRecording.BeginScope(usageRecorder);
+        using var usageScope = UsageRecording.BeginScope(usageRecorder, definition.Name);
 
         LogWorkflowStarting(definition.Name, execution.Id);
 
@@ -240,8 +243,12 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             var usageBaseline = await usageRecorder.ReadAsync(ct).ConfigureAwait(false);
 
             // One gate per execution, shared with every fork branch so the two paths cannot
-            // drift on the arithmetic — which is the class of bug this whole ADR is about.
-            var budgetGate = new BudgetGate(usageRecorder, usageBaseline, definition.Budget);
+            // drift on the arithmetic.
+            // A resumed execution carries what its earlier legs spent, restored from its checkpoint,
+            // so a run that pauses is bounded by one budget rather than one per leg.
+            var budgetGate = new BudgetGate(
+                usageRecorder, usageBaseline, definition.Budget,
+                execution.EstimatedCost, execution.CumulativeUsage);
 
             // Terminating for budget happens from two places — the per-job check, and a fork
             // whose branches stopped — so it lives in one place rather than being written twice.
@@ -390,7 +397,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 WorkflowTraceContext.Value = new TraceInfo(
                     definition.Name, execution.Id, currentJobName, trace, jobSpan,
-                    _storeCompletions, resumedIntoThisJob);
+                    _storeCompletions, resumedIntoThisJob, _recordContent);
 
                 if (descriptor.OnEnter is not null)
                     await descriptor.OnEnter(execution.State).ConfigureAwait(false);
@@ -421,7 +428,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     if (descriptor.OnExit is not null)
                         await descriptor.OnExit(execution.State).ConfigureAwait(false);
 
-                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, true));
+                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, true));
 
                     LogJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
 
@@ -475,7 +482,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     var timeoutMsg = $"Job '{currentJobName}' timed out after {descriptor.Timeout!.Value.TotalSeconds:F1}s.";
                     var timeoutEx = new TimeoutException(timeoutMsg);
                     jobSpan.RecordError(timeoutEx);
-                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, timeoutMsg));
+                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, false, timeoutMsg));
                     LogJobTimedOut(currentJobName, descriptor.Timeout!.Value.TotalSeconds);
                     await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, execution.State, timeoutEx).ConfigureAwait(false);
                     throw timeoutEx;
@@ -484,7 +491,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 {
                     jobSw.Stop();
                     jobSpan.RecordError(ex);
-                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, false, ex.Message));
+                    execution.RecordJobExecution(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, false, ex.Message));
                     LogJobFailed(ex, currentJobName, ex.Message);
                     await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, execution.State, ex).ConfigureAwait(false);
                     throw;
@@ -494,12 +501,6 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                     // H-7: restore ambient context so a stale trace cannot leak into async
                     // continuations that escape this job's execution scope.
                     WorkflowTraceContext.Value = prevTrace;
-                }
-
-                if (_checkpointStore is not null)
-                {
-                    var checkpoint = Checkpoint<TState>.Create(execution, _checkpointTtl, _timeProvider);
-                    await _checkpointStore.SaveAsync(checkpoint, ct).ConfigureAwait(false);
                 }
 
                 // --- Budget enforcement ---
@@ -514,6 +515,13 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
                 if (budgetGate.HasBudget)
                     execution.EstimatedCost = verdict.RunCost;
+
+                // Saved after the spend is updated, so a resume carries this job's cost too.
+                if (_checkpointStore is not null)
+                {
+                    var checkpoint = Checkpoint<TState>.Create(execution, _checkpointTtl, _timeProvider);
+                    await _checkpointStore.SaveAsync(checkpoint, ct).ConfigureAwait(false);
+                }
 
                 if (verdict.State == BudgetState.Warning)
                 {
@@ -672,7 +680,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            // The `when` guard matters (R6): without it, an OperationCanceledException thrown by
+            // The `when` guard matters: without it, an OperationCanceledException thrown by
             // a job from its own unrelated token — not this run's `ct` — was reported as
             // "Workflow cancelled." with no Exception at all (see WorkflowResult.Cancelled),
             // discarding the real fault. Only our own `ct` being signalled means the caller
@@ -876,8 +884,8 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
         }
         else if (results.Length == 0)
         {
-            // BestEffort with every branch failed — unchanged by B1: still throws immediately,
-            // without recording outcomes/history. B1 only extends FailFast's reporting.
+            // BestEffort with every branch failed: throws immediately, without recording
+            // outcomes or history. Only FailFast records them before throwing.
             throw new AggregateException(
                 "All fork branches faulted.", faulted.Select(f => f.Exception!));
         }
@@ -886,7 +894,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             LogForkPartialSuccess(definition.Name, execution.Id, results.Length, fork.Targets.Count);
         }
 
-        // D3/D4: a branch that did not succeed is reported, not swallowed — on the event stream
+        // A branch that did not succeed is reported, not swallowed — on the event stream
         // and on the execution, which carries it through to WorkflowResult.BranchOutcomes.
         foreach (var outcome in outcomes.Where(o => !o.Succeeded))
         {
@@ -997,7 +1005,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             // that with "cancelled by FailFast": under BestEffort it produced an AggregateException
             // with zero inner exceptions when every branch self-cancelled, and under FailFast it
             // fell through to "No matching Join found for branch endpoints: []" for what was really
-            // a job-level fault (R6). ourTokenAlreadyRequestedCancellation is true when *our* token
+            // a job-level fault. ourTokenAlreadyRequestedCancellation is true when *our* token
             // (the fork's linked FailFast token, or the outer ct under BestEffort) was the one that
             // fired — including via a child token linked from it — before this branch had any
             // chance to cancel it itself.
@@ -1061,7 +1069,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
 
             WorkflowTraceContext.Value = new TraceInfo(
                 definition.Name, executionId, currentJobName,
-                CurrentSpan: jobSpan, StoreCompletions: _storeCompletions);
+                CurrentSpan: jobSpan, StoreCompletions: _storeCompletions, RecordContent: _recordContent);
 
             if (descriptor.OnEnter is not null)
                 await descriptor.OnEnter(state).ConfigureAwait(false);
@@ -1092,7 +1100,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 if (descriptor.OnExit is not null)
                     await descriptor.OnExit(state).ConfigureAwait(false);
 
-                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, true));
+                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, true));
 
                 LogBranchJobCompleted(currentJobName, jobSw.ElapsedMilliseconds);
 
@@ -1118,7 +1126,7 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
                 var timeoutMsg = $"Job '{currentJobName}' timed out after {descriptor.Timeout!.Value.TotalSeconds:F1}s.";
                 var timeoutEx = new TimeoutException(timeoutMsg);
                 jobSpan.RecordError(timeoutEx);
-                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, false, timeoutMsg));
+                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, false, timeoutMsg));
                 await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, state, timeoutEx).ConfigureAwait(false);
                 throw timeoutEx;
             }
@@ -1126,14 +1134,14 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
             {
                 jobSw.Stop();
                 jobSpan.RecordError(ex);
-                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, false, ex.Message));
+                history.Add(JobExecution.FromStopwatch(currentJobName, jobSw, _timeProvider, false, ex.Message));
                 await InvokeFaultHandlersAsync(descriptor, definition, currentJobName, state, ex).ConfigureAwait(false);
                 throw;
             }
 
             lastCompletedJob = currentJobName;
 
-            // The budget check belongs here, not only on the main path: after D4 a branch can
+            // The budget check belongs here, not only on the main path: a branch can
             // loop, so a cycle inside one would otherwise spend without any check ever running —
             // exactly the runaway a guardrail exists for. Stop this branch and let the fork
             // report it; siblings notice independently at their own next check, so nothing is
@@ -1187,18 +1195,19 @@ public sealed partial class WorkflowRunner : IWorkflowRunner
     }
 
     /// <summary>
-    /// Writes reported events into a stream's channel, and stops quietly once nobody is reading.
+    /// Writes reported events into a stream's channel, each stamped by the runner's clock, and stops
+    /// quietly once nobody is reading.
     /// </summary>
     /// <remarks>
     /// A consumer who stops enumerating mid-run is not an error — the reader is disposed, the
     /// channel closes, and whatever is still running finds out by trying to report. Throwing there
     /// would turn "the caller looked away" into a faulted workflow.
     /// </remarks>
-    private sealed class ChannelEventSink(ChannelWriter<WorkflowEvent> writer) : IWorkflowEventSink
+    private sealed class ChannelEventSink(ChannelWriter<WorkflowEvent> writer, TimeProvider clock) : IWorkflowEventSink
     {
         public async ValueTask ReportAsync(WorkflowEvent evt, CancellationToken ct = default)
         {
-            try { await writer.WriteAsync(evt, ct).ConfigureAwait(false); }
+            try { await writer.WriteAsync(evt with { Timestamp = clock.GetUtcNow() }, ct).ConfigureAwait(false); }
             catch (ChannelClosedException) { }
             catch (OperationCanceledException) { }
         }

@@ -48,15 +48,20 @@ public record JobExecution
     public JobOutcome Outcome { get; init; }
 
     internal static JobExecution FromStopwatch(
-        string jobName, Stopwatch sw, bool success,
-        string? error = null, JobOutcome? outcome = null) => new()
+        string jobName, Stopwatch sw, TimeProvider clock, bool success,
+        string? error = null, JobOutcome? outcome = null)
+    {
+        var elapsed = sw.Elapsed;
+        var completedAt = clock.GetUtcNow();
+        return new()
         {
             JobName = jobName,
-            Duration = sw.Elapsed,
+            Duration = elapsed,
             Success = success,
             Error = error,
-            StartedAt = DateTimeOffset.UtcNow - sw.Elapsed,
-            CompletedAt = DateTimeOffset.UtcNow,
+            StartedAt = completedAt - elapsed,
+            CompletedAt = completedAt,
             Outcome = outcome ?? (success ? JobOutcome.Success : JobOutcome.Failed)
         };
+    }
 }

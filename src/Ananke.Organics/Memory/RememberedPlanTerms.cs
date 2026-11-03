@@ -1,6 +1,8 @@
 using Ananke.Learning.EmpiricalMemory;
+using Ananke.Orchestration;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Organics.Memory;
 
@@ -39,11 +41,16 @@ namespace Ananke.Organics.Memory;
 /// How close a remembered term has to be to the halted step before it is worth showing. See the
 /// remarks on <see cref="DefaultThreshold"/> — <b>this is embedder-specific and you should tune it</b>.
 /// </param>
+/// <param name="clock">Clock that stamps remembered terms. Default: <see cref="TimeProvider.System"/>.</param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class RememberedPlanTerms(
-    IEmpiricalMemory memory, string tag = "plan-term", float threshold = RememberedPlanTerms.DefaultThreshold)
+    IEmpiricalMemory memory, string tag = "plan-term", float threshold = RememberedPlanTerms.DefaultThreshold,
+    TimeProvider? clock = null)
 {
     /// <summary>How many remembered terms one halt is shown. Enough to be useful, few enough to read.</summary>
     private const int Most = 3;
+
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     /// <summary>
     /// The default relevance floor, and it is a <b>measurement against one embedder</b> rather than a
@@ -252,6 +259,7 @@ public sealed class RememberedPlanTerms(
     /// </remarks>
     private async Task RememberAsync(PlanTermCommitted committed, CancellationToken ct)
     {
+        var now = _clock.GetUtcNow();
         var stored = await memory.CommitAsync(
             new EmpiricalEntry
             {
@@ -277,8 +285,8 @@ public sealed class RememberedPlanTerms(
                 // keeps until somebody contradicts it.
                 Confidence = Stated,
                 ObservationCount = 1,
-                FirstObserved = DateTimeOffset.UtcNow,
-                LastObserved = DateTimeOffset.UtcNow
+                FirstObserved = now,
+                LastObserved = now
             },
             ct).ConfigureAwait(false);
 

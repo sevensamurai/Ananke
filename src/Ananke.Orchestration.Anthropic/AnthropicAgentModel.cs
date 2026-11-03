@@ -14,7 +14,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     private readonly string _model;
     private readonly int _maxTokens;
 
-    public AnthropicAgentModel(AnthropicClient client, string model = Models.Anthropic.Sonnet5, int maxTokens = 4096)
+    public AnthropicAgentModel(AnthropicClient client, string model = Models.Anthropic.Starred, int maxTokens = 16384)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -63,10 +63,11 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
         // text accumulates over thinking deltas, and its signature lands as a *separate* delta
         // afterwards (Anthropic 12.39.0). So a ReasoningPart is only well-formed once the stream
         // has moved past the block — which is why parts are assembled at the end rather than
-        // emitted incrementally. SeeD2/D3.
+        // emitted incrementally.
         var streamBlocks = new SortedDictionary<long, StreamBlock>();
 
         int streamInputTokens = 0, streamOutputTokens = 0;
+        string? stopReason = null;
 
         await foreach (var evt in _client.Messages.CreateStreaming(parameters, ct))
         {
@@ -75,8 +76,13 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
                 streamInputTokens = (int)msgStart.Message.Usage.InputTokens;
 
             // Delta event carries output token count
-            if (evt.TryPickDelta(out var msgDelta) && msgDelta.Usage is not null)
-                streamOutputTokens = (int)msgDelta.Usage.OutputTokens;
+            if (evt.TryPickDelta(out var msgDelta))
+            {
+                if (msgDelta.Usage is not null)
+                    streamOutputTokens = (int)msgDelta.Usage.OutputTokens;
+
+                stopReason = msgDelta.Delta.StopReason?.Raw() ?? stopReason;
+            }
 
             if (evt.TryPickContentBlockStart(out var blockStart))
             {
@@ -138,10 +144,21 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
                 ToolCalls = toolCalls,
                 Usage = (streamInputTokens > 0 || streamOutputTokens > 0)
                     ? new TokenUsage { InputTokens = streamInputTokens, OutputTokens = streamOutputTokens }
-                    : null
+                    : null,
+                StopReason = MapStopReason(stopReason)
             }
         };
     }
+
+    /// <summary>Anthropic's <c>stop_reason</c>, by the wire value the API documents.</summary>
+    private static AgentStopReason MapStopReason(string? reason) => reason switch
+    {
+        "end_turn" or "stop_sequence" => AgentStopReason.EndTurn,
+        "tool_use" => AgentStopReason.ToolCalls,
+        "max_tokens" => AgentStopReason.MaxTokens,
+        "refusal" => AgentStopReason.Refusal,
+        _ => AgentStopReason.Unknown
+    };
 
     private enum StreamBlockKind { Text, Reasoning, RedactedReasoning }
 
@@ -178,11 +195,9 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
     /// <c>Parts</c> null and lets <c>Text</c> carry it.
     /// </summary>
     /// <remarks>
-    /// <see cref="GenerateStreamAsync"/>'s <c>BuildStreamParts</c> has always applied this rule; the
-    /// unary path did not, so the same text-only reply came back as <c>[TextPart]</c> from
-    /// <see cref="GenerateAsync"/> and as <see langword="null"/> from the stream. D1 binds both
-    /// paths, and its own table names <c>Anthropic (text only) → Parts = null</c> as the shape —
-    /// wrapping text in a part carries nothing <c>Text</c> did not. Found by the conformance suite.
+    /// <see cref="GenerateStreamAsync"/>'s <c>BuildStreamParts</c> applies the same rule, so a
+    /// text-only reply has <c>Parts = null</c> on both paths — wrapping text in a part carries
+    /// nothing <c>Text</c> does not.
     /// </remarks>
     private static IReadOnlyList<ContentPart>? PartsOrNull(List<ContentPart> parts) =>
         parts.Count == 0 || parts.TrueForAll(p => p is TextPart) ? null : parts;
@@ -265,6 +280,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
             Text = text,
             Parts = PartsOrNull(responseParts),
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
+            StopReason = MapStopReason(message.StopReason?.Raw()),
             Usage = message.Usage is not null
                 ? new TokenUsage
                 {
@@ -277,6 +293,10 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
 
     private MessageCreateParams BuildParameters(AgentRequest request)
     {
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+        request.ThrowIfRequestFields("The Anthropic adapter");
+#pragma warning restore ANNKEEXP003
+
         string? system = null;
 
         if (request.SystemPrompt is not null && request.ResponseFormat is not null)
@@ -298,7 +318,7 @@ public sealed class AnthropicAgentModel : IStreamingAgentModel
         var parameters = new MessageCreateParams
         {
             Model = _model,
-            MaxTokens = _maxTokens,
+            MaxTokens = request.MaxOutputTokens ?? _maxTokens,
             Messages = MapMessages(request),
             Tools = tools
         };

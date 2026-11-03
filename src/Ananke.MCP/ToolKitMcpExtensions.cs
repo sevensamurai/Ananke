@@ -1,14 +1,19 @@
 using Ananke.Abstractions.Providers;
 using Ananke.Orchestration.Tools;
 using Ananke.Orchestration.Tools.Gating;
+using System.Reflection;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
-using System.Text.Json;
+using ModelContextProtocol.Server;
 
 namespace Ananke.MCP;
 
 /// <summary>
-/// Extension methods for <see cref="ToolKit"/> to import tools from an external MCP server.
+/// Extension methods for <see cref="ToolKit"/> to import tools from an MCP server, or from an MCP tool
+/// type in this process.
 /// </summary>
 /// <example>
 /// <code>
@@ -69,8 +74,7 @@ public static class ToolKitMcpExtensions
             {
                 var mcpArgs = ToMcpArguments(args);
                 var result = await client.CallToolAsync(toolName, mcpArgs, cancellationToken: ct);
-                var text = ExtractText(result);
-                return result.IsError == true ? ToolResult.Error(text) : ToolResult.Ok(text);
+                return McpToolResults.From(result);
             }
         };
     }
@@ -139,7 +143,88 @@ public static class ToolKitMcpExtensions
         };
     }
 
-    private static IReadOnlyList<ToolParameter> ParseParameters(JsonElement inputSchema)
+    /// <summary>
+    /// Registers the tools an MCP tool type declares — each public method of <paramref name="target"/>'s
+    /// type marked <see cref="McpServerToolAttribute"/> — run in this process, with no server between.
+    /// </summary>
+    /// <param name="toolkit">The toolkit to populate.</param>
+    /// <param name="target">An instance of the tool type, whose methods the tools call.</param>
+    /// <returns>The same <paramref name="toolkit"/> for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Each tool is declared as an MCP server serves it</b> — its name, description and input schema
+    /// are the SDK's for the method — so what a model is offered here is what a client of that server is
+    /// offered. Use it where the tool type is in reach; <see cref="AddMcpServerToolsAsync"/> is for a
+    /// server that is not.
+    /// </para>
+    /// <para>
+    /// A method's arguments are bound to its own parameters. One an MCP server supplies itself, such as
+    /// its request context, has nothing to bind to here. An exception from the method is an error result
+    /// carrying its message.
+    /// </para>
+    /// </remarks>
+    public static ToolKit AddMcpServerTools(this ToolKit toolkit, object target)
+    {
+        ArgumentNullException.ThrowIfNull(toolkit);
+        ArgumentNullException.ThrowIfNull(target);
+
+        var methods = target.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            .Where(method => method.GetCustomAttribute<McpServerToolAttribute>() is not null);
+
+        foreach (var method in methods)
+        {
+            var on = method.IsStatic ? null : target;
+            var declared = McpServerTool.Create(method, on).ProtocolTool;
+
+            // Bound with the options the declared schema was written with, and handed back as the
+            // method returned it, so an MCP result type is read as one rather than as its JSON.
+            var function = AIFunctionFactory.Create(method, on, new AIFunctionFactoryOptions
+            {
+                SerializerOptions = McpJsonUtilities.DefaultOptions,
+                MarshalResult = (result, _, _) => new ValueTask<object?>(result)
+            });
+
+            toolkit.AddTool(new ToolDefinition
+            {
+                Name = declared.Name,
+                Description = declared.Description ?? string.Empty,
+                Parameters = ParseParameters(declared.InputSchema),
+                Execute = async (args, ct) =>
+                {
+                    try
+                    {
+                        var answer = await function.InvokeAsync(new AIFunctionArguments(args.ToDictionary()), ct);
+                        return ResultOf(answer);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        return ToolResult.Error((ex is TargetInvocationException { InnerException: { } inner } ? inner : ex).Message);
+                    }
+                }
+            });
+        }
+
+        return toolkit;
+    }
+
+    /// <summary>
+    /// A method's answer as a server's client would read it: an MCP result or content as
+    /// <see cref="McpToolResults.From"/> reads it, a string as it is, anything else as its JSON.
+    /// </summary>
+    private static ToolResult ResultOf(object? answer) => answer switch
+    {
+        CallToolResult result => McpToolResults.From(result),
+        ContentBlock block => McpToolResults.From(new CallToolResult { Content = [block] }),
+        IEnumerable<ContentBlock> blocks => McpToolResults.From(new CallToolResult { Content = [.. blocks] }),
+        null => ToolResult.Ok(string.Empty),
+        string text => ToolResult.Ok(text),
+        JsonElement { ValueKind: JsonValueKind.String } element => ToolResult.Ok(element.GetString() ?? string.Empty),
+        JsonElement element => ToolResult.Ok(element.GetRawText()),
+        _ => ToolResult.Ok(JsonSerializer.Serialize(answer, answer.GetType(), McpJsonUtilities.DefaultOptions))
+    };
+
+    internal static IReadOnlyList<ToolParameter> ParseParameters(JsonElement inputSchema)
     {
         var parameters = new List<ToolParameter>();
 
@@ -167,9 +252,11 @@ public static class ToolKitMcpExtensions
                 ? desc.GetString() ?? string.Empty
                 : string.Empty;
 
-            var jsonType = prop.Value.TryGetProperty("type", out var typeEl)
-                ? typeEl.GetString() ?? "string"
-                : "string";
+            // An optional parameter's type may be a list, ["string", "null"]: the type is the one that is not null.
+            var jsonType = !prop.Value.TryGetProperty("type", out var typeEl) ? "string"
+                : typeEl.ValueKind == JsonValueKind.Array
+                    ? typeEl.EnumerateArray().Select(t => t.GetString()).FirstOrDefault(t => t is not null and not "null") ?? "string"
+                    : typeEl.GetString() ?? "string";
 
             parameters.Add(new ToolParameter(prop.Name, description, jsonType, IsRequired: requiredSet.Contains(prop.Name)));
         }
@@ -185,17 +272,5 @@ public static class ToolKitMcpExtensions
             mcpArgs[key] = value;
 
         return mcpArgs;
-    }
-
-    private static string ExtractText(CallToolResult result)
-    {
-        if (result.Content is null || result.Content.Count == 0)
-            return string.Empty;
-
-        var textParts = result.Content
-            .OfType<TextContentBlock>()
-            .Select(c => c.Text);
-
-        return string.Join("\n", textParts);
     }
 }

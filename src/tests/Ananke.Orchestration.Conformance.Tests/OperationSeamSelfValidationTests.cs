@@ -1,5 +1,5 @@
-using Ananke.Orchestration.Planning.Conformance;
-using Ananke.Orchestration.Planning.Conformance.NUnit;
+using Ananke.Orchestration.Conformance.Planning;
+using Ananke.Orchestration.Conformance.Planning.NUnit;
 
 namespace Ananke.Orchestration.Conformance.Tests;
 

@@ -126,9 +126,8 @@ public sealed class ModelResolver
         foreach (var (alias, def) in manifest.Models)
         {
             // Provider and Model carry defaults, so an alias that is only a reference would
-            // otherwise resolve to a live openai/gpt-5.4-mini client — the silent substitution
-            // the parser and the validator already refuse. Refused here too, or the
-            // inconsistency simply moves to the third consumer.
+            // otherwise resolve to a live openai/gpt-5.4-mini client, silently substituting a
+            // paid model for the one the reference named.
             if (def.Ref is { } reference)
                 throw new InvalidOperationException(
                     $"Model alias '{alias}' is an unresolved reference to '{reference}' and cannot "

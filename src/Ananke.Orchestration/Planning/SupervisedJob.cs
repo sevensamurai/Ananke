@@ -1,7 +1,9 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Agents.Context;
+using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Tools;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -18,12 +20,14 @@ namespace Ananke.Orchestration.Planning;
 /// <remarks>
 /// <b>Say what would be accepted, not only what was refused.</b> The message reaches whoever is
 /// choosing and, through the discard list, the model that wrote it — and a refusal that does not
-/// name the shape it wanted produces a better-formed version of the same mistake (R18).
+/// name the shape it wanted produces a better-formed version of the same mistake.
 /// </remarks>
 /// <param name="nodeId">The step the criterion would be asked of.</param>
 /// <param name="criterion">The criterion, as written.</param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate string? CriterionAdmission(string nodeId, string criterion);
 
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanRoles
 {
     /// <summary>Runs the work items.</summary>
@@ -55,6 +59,7 @@ public static class PlanRoles
 /// out of the run's history — which is why it is named where the plan is composed rather than here.
 /// See <c>AgenticPattern.SupervisedPlan</c>.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record SupervisionOptions
 {
     /// <summary>
@@ -167,8 +172,8 @@ public sealed record SupervisionOptions
     public IVerifier? Verifier { get; init; }
 
     /// <summary>
-    /// Applies a node's candidate operation to the domain the plan is about — R27's "the loop
-    /// applies it". <see langword="null"/> means no node here proposes one, so the shape gate never
+    /// Applies a node's candidate operation to the domain the plan is about: the loop
+    /// applies it, not the node. <see langword="null"/> means no node here proposes one, so the shape gate never
     /// runs and <see cref="NodeOutcome.Candidate"/> is read by nobody.
     /// </summary>
     /// <remarks>
@@ -264,8 +269,8 @@ public sealed record SupervisionOptions
 
     /// <summary>Who actually rules, or nobody.</summary>
     /// <remarks>
-    /// <b>Never built implicitly.</b> There was sugar here that made one out of a <c>Reviewer</c>
-    /// model, and R8 retired that role: what no check can decide goes to the Supervisor. A
+    /// <b>Never built implicitly.</b> There is no <c>Reviewer</c> model role: what no check can
+    /// decide goes to the Supervisor. A
     /// supervision that wants a model in the loop composes it — <c>AgentVerifier(supervisor,
     /// DeterministicVerifier([checks]))</c> — because which authority runs first is a decision worth
     /// writing down rather than inferring, and the checks are the cheaper and stronger one.
@@ -296,6 +301,14 @@ public sealed record SupervisionOptions
 
         return Models.TryGetValue(role, out var model) ? model : null;
     }
+
+    /// <summary>
+    /// Whether any role's model reports a per-call cost, so a budget can price its calls without
+    /// flat rates.
+    /// </summary>
+    internal bool HasProfileAwareModel =>
+        ((IEnumerable<IAgentModel?>)[Executor, Supervisor, Planner, .. Models.Values])
+        .Any(model => model is RoutedAgentModel { HasCostResolver: true });
 
     /// <summary>What actually runs a node: the supplied runner, or one built for the executor.</summary>
     /// <remarks>
@@ -334,6 +347,15 @@ public sealed record SupervisionOptions
         string planId, string nodeId, string answer, string by, CancellationToken ct = default) =>
         new PlanExecutor(ResolvedStore, TimeProvider, ProjectionTokenBudget, ResolvedVerifier)
             .AnswerAsync(planId, nodeId, answer, by, ct);
+
+    /// <summary>
+    /// Records what a node was told, including a node that asked nothing: <paramref name="unasked"/> is
+    /// then what it is answered about.
+    /// </summary>
+    internal Task<PlanTree> AnswerAsync(
+        string planId, string nodeId, string answer, string by, string? unasked, CancellationToken ct) =>
+        new PlanExecutor(ResolvedStore, TimeProvider, ProjectionTokenBudget, ResolvedVerifier)
+            .AnswerAsync(planId, nodeId, answer, by, unasked, ct);
 
     /// <summary>Records a term somebody settled about the plan, and reports it.</summary>
     public Task<PlanTree> CommitAsync(
@@ -411,13 +433,16 @@ public sealed record SupervisionOptions
 /// each plan still runs one node at a time.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class SupervisedJob<TState>(
     string name,
     Func<TState, PlanTree> plan,
     SupervisionOptions supervision,
-    Func<TState, PlanRunResult, TState> mapResult) : IJob<TState>
+    Func<TState, PlanRunResult, TState> mapResult) : IJob<TState>, IProfileAwareJob
 {
     private readonly IPlanTreeStore _store = supervision.ResolvedStore;
+
+    bool IProfileAwareJob.HasProfileAwareModel => supervision.HasProfileAwareModel;
 
     /// <inheritdoc />
     public string Name { get; } = name;

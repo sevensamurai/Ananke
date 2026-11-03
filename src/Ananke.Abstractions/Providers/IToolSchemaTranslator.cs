@@ -5,10 +5,9 @@ namespace Ananke.Abstractions.Providers;
 /// representation expected by a specific provider's API.
 /// </summary>
 /// <remarks>
-/// Implementations live in <c>Ananke.Orchestration.{Provider}</c> and are consumed
-/// both by the matching <c>{Provider}AgentModel</c> and by <c>Ananke.Federation.{Provider}</c>.
-/// Registering the implementation once via <c>AddOrchestration{Provider}()</c> makes it
-/// available to both layers through DI.
+/// Implementations live in <c>Ananke.Orchestration.{Provider}</c> and are consumed by the
+/// matching <c>{Provider}AgentModel</c>. <c>AddOrchestration{Provider}()</c> registers the
+/// implementation through DI.
 /// </remarks>
 public interface IToolSchemaTranslator
 {

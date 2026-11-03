@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Learning.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
     <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>

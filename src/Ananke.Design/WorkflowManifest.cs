@@ -1,6 +1,7 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Design.Tools;
 using System.Diagnostics.CodeAnalysis;
+using Ananke.Orchestration.Agents;
 
 namespace Ananke.Design;
 
@@ -108,8 +109,8 @@ public sealed class WorkflowManifest
     /// <para>
     /// <b>The rule that governs what belongs on which list:</b> an unsupported construct must not
     /// look like an absent one. Flow mappings moved to the supported list because manifests used
-    /// them and the parser dropped the alias silently, so every job referencing it reported
-    /// <c>FED011</c> "model alias not defined" about an alias plainly present in the file.
+    /// them and the parser dropped the alias silently, so every job referencing it reported the
+    /// alias as undefined while it was plainly present in the file.
     /// </para>
     /// <para>
     /// A general-purpose YAML library (e.g. YamlDotNet, SharpYaml) was evaluated and rejected:
@@ -326,8 +327,8 @@ public sealed class WorkflowManifest
     /// <para>
     /// This parser is a hand-rolled YAML subset, not a YAML implementation, and the flow form is
     /// supported here because manifests in the wild use it: before this, an alias declared that way
-    /// was <b>silently dropped</b>, so every job referencing it failed with <c>FED011</c>
-    /// "model alias not defined" while the alias was plainly there on the page.
+    /// was <b>silently dropped</b>, so every job referencing it failed on an undefined alias
+    /// while the alias was plainly there on the page.
     /// </para>
     /// <para>
     /// Deliberately scoped to <c>models:</c>. Flow mappings elsewhere are still unsupported, and the
@@ -913,8 +914,8 @@ public sealed class ModelDefinition
     /// <b>Why that matters more than it looks.</b> <see cref="Provider"/> and <see cref="Model"/>
     /// carry defaults, so an alias that declared only a <c>ref</c> used to parse into a perfectly
     /// valid-looking <c>openai</c> / <c>gpt-5.4-mini</c> definition — silently substituting a paid
-    /// frontier model for whatever the reference named. A validator that sees this set can refuse
-    /// instead; see <c>FED016</c> in <c>DeployabilityValidator</c>.
+    /// frontier model for whatever the reference named. <see cref="ModelResolver"/> refuses an
+    /// alias with this set instead.
     /// </para>
     /// </remarks>
     public string? Ref { get; set; }
@@ -964,7 +965,7 @@ public sealed class JobDefinition
     public bool Semantic { get; set; }
 
     /// <summary>Maximum tool-calling rounds before forcing a final response. Default is 3.</summary>
-    public int MaxToolRounds { get; set; } = 3;
+    public int MaxToolRounds { get; set; } = AgentJobFactory.DefaultMaxToolRounds;
 
     /// <summary>
     /// Declarative router chain for this job's tool kit.

@@ -112,12 +112,3 @@ Pass `--provider <name>` to any `nnke new` scaffold command.
 | Browse docs, patterns, error codes | `nnke` |
 | Inspect local mesh snapshots | `nnke` |
 | MCP server for AI clients | `nnke mcp-server` |
-| Deploy to Azure / Google / Anthropic | `nnke-platform` |
-| Live remote deployment status | `nnke-platform` |
-| Metrics trends, apoptosis, compare | `nnke-platform` |
-| Platform credentials / login | `nnke-platform` |
-
-For federation operations, install `nnke-platform`:
-```bash
-dotnet tool install -g nnke-platform
-```

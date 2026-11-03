@@ -25,25 +25,17 @@
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          CLI / TOOLING LAYER                            │
-│  nnke  ·  nnke-platform  ·  Ananke.Tool.Shared                         │
-│  nnke-platform-anthropic · nnke-platform-azure · nnke-platform-google  │
-│  nnke-platform-all                                                      │
+│  nnke  ·  Ananke.Tool.Shared                                            │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                         APPLICATION LAYER                               │
-│  Ananke (meta-pkg)  ·  Ananke.Mesh (meta-pkg)                          │
-│  Ananke.AspNetCore  ·  Ananke.Design  ·  Ananke.Roles                   │
-│  Ananke.Platforms.Slack  ·  Ananke.Platforms.Discord                   │
-├──────────────────────────────────────────────────────────────────────────┤
-│                        FEDERATION LAYER                                 │
-│  Ananke.Federation  ·  Ananke.Federation.Anthropic                      │
-│  Ananke.Federation.Azure  ·  Ananke.Federation.Google                   │
-│  Ananke.Federation.LocalEmulators                                       │
+│  Ananke (meta-pkg)                                                      │
+│  Ananke.AspNetCore  ·  Ananke.Design                                    │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                         ORGANICS LAYER                                  │
 │  Ananke.Organics  (Kernel, Division, Healing, Sensing, Lineage)         │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                       INTEGRATION LAYER                                 │
-│  Ananke.MCP  ·  Ananke.A2A  ·  Ananke.Platforms                        │
+│  Ananke.MCP  ·  Ananke.A2A                                              │
 │  Ananke.Skills  ·  Ananke.Documents                                     │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                      INTELLIGENCE LAYER                                 │
@@ -96,7 +88,6 @@ graph TD
     subgraph Integration
         MCP[Ananke.MCP]
         A2A[Ananke.A2A]
-        PLT[Ananke.Platforms]
         SKL[Ananke.Skills]
         DOC[Ananke.Documents]
     end
@@ -105,32 +96,15 @@ graph TD
         ORG[Ananke.Organics]
     end
 
-    subgraph Federation
-        FED[Ananke.Federation]
-        FANT[Ananke.Federation.Anthropic]
-        FAZR[Ananke.Federation.Azure]
-        FGOO[Ananke.Federation.Google]
-        FLE[Ananke.Federation.LocalEmulators]
-    end
-
     subgraph Application
         META[Ananke - meta]
-        MESH[Ananke.Mesh - meta]
         ASP[Ananke.AspNetCore]
         DSG[Ananke.Design]
-        SLK[Ananke.Platforms.Slack]
-        DIS[Ananke.Platforms.Discord]
-        ROL[Ananke.Roles]
     end
 
     subgraph CLI
         TSH[Ananke.Tool.Shared]
         CLI1[nnke]
-        CLI2[nnke-platform]
-        CLI3[nnke-platform-anthropic]
-        CLI4[nnke-platform-azure]
-        CLI5[nnke-platform-google]
-        CLI6[nnke-platform-all]
     end
 
     %% Foundation → Core
@@ -160,7 +134,6 @@ graph TD
     %% Core → Integration
     MCP --> ORC
     A2A --> ORC
-    PLT --> ORC
     SKL --> ORC
     DOC --> OKN
 
@@ -171,16 +144,6 @@ graph TD
     %% Core → Design
     DSG --> ORC
 
-    %% Organics → Federation
-    FED --> ORG
-    FED --> DSG
-    FANT --> FED
-    FANT --> ANT
-    FAZR --> FED
-    FAZR --> OAI
-    FGOO --> FED
-    FGOO --> GOO
-    FLE --> FED
 
     %% Infrastructure (Qdrant depends on Organics)
     QDR --> OKN
@@ -188,44 +151,21 @@ graph TD
     QDR --> ORG
 
     %% Integration → Application
-    SLK --> PLT
-    DIS --> PLT
-    DIS --> ORC
     ASP --> ORC
     ASP --> SM
     ASP --> ORG
 
-    %% Application → Roles
-    ROL --> DSG
-    ROL --> ORG
-    ROL --> PLT
-    ROL --> SLK
-
     %% Meta-packages
     META --> ORC
     META --> SM
-    MESH --> ORC
-    MESH --> LRN
-    MESH --> ORG
-    MESH --> DSG
 
     %% CLI
     TSH --> ORG
     CLI1 --> DSG
     CLI1 --> ORG
     CLI1 --> TSH
-    CLI2 --> DSG
-    CLI2 --> FED
-    CLI2 --> ORC
-    CLI2 --> TSH
 
     %% CLI platform adapter plugins
-    CLI3 --> FANT
-    CLI4 --> FAZR
-    CLI5 --> FGOO
-    CLI6 --> CLI3
-    CLI6 --> CLI4
-    CLI6 --> CLI5
 ```
 
 ## Project Inventory
@@ -272,7 +212,6 @@ graph TD
 |---------|----------|------|-------------|
 | `Ananke.MCP` | `Ananke.MCP` | Expose `ToolKit`/`Workflow` as MCP server tools; import MCP tools into `ToolKit` | `Ananke.Orchestration`, ModelContextProtocol SDK |
 | `Ananke.A2A` | `Ananke.A2A` | Agent-to-Agent protocol — call remote A2A agents as `IAgentModel`; expose workflows as A2A endpoints | `Ananke.Orchestration`, A2A SDK |
-| `Ananke.Platforms` | `Ananke.Platforms` | Conversational adapter contracts: `IMessagePlatformAdapter`, `IPlatformResponseSink`, `IPlatformMessageHandler`, `PlatformMessage`, `StreamingMessageBridge` | `Ananke.Orchestration` |
 | `Ananke.Skills` | `Ananke.Skills` | External skill catalog — discover, score, install CLI tools as `ToolDefinition` entries | `Ananke.Orchestration` |
 | `Ananke.Documents` | `Ananke.Documents` | `IDocumentExtractor` for PDF, Markdown, plain text | `Ananke.Orchestration`, PdfPig, Markdig |
 
@@ -281,22 +220,8 @@ graph TD
 | Project | NuGet ID | Role | Dependencies |
 |---------|----------|------|-------------|
 | `Ananke` | `Ananke` | Meta-package — bundles StateMachine + Orchestration in one step | `Ananke.Orchestration`, `Ananke.StateMachine` |
-| `Ananke.Mesh` | `Ananke.Mesh` | Meta-package — full growth-aware mesh story: Orchestration + Learning + Organics + Design | `Ananke.Orchestration`, `Ananke.Learning`, `Ananke.Organics`, `Ananke.Design` |
 | `Ananke.AspNetCore` | `Ananke.AspNetCore` | SSE streaming, `ChatSession`, state machine endpoint helpers, organic-colony inspection endpoints | `Ananke.Orchestration`, `Ananke.StateMachine`, `Ananke.Organics`, ASP.NET Core |
 | `Ananke.Design` | `Ananke.Design` | YAML DSL → `Workflow` import, Mermaid diagram export | `Ananke.Orchestration` |
-| `Ananke.Platforms.Slack` | `Ananke.Platforms.Slack` | Slack adapter via SlackNet (Socket Mode + Events API) | `Ananke.Platforms`, SlackNet |
-| `Ananke.Platforms.Discord` | `Ananke.Platforms.Discord` | Discord adapter via Discord.Net (Gateway) — **Phase 2, skeleton** | `Ananke.Orchestration`, `Ananke.Platforms`, Discord.Net |
-| `Ananke.Roles` | `Ananke.Roles` | Role/persona scaffolding — `AgentRole`, `ReviewPolicy`, `EscalationPolicy`, `StudioRouter`, `StudioHostBuilder`, Slack role routing (`SlackChannelMap`, `RoleAwareMessageHandler`, `SlackApprovalCallback`) | `Ananke.Design`, `Ananke.Organics`, `Ananke.Platforms`, `Ananke.Platforms.Slack` |
-
-### Federation
-
-| Project | NuGet ID | Role | Dependencies |
-|---------|----------|------|-------------|
-| `Ananke.Federation` | `Ananke.Federation` | Core deployer, registry, credential provider, validator, and monitor abstractions for multi-provider agent deployment | `Ananke.Organics`, `Ananke.Design` |
-| `Ananke.Federation.Anthropic` | `Ananke.Federation.Anthropic` | Claude federation adapter — deploy/teardown Claude-backed agents | `Ananke.Federation`, `Ananke.Orchestration.Anthropic` |
-| `Ananke.Federation.Azure` | `Ananke.Federation.Azure` | Azure OpenAI federation adapter | `Ananke.Federation`, `Ananke.Orchestration.OpenAI` |
-| `Ananke.Federation.Google` | `Ananke.Federation.Google` | Google GenAI federation adapter | `Ananke.Federation`, `Ananke.Orchestration.Google` |
-| `Ananke.Federation.LocalEmulators` | `Ananke.Federation.LocalEmulators` | Stub `IPlatformNativeExecutor` implementations (bash, code execution, web search/fetch, file search, memory, text editor) for exercising platform-native tool paths without cloud credentials | `Ananke.Federation` |
 
 ### CLI Tools
 
@@ -305,19 +230,9 @@ CLI packages use a **namespace exception** — see [CLI Namespace Exception](#cl
 | Project | Tool ID | Role | Dependencies |
 |---------|---------|------|-------------|
 | `nnke` | `nnke` | `dotnet ananke` global tool — agent scaffold, design pipeline, organics commands | `Ananke.Design`, `Ananke.Organics`, `Ananke.Tool.Shared`, ModelContextProtocol, System.CommandLine |
-| `nnke-platform` | `nnke-platform` | `dotnet ananke-platform` global tool — federation deploy/teardown/status commands | `Ananke.Design`, `Ananke.Federation`, `Ananke.Orchestration`, `Ananke.Tool.Shared`, System.CommandLine |
 
-`Ananke.Tool.Shared` is a library (not a tool) of CLI primitives shared by both: `CliOptions`,
+`Ananke.Tool.Shared` is a library (not a tool) of CLI primitives used by `nnke`: `CliOptions`,
 `JsonOutput`, `SnapshotLoader`. Depends only on `Ananke.Organics`.
-
-Standalone executable adapter plugins — installed alongside `nnke-platform` to enable a specific `deploy --platform` target (probed and loaded via `AdapterManifest`, not referenced as libraries):
-
-| Project | Role | Dependencies |
-|---------|------|-------------|
-| `nnke-platform-anthropic` | Enables `deploy --platform claude` — targets the Anthropic Beta Managed Agents API | `Ananke.Federation.Anthropic` |
-| `nnke-platform-azure` | Enables `deploy --platform azure-ai` | `Ananke.Federation.Azure` |
-| `nnke-platform-google` | Enables `deploy --platform vertex-ai` | `Ananke.Federation.Google` |
-| `nnke-platform-all` | Convenience meta-installer — runs all three adapters' `AdapterInstaller.Install()` in one command | `nnke-platform-anthropic`, `nnke-platform-azure`, `nnke-platform-google` |
 
 ## Key Abstractions (Cross-Project)
 
@@ -393,12 +308,6 @@ IHandoffChannel                              src/Ananke.Abstractions/Channels/IH
                                               (request/response)
   ├── InMemoryHandoffChannel                 src/Ananke.Orchestration/Jobs/InMemoryHandoffChannel.cs
   └── MqttHandoffChannel                     src/Ananke.MQTT/MqttHandoffChannel.cs
-
-IMessagePlatformAdapter                      src/Ananke.Platforms/IMessagePlatformAdapter.cs
-                                              (conversational)
-  ├── SlackAdapter                           src/Ananke.Platforms.Slack/SlackAdapter.cs
-  └── DiscordAdapter                         src/Ananke.Platforms.Discord/DiscordAdapter.cs
-                                              (Phase 2)
 ```
 
 ## Data Flow Diagrams
@@ -511,10 +420,9 @@ dotnet test src/tests/Ananke.Orchestration.Tests
 
 ## CLI Namespace Exception
 
-The repository rule requires namespaces to match assembly + folder path. CLI tool packages are an explicit documented exception:
+The repository rule requires namespaces to match assembly + folder path. The CLI tool package is an explicit documented exception:
 
 - `nnke` → namespace root `Ananke.Tool`
-- `nnke-platform` → namespace root `Ananke.Tool.Platform`
 
 Rationale: CLI entry-point projects are never referenced as libraries. The `Tool` namespace segment signals clearly that these types are not part of the public library API and avoids accidental name collisions if types were ever co-located with library types.
 

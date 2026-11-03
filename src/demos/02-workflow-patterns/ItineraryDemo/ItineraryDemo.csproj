@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Uses the plan tier, which is [Experimental]. -->
+    <NoWarn>$(NoWarn);ANNKEEXP001</NoWarn>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -18,6 +20,7 @@
     <ProjectReference Include="..\..\..\Ananke.Design\Ananke.Design.csproj" />
     <ProjectReference Include="..\..\..\Ananke.Orchestration.OpenAI\Ananke.Orchestration.OpenAI.csproj" />
     <ProjectReference Include="..\..\..\Ananke.Orchestration.Google\Ananke.Orchestration.Google.csproj" />
+    <ProjectReference Include="..\..\..\Ananke.OpenTelemetry\Ananke.OpenTelemetry.csproj" />
   </ItemGroup>
 
 </Project>

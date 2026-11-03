@@ -5,6 +5,7 @@ using Ananke.Organics.Topology;
 using Ananke.Organics.Topology.Centrality;
 using Ananke.Organics.Topology.Reporting;
 using Ananke.Organics.Kernel.Lineage;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Topology;
@@ -25,6 +26,18 @@ public class ColonyReportExporterTests
     {
         if (Directory.Exists(_outputDir))
             Directory.Delete(_outputDir, recursive: true);
+    }
+
+    [Test]
+    public async Task ExportAsync_GeneratedAt_ComesFromTheClock()
+    {
+        var graph = await BuildSmallGraphAsync();
+
+        await new ColonyReportExporter(new FakeTimeProvider(new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero)))
+            .ExportAsync(graph, [], _outputDir);
+
+        var md = await File.ReadAllTextAsync(Path.Combine(_outputDir, "COLONY_REPORT.md"));
+        md.ShouldContain("Generated: 2030-01-01 12:00:00 UTC");
     }
 
     private static async Task<IKnowledgeGraph> BuildSmallGraphAsync()

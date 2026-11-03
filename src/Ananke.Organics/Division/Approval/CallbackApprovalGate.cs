@@ -8,7 +8,7 @@ namespace Ananke.Organics.Division.Approval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Example: Slack human-in-the-loop approval using <c>Ananke.Platforms.Slack</c>:
+/// Example: human-in-the-loop approval through a Slack client of your own:
 /// </para>
 /// <code>
 /// var gate = new CallbackApprovalGate(async (plan, snapshot, ct) =>

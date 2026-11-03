@@ -25,7 +25,7 @@
 
   <!-- Coordinated version across all packages -->
   <PropertyGroup>
-    <VersionPrefix>0.9.0</VersionPrefix>
+    <VersionPrefix>0.9.1</VersionPrefix>
     <MsExtensionsVersion>10.0.7</MsExtensionsVersion>
   </PropertyGroup>
 

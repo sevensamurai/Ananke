@@ -3,6 +3,7 @@ using Ananke.Learning.EmpiricalMemory;
 using Ananke.Learning.Features;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Learning.Tests;
@@ -58,6 +59,19 @@ public class TagImportanceTrackerTests
         map.ShouldNotBeNull();
         map.GetImportance("winning-move").ShouldBe(1.0f);
         map.EntriesAnalyzed.ShouldBe(10);
+    }
+
+    [Test]
+    public async Task ComputedAt_ComesFromTheOptionsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < 5; i++)
+            await CommitEntryAsync($"clock-{i}", ["tag"], valence: 0.8f);
+
+        var map = await new TagImportanceTracker(
+            new TagImportanceOptions { MinSampleSize = 5, Clock = new FakeTimeProvider(now) }).ComputeAsync(_memory);
+
+        map!.ComputedAt.ShouldBe(now);
     }
 
     // ── MixedTagsGetNeutralImportance ────────────────────────────

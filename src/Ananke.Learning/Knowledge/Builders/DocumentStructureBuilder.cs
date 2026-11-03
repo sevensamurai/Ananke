@@ -34,8 +34,11 @@ namespace Ananke.Learning.Knowledge.Builders;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class DocumentStructureBuilder
+/// <param name="timeProvider">Clock that stamps each edge's <see cref="GraphEdge.ObservedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
+public sealed class DocumentStructureBuilder(TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     private const string EntityMetaPrefix = "entity:";
     private const string CitesMetaPrefix = "cites:";
 
@@ -52,6 +55,7 @@ public sealed class DocumentStructureBuilder
         ArgumentNullException.ThrowIfNull(document);
 
         var docNodeId = DocId(document.Id);
+        var observedAt = _timeProvider.GetUtcNow();
 
         await graph.UpsertNodeAsync(new GraphNode
         {
@@ -73,6 +77,7 @@ public sealed class DocumentStructureBuilder
                     ToId = entityNodeId,
                     Relation = "mentions",
                     Provenance = EdgeProvenance.Extracted,
+                    ObservedAt = observedAt,
                 }, ct);
             }
             else if (key.StartsWith(CitesMetaPrefix, StringComparison.OrdinalIgnoreCase))
@@ -85,6 +90,7 @@ public sealed class DocumentStructureBuilder
                     ToId = citedDocId,
                     Relation = "cites",
                     Provenance = EdgeProvenance.Extracted,
+                    ObservedAt = observedAt,
                 }, ct);
             }
         }

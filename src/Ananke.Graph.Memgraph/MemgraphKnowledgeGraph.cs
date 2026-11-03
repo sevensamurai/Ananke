@@ -26,8 +26,14 @@ namespace Ananke.Graph.Memgraph;
 /// is allowed; the reverse is silently ignored.
 /// </para>
 /// </remarks>
-public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKnowledgeGraph
+/// <param name="factory">Opens sessions against the Memgraph instance.</param>
+/// <param name="timeProvider">
+/// Clock read for an edge stored without <c>observedAt</c>. Defaults to <see cref="TimeProvider.System"/>.
+/// </param>
+public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory, TimeProvider? timeProvider = null) : IKnowledgeGraph
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     // ── Schema bootstrap ──────────────────────────────────────────────────────
 
     /// <summary>
@@ -292,7 +298,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
         };
     }
 
-    private static GraphEdge RecordToEdge(IRelationship r)
+    private GraphEdge RecordToEdge(IRelationship r)
     {
         var reserved = new HashSet<string>(StringComparer.Ordinal)
             { "weight", "provenance", "observedAt" };
@@ -307,7 +313,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory) : IKn
 
         var observedAt = r.Properties.TryGetValue("observedAt", out var oaVal)
             ? DateTimeOffset.FromUnixTimeMilliseconds(oaVal.As<long>())
-            : DateTimeOffset.UtcNow;
+            : _timeProvider.GetUtcNow();
 
         return new GraphEdge
         {

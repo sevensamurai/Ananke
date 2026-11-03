@@ -9,7 +9,7 @@ namespace Ananke.Orchestration.Usage;
 /// <remarks>
 /// The lock lives here rather than in the runner: recording happens once per model
 /// response from concurrent fork branches, so serialisation belongs at the one place
-/// every path funnels through. SeeD9.
+/// every path funnels through.
 /// </remarks>
 public sealed class InMemoryUsageRecorder : IUsageRecorder
 {
@@ -34,7 +34,7 @@ public sealed class InMemoryUsageRecorder : IUsageRecorder
                 _accumulatedCost += cost;
                 _hasModelBasedCost = true;
             }
-            else
+            else if (!record.Priced)
             {
                 // No per-call rate for this call, so a budget has to price it at flat rates.
                 _uncostedUsage = _uncostedUsage.Add(record.Usage);

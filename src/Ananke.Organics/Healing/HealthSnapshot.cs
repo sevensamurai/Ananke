@@ -75,7 +75,7 @@ public sealed record HealthSnapshot
     /// <summary>When this snapshot was measured.</summary>
     public required DateTimeOffset MeasuredAt { get; init; }
 
-    // ── Apoptosis fields (L4) ───────────────────────────────────────
+    // ── Apoptosis fields ────────────────────────────────────────────
 
     /// <summary>
     /// Timestamp of the most recent execution observed for this cell.

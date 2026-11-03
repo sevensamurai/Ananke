@@ -233,6 +233,22 @@ public class StateMachineTransitionTests
     }
 
     [Test]
+    public async Task TransitionAsync_WithoutEventTime_EventTimestampComesFromTheOptionsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var machine = new LightMachine(_lock, _lock, new StateMachineOptions { Clock = new FixedClock(now) });
+
+        var result = await machine.TransitionAsync(new TestContext("et-clock"), LightAction.TurnOn);
+
+        result.EventTimestamp.ShouldBe(now);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [Test]
     public async Task TransitionAsync_WithEventTime_ResultCarriesCorrectTimestamp()
     {
         var machine = new LightMachine(_lock, _lock);

@@ -45,7 +45,7 @@ public class MemgraphKnowledgeGraphTests
             Assert.Ignore("Memgraph is not reachable on bolt://localhost:7687 — skipping integration tests.");
         }
 
-        await _graph.EnsureSchemaAsync();
+        await new MemgraphKnowledgeGraph(_factory).EnsureSchemaAsync();
     }
 
     [SetUp]
@@ -159,6 +159,36 @@ public class MemgraphKnowledgeGraphTests
         var neighbors = await _graph.NeighborsAsync(a.Id, relation: "tagged");
         neighbors.ShouldNotBeEmpty();
         neighbors[0].Weight.ShouldBeGreaterThan(0f);
+    }
+
+    [Test]
+    public async Task Neighbors_EdgeStoredWithoutObservedAt_IsStampedByTheClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var a = new GraphNode { Id = $"test-{Guid.NewGuid():N}", Kind = "entry" };
+        var b = new GraphNode { Id = $"test-{Guid.NewGuid():N}", Kind = "entry" };
+        await _graph.UpsertNodeAsync(a);
+        await _graph.UpsertNodeAsync(b);
+        await using (var session = _factory.OpenSession())
+        {
+            await session.ExecuteWriteAsync(async tx =>
+            {
+                var cursor = await tx.RunAsync(
+                    "MATCH (a:Node {id: $a}), (b:Node {id: $b}) CREATE (a)-[:RAW]->(b)",
+                    new { a = a.Id, b = b.Id });
+                return await cursor.ConsumeAsync();
+            });
+        }
+
+        var clocked = new MemgraphKnowledgeGraph(_factory, new FixedClock(now));
+        var neighbors = await clocked.NeighborsAsync(a.Id, relation: "RAW");
+
+        neighbors.Single().ObservedAt.ShouldBe(now);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     [Test]

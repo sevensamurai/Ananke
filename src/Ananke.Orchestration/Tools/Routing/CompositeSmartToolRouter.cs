@@ -24,7 +24,7 @@ namespace Ananke.Orchestration.Tools.Routing;
 ///   <see cref="ToolRoutingDecision.Confidence"/> is <see cref="RoutingConfidence.High"/>,
 ///   the chain short-circuits and returns "no tools".</item>
 ///   <item>If <see cref="ToolRoutingDecision.Confidence"/> is <see cref="RoutingConfidence.Low"/>,
-///   the candidates are <em>not</em> narrowed for the next stage (escalation rule §4.3).</item>
+///   the candidates are <em>not</em> narrowed for the next stage.</item>
 /// </list>
 /// </para>
 /// <para>

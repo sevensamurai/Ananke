@@ -61,8 +61,9 @@ public record TransitionResult<S> where S : Enum
     /// <summary>
     /// The logical event time associated with this transition.
     /// When the transition payload implements <see cref="Ananke.Abstractions.ITimestamped"/>
-    /// this reflects <see cref="Ananke.Abstractions.ITimestamped.EventTime"/>;
-    /// otherwise defaults to <see cref="DateTimeOffset.UtcNow"/>.
+    /// this reflects <see cref="Ananke.Abstractions.ITimestamped.EventTime"/>; otherwise the machine
+    /// sets it from <see cref="StateMachineOptions.Clock"/>. A result built by hand defaults to the
+    /// current time.
     /// </summary>
     public DateTimeOffset EventTimestamp { get; init; } = DateTimeOffset.UtcNow;
 

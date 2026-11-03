@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using Ananke.Orchestration.Agents.Context;
 
@@ -11,6 +12,7 @@ namespace Ananke.Orchestration.Planning;
 /// reference, so re-ruling one subtree leaves every node outside it pointing at the same instance
 /// the previous version used.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanVersion
 {
     /// <summary>Version number, starting at 1 and increasing by one each time a version is minted.</summary>
@@ -90,6 +92,7 @@ public sealed record PlanVersion
 /// legible, which is the opposite of what it is for.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanTree
 {
     /// <summary>Identifier for this plan, stable across versions.</summary>
@@ -429,6 +432,22 @@ public sealed record PlanTree
 
         return Replace(Current.Nodes[nodeId] with { Abandonment = abandonment, State = StepState.Skipped });
     }
+
+    /// <summary>
+    /// Names how hard a node reasons (<see cref="PlanNode.Effort"/>); <see langword="null"/> names none.
+    /// Mints no version, since the effort is not part of the node's contract.
+    /// </summary>
+    public PlanTree WithEffort(string nodeId, string? effort) =>
+        Replace(Current.Nodes[nodeId] with { Effort = string.IsNullOrWhiteSpace(effort) ? null : effort.Trim() });
+
+    /// <summary>
+    /// Names what a node may change (<see cref="PlanNode.Touches"/>); none, or only blanks, names nothing.
+    /// </summary>
+    public PlanTree WithTouches(string nodeId, IEnumerable<string>? touches) =>
+        Replace(Current.Nodes[nodeId] with
+        {
+            Touches = [.. (touches ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim())]
+        });
 
     /// <summary>Records that an attempt at a node did not finish. Mints no version.</summary>
     public PlanTree WithFailure(string nodeId, NodeFailure failure)

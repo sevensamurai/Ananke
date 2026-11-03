@@ -157,9 +157,9 @@ public sealed class QdrantToolMemory : IToolMemory
             };
         }
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: queryVector,
+            query: queryVector.ToArray(),
             filter: searchFilter,
             limit: (ulong)topK,
             payloadSelector: true,

@@ -23,7 +23,8 @@ public class ChatSession<TState, TAction>
     where TState : Enum
     where TAction : Enum
 {
-    private Func<string, object, Task> _writeSse = (_, _) => Task.CompletedTask;
+    // Null until BindResponse: an event written before then has nowhere to go, so it is refused.
+    private Func<string, object, Task>? _writeSse;
     private readonly ConcurrentDictionary<Type, object> _contexts = new();
 
     public ChatSession(
@@ -63,7 +64,12 @@ public class ChatSession<TState, TAction>
     public void BindResponse(Func<string, object, Task> writeSse) => _writeSse = writeSse;
 
     /// <summary>Writes a named SSE event with JSON data to the client.</summary>
-    public Task EmitAsync(string eventName, object data) => _writeSse(eventName, data);
+    /// <exception cref="InvalidOperationException"><see cref="BindResponse"/> has not been called.</exception>
+    public Task EmitAsync(string eventName, object data) => WriteSse(eventName, data);
+
+    private Func<string, object, Task> WriteSse => _writeSse
+        ?? throw new InvalidOperationException(
+            "The session has no response to write to: call BindResponse before emitting events.");
 
     /// <summary>
     /// Consumes a <see cref="ChatSessionEvent"/> stream and emits corresponding SSE events.
@@ -75,7 +81,7 @@ public class ChatSession<TState, TAction>
     /// </param>
     public async Task StreamAsync(IAsyncEnumerable<ChatSessionEvent> events, CancellationToken ct = default)
     {
-        await events.WriteSseAsync(_writeSse,
+        await events.WriteSseAsync(WriteSse,
             onError: message => Logger.LogError("❌ Error: {Message}", message),
             ct: ct);
     }

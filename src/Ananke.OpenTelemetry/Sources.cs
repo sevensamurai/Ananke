@@ -62,9 +62,9 @@ public static class Sources
     public const string EmpiricalMemoryMeter = AnankeSourceNames.EmpiricalMemoryMeter;
 
     /// <summary>
-    /// Meter for <c>Ananke.Federation</c> remote cell metrics
-    /// (tokens/exec, tool-calls/exec, error rate per deployment).
-    /// Use with <c>builder.AddMeter(Sources.Federation)</c>.
+    /// Meter for what model calls consume (<c>ananke.usage.tokens.in</c>, <c>.tokens.out</c>,
+    /// <c>ananke.usage.cost</c>), tagged with the workflow.
+    /// Use with <c>builder.AddMeter(Sources.OrchestrationUsage)</c>.
     /// </summary>
-    public const string Federation = AnankeSourceNames.Federation;
+    public const string OrchestrationUsage = AnankeSourceNames.OrchestrationUsage;
 }

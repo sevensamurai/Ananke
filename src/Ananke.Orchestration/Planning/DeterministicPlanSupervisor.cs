@@ -1,4 +1,5 @@
 using Ananke.Orchestration.Agents.Context;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
@@ -17,6 +18,7 @@ namespace Ananke.Orchestration.Planning;
 /// no such thing as a table of things not to do.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record HaltRule
 {
     /// <summary>The node that stopped, or <see langword="null"/> for any node.</summary>
@@ -68,11 +70,12 @@ public sealed record HaltRule
 /// answer that has already been tried.
 /// </para>
 /// <para>
-/// <b>Retrying a transient failure is not this seat's any more.</b> R30: a provider outage or a reply
-/// that would not parse is a loop-level policy (E9), never a coordinator steering — so this type no
-/// longer counts retries or matches on how a halt happened, only on which node it was.
+/// <b>Retrying a transient failure is not this seat's.</b> A provider outage or a reply
+/// that would not parse is a loop-level policy, never a coordinator steering — so this type does
+/// not count retries or matches on how a halt happened, only on which node it was.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class DeterministicPlanSupervisor
 {
     private readonly List<HaltRule> _rules;

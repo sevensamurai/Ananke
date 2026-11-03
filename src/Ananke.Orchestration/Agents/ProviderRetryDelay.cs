@@ -47,11 +47,11 @@ public static class ProviderRetryDelay
     /// What <paramref name="exception"/> says to wait, or <see langword="null"/> when it says
     /// nothing — including when it asks for longer than <see cref="Longest"/>.
     /// </summary>
-    public static TimeSpan? From(Exception? exception)
+    public static TimeSpan? From(Exception? exception, TimeProvider? timeProvider = null)
     {
         for (var current = exception; current is not null; current = current.InnerException)
         {
-            var stated = FromProperty(current) ?? FromMessage(current.Message);
+            var stated = FromProperty(current, timeProvider ?? TimeProvider.System) ?? FromMessage(current.Message);
 
             if (stated is { } delay && delay > TimeSpan.Zero && delay <= Longest)
                 return delay;
@@ -61,11 +61,11 @@ public static class ProviderRetryDelay
     }
 
     /// <summary>An SDK that models this properly usually exposes it as a property.</summary>
-    private static TimeSpan? FromProperty(Exception exception) =>
+    private static TimeSpan? FromProperty(Exception exception, TimeProvider timeProvider) =>
         exception.GetType().GetProperty("RetryAfter")?.GetValue(exception) switch
         {
             TimeSpan span => span,
-            DateTimeOffset at => at - DateTimeOffset.UtcNow,
+            DateTimeOffset at => at - timeProvider.GetUtcNow(),
             int seconds => TimeSpan.FromSeconds(seconds),
             _ => null
         };

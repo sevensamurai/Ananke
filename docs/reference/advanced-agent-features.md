@@ -166,6 +166,13 @@ no new packages required.
 - **Production workloads** -- providers return 429 when you exceed rate limits.
   Without retry, the workflow faults immediately. With `ResilientAgentModel`, the
   call backs off and retries transparently.
+- **A model with no retry of its own** -- an agent job retries a 429 only when the
+  error states how long to wait, and leaves a plain 429 to the provider's SDK. The
+  OpenAI and Anthropic SDKs retry it, as do `GeminiAgentModel.Create` and
+  `CreateAgentPlatform`, and `A2AAgentModel` does through `RateLimitRetryHandler`.
+  A custom `IAgentModel`, or a `GeminiAgentModel` built on your own `Client`, does not:
+  wrap it in `ResilientAgentModel`. Wrapping a model whose SDK already retries
+  multiplies the attempts.
 - **Multi-user apps** -- concurrent users sharing an API key will occasionally hit
   limits. Graceful retry keeps the experience smooth.
 - **Batch processing** -- long-running pipelines that make many LLM calls benefit

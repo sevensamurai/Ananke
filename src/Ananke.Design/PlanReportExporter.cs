@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Ananke.Orchestration;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Planning;
 
@@ -30,6 +32,7 @@ namespace Ananke.Design;
 /// them apart is reading a document that looks like a record and is partly a guess.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanReportExporter
 {
     /// <summary>

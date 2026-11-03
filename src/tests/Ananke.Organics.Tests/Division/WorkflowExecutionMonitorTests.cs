@@ -2,6 +2,7 @@ using Ananke.Orchestration;
 using Ananke.Orchestration.Workflows;
 using Ananke.Organics.Division;
 using Ananke.Organics.Healing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Division;
@@ -45,6 +46,39 @@ public class WorkflowExecutionMonitorTests
         builder = builder.Then($"step-{steps - 1}", Workflow.End);
 
         return await builder.RunAsync("");
+    }
+
+    [Test]
+    public async Task Snapshots_AreStampedByTheMonitorsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var monitor = new WorkflowExecutionMonitor(windowSize: 10, clock: new FakeTimeProvider(now));
+        monitor.RegisterWorkflow("clocked", MakeProfile());
+        for (var i = 0; i < 3; i++)
+            monitor.Record(await RunWorkflow("clocked"));
+
+        (await monitor.GetSnapshotAsync("clocked")).MeasuredAt.ShouldBe(now);
+        (await monitor.GetHealthSnapshotAsync("clocked"))!.MeasuredAt.ShouldBe(now);
+    }
+
+    [Test]
+    public async Task HealthSnapshot_CarriesTheLastExecutionAndTheFirstEverRecorded()
+    {
+        var first = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(first);
+        var monitor = new WorkflowExecutionMonitor(windowSize: 3, clock: clock);
+
+        for (var i = 0; i < 4; i++)
+        {
+            monitor.Record(await RunWorkflow("tracked"));
+            clock.Advance(TimeSpan.FromMinutes(1));
+        }
+
+        var health = await monitor.GetHealthSnapshotAsync("tracked");
+
+        health.ShouldNotBeNull();
+        health.LastRequestAt.ShouldBe(first + TimeSpan.FromMinutes(3));
+        health.ObservedSince.ShouldBe(first);
     }
 
     [Test]

@@ -33,8 +33,8 @@ relevant documentation guide and demo (where available).
 | **Local / custom endpoints** | Ollama, LM Studio, vLLM, Azure OpenAI, Groq, Deepseek, Together AI | [17 — Local Models](../guides/17-local-models.md) | — |
 | **Model classification** | `ModelClassification` — size class, parameter count, weights (API-only / open), licence SPDX and OSI status, family. Queryable via `ModelCatalog.SmallModels` / `.LicensedUnder(...)`, kept out of routing so it can never affect what gets selected | [17 — Local Models](../guides/17-local-models.md) | — |
 | **Effective context window** | `LocalDeployment` reports what the server was launched with; `ModelProfile.ContextTokens` reads that instead of the catalogue's `MaxContextTokens`, so routing sees the runtime's actual window rather than the weights' rated one | [17 — Local Models](../guides/17-local-models.md) | — |
-| **Amazon Bedrock provider** | `Ananke.Orchestration.Bedrock` — SigV4 and API-key auth, endpoint construction for the existing OpenAI/Anthropic adapters. No third wire format, no model catalogue | [21 — Enterprise Clouds](../guides/21-enterprise-clouds.md) | — |
-| **Provider conformance suite** | `Ananke.Orchestration.Conformance` — 28 framework-neutral scenarios every shipped adapter must satisfy; a coverage test fails the build if one is added with no fixture | — | — |
+| **Amazon Bedrock** | Through the OpenAI and Anthropic adapters, with an SDK client whose authentication you supply. No third wire format, no model catalogue, no AWS authentication in Ananke | [21 — Enterprise Clouds](../guides/21-enterprise-clouds.md) | — |
+| **Provider conformance suite** | 28 framework-neutral scenarios every shipped adapter must satisfy, run by Ananke's own tests and not published as a package; a coverage test fails the build if one is added with no fixture | — | — |
 | **Structured output** | Typed response deserialization via `AgentJob<TState, TResponse>` | [03 — Agents](../guides/03-agents.md) | — |
 | **Token-level streaming** | Stream individual tokens via `IStreamingAgentModel.GenerateStreamAsync` | [05 — Streaming Chat](../guides/05-streaming-chat.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **StreamingChatWorkflow** | Pre-built workflow for chat UIs with tool calling and SSE | [05 — Streaming Chat](../guides/05-streaming-chat.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
@@ -52,6 +52,7 @@ relevant documentation guide and demo (where available).
 | **Async tools** | Tool lambdas can be `async` — `Task<ToolResult>` return type | [04 — Tools](../guides/04-tools.md) | — |
 | **MCP tool import** | `AddMcpServerToolsAsync` — import tools from any MCP server into a `ToolKit` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
 | **MCP tool export** | `WithAnankeTools` — expose any `ToolKit` as MCP server capabilities | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
+| **Smart Tool Router** | Narrow the tools a call sees with a multi-stage router: pinned tools, heuristic tags, affinity reranking | [16 — Agentic Patterns](../guides/16-agentic-patterns.md#smart-tool-router) | — |
 
 ## Long-Term Memory & Knowledge
 
@@ -78,10 +79,9 @@ relevant documentation guide and demo (where available).
 | **Interrupt before / after** | Pause workflow execution at any job for human review | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **Resume with state** | Resume a paused workflow with optionally modified state | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [AgenticWebDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/AgenticWebDemo) |
 | **Checkpointing** | `ICheckpointStore` — persist full workflow state for resume across restarts | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
-| **Work-review gates** | `IWorkReviewGate` with built-in `AutoWorkReviewGate`, `CallbackWorkReviewGate`, `LlmWorkReviewGate`, and `QuorumWorkReviewGate` — policy-driven review without hard-coding approval logic | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **Async review parking** | `ParkingCallbackWorkReviewGate` — park a review request, return `Pending` immediately, and resume when a decision arrives hours later via `ResumeAsync` | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
+| **Work-review gates** | `IWorkReviewGate` with built-in `AutoWorkReviewGate`, `CallbackWorkReviewGate`, `LlmWorkReviewGate`, and `QuorumWorkReviewGate` — policy-driven review without hard-coding approval logic | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
+| **Async review parking** | `ParkingCallbackWorkReviewGate` — park a review request, return `Pending` immediately, and resume when a decision arrives hours later via `ResumeAsync` | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
 | **Budget gates** | `IBudgetMeter` + `BudgetApprovalGate` — rolling-window token/cost cap enforcement; in-memory default, OTel-backed option | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
-| **Review notification helper** | `WorkItemReviewNotifier` — transport-neutral helper that posts a "please review" prompt to any `IPlatformResponseSink` channel | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
 
 ## State Machine
 
@@ -93,32 +93,6 @@ relevant documentation guide and demo (where available).
 | **Guard conditions** | Block transitions based on runtime state | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Circuit breaking** | `OperationalStatus.Faulted` blocks all transitions until `ResetAsync` | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Lifecycle hooks** | `OnEnter` / `OnExit` per state | [08 — State Machine](../guides/08-state-machine.md) | — |
-
-## Messaging Platforms
-
-| Feature | Description | Guide | Demo |
-|---|---|---|---|
-| **Normalized platform messages** | `PlatformMessage`, `PlatformReactionEvent`, `PlatformSlashCommand`, `PlatformInteractionEvent`, `PlatformAssistantThreadEvent` — unified inbound model across Slack, Discord, and others | — | — |
-| **IPlatformMessageHandler** | Handler interface with default no-op hooks for messages, reactions, slash commands, interactions, and assistant threads | — | — |
-| **IPlatformResponseSink** | Transport-neutral outbound abstraction: `SendMessageAsync`, `UpdateMessageAsync`, `SendTypingAsync`, `AddReactionAsync` | — | — |
-| **Slack adapter** | `AddAnankeSlack(...)` — full Slack integration via SlackNet; Events API endpoints (`/slack/events`, `/slack/commands`, `/slack/interactivity`) with signing-secret validation | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **Slack slash commands & interactivity** | Normalized `PlatformSlashCommand` and block-action / view-submission events; opt-in via `SlackAdapterOptions` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **Slack Assistant pane** | First-class support for Slack Agents & AI Apps pane: thread-started / context-changed events, `SetAssistantStatusAsync`, `SetSuggestedPromptsAsync` | — | — |
-| **Slack outbound extras** | Block Kit messages, ephemeral messages, external file uploads, scheduled messages, modal `OpenViewAsync`/`UpdateViewAsync`, optional message metadata footer, `SlackUploadMode` toggle | — | — |
-| **SlackApprovalBlocks** | `SlackApprovalBlocks.Build(workItem)` — Block Kit Approve / Revise / Reject layout with canonical action ids for review flows | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **StreamingMessageBridge** | Progressively edit a posted message as tokens stream in — works with any `IPlatformResponseSink` | — | — |
-
-## Agent Roles
-
-| Feature | Description | Guide | Demo |
-|---|---|---|---|
-| **AgentRole / ReviewPolicy / EscalationPolicy** | Declarative role definitions; compose persona, review behaviour, and escalation rules in one place | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **IAgentRoleCatalog** | Lookup and registration of named roles; default `AgentRoleCatalog` | — | — |
-| **RoleManifestFactory** | Projects `AgentRole` definitions into `WorkflowManifest` instances for the design-tooling layer | — | — |
-| **StudioRouter / StudioHostBuilder** | Route incoming requests to the right role's workflow; host-friendly composition via `StudioHostBuilder` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **SlackChannelMap** | Typed wrapper that resolves a Slack channel id to an `AgentRole` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **RoleAwareMessageHandler** | Routes each `PlatformMessage` to the workflow named after the resolved role, with configurable fallback | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
-| **SlackApprovalCallback** | Translates Slack block-action interactions into `WorkReviewDecision` values for `CallbackWorkReviewGate` | — | [MiniAgencyDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/05-applications/MiniAgencyDemo) |
 
 ## Production Resilience
 
@@ -141,7 +115,7 @@ relevant documentation guide and demo (where available).
 | **Agent handoff** | `HandoffJob` — request/response handoff between agents across processes | [09 — Distributed](../guides/09-distributed.md) | — |
 | **MCP server** | Expose `ToolKit` and `Workflow` as MCP server capabilities (stdio + HTTP) | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
 | **MCP client** | Import tools from external MCP servers into `ToolKit` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | [McpServerDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/06-interop-and-channels/McpServerDemo) |
-| **McpToolInvoker** | Invoke tools on external MCP servers and return typed results — the underlying transport used by `AddMcpServerToolsAsync` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
+| **McpToolInvoker** | Rotate a tool's calls across replicas of one MCP server, skipping one after repeated failures — what `AddMcpPoolAsync` runs on | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 | **A2A client** | Call remote A2A agents as `IAgentModel` | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 | **A2A server** | Expose Ananke workflows as A2A-compliant endpoints | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
 | **SkillCatalogMemorySync** | Sync discovered skill catalog entries into `IToolMemory` so the smart router can score and recall them across sessions | [12 — MCP & Interop](../guides/12-mcp-and-interop.md) | — |
@@ -155,7 +129,7 @@ relevant documentation guide and demo (where available).
 | **State machine spans** | Built-in `ActivitySource` for transition spans | [10 — Observability](../guides/10-observability.md) | — |
 | **Retry event reporting** | `llm.rate_limit_retry` events with attempt count and delay on the active span | [11 — Advanced Agents](../guides/11-advanced-agents.md) | — |
 | **Tool span attributes** | `output_length` and `tool.error` on tool execution spans | [04 — Tools](../guides/04-tools.md) | — |
-| **OpenTelemetry budget meter** | `OpenTelemetryBudgetMeter` — federation-style counters (`ananke.federation.tokens.in/out`, `ananke.federation.usd`) with configurable rolling windows and per-role caps; registered via `TracingExtensions.AddBudgetMeter(...)` | [10 — Observability](../guides/10-observability.md) | — |
+| **OpenTelemetry budget meter** | `OpenTelemetryBudgetMeter` — reads the usage every model call publishes (`ananke.usage.tokens.in/out`, `ananke.usage.cost` on the `Ananke.Orchestration.Usage` meter), per workflow, over a rolling window with per-workflow caps; registered via `TracingExtensions.AddBudgetMeter(...)` | [10 — Observability](../guides/10-observability.md) | [ItineraryDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/02-workflow-patterns/ItineraryDemo) |
 
 ## Design Tooling
 
@@ -189,11 +163,11 @@ relevant documentation guide and demo (where available).
 | Feature | Description | Guide | Demo |
 |---|---|---|---|
 | **IEmpiricalMemory** | Three-kind memory store: Pattern, Skill, Heuristic — each with a confidence score | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [Connect4Demo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/Connect4Demo) |
-| **EmpiricalMemoryTools** | Agent tools: `recall_empirical`, `commit_insight`, `reinforce_empirical`, `contradict_empirical` | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **EmpiricalMemoryTools** | Agent tools: `recall_empirical`, `commit_insight`, `reinforce_empirical`, `contradict_empirical` | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) |
 | **Confidence tracking** | Scores increase on reinforcement and decrease on contradiction — without deleting entries | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
-| **InMemoryEmpiricalMemory** | Zero-config in-memory implementation for dev/test | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **InMemoryEmpiricalMemory** | Zero-config in-memory implementation for dev/test | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) |
 | **QdrantEmpiricalMemory** | Persistent, distributed empirical memory via Qdrant | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
-| **IOfflineLearner** | Background learning cycles: decay, curiosity exploration, consolidation | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/LearningPrimitivesDemo) |
+| **IOfflineLearner** | Background learning cycles: decay, curiosity exploration, consolidation | [15 — Empirical Memory](../guides/15-empirical-memory.md) | [LearningPrimitivesDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/03-memory-and-knowledge/LearningPrimitivesDemo) |
 | **IConsolidationSummarizer** | Promote confident entries into `IKnowledgeStore` as permanent knowledge | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
 | **Skill packages** | Export validated skills as portable packages; import across deployments | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
 | **External knowledge ingestion** | `IExternalKnowledgeSource` + `ExternalKnowledgeSyncer<TEvent>` — pre-materialise domain context from external APIs into `IKnowledgeStore` on an event-driven schedule | [15 — Empirical Memory](../guides/15-empirical-memory.md) | — |
@@ -245,19 +219,6 @@ relevant documentation guide and demo (where available).
 | **Complexity monitors** | Detect generalist ceiling via tool count and routing entropy signals | — | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) |
 | **Division proposal & approval** | Human-gated or automatic approval of proposed splits before execution | — | [OrganicKernelDemo](https://github.com/sevensamurai/Ananke/tree/main/src/demos/04-organics-and-emergence/OrganicKernelDemo) |
 | **Organic mesh inspection** | `nnke mesh` — inspect local Organics mesh snapshots from the CLI | [CLI Overview](../cli/overview.md) | — |
-
-## Federation
-
-| Feature | Description | Guide | Demo |
-|---|---|---|---|
-| **Cross-cloud federation** | Deploy the same manifest to Azure, Google, or Anthropic; unified telemetry across the cluster | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
-| **Human approval gates** | Cross-cloud workflows with interrupt-and-resume approval gates | [07 — Human-in-the-Loop](../guides/07-human-in-the-loop.md) | — |
-| **nnke-platform CLI** | Deploy, observe, compare platforms, and manage federation mesh operations | [CLI Overview](../cli/overview.md) | — |
-| **Smart Tool Router** | Route tool calls to the best available provider based on capability, cost, and latency | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
-| **LocalFederationDeployer** | `IFederationDeployer` that runs cells in the local process — enables testing federation flows without cloud credentials | [20 — Platform Recommendation](../guides/20-platform-recommendation.md) | — |
-| **Adapter manifest system** | `AdapterManifest` sidecar JSON validated before loading a provider adapter DLL; `AdapterDiagnostics` for compatibility reporting | — | — |
-| **IManagedAgentClient** | CRUD abstraction over platform managed-agent resources; implemented by each provider package for conformance testing | — | — |
-| **IPlatformNativeExecutor** | Execute workflow steps via a platform's native execution API; `PlatformNativeExecutorRegistry` resolves by platform ID at runtime | — | — |
 
 ---
 

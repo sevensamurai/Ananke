@@ -14,7 +14,8 @@ public sealed class InMemoryChannelReader<M, A> : IChannelReader<M, A>
     where A : Enum
 {
     private BackgroundProcessor<M, A>? _processor;
-    private bool _disposed;
+    // An int so concurrent disposals claim it atomically; only the first one disposes.
+    private int _disposed;
 
     /// <summary>
     /// Directly enqueue a message with its action into the processing pipeline.
@@ -70,8 +71,7 @@ public sealed class InMemoryChannelReader<M, A> : IChannelReader<M, A>
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
         if (_processor is not null)
             await _processor.DisposeAsync();

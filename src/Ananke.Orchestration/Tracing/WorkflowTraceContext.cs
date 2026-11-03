@@ -25,7 +25,8 @@ public sealed record TraceInfo(
     ITrace? Trace = null,
     ISpan? CurrentSpan = null,
     bool StoreCompletions = false,
-    bool ResumedInto = false)
+    bool ResumedInto = false,
+    bool RecordContent = false)
 {
     /// <summary>
     /// Whether this job is the one the run was resumed into after a pause.

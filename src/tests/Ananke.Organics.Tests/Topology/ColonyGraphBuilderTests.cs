@@ -5,6 +5,7 @@ using Ananke.Organics.Division;
 using Ananke.Organics.Kernel.Lineage;
 using Ananke.Organics.Sensing;
 using Ananke.Organics.Topology;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests.Topology;
@@ -169,6 +170,36 @@ public class ColonyGraphBuilderTests
         var edges = await graph.NeighborsAsync("routing:observed", "routed_to");
         edges.ShouldContain(e => e.ToId == "cell:alpha");
         edges.ShouldContain(e => e.ToId == "cell:beta");
+    }
+
+    // ── Clock ────────────────────────────────────────────────────────
+
+    [Test]
+    public async Task BuildAsync_StampsEveryEdgeFromItsClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        _capabilityMap.Register(MakeSignal("alpha", "search", "kit/lookup"));
+        await _lineageStore.RecordBirthAsync(new CellLineage
+        {
+            CellId = "alpha",
+            WorkflowName = "alpha",
+            ParentCellId = "root",
+            Generation = 0,
+            BornAt = DateTimeOffset.UtcNow
+        });
+        var tracker = new RoutingAffinityTracker(new StubDomainRouter("alpha"), new StubExploration());
+        await tracker.IndexAsync(
+            [new ChildSpec { Name = "alpha", Domain = "search", Tools = [], Jobs = [] }],
+            new Dictionary<string, string>());
+        tracker.RecordOutcome("alpha", 0.8f);
+
+        var graph = new InMemoryKnowledgeGraph();
+        await new ColonyGraphBuilder(_capabilityMap, _lineageStore, tracker, new FakeTimeProvider(now)).BuildAsync(graph);
+
+        var edges = await graph.NeighborsAsync("cell:alpha");
+        edges.Select(e => e.Relation).Distinct()
+            .ShouldBe(["serves", "uses", "descended_from", "routed_to"], ignoreOrder: true);
+        edges.ShouldAllBe(e => e.ObservedAt == now);
     }
 
     // ── Stub helpers ─────────────────────────────────────────────────

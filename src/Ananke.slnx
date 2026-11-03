@@ -26,14 +26,11 @@
 
   <Folder Name="/demos/05-applications/">
     <Project Path="demos/05-applications/AgenticWebDemo/AgenticWebDemo.csproj" />
-    <Project Path="demos/05-applications/MiniAgencyDemo/MiniAgencyDemo.csproj" />
     <Project Path="demos/05-applications/PetAdoptionDemo/PetAdoptionDemo.csproj" />
   </Folder>
 
   <Folder Name="/demos/06-interop-and-channels/">
     <Project Path="demos/06-interop-and-channels/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" />
-    <Project Path="demos/06-interop-and-channels/ChannelsDemo/ChannelsDemo.csproj" />
-    <Project Path="demos/06-interop-and-channels/LocalPlatformLoopDemo/LocalPlatformLoopDemo.csproj" />
     <Project Path="demos/06-interop-and-channels/McpServerDemo/McpServerDemo.csproj" />
   </Folder>
 
@@ -45,30 +42,22 @@
     <Project Path="tests/Ananke.AspNetCore.Tests/Ananke.AspNetCore.Tests.csproj" />
     <Project Path="tests/Ananke.Design.Tests/Ananke.Design.Tests.csproj" />
     <Project Path="tests/Ananke.Documents.Tests/Ananke.Documents.Tests.csproj" />
-    <Project Path="tests/Ananke.Federation.Anthropic.Tests/Ananke.Federation.Anthropic.Tests.csproj" />
-    <Project Path="tests/Ananke.Federation.Azure.Tests/Ananke.Federation.Azure.Tests.csproj" />
-    <Project Path="tests/Ananke.Federation.Conformance.Tests/Ananke.Federation.Conformance.Tests.csproj" />
-    <Project Path="tests/Ananke.Federation.Google.Tests/Ananke.Federation.Google.Tests.csproj" />
-    <Project Path="tests/Ananke.Federation.Tests/Ananke.Federation.Tests.csproj" />
+    <Project Path="tests/Ananke.Embeddings.Onnx.Tests/Ananke.Embeddings.Onnx.Tests.csproj" />
     <Project Path="tests/Ananke.Graph.Memgraph.Tests/Ananke.Graph.Memgraph.Tests.csproj" />
     <Project Path="tests/Ananke.Integration.Tests/Ananke.Integration.Tests.csproj" Id="66d3c478-f1e6-4e7f-9c3c-9ea973c5c84f" />
     <Project Path="tests/Ananke.Learning.Tests/Ananke.Learning.Tests.csproj" Id="82daa2d2-e837-4c95-86d2-18249d5273ec" />
     <Project Path="tests/Ananke.OpenTelemetry.Tests/Ananke.OpenTelemetry.Tests.csproj" />
+    <Project Path="tests/Ananke.Postgres.Tests/Ananke.Postgres.Tests.csproj" />
     <Project Path="tests/Ananke.Qdrant.Tests/Ananke.Qdrant.Tests.csproj" />
-    <Project Path="tests/Ananke.Orchestration.Bedrock.Tests/Ananke.Orchestration.Bedrock.Tests.csproj" />
+    <Project Path="tests/Ananke.Orchestration.Conformance/Ananke.Orchestration.Conformance.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Knowledge.Tests/Ananke.Orchestration.Knowledge.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Tests/Ananke.Orchestration.Tests.csproj" />
     <Project Path="tests/Ananke.Organics.Tests/Ananke.Organics.Tests.csproj" />
-    <Project Path="tests/Ananke.Platforms.Slack.Tests/Ananke.Platforms.Slack.Tests.csproj" />
-    <Project Path="tests/Ananke.Platforms.Tests/Ananke.Platforms.Tests.csproj" />
     <Project Path="tests/Ananke.Redis.Tests/Ananke.Redis.Tests.csproj" />
-    <Project Path="tests/Ananke.Roles.Tests/Ananke.Roles.Tests.csproj" />
     <Project Path="tests/Ananke.Skills.Tests/Ananke.Skills.Tests.csproj" />
     <Project Path="tests/Ananke.StateMachine.Tests/Ananke.StateMachine.Tests.csproj" />
     <Project Path="tests/Ananke.TestHelpers/Ananke.TestHelpers.csproj" />
-    <Project Path="tests/nnke-platform-adapters.Tests/nnke-platform-adapters.Tests.csproj" />
-    <Project Path="tests/nnke-platform.Tests/nnke-platform.Tests.csproj" />
     <Project Path="tests/nnke.Tests/nnke.Tests.csproj" />
   </Folder>
 
@@ -86,43 +75,26 @@
   <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85" />
   <Project Path="Ananke.Design/Ananke.Design.csproj" />
   <Project Path="Ananke.Documents/Ananke.Documents.csproj" />
-  <Project Path="Ananke.Federation.Anthropic/Ananke.Federation.Anthropic.csproj" Id="934625fb-9b2a-4264-9704-db8daff92a0c" />
-  <Project Path="Ananke.Federation.Azure/Ananke.Federation.Azure.csproj" />
-  <Project Path="Ananke.Federation.Google/Ananke.Federation.Google.csproj" Id="4ae473a1-950a-422e-9fe9-e953f1832cf7" />
-  <Project Path="Ananke.Federation.LocalEmulators/Ananke.Federation.LocalEmulators.csproj" />
-  <Project Path="Ananke.Federation/Ananke.Federation.csproj" Id="ba69f556-2154-465b-b613-b2dbb59336d7" />
   <Project Path="Ananke.Graph.Abstractions/Ananke.Graph.Abstractions.csproj" />
   <Project Path="Ananke.Graph.Memgraph/Ananke.Graph.Memgraph.csproj" />
   <Project Path="Ananke.Learning/Ananke.Learning.csproj" Id="4e1339be-51d1-4550-9474-76b3a4e82cf4" />
   <Project Path="Ananke.MCP/Ananke.MCP.csproj" />
+  <Project Path="Ananke.Embeddings.Onnx/Ananke.Embeddings.Onnx.csproj" />
   <Project Path="Ananke.MQTT/Ananke.MQTT.csproj" />
   <Project Path="Ananke.OpenTelemetry/Ananke.OpenTelemetry.csproj" />
   <Project Path="Ananke.Orchestration.Anthropic/Ananke.Orchestration.Anthropic.csproj" />
-  <Project Path="Ananke.Orchestration.Bedrock/Ananke.Orchestration.Bedrock.csproj" />
-  <Project Path="Ananke.Orchestration.Conformance/Ananke.Orchestration.Conformance.csproj" />
-  <Project Path="Ananke.Orchestration.Conformance.NUnit/Ananke.Orchestration.Conformance.NUnit.csproj" />
-  <Project Path="Ananke.Orchestration.Planning.Conformance/Ananke.Orchestration.Planning.Conformance.csproj" />
-  <Project Path="Ananke.Orchestration.Planning.Conformance.NUnit/Ananke.Orchestration.Planning.Conformance.NUnit.csproj" />
   <Project Path="Ananke.Orchestration.Google/Ananke.Orchestration.Google.csproj" />
   <Project Path="Ananke.Orchestration.Knowledge/Ananke.Orchestration.Knowledge.csproj" Id="42cc6757-2cac-4197-80dd-f37cc31d2a7b" />
   <Project Path="Ananke.Orchestration.OpenAI/Ananke.Orchestration.OpenAI.csproj" />
   <Project Path="Ananke.Orchestration/Ananke.Orchestration.csproj" />
   <Project Path="Ananke.Organics/Ananke.Organics.csproj" Id="32a1086e-a1aa-4810-98e2-c39eabb3ffed" />
-  <Project Path="Ananke.Platforms.Discord/Ananke.Platforms.Discord.csproj" />
-  <Project Path="Ananke.Platforms.Slack/Ananke.Platforms.Slack.csproj" />
-  <Project Path="Ananke.Platforms/Ananke.Platforms.csproj" />
+  <Project Path="Ananke.Postgres/Ananke.Postgres.csproj" />
   <Project Path="Ananke.Qdrant/Ananke.Qdrant.csproj" />
   <Project Path="Ananke.Redis/Ananke.Redis.csproj" />
-  <Project Path="Ananke.Roles/Ananke.Roles.csproj" />
   <Project Path="Ananke.Skills/Ananke.Skills.csproj" />
   <Project Path="Ananke.StateMachine/Ananke.StateMachine.csproj" />
   <Project Path="Ananke.Tool.Shared/Ananke.Tool.Shared.csproj" />
   <Project Path="Ananke/Ananke.csproj" />
-  <Project Path="nnke-platform-all/nnke-platform-all.csproj" />
-  <Project Path="nnke-platform-anthropic/nnke-platform-anthropic.csproj" />
-  <Project Path="nnke-platform-azure/nnke-platform-azure.csproj" />
-  <Project Path="nnke-platform-google/nnke-platform-google.csproj" />
-  <Project Path="nnke-platform/nnke-platform.csproj" />
   <Project Path="nnke/nnke.csproj" />
   <Project Path="wiki/wiki.csproj" />
 

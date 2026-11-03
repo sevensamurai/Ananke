@@ -21,8 +21,8 @@ namespace Ananke.Orchestration.Agents.Middleware;
 /// </para>
 /// <para>
 /// The cache key is a SHA256 hash of the semantically-relevant parts of the request:
-/// <c>SystemPrompt</c>, <c>Messages</c>, <c>Tools</c>, <c>ResponseFormat</c>, and the model's
-/// <c>cacheScope</c>. <c>Metadata</c> and <c>StoreCompletions</c> are excluded because
+/// <c>SystemPrompt</c>, <c>Messages</c>, <c>Tools</c>, <c>ResponseFormat</c>, the request's own fields,
+/// and the model's <c>cacheScope</c>. <c>Metadata</c> and <c>StoreCompletions</c> are excluded because
 /// they do not affect model output.
 /// </para>
 /// <para>
@@ -142,7 +142,12 @@ public sealed class CachingAgentModel : IStreamingAgentModel
             request.SystemPrompt,
             request.Messages,
             request.Tools,
-            request.ResponseFormat
+            request.ResponseFormat,
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+            RequestFields = request.RequestFields?
+                .OrderBy(field => field.Key, StringComparer.Ordinal)
+                .Select(field => $"{field.Key}={field.Value.ToJsonString()}")
+#pragma warning restore ANNKEEXP003
         }, JsonOptions);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(hashInput));

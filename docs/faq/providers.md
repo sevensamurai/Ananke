@@ -12,7 +12,7 @@
 | OpenAI | `Ananke.Orchestration.OpenAI` | GPT-4.1, GPT-4o, o1, o3, text-embedding-3-small/large |
 | Anthropic | `Ananke.Orchestration.Anthropic` | Claude Sonnet, Claude Haiku, Claude Opus |
 | Google Gemini | `Ananke.Orchestration.Google` | Gemini 2.5 Pro, Gemini Flash |
-| Amazon Bedrock | `Ananke.Orchestration.Bedrock` | Most Bedrock-hosted models — **not** Nova or Titan; see the [enterprise clouds guide](../guides/21-enterprise-clouds.md) |
+| Amazon Bedrock | `Ananke.Orchestration.OpenAI` or `.Anthropic`, with a client you authenticate | Most Bedrock-hosted models — **not** Nova or Titan; see the [enterprise clouds guide](../guides/21-enterprise-clouds.md) |
 | Any OpenAI-compatible | `Ananke.Orchestration.OpenAI` | Ollama, LM Studio, vLLM, Microsoft Foundry, Groq, Deepseek, Together AI |
 
 ### Does Ananke support Ollama (local models)?
@@ -42,9 +42,9 @@ tenants, a Microsoft Entra ID bearer policy. Recipes for both are in
 
 ### Does Ananke support Amazon Bedrock?
 
-Yes, through `Ananke.Orchestration.Bedrock`, which supplies SigV4 signing, Bedrock API-key auth and
-endpoint construction — the requests themselves are served by the OpenAI and Anthropic adapters
-against Bedrock's compatible APIs.
+Through the OpenAI and Anthropic adapters, against Bedrock's compatible APIs. Both adapters take an
+SDK client you build, so you put the authentication in it — a Bedrock API key, or SigV4 signing from
+the AWS SDK. Ananke ships no AWS authentication of its own.
 
 **Amazon's own Nova and Titan families are not reachable**, nor are older Claude models: those speak
 only Bedrock's native Converse and Invoke APIs, which Ananke does not implement. See
@@ -68,7 +68,9 @@ one-line configuration change.
 `IStreamingAgentModel` is Ananke's provider-agnostic interface for LLM interaction. All
 provider implementations (`OpenAIChatAgentModel`, `AnthropicAgentModel`, `GeminiAgentModel`,
 `A2AAgentModel`) implement this interface. You can also implement it yourself to wrap any
-model or API.
+model or API. Set `AgentResponse.StopReason` on what you return: an agent job checks a reply
+whose stop reason is `Unknown` for runaway repetition, so a reply asked to repeat rows can end
+the run as a loop.
 
 ---
 

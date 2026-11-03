@@ -1,4 +1,6 @@
+using Ananke.Orchestration;
 using Ananke.Orchestration.Planning;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Design;
 
@@ -11,6 +13,7 @@ namespace Ananke.Design;
 /// ending in two domains. Everything else — which version was written and never ran, which step stopped
 /// it, whether anything was offered — is a fact about the run and is worded here.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanEndingWords
 {
     /// <summary>Every contract in the plan is met.</summary>
@@ -32,6 +35,7 @@ public sealed record PlanEndingWords
 /// <see cref="PlanRunOutcome"/>, the change-of-plan budget and the decision. It is written once here,
 /// and what the domain calls its endings arrives in <see cref="PlanEndingWords"/>.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanRunEnding
 {
     /// <summary>The sentence for how <paramref name="coordination"/>'s run ended.</summary>

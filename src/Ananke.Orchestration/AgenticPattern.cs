@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Workflows;
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Patterns;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration;
 
@@ -228,6 +229,7 @@ public static class AgenticPattern
     ///     .Build();
     /// </code>
     /// </example>
+    [Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public static SupervisedPlanBuilder<TState> SupervisedPlan<TState>(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

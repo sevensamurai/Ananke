@@ -80,6 +80,9 @@ public class EventSinkTests
         ExecutionId = "e",
         AgentName = "plan-node:parse",
         ToolName = "search",
+        CallId = "call-1",
+        Round = 1,
+        Duration = TimeSpan.FromSeconds(1),
         Arguments = """{"place":"hakone"}""",
         Result = "{}",
         ResultLength = 2

@@ -56,7 +56,7 @@ public sealed class GraphTagImportanceTracker(
         {
             Importances = importances,
             EntriesAnalyzed = total,
-            ComputedAt = DateTimeOffset.UtcNow,
+            ComputedAt = _options.Clock.GetUtcNow(),
         };
     }
 }

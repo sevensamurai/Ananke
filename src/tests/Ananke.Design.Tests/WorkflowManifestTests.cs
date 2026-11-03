@@ -1,4 +1,5 @@
 using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
 using Shouldly;
 
 namespace Ananke.Design.Tests;
@@ -149,7 +150,7 @@ public class WorkflowManifestTests
         manifest.Jobs["minimal"].SystemPrompt.ShouldBeNull();
         manifest.Jobs["minimal"].Tools.ShouldBeEmpty();
         manifest.Jobs["minimal"].Semantic.ShouldBeFalse();
-        manifest.Jobs["minimal"].MaxToolRounds.ShouldBe(3);
+        manifest.Jobs["minimal"].MaxToolRounds.ShouldBe(AgentJobFactory.DefaultMaxToolRounds);
     }
 
     [Test]

@@ -35,6 +35,20 @@ var response = await model.GenerateAsync(new AgentRequest
 Console.WriteLine(response.Text);
 ```
 
+### Rate limits
+
+A remote agent that answers HTTP 429 is asked again, up to 3 attempts, waiting for its
+`Retry-After` header or a delay stated in the body, and otherwise backing off from one second.
+A 429 that asks for more than two minutes, or says the account is out of quota, is returned at
+once. That is `RateLimitRetryHandler`, on the client `A2AAgentModel` uses when you give it none.
+An `HttpClient` you pass in `A2AAgentModelOptions` is used as it is; add the handler to retry
+through it:
+
+```csharp
+var http = new HttpClient(new RateLimitRetryHandler { InnerHandler = new HttpClientHandler() });
+var model = new A2AAgentModel(new A2AAgentModelOptions { AgentUrl = agentUrl, HttpClient = http });
+```
+
 ### Streaming
 
 `A2AAgentModel` implements `IStreamingAgentModel`, so it works with `StreamingChatWorkflow`:
@@ -125,6 +139,7 @@ var workflow = new Workflow<MyState>("pipeline")
 | Component | What it does |
 |---|---|
 | `A2AAgentModel` | `IStreamingAgentModel` that delegates to a remote A2A agent |
+| `RateLimitRetryHandler` | `DelegatingHandler` that retries a remote agent's HTTP 429 |
 | `A2AAgentDiscovery` | Resolves `AgentCard` metadata into Ananke-friendly `A2AAgentCardInfo` |
 | `AgentCardBuilder` | Fluent builder for `AgentCard` from Ananke `ToolKit` and workflow metadata |
 | `WorkflowTaskAdapter` | Bridges `TaskManager` callbacks to any processing function or `IAgentModel` |

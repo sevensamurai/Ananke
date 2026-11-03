@@ -88,7 +88,7 @@ Checkpointing (InMemory / Redis) · distributed locking (Redis) · MQTT pub/sub 
 Discover CLI tools from the [OpenClaw/ClawHub](https://clawhub.io) registry · local JSON cache for offline search · `ToolKit.AddFromCatalogAsync()` for natural-language skill discovery · local skill voting and reliability scoring · **runs Python (PyPI) tools via `uvx`, Node.js tools via `npx`, Docker containers, or any shell command — no Python installation required**
 
 ### 🧑‍💻 Developer Experience
-Idiomatic C# (async/await, DI, generics) · full in-memory test mode for every infrastructure contract · 18 focused NuGet packages
+Idiomatic C# (async/await, DI, generics) · full in-memory test mode for every infrastructure contract · 23 NuGet packages, including the `nnke` tool
 
 ---
 
@@ -189,7 +189,6 @@ guide it illustrates, is in [docs/demos.md](docs/demos.md).
 |---|---|
 | [`AgenticWebDemo`](src/demos/05-applications/AgenticWebDemo/) | Embedding Ananke in an ASP.NET Core service — HTTP SSE streaming, human-in-the-loop approval |
 | [`PetAdoptionDemo`](src/demos/05-applications/PetAdoptionDemo/) | Stateful multi-phase conversation with knowledge base, payment interrupts, SSE — full JS frontend |
-| [`MiniAgencyDemo`](src/demos/05-applications/MiniAgencyDemo/) | A Slack-backed two-stage agency |
 
 ### 06 — Interop and channels
 
@@ -197,8 +196,6 @@ guide it illustrates, is in [docs/demos.md](docs/demos.md).
 |---|---|
 | [`McpServerDemo`](src/demos/06-interop-and-channels/McpServerDemo/) | Expose Ananke tools and a workflow as an MCP server for VS Code Copilot and Claude Desktop |
 | [`AgentToAgentProtocolDemo`](src/demos/06-interop-and-channels/AgentToAgentProtocolDemo/) | Expose an Ananke agent as an A2A-compliant HTTP server, and call it from two clients |
-| [`ChannelsDemo`](src/demos/06-interop-and-channels/ChannelsDemo/) | A tool-calling agent running as a long-lived Discord or Slack bot |
-| [`LocalPlatformLoopDemo`](src/demos/06-interop-and-channels/LocalPlatformLoopDemo/) | The local design loop — declare platform-native tools and run them locally |
 
 ---
 
@@ -213,20 +210,23 @@ guide it illustrates, is in [docs/demos.md](docs/demos.md).
 | [`Ananke.Orchestration.OpenAI`](src/Ananke.Orchestration.OpenAI/) | OpenAI provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.OpenAI.svg)](https://www.nuget.org/packages/Ananke.Orchestration.OpenAI) |
 | [`Ananke.Orchestration.Anthropic`](src/Ananke.Orchestration.Anthropic/) | Anthropic / Claude provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Anthropic.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Anthropic) |
 | [`Ananke.Orchestration.Google`](src/Ananke.Orchestration.Google/) | Google Gemini provider (`IStreamingAgentModel`) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Google.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Google) |
-| [`Ananke.Orchestration.Bedrock`](src/Ananke.Orchestration.Bedrock/) | Amazon Bedrock — SigV4 and API-key auth, endpoint construction, for the existing OpenAI/Anthropic adapters | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Bedrock.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Bedrock) |
-| [`Ananke.Orchestration.Conformance`](src/Ananke.Orchestration.Conformance/) | Provider conformance contract — shared scenarios every `IStreamingAgentModel` adapter must satisfy | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Conformance.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Conformance) |
-| [`Ananke.Orchestration.Conformance.NUnit`](src/Ananke.Orchestration.Conformance.NUnit/) | Inherit-and-done NUnit fixtures over `Ananke.Orchestration.Conformance` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Conformance.NUnit.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Conformance.NUnit) |
 | [`Ananke.MCP`](src/Ananke.MCP/) | Expose workflows and tools as MCP server capabilities | [![NuGet](https://img.shields.io/nuget/v/Ananke.MCP.svg)](https://www.nuget.org/packages/Ananke.MCP) |
 | [`Ananke.A2A`](src/Ananke.A2A/) | Agent-to-Agent (A2A) protocol — call remote agents as `IAgentModel`, expose workflows as A2A endpoints | [![NuGet](https://img.shields.io/nuget/v/Ananke.A2A.svg)](https://www.nuget.org/packages/Ananke.A2A) |
 | [`Ananke.Learning`](src/Ananke.Learning/) | Empirical memory, offline learning, episode store, Monte Carlo reward propagation, skill package export/import | [![NuGet](https://img.shields.io/nuget/v/Ananke.Learning.svg)](https://www.nuget.org/packages/Ananke.Learning) |
 | [`Ananke.Skills`](src/Ananke.Skills/) | External skill catalog — discover and run CLI tools from the OpenClaw registry via `ToolKit` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Skills.svg)](https://www.nuget.org/packages/Ananke.Skills) |
 | [`Ananke.Documents`](src/Ananke.Documents/) | Document extractors for the knowledge pipeline (PDF, Markdown) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Documents.svg)](https://www.nuget.org/packages/Ananke.Documents) |
+| [`Ananke.Embeddings.Onnx`](src/Ananke.Embeddings.Onnx/) | Local embeddings: a BERT-style ONNX model behind `IEmbeddingModel` (experimental) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Embeddings.Onnx.svg)](https://www.nuget.org/packages/Ananke.Embeddings.Onnx) |
+| [`Ananke.Postgres`](src/Ananke.Postgres/) | PostgreSQL provider for `IKnowledgeStore` and `IKnowledgeCatalog`: pgvector, full-text and hybrid search (experimental) | [![NuGet](https://img.shields.io/nuget/v/Ananke.Postgres.svg)](https://www.nuget.org/packages/Ananke.Postgres) |
 | [`Ananke.Qdrant`](src/Ananke.Qdrant/) | Qdrant vector database provider for `IKnowledgeStore`, `IKnowledgeCatalog`, and `IEmpiricalMemory` | [![NuGet](https://img.shields.io/nuget/v/Ananke.Qdrant.svg)](https://www.nuget.org/packages/Ananke.Qdrant) |
 | [`Ananke.Redis`](src/Ananke.Redis/) | Distributed lock and key-value store via Redis | [![NuGet](https://img.shields.io/nuget/v/Ananke.Redis.svg)](https://www.nuget.org/packages/Ananke.Redis) |
 | [`Ananke.MQTT`](src/Ananke.MQTT/) | Pub/sub channels via MQTTnet | [![NuGet](https://img.shields.io/nuget/v/Ananke.MQTT.svg)](https://www.nuget.org/packages/Ananke.MQTT) |
 | [`Ananke.OpenTelemetry`](src/Ananke.OpenTelemetry/) | One-liner OTLP tracing export | [![NuGet](https://img.shields.io/nuget/v/Ananke.OpenTelemetry.svg)](https://www.nuget.org/packages/Ananke.OpenTelemetry) |
 | [`Ananke.AspNetCore`](src/Ananke.AspNetCore/) | SSE streaming, provider configuration, and session management for ASP.NET Core | [![NuGet](https://img.shields.io/nuget/v/Ananke.AspNetCore.svg)](https://www.nuget.org/packages/Ananke.AspNetCore) |
 | [`Ananke.Design`](src/Ananke.Design/) | YAML manifest import and Mermaid diagram export | [![NuGet](https://img.shields.io/nuget/v/Ananke.Design.svg)](https://www.nuget.org/packages/Ananke.Design) |
+| [`Ananke.Orchestration.Knowledge`](src/Ananke.Orchestration.Knowledge/) | Knowledge pipeline: vector knowledge stores, document processing, chunking, embedding abstractions, catalog, document linking | [![NuGet](https://img.shields.io/nuget/v/Ananke.Orchestration.Knowledge.svg)](https://www.nuget.org/packages/Ananke.Orchestration.Knowledge) |
+| [`Ananke.Organics`](src/Ananke.Organics/) | Organic kernel: cell division, heartbeat sensing, triage routing, division policies | [![NuGet](https://img.shields.io/nuget/v/Ananke.Organics.svg)](https://www.nuget.org/packages/Ananke.Organics) |
+| [`Ananke.Graph.Abstractions`](src/Ananke.Graph.Abstractions/) | Shared connection options and helpers for graph-backend packages | [![NuGet](https://img.shields.io/nuget/v/Ananke.Graph.Abstractions.svg)](https://www.nuget.org/packages/Ananke.Graph.Abstractions) |
+| [`Ananke.Graph.Memgraph`](src/Ananke.Graph.Memgraph/) | Memgraph backend for `IKnowledgeGraph` over the Neo4j Bolt driver | [![NuGet](https://img.shields.io/nuget/v/Ananke.Graph.Memgraph.svg)](https://www.nuget.org/packages/Ananke.Graph.Memgraph) |
 
 ---
 
@@ -254,7 +254,6 @@ The full documentation hub and progressive learning path are at **[docs/learning
 | [Agentic Patterns](docs/guides/16-agentic-patterns.md) | Review & Critique, Iterative Refinement — pre-wired pattern builders |
 | [Local & Self-Hosted Models](docs/guides/17-local-models.md) | Ollama, llama.cpp, vLLM — the context, routing, and licence traps that come with them |
 | [nnke Tool Companion](docs/cli/nnke-tool.md) | Design-time CLI — scaffold, validate, diagram, MCP companion for AI tools |
-| [nnke-platform Tool](docs/cli/nnke-platform-tool.md) | Federation CLI — install adapters, deploy workflows, monitor and manage cloud deployments |
 | [Empirical Memory & Skill Packaging](docs/guides/15-empirical-memory.md) | Patterns, skills, heuristics, confidence tracking, offline learning, episode store, skill export/import |
 | [Empirical Memory Tuning](docs/guides/15a-empirical-memory-tuning.md) | `AffectOptions`, `OfflineLearnerOptions`, domain-specific recipes (game agents, incident response) |
 | [Testing](docs/guides/14-testing.md) | In-memory implementations, zero-config integration tests |
@@ -286,7 +285,6 @@ Common questions are answered in the **[FAQ](docs/faq.md)**. Quick answers:
 - **Can learned knowledge be transferred between agents?** Yes — `ISkillPackager` exports empirical entries and linked episodes as a portable JSON package (quality gates: min confidence, min strength, min observations). Import into any other agent with configurable trust scaling. Tag importance weights are bundled so the receiving agent inherits feature correlations too.
 - **What is the OpenClaw skill catalog?** `Ananke.Skills` connects to the [OpenClaw/ClawHub](https://clawhub.io) registry of CLI-based tools. One call to `toolkit.AddFromCatalogAsync("airbnb search lodging")` discovers, caches, and resolves matching tools as `ToolDefinition` entries that any agent can call.
 - **What is nnke?** A .NET CLI tool (`dotnet tool install -g nnke`) for design-time workflow tasks: scaffold projects, validate topology files, export Mermaid diagrams, inspect project health, and browse docs. `nnke mcp-server` runs as an MCP server so AI coding tools (GitHub Copilot, Claude) can call these capabilities directly.
-- **What is nnke-platform?** A companion CLI tool (`dotnet tool install -g nnke-platform`) for federation — deploy, monitor, and manage workflow deployments across cloud platforms (Azure AI, Vertex AI, Claude). Platform adapters are installed as separate companion tools (`nnke-platform-azure`, `nnke-platform-google`, `nnke-platform-anthropic`) or all at once via `nnke-platform-all`. Each adapter is an independently published .NET tool that registers itself with `nnke-platform` via module initializers at runtime.
 - **What is the difference between a Workflow and a State Machine?** A workflow runs a directed pipeline end to end (best for task pipelines, document processing, batch jobs). A state machine models long-lived entities with stable states and event-driven transitions (best for conversation sessions, order lifecycle, device management). Both compose: state machines can invoke workflows, and workflows can interact with state machines.
 
 → **[Full FAQ →](docs/faq.md)**

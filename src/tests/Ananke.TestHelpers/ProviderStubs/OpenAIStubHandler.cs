@@ -5,24 +5,33 @@ namespace Ananke.TestHelpers.ProviderStubs;
 /// </summary>
 public sealed class OpenAIStubHandler : ScriptedProviderHandler
 {
+    /// <summary>
+    /// The <c>finish_reason</c> a tool call arrives with. OpenAI sends <c>tool_calls</c>; some
+    /// compatible servers, Ollama among them, send <c>stop</c>.
+    /// </summary>
+    public string ToolCallFinish { get; init; } = "tool_calls";
+
     protected override (string Payload, string MediaType) Respond(HttpRequestMessage request, string body)
     {
         var streaming = Mentions(body, "\"stream\":true");
 
         // A request that declares tools is answered with a tool call, as the service would.
         if (!streaming && FirstToolName(body) is { } tool)
-            return (ToolCall(tool), "application/json");
+            return (ToolCall(tool, ToolCallFinish), "application/json");
 
         var content = Mentions(body, "\"response_format\"")
             ? StructuredJson
             : ReplyText;
 
+        // "length" is the documented finish_reason for a reply cut off at max_completion_tokens.
+        var finish = Truncates ? "length" : "stop";
+
         return streaming
-            ? (StreamOf(content), "text/event-stream")
-            : (Completion(content), "application/json");
+            ? (StreamOf(content, finish), "text/event-stream")
+            : (Completion(content, finish), "application/json");
     }
 
-    private static string ToolCall(string tool) => $$"""
+    private static string ToolCall(string tool, string finish) => $$"""
         {
           "id": "chatcmpl-conformance",
           "object": "chat.completion",
@@ -42,7 +51,7 @@ public sealed class OpenAIStubHandler : ScriptedProviderHandler
                   }
                 ]
               },
-              "finish_reason": "tool_calls"
+              "finish_reason": {{Quote(finish)}}
             }
           ],
           "usage": {
@@ -53,7 +62,7 @@ public sealed class OpenAIStubHandler : ScriptedProviderHandler
         }
         """;
 
-    private static string Completion(string content) => $$"""
+    private static string Completion(string content, string finish) => $$"""
         {
           "id": "chatcmpl-conformance",
           "object": "chat.completion",
@@ -63,7 +72,7 @@ public sealed class OpenAIStubHandler : ScriptedProviderHandler
             {
               "index": 0,
               "message": { "role": "assistant", "content": {{Quote(content)}} },
-              "finish_reason": "stop"
+              "finish_reason": {{Quote(finish)}}
             }
           ],
           "usage": {
@@ -74,7 +83,7 @@ public sealed class OpenAIStubHandler : ScriptedProviderHandler
         }
         """;
 
-    private static string StreamOf(string content)
+    private static string StreamOf(string content, string finish)
     {
         // One delta per word, then a final chunk carrying finish_reason and usage — which is where
         // the Chat Completions stream reports it.
@@ -84,7 +93,7 @@ public sealed class OpenAIStubHandler : ScriptedProviderHandler
                 """));
 
         var final = "data: " + Chunk(
-            """{ "index": 0, "delta": {}, "finish_reason": "stop" }""",
+            $$"""{ "index": 0, "delta": {}, "finish_reason": {{Quote(finish)}} }""",
             $$"""
               , "usage": { "prompt_tokens": {{InputTokens}}, "completion_tokens": {{OutputTokens}}, "total_tokens": {{InputTokens + OutputTokens}} }
               """);

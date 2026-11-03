@@ -20,6 +20,12 @@ public sealed record OrganicGrowthOptions
     public required IDivisionPolicy Policy { get; init; }
 
     /// <summary>
+    /// Clock the host stamps division events and lineage with. Default: <see cref="TimeProvider.System"/>.
+    /// The <see cref="Monitor"/>, <see cref="MeshAggregator"/> and <see cref="Divider"/> take their own.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>
     /// Approval gate for division proposals. Default: <see cref="AutoApprovalGate"/>.
     /// </summary>
     public IDivisionApprovalGate ApprovalGate { get; init; } = new AutoApprovalGate();

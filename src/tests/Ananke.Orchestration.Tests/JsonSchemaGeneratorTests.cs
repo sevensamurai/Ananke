@@ -66,12 +66,27 @@ public class JsonSchemaGeneratorTests
             JsonSchemaGenerator.GenerateForType(typeof(PlanNodeReport))["properties"];
         var operation = (Dictionary<string, object>)
             JsonSchemaGenerator.GenerateForType(typeof(Operation))["properties"];
+        var finding = (Dictionary<string, object>)
+            JsonSchemaGenerator.GenerateForType(typeof(NodeFinding))["properties"];
 
-        foreach (var (name, schema) in report.Concat(operation))
+        foreach (var (name, schema) in report.Concat(operation).Concat(finding))
         {
             ((Dictionary<string, object>)schema).ShouldContainKey(
                 "description", $"{name} reaches the model with no meaning attached");
         }
+    }
+
+    [Test]
+    public void Generate_AFinding_CarriesWhatItQuotesAsAListOfStrings()
+    {
+        var finding = (Dictionary<string, object>)
+            JsonSchemaGenerator.GenerateForType(typeof(NodeFinding))["properties"];
+
+        finding.ShouldContainKey(nameof(NodeFinding.Quotes));
+        var quotes = (Dictionary<string, object>)finding[nameof(NodeFinding.Quotes)];
+
+        quotes["type"].ShouldBe("array");
+        ((Dictionary<string, object>)quotes["items"])["type"].ShouldBe("string");
     }
 
     // ── Nullable types ───────────────────────────────────────────────────────

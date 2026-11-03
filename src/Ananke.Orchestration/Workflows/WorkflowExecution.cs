@@ -129,7 +129,9 @@ public sealed class WorkflowExecution<TState>
                 : null)
         {
             CurrentJob = checkpoint.CurrentJob,
-            Status = checkpoint.Status
+            Status = checkpoint.Status,
+            EstimatedCost = checkpoint.RunCost,
+            CumulativeUsage = checkpoint.RunUsage ?? TokenUsage.Zero
         };
 
     /// <summary>Increments the loop counter for <paramref name="loopSource"/> and returns the new value.</summary>

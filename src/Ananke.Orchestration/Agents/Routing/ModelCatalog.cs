@@ -140,6 +140,7 @@ public static class ModelCatalog
         // Anthropic
         Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
         Anthropic.ClaudeSonnet5, Anthropic.ClaudeOpus5, Anthropic.ClaudeFable5,
+        Anthropic.ClaudeSonnet5_5, Anthropic.ClaudeOpus5_5, Anthropic.ClaudeFable5_1,
 
         // Google
         Google.Gemini3_1Pro,
@@ -367,17 +368,29 @@ public static class ModelCatalog
         public static ModelProfileTemplate ClaudeHaiku4_5 { get; } =
             CreateTemplate(Models.Anthropic.Haiku45, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 200_000, speedTier: 5, family: "claude");
 
-        /// <summary>Claude Sonnet 5 — current-generation balanced frontier model.</summary>
+        /// <summary>Claude Sonnet 5 — legacy balanced frontier model.</summary>
         public static ModelProfileTemplate ClaudeSonnet5 { get; } =
             CreateTemplate(Models.Anthropic.Sonnet5, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3, family: "claude");
 
-        /// <summary>Claude Opus 5 — current-generation, complex agentic coding and enterprise work.</summary>
+        /// <summary>Claude Opus 5 — legacy, complex agentic coding and enterprise work.</summary>
         public static ModelProfileTemplate ClaudeOpus5 { get; } =
             CreateTemplate(Models.Anthropic.Opus5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
 
-        /// <summary>Claude Fable 5 — Mythos-class frontier model, most capable, complex reasoning.</summary>
+        /// <summary>Claude Fable 5 — legacy Mythos-class frontier model, complex reasoning.</summary>
         public static ModelProfileTemplate ClaudeFable5 { get; } =
             CreateTemplate(Models.Anthropic.Fable5, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
+
+        /// <summary>Claude Sonnet 5.5 — current generation, the best combination of speed and intelligence.</summary>
+        public static ModelProfileTemplate ClaudeSonnet5_5 { get; } =
+            CreateTemplate(Models.Anthropic.Sonnet55, FrontierModel, intelligenceTier: 4, maxContextTokens: 1_000_000, speedTier: 3, family: "claude");
+
+        /// <summary>Claude Opus 5.5 — current generation, long-running agentic coding and knowledge work.</summary>
+        public static ModelProfileTemplate ClaudeOpus5_5 { get; } =
+            CreateTemplate(Models.Anthropic.Opus55, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
+
+        /// <summary>Claude Fable 5.1 — current generation, demanding reasoning and long-horizon agentic work.</summary>
+        public static ModelProfileTemplate ClaudeFable5_1 { get; } =
+            CreateTemplate(Models.Anthropic.Fable51, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_000_000, speedTier: 2, family: "claude");
 
 #pragma warning restore ANNKE001
     }

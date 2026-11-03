@@ -37,25 +37,22 @@ NuGet ID and dependencies, the CLI tooling layer, and abstraction trees annotate
 | Streaming chat sessions | [architecture/agents.md](architecture/agents.md) | [05-streaming-chat](docs/guides/05-streaming-chat.md) | `src/Ananke.Orchestration/Agents/StreamingChatWorkflow.cs` |
 | Tools / `ToolKit` | [ARCHITECTURE.md#key-abstractions](ARCHITECTURE.md#key-abstractions) | [04-tools](docs/guides/04-tools.md), [tools-reference](docs/reference/tools-reference.md) | `src/Ananke.Orchestration/Tools/` |
 | Knowledge / RAG pipeline | [architecture/knowledge.md](architecture/knowledge.md) | [06-memory](docs/guides/06-memory.md) | `src/Ananke.Orchestration.Knowledge/`, `src/Ananke.Documents/` |
+| Local embeddings (ONNX) | [src/Ananke.Embeddings.Onnx/ARCHITECTURE.md](src/Ananke.Embeddings.Onnx/ARCHITECTURE.md) | [06-memory](docs/guides/06-memory.md) | `src/Ananke.Embeddings.Onnx/` |
+| Vector stores (Postgres) | [src/Ananke.Postgres/ARCHITECTURE.md](src/Ananke.Postgres/ARCHITECTURE.md) | [06-memory](docs/guides/06-memory.md) | `src/Ananke.Postgres/` |
 | Vector stores (Qdrant) | [architecture/infrastructure.md](architecture/infrastructure.md) (Qdrant) | [06-memory](docs/guides/06-memory.md) | `src/Ananke.Qdrant/` |
 | Knowledge graph | [architecture/learning.md](architecture/learning.md) (Knowledge Graph Analytics) | [memory FAQ](docs/faq/memory.md) | `src/Ananke.Graph.Abstractions/`, `src/Ananke.Graph.Memgraph/` |
 | State machine | [architecture/infrastructure.md](architecture/infrastructure.md) (State Machine) | [08-state-machine](docs/guides/08-state-machine.md) | `src/Ananke.StateMachine/` |
 | Empirical memory / episodes / offline learning | [architecture/learning.md](architecture/learning.md) | [15-empirical-memory](docs/guides/15-empirical-memory.md), [15a-tuning](docs/guides/15a-empirical-memory-tuning.md) | `src/Ananke.Learning/` |
-| Organic colony / cell division | [architecture/organics-federation.md](architecture/organics-federation.md) (Organic Colony Architecture) | [organics FAQ](docs/faq/organics.md) | `src/Ananke.Organics/` |
-| Enterprise clouds (Bedrock, Foundry) — auth, endpoints, BYO model ids | — | [21-enterprise-clouds](docs/guides/21-enterprise-clouds.md) | `src/Ananke.Orchestration.Bedrock/` |
-| Federation / cross-cloud deployment | [architecture/organics-federation.md](architecture/organics-federation.md) (Federation) | [20-platform-recommendation](docs/guides/20-platform-recommendation.md), [nnke-platform-tool](docs/cli/nnke-platform-tool.md) | `src/Ananke.Federation/`, `src/Ananke.Federation.{Anthropic,Google,Azure,LocalEmulators}/` |
-| Federation credentials & rotation | [architecture/federation-credentials.md](architecture/federation-credentials.md) | [nnke-platform-tool](docs/cli/nnke-platform-tool.md) | `src/Ananke.Federation/Credentials/` |
+| Organic colony / cell division | [architecture/organics.md](architecture/organics.md) | [organics FAQ](docs/faq/organics.md) | `src/Ananke.Organics/` |
+| Enterprise clouds (Bedrock, Foundry) — auth, endpoints, BYO model ids | — | [21-enterprise-clouds](docs/guides/21-enterprise-clouds.md) | `src/Ananke.Orchestration.OpenAI/`, `src/Ananke.Orchestration.Anthropic/` |
 | Redis / MQTT / distributed primitives | [architecture/infrastructure.md](architecture/infrastructure.md) (Redis, MQTT) | [09-distributed](docs/guides/09-distributed.md) | `src/Ananke.Redis/`, `src/Ananke.MQTT/` |
 | Observability (OpenTelemetry) | [architecture/infrastructure.md](architecture/infrastructure.md) (OpenTelemetry) | [10-observability](docs/guides/10-observability.md) | `src/Ananke.OpenTelemetry/` |
 | ASP.NET Core / SSE hosting | [architecture/infrastructure.md](architecture/infrastructure.md) (ASP.NET Core) | [05-streaming-chat](docs/guides/05-streaming-chat.md) | `src/Ananke.AspNetCore/` |
 | MCP server / A2A protocol | [architecture/interop.md](architecture/interop.md) | [12-mcp-and-interop](docs/guides/12-mcp-and-interop.md) | `src/Ananke.MCP/`, `src/Ananke.A2A/` |
 | External skill catalog (OpenClaw) | [architecture/interop.md](architecture/interop.md) (External Skill Catalog) | [tools-reference](docs/reference/tools-reference.md) | `src/Ananke.Skills/` |
-| Messaging platform adapters (Slack/Discord) | [architecture/interop.md](architecture/interop.md) (Messaging Platforms) | — *(no guide yet)* | `src/Ananke.Platforms/`, `src/Ananke.Platforms.{Slack,Discord}/` |
-| Roles / studio host / role catalog | — *(not yet in `architecture/*.md`; see `src/Ananke.Roles/ARCHITECTURE.md`)* | — *(no guide yet)* | `src/Ananke.Roles/` |
 | Design DSL / YAML manifests | — *(not yet in `architecture/*.md`; see `src/Ananke.Design/ARCHITECTURE.md`)* | [13-design-tooling](docs/guides/13-design-tooling.md), [workflow-dsl](docs/reference/workflow-dsl.md), [18-plans-and-contracts](docs/guides/18-plans-and-contracts.md) (`PlanManifest`, `PlanReportExporter`) | `src/Ananke.Design/` |
 | Testing helpers / in-memory fakes / simulated models | [ARCHITECTURE.md#testing-strategy](ARCHITECTURE.md#testing-strategy) | [14-testing](docs/guides/14-testing.md) | `src/Ananke.Orchestration/Agents/Simulation/`, per-project `*.Tests/` |
 | `nnke` CLI (design-time) | [src/ARCHITECTURE.md](src/ARCHITECTURE.md) (CLI / Tooling Layer) | [nnke-tool](docs/cli/nnke-tool.md), [overview](docs/cli/overview.md) | `src/nnke/` |
-| `nnke-platform` CLI (federation ops) + adapters | [src/ARCHITECTURE.md](src/ARCHITECTURE.md) (CLI / Tooling Layer) | [nnke-platform-tool](docs/cli/nnke-platform-tool.md) | `src/nnke-platform/`, `src/nnke-platform-{anthropic,azure,google,all}/` |
 
 ## Maintenance
 

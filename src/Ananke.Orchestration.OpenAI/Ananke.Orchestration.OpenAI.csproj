@@ -10,6 +10,12 @@
     <PackageReference Include="OpenAI" />
   </ItemGroup>
 
+  <!-- The credential overloads carry an [Experimental] id and message, defined once in
+       Ananke.Orchestration. -->
+  <ItemGroup>
+    <Compile Include="..\Ananke.Orchestration\ExperimentalApis.cs" Link="ExperimentalApis.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
   </ItemGroup>

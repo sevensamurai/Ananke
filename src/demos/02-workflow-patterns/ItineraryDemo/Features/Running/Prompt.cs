@@ -57,7 +57,7 @@ internal static class Prompt
         }
 
         // Appended here rather than offered by the supervisor, so no supervisor can leave somebody
-        // stuck (R32). Lettered, because neither is one of the options and numbering them would move
+        // stuck. Lettered, because neither is one of the options and numbering them would move
         // them every time the supervisor offers a different number of alternatives.
         Console.WriteLine("       s. Say something else — in your own words, and it goes back to the supervisor");
         Console.WriteLine("       c. Cancel — stop here, and leave the trip unplanned");

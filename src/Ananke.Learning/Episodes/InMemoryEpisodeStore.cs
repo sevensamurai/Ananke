@@ -16,6 +16,10 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
     private readonly IEpisodeGraphProjector? _graphProjector;
     private readonly IKnowledgeGraph? _graph;
 
+    // Held across check, evict and add, so two commits cannot both see room. Not across the graph
+    // projection, which is awaited.
+    private readonly Lock _gate = new();
+
     /// <summary>
     /// Creates a new in-memory episode store.
     /// </summary>
@@ -51,17 +55,20 @@ public sealed class InMemoryEpisodeStore : IEpisodeStore
         ArgumentNullException.ThrowIfNull(episode);
 
         // 5.7: Evict the oldest episode (by CompletedAt) before storing, if at capacity.
-        if (!_episodes.ContainsKey(episode.Id) && _episodes.Count >= _maxEpisodes)
+        lock (_gate)
         {
-            var oldest = _episodes.Values
-                .OrderBy(e => e.CompletedAt)
-                .Select(e => e.Id)
-                .FirstOrDefault();
-            if (oldest is not null)
-                _episodes.TryRemove(oldest, out _);
-        }
+            if (!_episodes.ContainsKey(episode.Id) && _episodes.Count >= _maxEpisodes)
+            {
+                var oldest = _episodes.Values
+                    .OrderBy(e => e.CompletedAt)
+                    .Select(e => e.Id)
+                    .FirstOrDefault();
+                if (oldest is not null)
+                    _episodes.TryRemove(oldest, out _);
+            }
 
-        _episodes[episode.Id] = episode;
+            _episodes[episode.Id] = episode;
+        }
 
         if (_graph is not null && _graphProjector is not null)
             await _graphProjector.ProjectAsync(episode, _graph, ct);

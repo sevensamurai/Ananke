@@ -10,10 +10,9 @@ Most AI frameworks start with the LLM and build infrastructure around it. Ananke
   in-memory implementation
 - **Agents that learn** — three-layer memory (RAG, episodic, empirical) with offline learning, skill packages, and Monte Carlo reward propagation
 - **Organics** — autonomous agent ecosystems that self-organise, adapt, and evolve their own policies over time without manual re-configuration
-- **Federation** — run workflows across organisational boundaries; join nodes into a mesh, share agent pools, and get unified telemetry across the whole cluster
 - **Agentic patterns** — Review & Critique, Iterative Refinement — recognized patterns as first-class workflow builders
 - **External skill catalog** — discover and run Python, Node.js, and Docker tools from registries directly through ToolKit
-- **nnke Tools** — `nnke` scaffolds, validates, runs, and serves workflows locally; `nnke-platform` deploys, observes, and manages the federation mesh in the cloud
+- **nnke Tools** — `nnke` scaffolds, validates, runs, and serves workflows locally
 - **Production-oriented infrastructure** — distributed locking, checkpointing, circuit breaking,
   and OpenTelemetry tracing built in; not added later
 

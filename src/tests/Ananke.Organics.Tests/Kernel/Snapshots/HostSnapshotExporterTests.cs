@@ -1,4 +1,5 @@
 using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Agents;
 using Ananke.Organics.Kernel.Snapshots;
 using Ananke.Organics.Division;
 using Shouldly;
@@ -108,6 +109,20 @@ public class HostSnapshotExporterTests
 
         restored.KernelId.ShouldBe(original.KernelId);
         restored.Version.ShouldBe(original.Version);
+    }
+
+    [Test]
+    public void RoundTrip_AJobWithTheDefaultRounds_KeepsTheJobDefault()
+    {
+        // A snapshot that names no rounds means what a job built in code without them runs with.
+        var original = BuildMinimalSnapshot();
+        original.Cells[0].Jobs["handle-request"].MaxToolRounds.ShouldBe(AgentJobFactory.DefaultMaxToolRounds);
+
+        var yaml = HostSnapshotExporter.ToYaml(original);
+        var restored = HostSnapshotExporter.FromYaml(yaml);
+
+        yaml.ShouldNotContain("max_tool_rounds");
+        restored.Cells[0].Jobs["handle-request"].MaxToolRounds.ShouldBe(AgentJobFactory.DefaultMaxToolRounds);
     }
 
     [Test]

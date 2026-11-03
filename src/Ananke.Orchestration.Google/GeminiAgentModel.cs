@@ -39,11 +39,17 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// Custom API base URL for Gemini-compatible endpoints, or <see langword="null"/> for the
     /// default Gemini Developer API endpoint.
     /// </param>
-    public static GeminiAgentModel Create(string apiKey, string model, Uri? endpoint = null)
-    {
-        var httpOptions = endpoint is not null ? new HttpOptions { BaseUrl = endpoint.ToString() } : null;
-        return new(new Client(apiKey: apiKey, httpOptions: httpOptions), model);
-    }
+    public static GeminiAgentModel Create(string apiKey, string model, Uri? endpoint = null) =>
+        new(new Client(apiKey: apiKey, httpOptions: HttpOptionsFor(endpoint)), model);
+
+    /// <summary>The HTTP options every factory gives the SDK.</summary>
+    /// <remarks>
+    /// The SDK makes a single attempt unless it is given retry options, and the engine leaves a
+    /// plain rate limit to the provider's SDK — so this turns them on, on the SDK's own retryable
+    /// codes (408, 429, 5xx).
+    /// </remarks>
+    internal static HttpOptions HttpOptionsFor(Uri? endpoint) =>
+        new() { BaseUrl = endpoint?.ToString(), RetryOptions = new HttpRetryOptions { Attempts = 3 } };
 
     /// <summary>
     /// Creates a <see cref="GeminiAgentModel"/> for Gemini Enterprise Agent Platform using
@@ -55,7 +61,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     public static GeminiAgentModel CreateAgentPlatform(string project, string location, string model) =>
         // The SDK's own parameter is still called vertexAI; that name is Google's, not ours.
         // See — it is left alone deliberately rather than papered over.
-        new(new Client(project: project, location: location, vertexAI: true), model);
+        new(new Client(project: project, location: location, vertexAI: true, httpOptions: HttpOptionsFor(null)), model);
 
     /// <summary>
     /// Creates a <see cref="GeminiAgentModel"/> for Gemini Enterprise Agent Platform using
@@ -95,6 +101,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         var toolCalls = new List<AgentToolCall>();
         var responseParts = new List<ContentPart>();
         TokenUsage? streamUsage = null;
+        FinishReason? finishReason = null;
 
         await foreach (var chunk in _client.Models.GenerateContentStreamAsync(
             model: _model,
@@ -112,6 +119,9 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
 
             if (chunk.Candidates is not { Count: > 0 })
                 continue;
+
+            if (chunk.Candidates[0].FinishReason is { } finished)
+                finishReason = finished;
 
             var parts = chunk.Candidates[0].Content?.Parts;
             if (parts is null)
@@ -156,18 +166,26 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
                 Text = fullText.Length > 0 ? fullText.ToString() : null,
                 Parts = responseParts.Count > 0 ? responseParts : null,
                 ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
-                Usage = streamUsage
+                Usage = streamUsage,
+                StopReason = MapStopReason(finishReason, toolCalls.Count > 0)
             }
         };
     }
 
     private GenerateContentConfig BuildConfig(AgentRequest request)
     {
+#pragma warning disable ANNKEEXP003 // a request's own fields are experimental
+        request.ThrowIfRequestFields("The Gemini adapter");
+#pragma warning restore ANNKEEXP003
+
         var config = new GenerateContentConfig();
 
         // Only when set: null must reach the provider as "absent", not as 0.
         if (request.Temperature is { } temperature)
             config.Temperature = (float)temperature;
+
+        if (request.MaxOutputTokens is { } maxOutputTokens)
+            config.MaxOutputTokens = maxOutputTokens;
 
         if (request.SystemPrompt is not null)
         {
@@ -334,6 +352,29 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
         return parts;
     }
 
+
+    /// <remarks>
+    /// Gemini has no finish value for a tool call — a reply that calls tools finishes with <c>STOP</c>
+    /// — so the calls themselves decide it.
+    /// </remarks>
+    private static AgentStopReason MapStopReason(FinishReason? reason, bool calledTools)
+    {
+        if (reason is null)
+            return calledTools ? AgentStopReason.ToolCalls : AgentStopReason.Unknown;
+
+        if (reason == FinishReason.Stop)
+            return calledTools ? AgentStopReason.ToolCalls : AgentStopReason.EndTurn;
+
+        if (reason == FinishReason.MaxTokens)
+            return AgentStopReason.MaxTokens;
+
+        if (reason == FinishReason.Safety || reason == FinishReason.Blocklist
+            || reason == FinishReason.ProhibitedContent || reason == FinishReason.Spii
+            || reason == FinishReason.ImageSafety || reason == FinishReason.ImageProhibitedContent)
+            return AgentStopReason.ContentFilter;
+
+        return AgentStopReason.Unknown;
+    }
     /// <summary>
     /// Output tokens for a response, counting reasoning tokens as output.
     /// </summary>
@@ -396,6 +437,9 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
             Text = text,
             Parts = responseParts.Count > 0 ? responseParts : null,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
+            StopReason = MapStopReason(
+                response.Candidates is { Count: > 0 } ? response.Candidates[0].FinishReason : null,
+                toolCalls.Count > 0),
             Usage = response.UsageMetadata is not null
                 ? new TokenUsage
                 {

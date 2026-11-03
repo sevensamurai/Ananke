@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -17,6 +19,7 @@ namespace Ananke.Orchestration.Planning;
 /// to guarantee.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record Finding
 {
     /// <summary>Whether the criterion holds.</summary>
@@ -43,6 +46,7 @@ public sealed record Finding
 /// answer is not one of these, and must not be dressed up as one: a check that quietly guesses is
 /// worse than no check, because its verdict carries the authority of something that ran.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public interface IDeterministicCheck
 {
     /// <summary>What runs, named so that re-running it later is a concrete instruction.</summary>
@@ -56,6 +60,7 @@ public interface IDeterministicCheck
 }
 
 /// <summary>What an verifier is asked to rule on.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record VerificationRequest
 {
     /// <summary>The node whose contract is being ruled against.</summary>
@@ -72,6 +77,7 @@ public sealed record VerificationRequest
 }
 
 /// <summary>How a node's contract stood up.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum VerificationOutcome
 {
     /// <summary>Every acceptance criterion was checked and held.</summary>
@@ -99,6 +105,7 @@ public enum VerificationOutcome
 }
 
 /// <summary>An verifier's ruling.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record Verification
 {
     /// <summary>Verdicts the verifier is prepared to stand behind.</summary>
@@ -138,6 +145,7 @@ public sealed record Verification
 /// Opt-in. A plan with no verifier has nothing verified and behaves exactly as before.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public interface IVerifier
 {
     /// <summary>Rules on <paramref name="request"/>.</summary>

@@ -121,7 +121,9 @@ public class TimeDecayTests
     {
         var options = new TimeDecayOptions { HalfLifeDays = 90, FloorWeight = 0f };
 
+#pragma warning disable CS0618 // The overload under test is obsolete
         var weight = TimeDecay.ComputeWeight(DateTimeOffset.UtcNow, options);
+#pragma warning restore CS0618
 
         weight.ShouldBe(1.0f, tolerance: 0.01f);
     }
@@ -138,7 +140,7 @@ public class TimeDecayTests
             FloorWeight = 0f
         };
 
-        var decayed = TimeDecay.Apply(1.0f, indexedAt, options);
+        var decayed = TimeDecay.Apply(1.0f, indexedAt, now, options);
 
         decayed.ShouldBe(0.5f, tolerance: 0.01f);
     }
@@ -148,7 +150,9 @@ public class TimeDecayTests
     {
         var options = new TimeDecayOptions { HalfLifeDays = 1, FloorWeight = 0f };
 
-        var decayed = TimeDecay.Apply(0f, DateTimeOffset.UtcNow.AddYears(-10), options);
+        var now = DateTimeOffset.UtcNow;
+
+        var decayed = TimeDecay.Apply(0f, now.AddYears(-10), now, options);
 
         decayed.ShouldBe(0f);
     }

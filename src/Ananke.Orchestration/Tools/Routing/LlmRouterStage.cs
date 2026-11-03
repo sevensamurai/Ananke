@@ -121,7 +121,7 @@ public sealed class LlmRouterStage : ISmartToolRouter
     {
         decision = null!;
 
-        var json = StripMarkdownFences(raw);
+        var json = JsonReply.Extract(raw);
         if (string.IsNullOrWhiteSpace(json))
             return false;
 
@@ -187,24 +187,6 @@ public sealed class LlmRouterStage : ISmartToolRouter
             Rationale = payload.Rationale,
         };
         return true;
-    }
-
-    /// <summary>
-    /// Strips optional Markdown code fences (```json … ```) that models sometimes emit.
-    /// </summary>
-    private static string StripMarkdownFences(string raw)
-    {
-        var trimmed = raw.Trim();
-        if (trimmed.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstNewline = trimmed.IndexOf('\n');
-            if (firstNewline >= 0)
-                trimmed = trimmed[(firstNewline + 1)..];
-
-            if (trimmed.EndsWith("```", StringComparison.Ordinal))
-                trimmed = trimmed[..^3].TrimEnd();
-        }
-        return trimmed;
     }
 
     // ── Private DTO ───────────────────────────────────────────────────

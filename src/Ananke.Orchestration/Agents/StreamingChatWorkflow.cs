@@ -1,7 +1,6 @@
 using Ananke.Orchestration.Workflows;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Channels;
 using Ananke.Abstractions.Memory;
 using Ananke.Orchestration.Agents.Context;
@@ -41,6 +40,12 @@ public sealed record StreamingChatState
     /// <summary>Number of history messages loaded from memory (used to persist only new messages).</summary>
     internal int HistoryBaseline { get; init; }
 
+    /// <summary>
+    /// The workflow's own prompts in <see cref="Messages"/>, by reference: sent to the model but never
+    /// something the user said, so never persisted to memory. Shared by every copy of one run's state.
+    /// </summary>
+    internal HashSet<AgentMessage> Synthetic { get; init; } = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>When <c>true</c>, the last generation was interrupted and the agent will be re-invoked.</summary>
     public bool WasInterrupted { get; init; }
 
@@ -77,7 +82,7 @@ public static class StreamingChatWorkflow
         private readonly IStreamingAgentModel _model;
         private string? _systemPrompt;
         private ToolKit? _toolKit;
-        private int _maxToolRounds = 10;
+        private int _maxToolRounds = AgentJobFactory.DefaultMaxToolRounds;
         private double? _temperature;
         private Func<string, Task>? _onTextDelta;
         private Func<byte[], string, Task>? _onAudioDelta;
@@ -85,6 +90,8 @@ public static class StreamingChatWorkflow
         private Func<string, string, Task>? _onToolResult;
         private IConversationMemory? _memory;
         private IContextStrategy? _contextStrategy;
+        private ToolOutputPolicy? _toolOutputPolicy;
+        private TimeProvider _timeProvider = TimeProvider.System;
 
         internal Builder(string name, IStreamingAgentModel model)
         {
@@ -131,6 +138,32 @@ public static class StreamingChatWorkflow
         {
             ArgumentNullException.ThrowIfNull(strategy);
             _contextStrategy = strategy;
+            return this;
+        }
+
+        /// <summary>
+        /// Bounds tool results so one oversized return cannot fill the window.
+        /// </summary>
+        /// <remarks>
+        /// Opt-in, as on an agent job. Each result is capped as it arrives, before it joins the
+        /// transcript; <see cref="OnToolResult"/> still receives it whole.
+        /// </remarks>
+        public Builder WithToolOutputPolicy(ToolOutputPolicy policy)
+        {
+            ArgumentNullException.ThrowIfNull(policy);
+            policy.Validate();
+            _toolOutputPolicy = policy;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the clock that stamps this workflow's unknown-tool reports. Defaults to
+        /// <see cref="TimeProvider.System"/>.
+        /// </summary>
+        public Builder WithTimeProvider(TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(timeProvider);
+            _timeProvider = timeProvider;
             return this;
         }
 
@@ -212,6 +245,84 @@ public static class StreamingChatWorkflow
             var onTool = _onToolResult;
             var memory = _memory;
             var contextStrategy = _contextStrategy;
+            var toolOutputPolicy = _toolOutputPolicy;
+            var timeProvider = _timeProvider;
+            var name = _name;
+
+            // What the tool schemas take before any message, as an agent job counts it.
+            var toolSchemaTokens = agentToolDefs is null
+                ? 0
+                : RequestTokenEstimator.Estimate(new AgentRequest { Messages = [], Tools = agentToolDefs });
+
+            // Compacted against the window of the model that will answer, when it can say.
+            ContextBudget BudgetFor(IReadOnlyList<AgentMessage> messages) =>
+                ContextBudgets.For(model, new AgentRequest
+                {
+                    SystemPrompt = systemPrompt,
+                    Messages = messages,
+                    Tools = agentToolDefs
+                }, maxContextTokens: null, toolSchemaTokens);
+
+            // Shared by "agent" and "limit" — the only difference between them is what goes
+            // into the outgoing message list before this runs.
+            async Task<(AgentResponse? Completed, string FullText)> CallAsync(
+                IReadOnlyList<AgentMessage> outbound, CancellationToken ct)
+            {
+                var request = new AgentRequest
+                {
+                    SystemPrompt = systemPrompt,
+                    Messages = outbound,
+                    Tools = agentToolDefs,
+                    Temperature = temperature
+                };
+
+                var fullText = new StringBuilder();
+                AgentResponse? completed = null;
+
+                await foreach (var chunk in model.GenerateStreamAsync(request, ct))
+                {
+                    if (chunk.TextDelta is not null)
+                    {
+                        fullText.Append(chunk.TextDelta);
+                        if (onDelta is not null)
+                            await onDelta(chunk.TextDelta);
+                    }
+                    if (chunk.AudioDelta is not null && onAudioDelta is not null)
+                        await onAudioDelta(chunk.AudioDelta, chunk.AudioMimeType ?? "audio/pcm");
+                    if (chunk.CompletedResponse is not null)
+                        completed = chunk.CompletedResponse;
+                }
+
+                // Capture token usage for budget tracking
+                if (completed is not null)
+                    await UsageRecording.ReportAsync(completed, ct);
+
+                return (completed, fullText.ToString());
+            }
+
+            // Persists whatever the turn produced even when it ends unanswered at the tool-call
+            // limit — the alternative is silently losing the user's message and every tool call
+            // that did run. The assistant turn itself is only appended when there is one: a
+            // response that still has a pending tool call has no result for it, and appending it
+            // anyway would corrupt the next turn's transcript.
+            async Task FinalizeAsync(StreamingChatState state)
+            {
+                if (state.LastResponse?.RequiresAction != true)
+                {
+                    var responseText = state.LastResponse?.Text ?? state.FullText;
+                    if (!string.IsNullOrEmpty(responseText))
+                        state.Messages.Add(AgentMessage.Assistant(responseText));
+                }
+
+                if (memory is not null && state.SessionId is not null
+                    && state.HistoryBaseline < state.Messages.Count)
+                {
+                    var newMessages = state.Messages.Skip(state.HistoryBaseline)
+                        .Where(m => !state.Synthetic.Contains(m))
+                        .ToList();
+                    await memory.AddAsync(state.SessionId, newMessages, CancellationToken.None);
+                }
+            }
 
             return new Workflow<StreamingChatState>(_name)
                 .Job("agent", async (state, ct) =>
@@ -229,42 +340,54 @@ public static class StreamingChatWorkflow
                         }
                     }
 
-                    var request = new AgentRequest
-                    {
-                        SystemPrompt = systemPrompt,
-                        Messages = contextStrategy is not null
-                            ? (await contextStrategy.ApplyAsync(
-                                state.Messages, systemPrompt, ContextBudget.Unspecified, ct)).Messages
-                            : state.Messages,
-                        Tools = agentToolDefs,
-                        Temperature = temperature
-                    };
+                    var outbound = contextStrategy is not null
+                        ? (await contextStrategy.ApplyAsync(
+                            state.Messages, systemPrompt, BudgetFor(state.Messages), ct)).Messages
+                        : state.Messages;
 
-                    var fullText = new StringBuilder();
-                    AgentResponse? completed = null;
-
-                    await foreach (var chunk in model.GenerateStreamAsync(request, ct))
-                    {
-                        if (chunk.TextDelta is not null)
-                        {
-                            fullText.Append(chunk.TextDelta);
-                            if (onDelta is not null)
-                                await onDelta(chunk.TextDelta);
-                        }
-                        if (chunk.AudioDelta is not null && onAudioDelta is not null)
-                            await onAudioDelta(chunk.AudioDelta, chunk.AudioMimeType ?? "audio/pcm");
-                        if (chunk.CompletedResponse is not null)
-                            completed = chunk.CompletedResponse;
-                    }
-
-                    // Capture token usage for budget tracking
-                    if (completed is not null)
-                        await UsageRecording.ReportAsync(completed, ct);
+                    var (completed, fullText) = await CallAsync(outbound, ct);
 
                     return state with
                     {
                         LastResponse = completed,
-                        FullText = fullText.ToString()
+                        FullText = fullText
+                    };
+                })
+                .Job("limit", async (state, ct) =>
+                {
+                    // One last chance instead of silently dropping the turn: every pending call
+                    // gets a stub result so the transcript stays valid, then one more call with
+                    // the same tools, asked not to use them.
+                    state.Messages.Add(AgentMessage.Assistant(
+                        state.LastResponse!.Text ?? string.Empty, state.LastResponse.ToolCalls));
+
+                    foreach (var call in state.LastResponse.ToolCalls!)
+                        state.Messages.Add(AgentMessage.ToolResult(
+                            call.Id, "Not executed: the tool-call limit for this turn was reached."));
+
+                    AddSynthetic(state, AgentMessage.User(
+                        "You have reached the tool-call limit. Answer now with what you have; do not call tools."));
+
+                    var outbound = contextStrategy is not null
+                        ? (await contextStrategy.ApplyAsync(
+                            state.Messages, systemPrompt, BudgetFor(state.Messages), ct)).Messages
+                        : state.Messages;
+
+                    var (completed, fullText) = await CallAsync(outbound, ct);
+
+                    // Streamed as well as set, since a client that renders deltas shows only those.
+                    if (completed?.RequiresAction == true)
+                    {
+                        fullText = "I could not finish within the tool-call limit.";
+                        if (onDelta is not null)
+                            await onDelta(fullText);
+                    }
+
+                    return state with
+                    {
+                        LastResponse = completed,
+                        FullText = fullText,
+                        ToolRounds = state.ToolRounds + 1
                     };
                 })
                 .Job("tools", async (state, ct) =>
@@ -280,10 +403,15 @@ public static class StreamingChatWorkflow
                         if (onToolCall is not null)
                             await onToolCall(call.FunctionName, call.Arguments);
 
-                        var args = ParseToolArgs(call.Arguments);
-                        var toolResult = toolKit!.Tools.TryGetValue(call.FunctionName, out var executor)
-                            ? await executor.ExecuteAsync(args, ct)
-                            : ToolResult.Error($"Unknown tool: {call.FunctionName}");
+                        ToolResult toolResult;
+                        if (!ToolDispatch.TryParseArguments(call.Arguments, call.FunctionName, out var args, out var parseError))
+                            toolResult = parseError;
+                        else if (toolKit!.Tools.TryGetValue(call.FunctionName, out var executor))
+                            toolResult = await ToolDispatch.InvokeAsync(executor, args, ct);
+                        else
+                            toolResult = await UnknownTools.ReportAsync(
+                                toolKit?.HallucinationObserver, call.FunctionName, toolKit?.Name, name,
+                                episodeId: string.Empty, timeProvider, ct);
 
                         if (onTool is not null)
                             await onTool(call.FunctionName, toolResult.Value);
@@ -291,12 +419,23 @@ public static class StreamingChatWorkflow
                         if (toolResult.IsError && !toolResult.IsRetryable)
                             hasNonRetryable = true;
 
-                        state.Messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
+                        var carried = toolResult.Value;
+                        if (toolOutputPolicy is not null)
+                        {
+                            var (capped, record) = await ToolOutputHygiene.CapAsync(
+                                toolOutputPolicy, call.FunctionName, toolResult.Value, ct);
+                            carried = capped;
+
+                            if (record is not null)
+                                await ContextObserving.ReportAsync(record, ct);
+                        }
+
+                        state.Messages.Add(AgentMessage.ToolResult(call.Id, carried));
                     }
 
                     if (hasNonRetryable)
                     {
-                        state.Messages.Add(AgentMessage.User(
+                        AddSynthetic(state, AgentMessage.User(
                             "One or more tools returned a permanent error that will not succeed on retry. " +
                             "Do not call those tools again. Proceed with your best answer using any information you already have."));
                     }
@@ -309,33 +448,18 @@ public static class StreamingChatWorkflow
                     };
                 })
                 .Then("agent", Workflow.Decide<StreamingChatState>(state =>
-                    state.LastResponse?.RequiresAction == true && state.ToolRounds < maxRounds
-                        ? "tools"
-                        : Workflow.End))
+                    state.LastResponse?.RequiresAction != true
+                        ? Workflow.End
+                        : state.ToolRounds < maxRounds ? "tools" : "limit"))
                 .Then("tools", "agent")
-                .OnExit("agent", async state =>
-                {
-                    // Append the final assistant response to the message list so the
-                    // full turn (including tool calls and the closing reply) is preserved
-                    // for subsequent turns, regardless of memory configuration.
-                    if (state.LastResponse?.RequiresAction != true)
-                    {
-                        var responseText = state.LastResponse?.Text ?? state.FullText;
-                        if (!string.IsNullOrEmpty(responseText))
-                            state.Messages.Add(AgentMessage.Assistant(responseText));
-                    }
-
-                    // Persist only new messages (skip the loaded history) when the workflow completes
-                    if (memory is not null && state.SessionId is not null
-                        && state.LastResponse?.RequiresAction != true)
-                    {
-                        if (state.HistoryBaseline < state.Messages.Count)
-                        {
-                            var newMessages = state.Messages.Skip(state.HistoryBaseline).ToList();
-                            await memory.AddAsync(state.SessionId, newMessages, CancellationToken.None);
-                        }
-                    }
-                });
+                .Then("limit", Workflow.End)
+                // An exit hook runs after every round of its job. "agent" ends the turn only when it
+                // has answered; asking for a tool, it goes on to "tools" or "limit", and "limit"
+                // always ends it.
+                .OnExit("agent", state => state.LastResponse?.RequiresAction == true
+                    ? Task.CompletedTask
+                    : FinalizeAsync(state))
+                .OnExit("limit", FinalizeAsync);
         }
 
         /// <summary>
@@ -464,12 +588,10 @@ public static class StreamingChatWorkflow
         }
     }
 
-    private static IReadOnlyDictionary<string, object?> ParseToolArgs(string arguments)
+    /// <summary>Adds one of the workflow's own prompts: sent to the model, kept out of memory.</summary>
+    private static void AddSynthetic(StreamingChatState state, AgentMessage prompt)
     {
-        var dict = new Dictionary<string, object?>();
-        using var doc = JsonDocument.Parse(arguments);
-        foreach (var prop in doc.RootElement.EnumerateObject())
-            dict[prop.Name] = prop.Value.Clone();
-        return dict;
+        state.Synthetic.Add(prompt);
+        state.Messages.Add(prompt);
     }
 }

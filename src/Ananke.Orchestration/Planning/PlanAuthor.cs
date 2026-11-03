@@ -1,10 +1,12 @@
 using Ananke.Orchestration.Jobs;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Streaming;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>One step a re-authored plan would have.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record AuthoredStep
 {
     /// <summary>Its id, which the domain decides the meaning of.</summary>
@@ -12,6 +14,12 @@ public sealed record AuthoredStep
 
     /// <summary>What it is asked to do.</summary>
     public required AgentContract Contract { get; init; }
+
+    /// <summary>
+    /// What it may change (<see cref="PlanNode.Touches"/>). Empty, the default, leaves a step the plan
+    /// already has with what it touched, and names nothing for a new one.
+    /// </summary>
+    public IReadOnlyList<string> Touches { get; init; } = [];
 }
 
 /// <summary>A plan as the Planner would now write it.</summary>
@@ -20,6 +28,7 @@ public sealed record AuthoredStep
 /// what was already accepted costs nothing worth saving — and incremental admission is more code that
 /// can miss an interaction between a step that changed and one that did not.
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record AuthoredPlan
 {
     /// <summary>What the plan as a whole now asks for.</summary>
@@ -37,10 +46,10 @@ public sealed record AuthoredPlan
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The seat R2 named and nothing filled.</b> A Supervisor may replace a contract; only this may
+/// <b>The seat that decides which steps there are.</b> A Supervisor may replace a contract; only this may
 /// decide which steps there are. It is reached when the Supervisor has nothing to offer — which is a
 /// statement about the <em>shape</em> of the plan, made by the one role that has seen the halt, the
-/// tools and the tree (R25).
+/// tools and the tree.
 /// </para>
 /// <para>
 /// <b>It is told what was refused.</b> Everything the Supervisor tried and every reason it could not
@@ -52,10 +61,12 @@ public sealed record AuthoredPlan
 /// stands.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public delegate Task<AuthoredPlan?> PlanAuthor(
     PlanCoordination coordination, IReadOnlyList<string> refused, CancellationToken ct);
 
 /// <summary>The Planner re-authored the plan, and this is what it wrote.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanReauthored : PlanEvent
 {
     /// <summary>The steps the plan now has.</summary>
@@ -72,6 +83,7 @@ public sealed record PlanReauthored : PlanEvent
 }
 
 /// <summary>The Planner was asked to re-author the plan and would not.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed record PlanNotReauthored : PlanEvent
 {
     /// <summary>Why nothing was written — a refusal from admission, or the Planner's own answer.</summary>
@@ -88,11 +100,12 @@ public sealed record PlanNotReauthored : PlanEvent
 /// because a person choosing is the answer and this is what happens when there was nothing to choose.
 /// </para>
 /// <para>
-/// <b>What it may not do is un-abandon.</b> Work somebody gave up stays given up: R10 in its narrowest
-/// form, and it holds by construction — a re-listed node keeps the decision recorded on it, and one
-/// left out is dropped rather than revived.
+/// <b>What it may not do is un-abandon.</b> Work somebody gave up stays given up, and it holds by
+/// construction — a re-listed node keeps the decision recorded on it, and one left out is dropped
+/// rather than revived.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanAuthorJob<TState>(
     string name,
     PlanAuthor author,
@@ -168,7 +181,7 @@ public sealed class PlanAuthorJob<TState>(
 
         // The halt is answered: the plan is different now, and the next pass runs it. No Decision to
         // record, because the re-ruling has already been applied and a Replan that claimed to carry
-        // one would be a second copy of something already in the tree — R30's "an answer arrives,
+        // one would be a second copy of something already in the tree — "an answer arrives,
         // plan unchanged" is the absence of a verb, not one more, and clearing HaltedAt is what tells
         // the topology's routing to fall through to the plan rather than reading this as stuck.
         // The applied tree goes back into the coordination. The next pass would reload it from

@@ -1,10 +1,13 @@
+using Ananke.Orchestration;
 using Ananke.Orchestration.Planning;
 using Ananke.Orchestration.Streaming;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Ananke.Design;
 
 /// <summary>Lines a narrator adds only when asked to.</summary>
 [Flags]
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public enum PlanNarratorLines
 {
     /// <summary>The narration a run always gets.</summary>
@@ -52,6 +55,7 @@ public enum PlanNarratorLines
 /// Lines that are off by default: a run that narrated every tool call and every gate it cleared would
 /// bury the events worth reading. A log kept beside the console usually asks for both.
 /// </param>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PlanNarrator(int width = 150, PlanNarratorLines lines = PlanNarratorLines.None)
 {
     private PlanNodeStarted? _running;
@@ -175,6 +179,9 @@ public sealed class PlanNarrator(int width = 150, PlanNarratorLines lines = Plan
                     $"   supervisor asked about '{offered.NodeId}' (version {offered.PlanVersion}): "
                     + Short(offered.HaltReason ?? "nothing recorded why"));
 
+                if (!string.IsNullOrWhiteSpace(offered.Summary))
+                    offer = Join(offer, $"     says: {Short(offered.Summary)}");
+
                 foreach (var refused in offered.Discarded)
                     offer = Join(offer, $"     refused: {Short(refused)}");
 
@@ -203,13 +210,16 @@ public sealed class PlanNarrator(int width = 150, PlanNarratorLines lines = Plan
 
             // Not flushed: a tool call happens while a node is running, so the node's own line still
             // belongs after the calls it made.
+            // Without content, the call is told by its length alone.
             case AgentToolCalled called when lines.HasFlag(PlanNarratorLines.ToolCalls):
-                var result = called.ResultLength > called.Result.Length
-                    ? $"{called.Result} … ({called.ResultLength} characters)"
-                    : called.Result;
+                var arguments = called.Arguments is null ? "" : $" {called.Arguments}";
+                var result = called.Result is null
+                    ? (called.IsError ? "error, " : "") + $"{called.ResultLength} characters"
+                    : (called.IsError ? "error: " : "") + (called.ResultLength > called.Result.Length
+                        ? $"{called.Result} … ({called.ResultLength} characters)"
+                        : called.Result);
 
-                return $"      tool {called.AgentName}: {called.ToolName} {called.Arguments} → "
-                    + (called.IsError ? $"error: {result}" : result);
+                return $"      tool {called.AgentName}: {called.ToolName}{arguments} → {result}";
 
             default:
                 // Including a ruling that passed: a run that narrated every gate it cleared would
@@ -276,6 +286,7 @@ public sealed class PlanNarrator(int width = 150, PlanNarratorLines lines = Plan
 }
 
 /// <summary>Reading a supervised run as text.</summary>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class PlanNarrationExtensions
 {
     /// <summary>

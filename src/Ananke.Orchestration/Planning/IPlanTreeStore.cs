@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -20,6 +22,7 @@ namespace Ananke.Orchestration.Planning;
 /// Execution is sequential, so implementations may assume a single writer per plan.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public interface IPlanTreeStore
 {
     /// <summary>Persists or overwrites the tree for <see cref="PlanTree.PlanId"/>.</summary>

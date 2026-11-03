@@ -26,7 +26,8 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
     private readonly Action<string>? _onInfo;
     private CancellationTokenSource? _cts;
     private Task _processingTask = Task.CompletedTask;
-    private bool _disposed;
+    // An int so concurrent disposals claim it atomically; only the first one disposes.
+    private int _disposed;
 
     /// <summary>
     /// Creates a new background processor.
@@ -123,8 +124,7 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
         _queue.Writer.TryComplete();
 
@@ -160,7 +160,8 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
     private readonly Action<string>? _onInfo;
     private CancellationTokenSource? _cts;
     private Task _processingTask = Task.CompletedTask;
-    private bool _disposed;
+    // An int so concurrent disposals claim it atomically; only the first one disposes.
+    private int _disposed;
 
     /// <summary>
     /// Creates a new typed-action background processor.
@@ -252,8 +253,7 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
         _queue.Writer.TryComplete();
 

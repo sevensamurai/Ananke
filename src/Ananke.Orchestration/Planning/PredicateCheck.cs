@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Planning;
 
 /// <summary>
@@ -17,6 +19,7 @@ namespace Ananke.Orchestration.Planning;
 /// that authority is worse than no check at all.
 /// </para>
 /// </remarks>
+[Experimental(ExperimentalApis.PlanTier, Message = ExperimentalApis.PlanTierMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PredicateCheck : IDeterministicCheck
 {
     private readonly HashSet<string> _criteria;

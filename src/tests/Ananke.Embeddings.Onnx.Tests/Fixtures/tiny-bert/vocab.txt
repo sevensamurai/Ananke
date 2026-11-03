@@ -1,0 +1,13 @@
+[PAD]
+[UNK]
+[CLS]
+[SEP]
+core
+.
+identity
+is
+built
+on
+open
+##iddict
+[MASK]

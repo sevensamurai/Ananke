@@ -11,7 +11,8 @@ public sealed record A2AAgentModelOptions
 
     /// <summary>
     /// Optional <see cref="HttpClient"/> instance for making A2A requests.
-    /// When <c>null</c>, a new client is created internally.
+    /// When <c>null</c>, a shared client that retries HTTP 429 (<see cref="RateLimitRetryHandler"/>)
+    /// is used. A client given here is used as it is: add the handler to retry a 429 through it.
     /// </summary>
     public HttpClient? HttpClient { get; init; }
 

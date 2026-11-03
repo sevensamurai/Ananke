@@ -23,11 +23,15 @@ namespace Ananke.Organics.Topology;
 /// Optional routing-affinity tracker. When supplied, learned routing weights
 /// are projected as <c>routed_to</c> edges with <see cref="EdgeProvenance.Inferred"/>.
 /// </param>
+/// <param name="clock">Clock that stamps each edge's <see cref="GraphEdge.ObservedAt"/>. Defaults to <see cref="TimeProvider.System"/>.</param>
 public sealed class ColonyGraphBuilder(
     ICapabilityMap capabilityMap,
     ILineageStore lineageStore,
-    RoutingAffinityTracker? affinityTracker = null)
+    RoutingAffinityTracker? affinityTracker = null,
+    TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     // ── Node-ID helpers ──────────────────────────────────────────────
 
     internal static string CellId(string cellId) => $"cell:{cellId}";
@@ -45,14 +49,15 @@ public sealed class ColonyGraphBuilder(
     {
         ArgumentNullException.ThrowIfNull(graph);
 
-        await AddCapabilityNodesAsync(graph, ct).ConfigureAwait(false);
-        await AddLineageEdgesAsync(graph, ct).ConfigureAwait(false);
-        await AddRoutingEdgesAsync(graph, ct).ConfigureAwait(false);
+        var observedAt = _clock.GetUtcNow();
+        await AddCapabilityNodesAsync(graph, observedAt, ct).ConfigureAwait(false);
+        await AddLineageEdgesAsync(graph, observedAt, ct).ConfigureAwait(false);
+        await AddRoutingEdgesAsync(graph, observedAt, ct).ConfigureAwait(false);
     }
 
     // ── Private helpers ──────────────────────────────────────────────
 
-    private async Task AddCapabilityNodesAsync(IKnowledgeGraph graph, CancellationToken ct)
+    private async Task AddCapabilityNodesAsync(IKnowledgeGraph graph, DateTimeOffset observedAt, CancellationToken ct)
     {
         var capabilities = capabilityMap.DiscoverAll();
 
@@ -85,6 +90,7 @@ public sealed class ColonyGraphBuilder(
                 ToId = DomainId(cap.Domain),
                 Relation = "serves",
                 Provenance = EdgeProvenance.Extracted,
+                ObservedAt = observedAt,
                 Properties = new Dictionary<string, string> { ["source"] = "capability_map" }
             }, ct).ConfigureAwait(false);
 
@@ -112,13 +118,14 @@ public sealed class ColonyGraphBuilder(
                     ToId = toolNodeId,
                     Relation = "uses",
                     Provenance = EdgeProvenance.Extracted,
+                    ObservedAt = observedAt,
                     Properties = new Dictionary<string, string> { ["source"] = "capability_map" }
                 }, ct).ConfigureAwait(false);
             }
         }
     }
 
-    private async Task AddLineageEdgesAsync(IKnowledgeGraph graph, CancellationToken ct)
+    private async Task AddLineageEdgesAsync(IKnowledgeGraph graph, DateTimeOffset observedAt, CancellationToken ct)
     {
         // Collect all cells we know about from generation 0 upward.
         // We iterate until an empty generation to avoid infinite loops.
@@ -157,6 +164,7 @@ public sealed class ColonyGraphBuilder(
                         ToId = CellId(lineage.ParentCellId),
                         Relation = "descended_from",
                         Provenance = EdgeProvenance.Extracted,
+                        ObservedAt = observedAt,
                         Properties = new Dictionary<string, string>
                         {
                             ["source"] = "lineage_store",
@@ -170,7 +178,7 @@ public sealed class ColonyGraphBuilder(
         }
     }
 
-    private async Task AddRoutingEdgesAsync(IKnowledgeGraph graph, CancellationToken ct)
+    private async Task AddRoutingEdgesAsync(IKnowledgeGraph graph, DateTimeOffset observedAt, CancellationToken ct)
     {
         if (affinityTracker is null) return;
 
@@ -199,6 +207,7 @@ public sealed class ColonyGraphBuilder(
                 ToId = CellId(cellName),
                 Relation = "routed_to",
                 Provenance = EdgeProvenance.Inferred,
+                ObservedAt = observedAt,
                 Weight = Math.Max(0f, meanReward),
                 Properties = new Dictionary<string, string>
                 {

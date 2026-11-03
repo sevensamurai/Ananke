@@ -20,7 +20,9 @@ namespace Ananke.Qdrant;
 /// The original text is stored in a <c>_text</c> payload field and returned with search results.
 /// </para>
 /// </remarks>
-public sealed class QdrantKnowledgeStore : IKnowledgeStore
+#pragma warning disable ANNKEEXP004 // implements the experimental listing
+public sealed class QdrantKnowledgeStore : IListableKnowledgeStore
+#pragma warning restore ANNKEEXP004
 {
     private const string TextPayloadKey = "_text";
 
@@ -65,24 +67,33 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
         string query, SearchOptions? options = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        await EnsureCollectionAsync(ct).ConfigureAwait(false);
-
         options ??= new SearchOptions();
+        if (options.Mode != SearchMode.Dense)
+        {
+            throw new NotSupportedException(
+                $"QdrantKnowledgeStore searches by embedding only; SearchMode.{options.Mode} is not supported.");
+        }
+
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
         var queryEmbedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
         var filter = BuildFilter(options.Filter);
 
-        var results = await _client.SearchAsync(
+        var results = await _client.QueryAsync(
             collectionName: _collectionName,
-            vector: queryEmbedding,
+            query: queryEmbedding.ToArray(),
             filter: filter,
-            limit: (ulong)options.TopK,
+#pragma warning disable ANNKEEXP004 // limits per source, an experimental option
+            limit: (ulong)options.Candidates(),
+#pragma warning restore ANNKEEXP004
             scoreThreshold: options.ScoreThreshold,
             payloadSelector: true,
             cancellationToken: ct).ConfigureAwait(false);
 
+#pragma warning disable ANNKEEXP004 // limits per source, an experimental option
         return results
             .Select(MapScoredPoint)
-            .ToList();
+            .LimitPerSource(options);
+#pragma warning restore ANNKEEXP004
     }
 
     /// <inheritdoc />
@@ -140,6 +151,33 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
         await _client.DeleteAsync(_collectionName, qdrantFilter, cancellationToken: ct).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    /// <remarks>Qdrant scrolls by point id, which is derived from the chunk's id, so that is the order.</remarks>
+    public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentOutOfRangeException.ThrowIfNegative(limit);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
+
+        var listed = new List<KnowledgeChunk>();
+        PointId? offset = null;
+        while (listed.Count < limit)
+        {
+            var page = await _client.ScrollAsync(
+                _collectionName,
+                filter: BuildFilter(filter),
+                limit: (uint)Math.Min(256, limit - listed.Count),
+                offset: offset,
+                payloadSelector: true,
+                cancellationToken: ct).ConfigureAwait(false);
+            listed.AddRange(page.Result.Select(p => MapPayload(p.Id, p.Payload, 0f)));
+            if (page.NextPageOffset is null || page.Result.Count == 0)
+                break;
+            offset = page.NextPageOffset;
+        }
+        return listed;
+    }
+
     private async Task EnsureCollectionAsync(CancellationToken ct)
     {
         if (_initialized) return;
@@ -185,12 +223,14 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
         return new Filter { Must = { conditions } };
     }
 
-    private static KnowledgeChunk MapScoredPoint(ScoredPoint point)
+    private static KnowledgeChunk MapScoredPoint(ScoredPoint point) => MapPayload(point.Id, point.Payload, point.Score);
+
+    private static KnowledgeChunk MapPayload(PointId id, IDictionary<string, Value> payload, float score)
     {
         var metadata = new Dictionary<string, string>();
         var text = string.Empty;
 
-        foreach (var (key, value) in point.Payload)
+        foreach (var (key, value) in payload)
         {
             var stringValue = value.StringValue;
             if (key == TextPayloadKey)
@@ -201,9 +241,9 @@ public sealed class QdrantKnowledgeStore : IKnowledgeStore
 
         return new KnowledgeChunk
         {
-            Id = point.Id.Uuid,
+            Id = id.Uuid,
             Text = text,
-            Score = point.Score,
+            Score = score,
             Metadata = metadata
         };
     }

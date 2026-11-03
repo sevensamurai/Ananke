@@ -18,6 +18,10 @@ namespace Ananke.Orchestration.Agents.Context;
 /// This strategy is stateless and does not modify the original list. A new
 /// list is returned only when compaction is needed.
 /// </para>
+/// <para>
+/// The projection never starts with a tool result: a provider rejects a request where a tool
+/// result's call was dropped, so any orphaned result at the front is dropped along with it.
+/// </para>
 /// </remarks>
 /// <example>
 /// <code>
@@ -101,6 +105,14 @@ public sealed class SlidingWindowContextStrategy : IContextStrategy
         while (total > remaining && dropIndex < messages.Count - 1)
         {
             total -= messageCosts[dropIndex];
+            droppedTokens += messageCosts[dropIndex];
+            dropIndex++;
+        }
+
+        // A tool result kept without the assistant call that produced it is a request no
+        // provider accepts — drop any such orphans left at the front by the cut above.
+        while (dropIndex < messages.Count - 1 && messages[dropIndex].Role == AgentRole.Tool)
+        {
             droppedTokens += messageCosts[dropIndex];
             dropIndex++;
         }

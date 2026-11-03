@@ -22,6 +22,12 @@ public sealed record DivisionOptions
     public TimeSpan HealthConfirmationTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Clock for lineage birth times and the <see cref="HealthConfirmationTimeout"/> deadline.
+    /// Default: <see cref="TimeProvider.System"/>.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>
     /// Trust scale for RNA seeding — inherited knowledge starts at this
     /// fraction of the parent's strength. Default: 0.8.
     /// </summary>

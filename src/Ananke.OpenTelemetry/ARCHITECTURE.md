@@ -7,7 +7,8 @@
 
 Provides `IWorkflowTracer` implementation via OpenTelemetry `ActivitySource`,
 plus helpers for configuring OTLP export and registering a listener-backed
-`IBudgetMeter` that consumes federation token/cost counters.
+`IBudgetMeter` that reads the token and cost counters model calls publish on the
+`Ananke.Orchestration.Usage` meter, per workflow.
 
 ---
 

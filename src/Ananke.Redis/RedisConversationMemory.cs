@@ -74,6 +74,7 @@ public sealed class RedisConversationMemory : IConversationMemory
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to add {Count} message(s) to session {SessionId}", values.Length, sessionId);
+            throw;
         }
     }
 
@@ -95,6 +96,7 @@ public sealed class RedisConversationMemory : IConversationMemory
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to add message to session {SessionId}", sessionId);
+            throw;
         }
     }
 
@@ -113,14 +115,26 @@ public sealed class RedisConversationMemory : IConversationMemory
         }
         catch (Exception ex)
         {
+            // Rethrown: an empty history reads as a new conversation, and the caller would carry on
+            // without anything it had been told.
             _logger.LogError(ex, "Failed to retrieve history for session {SessionId}", sessionId);
-            return [];
+            throw;
         }
 
         var messages = new List<AgentMessage>(values.Length);
         foreach (var value in values)
         {
-            var msg = JsonSerializer.Deserialize<AgentMessage>(value.ToString(), JsonOptions);
+            AgentMessage? msg;
+
+            try
+            {
+                msg = JsonSerializer.Deserialize<AgentMessage>(value.ToString(), JsonOptions);
+            }
+            catch (JsonException)
+            {
+                msg = null;
+            }
+
             if (msg is not null)
                 messages.Add(msg);
             else
@@ -146,6 +160,7 @@ public sealed class RedisConversationMemory : IConversationMemory
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to clear session {SessionId}", sessionId);
+            throw;
         }
     }
 

@@ -18,6 +18,7 @@ public static class TimeDecay
     /// Computes a decay weight in <c>[FloorWeight, 1.0]</c> based on how old
     /// <paramref name="indexedAt"/> is relative to now.
     /// </summary>
+    [Obsolete("Reads the system clock; use the overload that takes now, from a TimeProvider.")]
     public static float ComputeWeight(DateTimeOffset indexedAt, TimeDecayOptions options) =>
         ComputeWeight(indexedAt, DateTimeOffset.UtcNow, options);
 
@@ -44,8 +45,16 @@ public static class TimeDecay
     /// Applies time-decay to a similarity <paramref name="score"/>:
     /// <c>finalScore = score × decayWeight</c>.
     /// </summary>
+    [Obsolete("Reads the system clock; use the overload that takes now, from a TimeProvider.")]
     public static float Apply(float score, DateTimeOffset indexedAt, TimeDecayOptions options) =>
-        score * ComputeWeight(indexedAt, options);
+        score * ComputeWeight(indexedAt, DateTimeOffset.UtcNow, options);
+
+    /// <summary>
+    /// Applies time-decay to a similarity <paramref name="score"/>, measuring age up to
+    /// <paramref name="now"/>: <c>finalScore = score × decayWeight</c>.
+    /// </summary>
+    public static float Apply(float score, DateTimeOffset indexedAt, DateTimeOffset now, TimeDecayOptions options) =>
+        score * ComputeWeight(indexedAt, now, options);
 
     // ln(2) ≈ 0.693147; weight = e^(-ln2 × age / halfLife) → 0.5 at halfLife days.
     private static double ExponentialDecay(double ageDays, double halfLifeDays) =>

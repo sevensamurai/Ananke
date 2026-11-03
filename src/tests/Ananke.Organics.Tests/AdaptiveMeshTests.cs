@@ -3,6 +3,7 @@ using Ananke.Organics.Division;
 using Ananke.Organics.Healing;
 using Ananke.Organics.Kernel.Lineage;
 using Ananke.Organics.Sensing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
 namespace Ananke.Organics.Tests;
@@ -355,6 +356,16 @@ public class AdaptiveMeshTests
     // ══════════════════════════════════════════════════════════════════
     // L5 — Quorum sensing
     // ══════════════════════════════════════════════════════════════════
+
+    [Test]
+    public void InMemoryMeshAggregator_SampledAt_ComesFromTheClock()
+    {
+        var now = new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var agg = new InMemoryMeshAggregator(clock: new FakeTimeProvider(now));
+        agg.Report("a", MetabolicSignal.Healthy);
+
+        agg.CurrentSignal().SampledAt.ShouldBe(now);
+    }
 
     [Test]
     public void InMemoryMeshAggregator_AllHealthy_ZeroStressRatio()
