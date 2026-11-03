@@ -94,11 +94,17 @@ jobs:
             [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
+      - name: NuGet login for nnke (trusted publishing)
+        uses: NuGet/login@v1
+        id: nuget-login-nnke
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Publish nnke tools to NuGet
         # Covers: nnke
         run: |
           for pkg in ./packages/nnke*.nupkg; do
-            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+            [ -f "$pkg" ] && dotnet nuget push "$pkg" --api-key ${{ steps.nuget-login-nnke.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
       - name: Read version from Directory.Build.props
