@@ -1,0 +1,35 @@
+<Project>
+
+  <!-- Two products built from the packages scripts/ci.sh packs, never from src/: this file and
+       Directory.Packages.props stop MSBuild from finding src/'s, so a consumer gets only what a
+       package carries (its dependencies, analyzers and build assets).
+       ci.sh passes AnankeVersion (VersionPrefix in src/Directory.Build.props). .editorconfig
+       here likewise keeps out the repository's own. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Any warning fails the build (a package dragging a dependency downgrade or conflict, or a
+         rule of this repository reaching a product), except ANNKE002, which ZenziqueShaped
+         raises on purpose and ci.sh looks for in the build log. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);ANNKE002</WarningsNotAsErrors>
+
+    <CiRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'artifacts', 'ci'))</CiRoot>
+    <!-- Restored into a cache of their own, never the machine's: a published Ananke package of
+         the same version there would be taken in place of the one just packed, and the one
+         just packed must not land there. ci.sh empties its Ananke packages before each run. -->
+    <RestorePackagesPath>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'artifacts', 'consumer-packages'))</RestorePackagesPath>
+    <RestoreFallbackFolders>clear</RestoreFallbackFolders>
+    <BaseIntermediateOutputPath>$(CiRoot)consumers/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(CiRoot)consumers/$(MSBuildProjectName)/bin/</BaseOutputPath>
+  </PropertyGroup>
+
+  <Target Name="RequireAnankeVersion" BeforeTargets="_GenerateRestoreProjectSpec;Restore;Build">
+    <Error Condition="'$(AnankeVersion)' == ''"
+           Text="Build these through scripts/ci.sh, which passes AnankeVersion." />
+  </Target>
+
+</Project>

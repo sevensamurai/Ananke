@@ -4,9 +4,9 @@ namespace Ananke.Abstractions.Budget;
 /// Instrument and tag names on the <see cref="AnankeSourceNames.OrchestrationUsage"/> meter.
 /// </summary>
 /// <remarks>
-/// Every model call reports its tokens once. A call priced by a cost-resolving router also reports
-/// its cost; a call with no per-call cost reports none, so <see cref="Cost"/> totals only what was
-/// priced per call.
+/// Every model call reports its tokens once. A call priced by a cost-resolving router, or whose
+/// provider reported a cost, also reports that cost once; a call with no per-call cost reports none,
+/// so <see cref="Cost"/> totals only what was priced per call.
 /// </remarks>
 public static class UsageInstrumentNames
 {
@@ -16,7 +16,10 @@ public static class UsageInstrumentNames
     /// <summary>Output tokens a model call produced. A <c>long</c> counter.</summary>
     public const string TokensOut = "ananke.usage.tokens.out";
 
-    /// <summary>A call's cost at its model's rates, in the rates' currency. A <c>double</c> counter.</summary>
+    /// <summary>
+    /// A call's cost at its model's rates, in the rates' currency, or else as its provider reported it, in
+    /// the provider's currency. A <c>double</c> counter.
+    /// </summary>
     public const string Cost = "ananke.usage.cost";
 
     /// <summary>

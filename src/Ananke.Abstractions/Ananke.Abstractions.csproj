@@ -7,9 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Ananke.Abstractions.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Single source of truth for model lifecycle status, read at runtime by ModelLifecycleData
-         and at compile time by Ananke.Analyzers' ANNKE002 (see the AdditionalFiles entry in
-         Ananke.Analyzers.csproj referencing this same file). -->
+         and at compile time by Ananke.Orchestration.Analyzers' ANNKE002/ANNKE003, which embeds this
+         same file (see Ananke.Orchestration.Analyzers.csproj). -->
     <EmbeddedResource Include="Agents\model-lifecycle.json" />
   </ItemGroup>
 

@@ -31,6 +31,7 @@
 
   <Folder Name="/demos/06-interop-and-channels/">
     <Project Path="demos/06-interop-and-channels/AgentToAgentProtocolDemo/AgentToAgentProtocolDemo.csproj" />
+    <Project Path="demos/06-interop-and-channels/FleetDemo/FleetDemo.csproj" />
     <Project Path="demos/06-interop-and-channels/McpServerDemo/McpServerDemo.csproj" />
   </Folder>
 
@@ -49,6 +50,7 @@
     <Project Path="tests/Ananke.OpenTelemetry.Tests/Ananke.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/Ananke.Postgres.Tests/Ananke.Postgres.Tests.csproj" />
     <Project Path="tests/Ananke.Qdrant.Tests/Ananke.Qdrant.Tests.csproj" />
+    <Project Path="tests/Ananke.MQTT.Tests/Ananke.MQTT.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance/Ananke.Orchestration.Conformance.csproj" />
     <Project Path="tests/Ananke.Orchestration.Conformance.Tests/Ananke.Orchestration.Conformance.Tests.csproj" />
     <Project Path="tests/Ananke.Orchestration.Knowledge.Tests/Ananke.Orchestration.Knowledge.Tests.csproj" />
@@ -72,6 +74,7 @@
   <Project Path="Ananke.Abstractions/Ananke.Abstractions.csproj" />
   <Project Path="Ananke.Analyzers/Ananke.Analyzers.csproj" />
   <Project Path="Ananke.Analyzers.CodeFixes/Ananke.Analyzers.CodeFixes.csproj" />
+  <Project Path="Ananke.Orchestration.Analyzers/Ananke.Orchestration.Analyzers.csproj" />
   <Project Path="Ananke.AspNetCore/Ananke.AspNetCore.csproj" Id="99059bd8-4541-421b-85eb-462b95723e85" />
   <Project Path="Ananke.Design/Ananke.Design.csproj" />
   <Project Path="Ananke.Documents/Ananke.Documents.csproj" />

@@ -30,7 +30,7 @@ nnke new workflow MyChat --pattern streaming-chat
 nnke new workflow MyMesh --pattern organic-host
 
 # Scaffold a project from an agentic design pattern (--list to see them all)
-nnke new pattern router MyRouter
+nnke new pattern MyRouter --pattern router
 
 # Validate a manifest file
 nnke validate my-etl.ananke.yml

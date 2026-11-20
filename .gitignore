@@ -81,3 +81,6 @@ secrets.json
 src/demos/DistributedServicesDemo/mosquitto/
 .env
 __pycache__
+
+# Built by scripts/build-search-index.ps1 before each docs deploy
+docs/search-index.json

@@ -1,3 +1,5 @@
+using Ananke.Abstractions;
+
 namespace Ananke.StateMachine.Builder;
 
 /// <summary>
@@ -19,8 +21,8 @@ public class TransitionBuilder<S, T> :
     private T? _currentTransition;
     private S? _currentTargetState;
     private S? _currentConfigState;
-    private Func<Task<bool>>? _currentGuard;
-    private Func<Task<S>>? _currentAction;
+    private Func<IBaseContext, CancellationToken, Task<bool>>? _currentGuard;
+    private Func<IBaseContext, CancellationToken, Task<S>>? _currentAction;
     private bool _isInterrupt;
     private bool _isResume;
 
@@ -73,30 +75,30 @@ public class TransitionBuilder<S, T> :
         return this;
     }
 
-    public ITransitionConfigBuilder<S, T> When(Func<bool> condition)
+    public ITransitionConfigBuilder<S, T> When(Func<IBaseContext, CancellationToken, bool> condition)
     {
-        _currentGuard = () => Task.FromResult(condition());
+        _currentGuard = (context, ct) => Task.FromResult(condition(context, ct));
         return this;
     }
 
-    public ITransitionConfigBuilder<S, T> WhenAsync(Func<Task<bool>> condition)
+    public ITransitionConfigBuilder<S, T> WhenAsync(Func<IBaseContext, CancellationToken, Task<bool>> condition)
     {
         _currentGuard = condition;
         return this;
     }
 
-    public ITransitionConfigBuilder<S, T> WithAction(Func<Task> action)
+    public ITransitionConfigBuilder<S, T> WithAction(Func<IBaseContext, CancellationToken, Task> action)
     {
         var targetState = _currentTargetState!;
-        _currentAction = async () =>
+        _currentAction = async (context, ct) =>
         {
-            await action();
+            await action(context, ct);
             return targetState;
         };
         return this;
     }
 
-    public ITransitionConfigBuilder<S, T> WithAction(Func<Task<S>> action)
+    public ITransitionConfigBuilder<S, T> WithAction(Func<IBaseContext, CancellationToken, Task<S>> action)
     {
         _currentAction = action;
         return this;
@@ -115,7 +117,7 @@ public class TransitionBuilder<S, T> :
         return this;
     }
 
-    public IStateConfigBuilder<S, T> OnEnter(Func<Task> action)
+    public IStateConfigBuilder<S, T> OnEnter(Func<IBaseContext, CancellationToken, Task> action)
     {
         if (_currentConfigState is not null && _stateConfigs.TryGetValue(_currentConfigState, out var config))
         {
@@ -124,7 +126,7 @@ public class TransitionBuilder<S, T> :
         return this;
     }
 
-    public IStateConfigBuilder<S, T> OnExit(Func<Task> action)
+    public IStateConfigBuilder<S, T> OnExit(Func<IBaseContext, CancellationToken, Task> action)
     {
         if (_currentConfigState is not null && _stateConfigs.TryGetValue(_currentConfigState, out var config))
         {

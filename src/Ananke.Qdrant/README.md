@@ -40,6 +40,10 @@ await processor.ProcessAsync(pdfStream, "application/pdf", "design-patterns.pdf"
 var results = await store.SearchAsync("factory method pattern", new SearchOptions { TopK = 5 });
 ```
 
+Metadata is stored as keyword payload fields. A `KnowledgeFilter` entry matches a point whose field equals its value,
+and a key in `KnowledgeFilter.AnyOf` a point whose field is any of its values, in `SearchAsync`, `ListAsync` and
+`DeleteAsync`.
+
 ### Knowledge catalog (document-level discovery + time decay)
 
 The catalog maintains one entry per source document in a separate Qdrant collection (`knowledge_catalog`). Each entry is enriched with LLM-extracted keywords, a category, and a summary — enabling agents to *discover what's in the knowledge base* before deep-searching individual chunks.
@@ -96,6 +100,12 @@ This enables **two-phase discovery**: the agent first discovers which documents 
 | `QdrantKnowledgeCatalog` | `knowledge_catalog` (configurable) | Document-level summaries for catalog discovery |
 
 Both collections are created automatically on first use with cosine distance.
+
+**Lists and browsing are ordered by Qdrant.** `QdrantKnowledgeStore.ListAsync` with a `KnowledgeDateOrder` creates a
+datetime payload index on the order's key the first time it is asked, scrolls with `order_by` on it, newest first, and
+adds the points without a date after; without an order it scrolls by point id. `QdrantKnowledgeCatalog` creates an
+integer payload index on `effective_at` the first time it browses by it, on a collection made earlier too, and `BrowseAsync` scrolls with `order_by` on
+`indexed_at` or `effective_at`, so with more entries than its limit it returns the newest.
 
 ## Configuration
 

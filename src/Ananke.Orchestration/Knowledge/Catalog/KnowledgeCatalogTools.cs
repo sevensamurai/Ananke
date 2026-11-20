@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Ananke.Orchestration.Knowledge.Documents;
 using Ananke.Orchestration.Tools;
 
 namespace Ananke.Orchestration.Knowledge.Catalog;
@@ -10,6 +12,9 @@ namespace Ananke.Orchestration.Knowledge.Catalog;
 /// </summary>
 public static class KnowledgeCatalogTools
 {
+    /// <summary>How many documents <c>list_documents</c> shows at most, the newest.</summary>
+    private const int MaxListedDocuments = 200;
+
     /// <summary>
     /// Creates a <see cref="ToolKit"/> with <c>browse_catalog</c>, <c>discover_sources</c> and <c>list_documents</c>
     /// tools. <c>list_documents</c> lists every document whose header field has a value (every plan, with its status),
@@ -79,11 +84,61 @@ public static class KnowledgeCatalogTools
                             Field = args.Get("field"),
                             Value = args.Get("value"),
                             Order = CatalogBrowseOrder.EffectiveAt,
-                            Limit = 200,
+                            // One more than is shown, to tell whether more match.
+                            Limit = MaxListedDocuments + 1,
                         }, ct);
                         return FormatListResults(entries);
                     }));
     }
+
+    /// <summary>
+    /// Creates a <see cref="ToolKit"/> with <c>list_linked_documents</c>: given a document's source id, the documents it
+    /// links to, newest first, each with its date and what supersedes it, read from the links
+    /// <see cref="DocumentProcessor.Hyperlinks"/> stored, with no model call.
+    /// </summary>
+    /// <param name="reader">Reads the stored links, and the catalog when it was given one.</param>
+    /// <param name="name">Name for the returned <see cref="ToolKit"/>. Default is <c>"document_links"</c>.</param>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public static ToolKit CreateLinks(LinkedDocumentReader reader, string name = "document_links")
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+
+        return new ToolKit(name).AddTool(
+            "list_linked_documents",
+            "List the documents a document links to, newest first, with each one's date and what supersedes it. Use " +
+            "this when a question asks what a document builds on, cites or follows from.",
+            tool => tool
+                .Param("source", "The source id of the document whose links to list, as search results name it")
+                .OnExecute(async (args, ct) =>
+                {
+                    var source = args.Get("source");
+                    return FormatLinkedDocuments(source, await reader.ListAsync(source, ct: ct));
+                }));
+    }
+
+#pragma warning disable ANNKEEXP004 // LinkedDocument is experimental, as is the tool that lists it.
+    private static string FormatLinkedDocuments(string source, IReadOnlyList<LinkedDocument> linked)
+    {
+        if (linked.Count == 0)
+            return $"No links from {source}.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"{source} links to {linked.Count} document(s), newest first:");
+        foreach (var document in linked)
+        {
+            sb.Append($"• {document.Source}");
+            if ((document.EffectiveAt ?? document.IndexedAt) is { } date)
+                sb.Append($" — {date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}");
+            if (document.SupersededBy is not null)
+                sb.Append($" — Superseded by: {document.SupersededBy}");
+            if (!document.Indexed)
+                sb.Append(" — not indexed");
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+#pragma warning restore ANNKEEXP004
 
     private static string FormatListResults(IReadOnlyList<CatalogEntry> entries)
     {
@@ -91,8 +146,10 @@ public static class KnowledgeCatalogTools
             return "No document has that field and value.";
 
         var sb = new StringBuilder();
-        sb.AppendLine($"{entries.Count} document(s), newest first:");
-        foreach (var entry in entries)
+        sb.AppendLine(entries.Count > MaxListedDocuments
+            ? $"More than {MaxListedDocuments} documents match; the newest {MaxListedDocuments}:"
+            : $"{entries.Count} document(s), newest first:");
+        foreach (var entry in entries.Take(MaxListedDocuments))
         {
             var date = (entry.EffectiveAt ?? entry.IndexedAt).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
             var fields = string.Join(" · ", entry.Fields.Select(f => $"{f.Key}: {f.Value}"));

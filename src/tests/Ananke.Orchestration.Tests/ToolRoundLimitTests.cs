@@ -435,6 +435,78 @@ public class ToolRoundLimitTests
         strategy.LastSeen.Single(m => m.ToolCallId == "c2").Content.ShouldBe("seen");
     }
 
+    // At the round limit a call that ends the turn still runs, and its answer — ~10,000 estimated
+    // tokens here — is in the history only for the final call, so only that call's check can catch it.
+
+    [Test]
+    public async Task AgentJob_ToolRoundLimit_FinalCallOverTheContextLimit_ThrowsBeforeTheCall()
+    {
+        var model = OverflowingAtTheLimit();
+
+        var job = AgentJobFactory.Create<Turn>("limited", model)
+            .WithPrompt(s => s.Input)
+            .WithTools(BulkyProposal())
+            .WithMaxToolRounds(1)
+            .WithContextLimit(7_000)
+            .MapResult((s, r) => s with { Output = r })
+            .Build();
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(() => job.ExecuteAsync(new Turn("go")));
+
+        ex.Message.ShouldContain("exceeds the configured limit");
+        // The final call is asked not to call tools: the message names no tool round for it.
+        ex.Message.ShouldContain("before the model call");
+        model.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AgentJob_ToolRoundLimit_PreCompaction_MeasuresTheRawHistoryOfTheFinalCall()
+    {
+        var model = OverflowingAtTheLimit();
+
+        var job = AgentJobFactory.Create<Turn>("limited", model)
+            .WithPrompt(s => s.Input)
+            .WithTools(BulkyProposal())
+            .WithMaxToolRounds(1)
+            .WithContextLimit(7_000, ContextLimitMode.PreCompaction)
+            .WithContextStrategy(new ShowsOnlyUserMessages())
+            .MapResult((s, r) => s with { Output = r })
+            .Build();
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(() => job.ExecuteAsync(new Turn("go")));
+
+        ex.Message.ShouldContain("exceeds the configured limit");
+        model.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AgentJob_ToolRoundLimit_PostCompaction_MeasuresWhatTheFinalCallSends()
+    {
+        var model = OverflowingAtTheLimit();
+
+        var result = await AgentJobFactory.Create<Turn>("limited", model)
+            .WithPrompt(s => s.Input)
+            .WithTools(BulkyProposal())
+            .WithMaxToolRounds(1)
+            .WithContextLimit(7_000, ContextLimitMode.PostCompaction)
+            .WithContextStrategy(new ShowsOnlyUserMessages())
+            .MapResult((s, r) => s with { Output = r })
+            .Build()
+            .ExecuteAsync(new Turn("go"));
+
+        result.Output.ShouldBe("done");
+        model.Requests.Count.ShouldBe(3);
+    }
+
+    private static ToolKit BulkyProposal() => new ToolKit("k")
+        .AddTool("look", "Look.", () => ToolResult.Ok("seen"))
+        .AddTool("propose", "Propose.", b => { b.EndsTurn().OnExecute(_ => ToolResult.Ok(new string('x', 40_000))); });
+
+    private static ScriptedAgentModel OverflowingAtTheLimit() => new(
+        ScriptedAgentModel.Call("c1", "look", "{}"),
+        ScriptedAgentModel.Call("c2", "propose", "{}"),
+        ScriptedAgentModel.Say("done"));
+
     /// <summary>Sends the model only the user's messages, and keeps the whole list it was given.</summary>
     private sealed class ShowsOnlyUserMessages : IContextStrategy
     {

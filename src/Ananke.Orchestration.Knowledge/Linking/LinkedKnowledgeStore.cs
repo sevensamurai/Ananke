@@ -113,13 +113,13 @@ public sealed class LinkedKnowledgeStore : IKnowledgeStore
     /// <inheritdoc />
     public async Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
-        // Best-effort link cleanup: when the filter targets a specific chunk ID,
-        // remove its links before deleting from the inner store.
+        // Best-effort link cleanup: when the filter targets specific chunk IDs,
+        // remove their links before deleting from the inner store.
         // Source-level link cleanup is not attempted here because the IKnowledgeStore
         // contract does not support listing chunks by filter without a query.
         // Callers who need full graph cleanup on source deletion should remove links
         // explicitly via IDocumentLinkGraph.RemoveLinksAsync for each known chunk ID.
-        if (filter.TryGetValue("id", out var id))
+        foreach (var id in filter.ValuesOf("id") ?? [])
             await _graph.RemoveLinksAsync(id, ct);
 
         await _inner.DeleteAsync(filter, ct);

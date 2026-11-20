@@ -21,7 +21,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// Creates a <see cref="GeminiAgentModel"/> from an existing <see cref="Client"/>.
     /// </summary>
     /// <param name="client">A configured Google GenAI client.</param>
-    /// <param name="model">Model name (e.g. <c>"gemini-2.5-flash"</c>).</param>
+    /// <param name="model">Model name (e.g. <c>"gemini-3.6-flash"</c>).</param>
     public GeminiAgentModel(Client client, string model)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -34,7 +34,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// Creates a <see cref="GeminiAgentModel"/> for the Gemini Developer API.
     /// </summary>
     /// <param name="apiKey">Google AI API key.</param>
-    /// <param name="model">Model name (e.g. <c>"gemini-2.5-flash"</c>).</param>
+    /// <param name="model">Model name (e.g. <c>"gemini-3.6-flash"</c>).</param>
     /// <param name="endpoint">
     /// Custom API base URL for Gemini-compatible endpoints, or <see langword="null"/> for the
     /// default Gemini Developer API endpoint.
@@ -57,7 +57,7 @@ public sealed class GeminiAgentModel : IStreamingAgentModel
     /// </summary>
     /// <param name="project">Google Cloud project ID.</param>
     /// <param name="location">Google Cloud region (e.g. <c>"us-central1"</c>).</param>
-    /// <param name="model">Model name (e.g. <c>"gemini-2.5-flash"</c>).</param>
+    /// <param name="model">Model name (e.g. <c>"gemini-3.6-flash"</c>).</param>
     public static GeminiAgentModel CreateAgentPlatform(string project, string location, string model) =>
         // The SDK's own parameter is still called vertexAI; that name is Google's, not ours.
         // See — it is left alone deliberately rather than papered over.

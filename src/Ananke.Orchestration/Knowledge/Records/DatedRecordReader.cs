@@ -57,10 +57,11 @@ public sealed partial class DatedRecordReader<TRecord>
     }
 
     /// <summary>
-    /// Every record whose metadata matches <paramref name="filter"/> (a property kept by
+    /// The newest <paramref name="limit"/> records whose metadata matches <paramref name="filter"/> (a property kept by
     /// <see cref="DatedRecordOptions{TRecord}.Fields"/>, a source), dated <paramref name="since"/> or later when given,
-    /// newest first and labelled as <see cref="SearchAsync"/> labels them. At most <paramref name="limit"/> are read
-    /// from the store.
+    /// newest first and labelled as <see cref="SearchAsync"/> labels them. The store orders them by date and cuts them
+    /// at the limit; records without a date come last, and are left out when <paramref name="since"/> is given. A list
+    /// of <paramref name="limit"/> records may have left more out.
     /// </summary>
     /// <exception cref="NotSupportedException">The records' store can't list (<see cref="IListableKnowledgeStore"/>).</exception>
     public async Task<IReadOnlyList<DatedRecord<TRecord>>> ListAsync(
@@ -69,9 +70,10 @@ public sealed partial class DatedRecordReader<TRecord>
         if (_records is not IListableKnowledgeStore listable)
             throw new NotSupportedException($"The records' store ({_records.GetType().Name}) can't list.");
 
-        var chunks = await listable.ListAsync(filter ?? new KnowledgeFilter(), limit, ct).ConfigureAwait(false);
-        var records = await LabelAsync(chunks, ct).ConfigureAwait(false);
-        return since is { } from ? [.. records.Where(r => r.EffectiveAt >= from)] : records;
+        var chunks = await listable.ListAsync(
+            filter ?? new KnowledgeFilter(), limit, new KnowledgeDateOrder(DocumentHeaderOptions.EffectiveAtKey, since), ct)
+            .ConfigureAwait(false);
+        return await LabelAsync(chunks, ct).ConfigureAwait(false);
     }
 
     /// <summary>Records from <paramref name="chunks"/>, newest first, each labelled with what replaced it.</summary>

@@ -29,8 +29,9 @@ public sealed record ModelLifecycleEntry(string Id, ModelStatus Status, string? 
 /// <list type="bullet">
 ///   <item>At runtime, this class reads it as an embedded resource (see the
 ///   <c>EmbeddedResource</c> item in <c>Ananke.Abstractions.csproj</c>).</item>
-///   <item>At analyzer compile time, <c>Ananke.Analyzers</c> reads the same file via an
-///   <c>AdditionalFiles</c> item pointing at this exact path.</item>
+///   <item>At analyzer compile time, <c>Ananke.Orchestration.Analyzers</c> reads the copy of
+///   this file embedded in its assembly, or a file of the same name given as
+///   <c>AdditionalFiles</c> (in this repository, this exact path).</item>
 /// </list>
 /// </remarks>
 public static class ModelLifecycleData

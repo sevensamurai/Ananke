@@ -1,9 +1,6 @@
 name: Build and Deployment Pipeline
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -13,20 +10,16 @@ permissions:
   contents: write
 
 jobs:
+  # Pull requests get no job here: card verify (scripts/ci.sh) gates a merge. This job runs the
+  # same script before publish, so the two never list different checks.
   build:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      - name: Check encoding (no UTF-8 BOM)
-        shell: pwsh
-        run: pwsh scripts/fix-encoding.ps1 -Check
-
-      - name: Check for internal document references in shipped files
-        run: bash scripts/check-internal-refs.sh
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -35,31 +28,15 @@ jobs:
           # anything below SDK 10.0.302 fails every project with CS9057.
           global-json-file: global.json
 
-      - name: Restore dependencies
-        run: dotnet restore src/Ananke.slnx
-
-      - name: Build
-        run: dotnet build src/Ananke.slnx --configuration Release
-
-      - name: Test
-        run: dotnet test src/Ananke.slnx --configuration Release --no-build --verbosity normal -- RunConfiguration.FailFast=true
-
-      - name: Check release notes
-        run: |
-          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' src/Directory.Build.props)
-          NOTES="releases/v${VERSION}.md"
-          if [ ! -f "$NOTES" ]; then
-            echo "::error::Version is $VERSION but $NOTES is missing. Add release notes for this version (see releases/TEMPLATE.md)."
-            exit 1
-          fi
-          echo "✓ Release notes found: $NOTES"
+      - name: Check, build and test
+        run: bash scripts/ci.sh
 
   publish:
+    needs: build
     # Packages, tags and releases come from the public repo only. Forks build and test,
     # but must never push to NuGet or cut a release under their own name.
     if: >-
-      github.repository == 'sevensamurai/Ananke' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      github.repository == 'sevensamurai/Ananke'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -116,17 +93,9 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           NOTES="releases/v${VERSION}.md"
+          # The build job fails when $NOTES is missing, so it is always there.
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists — skipping release."
-          elif [ ! -f "$NOTES" ]; then
-            echo "::warning::$NOTES not found — creating release with default notes."
-            git tag "$TAG"
-            git push origin "$TAG"
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --notes "Released version $VERSION to NuGet." \
-              --latest \
-              ./packages/*.nupkg ./packages/*.snupkg
           else
             git tag "$TAG"
             git push origin "$TAG"

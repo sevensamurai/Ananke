@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);ANNKEEXP004</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,10 +14,13 @@
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="Shouldly" />
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Qdrant\Ananke.Qdrant.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <Compile Include="..\Ananke.Orchestration.Tests\DatedRecordListingCases.cs" Link="DatedRecordListingCases.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -168,6 +168,25 @@ public class LinkedKnowledgeStoreTests
     }
 
     [Test]
+    public async Task DeleteAsync_WithSeveralIds_RemovesEachOnesLinksAndPassesTheFilterOn()
+    {
+        await _graph.AddLinkAsync("a", "b", "extends");
+        await _graph.AddLinkAsync("c", "b", "extends");
+        await _graph.AddLinkAsync("d", "b", "extends");
+        var store = new LinkedKnowledgeStore(_inner, _graph);
+#pragma warning disable ANNKEEXP004 // KnowledgeFilter.AnyOf is experimental
+        var filter = new KnowledgeFilter { AnyOf = { ["id"] = ["a", "c"] } };
+#pragma warning restore ANNKEEXP004
+
+        await store.DeleteAsync(filter);
+
+        (await _graph.GetLinksAsync("a")).ShouldBeEmpty();
+        (await _graph.GetLinksAsync("c")).ShouldBeEmpty();
+        (await _graph.GetLinksAsync("d")).Count.ShouldBe(1);
+        _inner.DeleteCalls.ShouldBe([filter]);
+    }
+
+    [Test]
     public async Task DeleteAsync_WithoutIdFilter_OnlyDeletesFromInner_LinksUntouched()
     {
         await _graph.AddLinkAsync("a", "b", "extends");

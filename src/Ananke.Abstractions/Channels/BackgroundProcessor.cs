@@ -14,20 +14,19 @@ namespace Ananke.Abstractions.Channels;
 /// </para>
 /// <para>
 /// Worker exceptions are reported via the optional <c>onError</c> callback
-/// and do not stop the processing loop. Cancellation and disposal are handled gracefully.
+/// and do not stop the processing loop. An exception thrown by <c>onError</c> itself is
+/// reported via <c>onInfo</c>, and the loop goes on.
+/// </para>
+/// <para>
+/// Two ways to stop: <see cref="CompleteAsync"/> refuses new items and returns once every
+/// queued item was handled; <see cref="DisposeAsync"/> cancels the loop and drops what is
+/// still queued.
 /// </para>
 /// </remarks>
 /// <typeparam name="T">The item type to process.</typeparam>
 public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
 {
-    private readonly IBackgroundWorker<T> _worker;
-    private readonly Channel<T> _queue;
-    private readonly Action<Exception, T?>? _onError;
-    private readonly Action<string>? _onInfo;
-    private CancellationTokenSource? _cts;
-    private Task _processingTask = Task.CompletedTask;
-    // An int so concurrent disposals claim it atomically; only the first one disposes.
-    private int _disposed;
+    private readonly BackgroundLoop<T> _loop;
 
     /// <summary>
     /// Creates a new background processor.
@@ -42,7 +41,8 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
     /// Receives the exception and the item that caused it (if available).
     /// </param>
     /// <param name="onInfo">
-    /// Optional callback for informational messages (e.g., shutdown notifications).
+    /// Optional callback for informational messages (e.g., shutdown notifications, or an
+    /// exception thrown by <paramref name="onError"/>).
     /// </param>
     public BackgroundProcessor(
         IBackgroundWorker<T> worker,
@@ -51,91 +51,73 @@ public sealed class BackgroundProcessor<T> : IAsyncDisposable where T : class
         Action<string>? onInfo = null)
     {
         ArgumentNullException.ThrowIfNull(worker);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(capacity, 0);
 
-        _worker = worker;
-        _onError = onError;
-        _onInfo = onInfo;
-        _queue = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
-        {
-            SingleWriter = false,
-            SingleReader = true,
-            FullMode = BoundedChannelFullMode.Wait
-        });
+        _loop = new BackgroundLoop<T>(
+            typeof(BackgroundProcessor<T>),
+            worker.HandleAsync,
+            capacity,
+            onError,
+            onInfo);
     }
 
     /// <summary>
-    /// Starts the background processing loop. Safe to call multiple times — subsequent calls are no-ops.
+    /// Starts the background processing loop. Safe to call more than once, from any thread —
+    /// only the first call starts a loop.
     /// </summary>
     /// <param name="ct">
     /// Cancellation token that stops the processing loop. Linked internally so that
     /// <see cref="DisposeAsync"/> also cancels.
     /// </param>
-    public void Start(CancellationToken ct = default)
-    {
-        if (_cts is not null) return;
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _processingTask = Task.Run(() => ProcessAsync(_cts.Token), _cts.Token);
-    }
+    /// <exception cref="ObjectDisposedException">The processor was disposed.</exception>
+    public void Start(CancellationToken ct = default) => _loop.Start(ct);
 
     /// <summary>
     /// Whether the processing loop has been started and has not yet completed.
     /// </summary>
-    public bool IsRunning => _cts is not null && !_processingTask.IsCompleted;
+    public bool IsRunning => _loop.IsRunning;
 
     /// <summary>
     /// Enqueues an item for processing. Applies backpressure when the internal buffer is full.
     /// </summary>
-    public ValueTask EnqueueAsync(T item, CancellationToken ct = default)
-        => _queue.Writer.WriteAsync(item, ct);
+    /// <exception cref="ChannelClosedException">
+    /// <see cref="CompleteAsync"/> or <see cref="DisposeAsync"/> was called.
+    /// </exception>
+    public ValueTask EnqueueAsync(T item, CancellationToken ct = default) => _loop.EnqueueAsync(item, ct);
 
     /// <summary>
-    /// Tries to enqueue an item without waiting. Returns <see langword="false"/> if the buffer is full.
+    /// Tries to enqueue an item without waiting. Returns <see langword="false"/> if the buffer is full,
+    /// or once <see cref="CompleteAsync"/> or <see cref="DisposeAsync"/> was called.
     /// </summary>
-    public bool TryEnqueue(T item)
-        => _queue.Writer.TryWrite(item);
+    public bool TryEnqueue(T item) => _loop.TryEnqueue(item);
 
-    private async Task ProcessAsync(CancellationToken ct)
-    {
-        try
-        {
-            await foreach (var item in _queue.Reader.ReadAllAsync(ct).ConfigureAwait(false))
-            {
-                try
-                {
-                    await _worker.HandleAsync(item, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _onError?.Invoke(ex, item);
-                }
-            }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _onInfo?.Invoke("Processing stopped (cancellation requested)");
-        }
-    }
+    /// <summary>
+    /// Refuses further items and returns once every item already queued was handled.
+    /// Starts the loop if it was not started, so items queued before are handled too.
+    /// </summary>
+    /// <param name="ct">
+    /// Stops waiting; the loop goes on with the queue. To drop what is left, call <see cref="DisposeAsync"/>.
+    /// </param>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="ct"/> was cancelled, or the loop was stopped (the token given to <see cref="Start"/>,
+    /// or <see cref="DisposeAsync"/>) before the queue was empty.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The processor was disposed.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Called from the worker, <c>onError</c> or <c>onInfo</c>, or from a task one of them started, while
+    /// the loop runs: it would wait for the loop it runs on. Thrown at the call, not by the returned task.
+    /// </exception>
+    public Task CompleteAsync(CancellationToken ct = default) => _loop.CompleteAsync(ct);
 
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
-
-        _queue.Writer.TryComplete();
-
-        if (_cts is not null)
-        {
-            await _cts.CancelAsync().ConfigureAwait(false);
-            try { await _processingTask.ConfigureAwait(false); }
-            catch { /* ProcessAsync handles its own errors */ }
-            _cts.Dispose();
-        }
-    }
+    /// <summary>
+    /// Refuses further items, cancels the loop and drops the items still queued.
+    /// Use <see cref="CompleteAsync"/> first to handle them. Every call returns once the loop has
+    /// stopped.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Called from the worker, <c>onError</c> or <c>onInfo</c>, or from a task one of them started, while
+    /// the loop runs: it would wait for the loop it runs on. Thrown at the call, not by the returned task.
+    /// </exception>
+    public ValueTask DisposeAsync() => _loop.DisposeAsync();
 }
 
 /// <summary>
@@ -154,14 +136,7 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
     where T : class
     where A : Enum
 {
-    private readonly IBackgroundWorker<T, A> _worker;
-    private readonly Channel<(T Item, A Action)> _queue;
-    private readonly Action<Exception, T?>? _onError;
-    private readonly Action<string>? _onInfo;
-    private CancellationTokenSource? _cts;
-    private Task _processingTask = Task.CompletedTask;
-    // An int so concurrent disposals claim it atomically; only the first one disposes.
-    private int _disposed;
+    private readonly BackgroundLoop<(T Item, A Action)> _loop;
 
     /// <summary>
     /// Creates a new typed-action background processor.
@@ -175,7 +150,8 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
     /// Optional callback invoked when the worker throws a non-cancellation exception.
     /// </param>
     /// <param name="onInfo">
-    /// Optional callback for informational messages (e.g., shutdown notifications).
+    /// Optional callback for informational messages (e.g., shutdown notifications, or an
+    /// exception thrown by <paramref name="onError"/>).
     /// </param>
     public BackgroundProcessor(
         IBackgroundWorker<T, A> worker,
@@ -184,85 +160,39 @@ public sealed class BackgroundProcessor<T, A> : IAsyncDisposable
         Action<string>? onInfo = null)
     {
         ArgumentNullException.ThrowIfNull(worker);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(capacity, 0);
 
-        _worker = worker;
-        _onError = onError;
-        _onInfo = onInfo;
-        _queue = Channel.CreateBounded<(T, A)>(new BoundedChannelOptions(capacity)
-        {
-            SingleWriter = false,
-            SingleReader = true,
-            FullMode = BoundedChannelFullMode.Wait
-        });
+        _loop = new BackgroundLoop<(T Item, A Action)>(
+            typeof(BackgroundProcessor<T, A>),
+            (queued, ct) => worker.HandleAsync(queued.Item, queued.Action, ct),
+            capacity,
+            onError is null ? null : (ex, queued) => onError(ex, queued.Item),
+            onInfo);
     }
 
-    /// <summary>
-    /// Starts the background processing loop. Safe to call multiple times — subsequent calls are no-ops.
-    /// </summary>
-    public void Start(CancellationToken ct = default)
-    {
-        if (_cts is not null) return;
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _processingTask = Task.Run(() => ProcessAsync(_cts.Token), _cts.Token);
-    }
+    /// <inheritdoc cref="BackgroundProcessor{T}.Start"/>
+    public void Start(CancellationToken ct = default) => _loop.Start(ct);
 
-    /// <summary>
-    /// Whether the processing loop has been started and has not yet completed.
-    /// </summary>
-    public bool IsRunning => _cts is not null && !_processingTask.IsCompleted;
+    /// <inheritdoc cref="BackgroundProcessor{T}.IsRunning"/>
+    public bool IsRunning => _loop.IsRunning;
 
     /// <summary>
     /// Enqueues an item with its associated action for processing.
     /// </summary>
+    /// <exception cref="ChannelClosedException">
+    /// <see cref="CompleteAsync"/> or <see cref="DisposeAsync"/> was called.
+    /// </exception>
     public ValueTask EnqueueAsync(T item, A action, CancellationToken ct = default)
-        => _queue.Writer.WriteAsync((item, action), ct);
+        => _loop.EnqueueAsync((item, action), ct);
 
     /// <summary>
-    /// Tries to enqueue an item without waiting. Returns <see langword="false"/> if the buffer is full.
+    /// Tries to enqueue an item without waiting. Returns <see langword="false"/> if the buffer is full,
+    /// or once <see cref="CompleteAsync"/> or <see cref="DisposeAsync"/> was called.
     /// </summary>
-    public bool TryEnqueue(T item, A action)
-        => _queue.Writer.TryWrite((item, action));
+    public bool TryEnqueue(T item, A action) => _loop.TryEnqueue((item, action));
 
-    private async Task ProcessAsync(CancellationToken ct)
-    {
-        try
-        {
-            await foreach (var (item, action) in _queue.Reader.ReadAllAsync(ct).ConfigureAwait(false))
-            {
-                try
-                {
-                    await _worker.HandleAsync(item, action, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _onError?.Invoke(ex, item);
-                }
-            }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _onInfo?.Invoke("Processing stopped (cancellation requested)");
-        }
-    }
+    /// <inheritdoc cref="BackgroundProcessor{T}.CompleteAsync"/>
+    public Task CompleteAsync(CancellationToken ct = default) => _loop.CompleteAsync(ct);
 
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
-
-        _queue.Writer.TryComplete();
-
-        if (_cts is not null)
-        {
-            await _cts.CancelAsync().ConfigureAwait(false);
-            try { await _processingTask.ConfigureAwait(false); }
-            catch { /* ProcessAsync handles its own errors */ }
-            _cts.Dispose();
-        }
-    }
+    /// <inheritdoc cref="BackgroundProcessor{T}.DisposeAsync"/>
+    public ValueTask DisposeAsync() => _loop.DisposeAsync();
 }

@@ -1,7 +1,9 @@
-using Ananke.Analyzers;
+using Ananke.Abstractions.Agents;
+using Ananke.Orchestration.Analyzers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
+using Shouldly;
 
 namespace Ananke.Analyzers.Tests;
 
@@ -76,14 +78,15 @@ public sealed class DeprecatedModelLiteralAnalyzerTests
     }
 
     [Test]
-    public async Task NoAdditionalFile_NoDiagnostic()
+    public async Task Analyze_NoAdditionalFile_ReportsFromEmbeddedLifecycleFile()
     {
-        // Without model-lifecycle.json wired in, the analyzer must not fire on anything —
-        // confirms it fails closed (silently does nothing) rather than throwing or false-flagging.
-        var source = """
+        // A product referencing the package passes no model-lifecycle.json: the analyzer reads
+        // the copy embedded in its own assembly, the same file ModelLifecycleData reads.
+        var deprecated = EmbeddedDeprecatedEntry();
+        var source = $$"""
             class MyMapper
             {
-                public string Resolve() => "gpt-4.1";
+                public string Resolve() => {|#0:"{{deprecated.Id}}"|};
             }
             """;
 
@@ -92,8 +95,35 @@ public sealed class DeprecatedModelLiteralAnalyzerTests
             TestCode = source,
             ReferenceAssemblies = Net10Reference
         };
-        await test.RunAsync();
+        test.ExpectedDiagnostics.Add(
+            new DiagnosticResult(DeprecatedModelLiteralAnalyzer.DiagnosticId, DiagnosticSeverity.Warning)
+                .WithLocation(0)
+                .WithArguments(deprecated.Id, deprecated.ReplacedBy!));
+        await test.RunAsync().ConfigureAwait(false);
     }
+
+    [Test]
+    public async Task Analyze_AdditionalFileGiven_ReplacesEmbeddedLifecycleFile()
+    {
+        // The id is Deprecated in the embedded file but absent from the one given: the given
+        // file is read instead of the embedded one, not merged with it.
+        var deprecated = EmbeddedDeprecatedEntry();
+        LifecycleJson.ShouldNotContain($"\"{deprecated.Id}\"");
+        var source = $$"""
+            class MyMapper
+            {
+                public string Resolve() => "{{deprecated.Id}}";
+            }
+            """;
+
+        await VerifyNoDiagnosticsAsync(source);
+    }
+
+    private static ModelLifecycleEntry EmbeddedDeprecatedEntry() =>
+        ModelLifecycleData.Entries.Values
+            .Where(e => e.Status == ModelStatus.Deprecated && e.ReplacedBy is not null)
+            .OrderBy(e => e.Id, StringComparer.Ordinal)
+            .First();
 
     private static async Task VerifyNoDiagnosticsAsync(string source)
     {

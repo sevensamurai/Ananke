@@ -61,7 +61,7 @@ using Ananke.Orchestration.Memory;
 // In-memory (dev/test)
 var memory = new InMemoryConversationMemory();
 
-// Or Redis (production)
+// Or Redis (production), from Ananke.Redis
 // var memory = new RedisConversationMemory(redis, ttl: TimeSpan.FromHours(1));
 
 var workflow = StreamingChatWorkflow.Create("chat", model)

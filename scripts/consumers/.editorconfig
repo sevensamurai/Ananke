@@ -1,0 +1,20 @@
+# The consumers stand for products, which do not have the repository's .editorconfig: root here
+# keeps its diagnostic severities out, so a packed analyzer reports at its own default severity.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+[*.{config,xml}]
+indent_size = 2
+
+[*.{csproj,props}]
+end_of_line = crlf
+indent_size = 2

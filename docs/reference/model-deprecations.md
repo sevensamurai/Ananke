@@ -57,30 +57,38 @@ categorically different from production code drifting onto one.
 
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
+| `gpt-6.2-astra` | `Gpt62Astra` | Current | — |
+| `gpt-6.2-sol` | `Gpt62Sol` | Current | — |
+| `gpt-6.1-sol` | `Gpt61Sol` | Current | — |
+| `gpt-6.1-terra` | `Gpt61Terra` | Current | — |
+| `gpt-6-astra` | `Gpt6Astra` | Current | — |
+| `gpt-6-sol` | `Gpt6Sol` | Current | — |
+| `gpt-6-luna` | `Gpt6Luna` | Current | — |
 | `gpt-5.6-sol` | `Gpt56Sol` | Current | — |
 | `gpt-5.6-terra` | `Gpt56Terra` | Current | — |
 | `gpt-5.6-luna` | `Gpt56Luna` | Current | — |
 | `gpt-5.5` | `Gpt55` | Legacy | `Gpt56Sol` |
 | `gpt-5.4` | `Gpt54` | Legacy | `Gpt56Sol` |
 | `gpt-5.4-mini` | `Gpt54Mini` | Legacy | `Gpt56Terra` |
-| `gpt-5.4-nano` | `Gpt54Nano` | Legacy | `Gpt56Luna` |
+| `gpt-5.4-nano` | `Gpt54Nano` | Deprecated (shutdown 2027-04-01) | `Gpt6Luna` |
 | `gpt-5.2` | `Gpt52` | Deprecated | `Gpt56Sol` |
 | `gpt-5` | `Gpt5` | Deprecated | `Gpt56Sol` |
 | `gpt-5-mini` | `Gpt5Mini` | Deprecated | `Gpt56Terra` |
 | `gpt-5-nano` | `Gpt5Nano` | Deprecated | `Gpt56Luna` |
 | `gpt-4.1` | `Gpt41` | Deprecated | `Gpt56Sol` |
 | `gpt-4.1-mini` | `Gpt41Mini` | Deprecated | `Gpt56Terra` |
-| `gpt-4.1-nano` | `Gpt41Nano` | Deprecated | `Gpt56Luna` |
 | `gpt-4o` | `Gpt4o` | Deprecated | `Gpt56Sol` |
 | `gpt-4o-mini` | `Gpt4oMini` | Deprecated | `Gpt56Terra` |
 | `o3` | `O3` | Deprecated | `Gpt56Sol` |
-| `o3-mini` | `O3Mini` | Deprecated | `Gpt56Terra` |
-| `o4-mini` | `O4Mini` | Deprecated | `Gpt56Terra` |
 
 ### Google
 
 | Model | Constant | Status | Replacement |
 |---|---|---|---|
+| `gemini-4-carbon` | `Gemini4Carbon` | Current | — |
+| `gemini-4-argon` | `Gemini4Argon` | Current | — |
+| `gemini-4-hydrogen` | `Gemini4Hydrogen` | Current | — |
+| `gemini-3.8-flash` | `Gemini38Flash` | Current | — |
 | `gemini-3.7-flash` | `Gemini37Flash` | Current | — |
 | `gemini-3.6-flash` | `Gemini36Flash` | Current | — |
 | `gemini-3.5-flash-lite` | `Gemini35FlashLite` | Current | — |
@@ -90,8 +98,8 @@ categorically different from production code drifting onto one.
 | `lyria-3` | `Lyria3` | Current | — |
 | `gemini-3.5-flash` | `Gemini35Flash` | Legacy | `Gemini36Flash` |
 | `gemini-3.1-flash-lite` | `Gemini31FlashLite` | Legacy | `Gemini35FlashLite` |
-| `gemini-2.5-pro` | `Gemini25Pro` | Deprecated | `Gemini31Pro` (`gemini-3.1-pro-preview`) |
-| `gemini-2.5-flash` | `Gemini25Flash` | Deprecated | `Gemini36Flash` |
+| `gemini-2.5-pro` | `Gemini25Pro` | Deprecated (routed to `gemini-3.8-flash` from 2026-12-01) | `Gemini38Flash` |
+| `gemini-2.5-flash` | `Gemini25Flash` | Deprecated (routed to `gemini-3.5-flash-lite` from 2026-12-01) | `Gemini35FlashLite` |
 
 ### Removed models (Retired, then deleted)
 
@@ -102,6 +110,9 @@ switch to its replacement.
 
 | Removed model | Was constant | Provider retirement date | Replacement |
 |---|---|---|---|
+| `gpt-4.1-nano` | `Gpt41Nano` | 2026-10-23 | `Gpt56Luna` |
+| `o3-mini` | `O3Mini` | 2026-10-23 | `Gpt56Sol` |
+| `o4-mini` | `O4Mini` | 2026-10-23 | `Gpt56Terra` |
 | `gemini-3.1-flash` | `Gemini31Flash` | observed gone 2026-08-30 | `Gemini36Flash` |
 | `claude-opus-4-1` | `Opus41` | 2026-08-05 | `Opus5` |
 | `claude-opus-4` | `Opus4` | 2026-06-15 | `Fable5` |
@@ -110,6 +121,9 @@ switch to its replacement.
 | `claude-3-5-haiku` | `Haiku35` | 2026-02-19 | `Haiku45` |
 | `gemini-2.0-flash` | `Gemini20Flash` | 2026-06-01 | `Gemini35Flash` |
 | `gemini-2.0-flash-lite` | `Gemini20FlashLite` | 2026-06-01 | `Gemini31FlashLite` |
+
+`Gpt41Nano`, `O3Mini` and `O4Mini` went with their Orchestration templates (`Gpt4_1Nano`,
+`O3Mini`, `O4Mini`): OpenAI's model list no longer has them.
 
 Two Orchestration-only templates (no `Models.cs` constant, so no compile-time trace) were removed
 for the same reason: `Claude3_7Sonnet` (pinned to the now-retired dated snapshot

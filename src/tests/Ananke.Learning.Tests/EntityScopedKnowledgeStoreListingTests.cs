@@ -26,6 +26,21 @@ public class EntityScopedKnowledgeStoreListingTests
     }
 
     [Test]
+    public async Task ListAsync_ByDate_OrdersInTheStoreItScopes()
+    {
+        var mine = new EntityScopedKnowledgeStore(new InMemoryKnowledgeStore(new InMemoryEmbedder()), "org-a");
+        await mine.UpsertAsync(
+        [
+            new KnowledgeDocument { Id = "a1", Text = "older plan", Metadata = new Dictionary<string, string> { ["effective_at"] = "2026-10-01T00:00:00+00:00" } },
+            new KnowledgeDocument { Id = "a2", Text = "newer plan", Metadata = new Dictionary<string, string> { ["effective_at"] = "2026-11-01T00:00:00+00:00" } },
+        ]);
+
+        var listed = await mine.ListAsync(new KnowledgeFilter(), limit: 1, order: new KnowledgeDateOrder("effective_at"));
+
+        listed.Select(c => c.Id).ShouldBe(["a2"]);
+    }
+
+    [Test]
     public async Task ListAsync_OverAStoreThatCantList_Throws()
     {
         var store = new EntityScopedKnowledgeStore(new SearchOnly(), "org-a");

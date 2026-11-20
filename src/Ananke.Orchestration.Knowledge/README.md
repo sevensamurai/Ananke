@@ -32,6 +32,28 @@ var results = await store.SearchAsync("how do I build a workflow?");
 // results[0].Text => "Workflows are built with a fluent graph-as-code API."
 ```
 
+### Filters
+
+A `KnowledgeFilter` limits search, listing and delete to documents whose metadata matches. Each entry is one value a
+key must hold; a key in `AnyOf` may hold several, and a document matches when its value is any of them. A document
+matches when every entry and every `AnyOf` key holds; one value per key works as it always has. `AnyOf` is
+experimental (`ANNKEEXP004`).
+
+```csharp
+var results = await store.SearchAsync("chip shortage", new SearchOptions
+{
+    Filter = new KnowledgeFilter
+    {
+        ["kind"] = "news",
+        AnyOf = { ["outlet"] = ["TechCrunch", "The Verge"] },
+    },
+});
+```
+
+The in-memory, Postgres and Qdrant stores apply it in `SearchAsync`, `ListAsync` and `DeleteAsync`;
+`EntityScopedKnowledgeStore`, `CatalogAwareKnowledgeStore` and `LinkedKnowledgeStore` pass it on unchanged. A key whose
+`AnyOf` list is empty matches no document.
+
 ### Document ingestion pipeline
 
 ```csharp
@@ -69,6 +91,30 @@ var chunks = await catalogStore.SearchAsync("kubernetes deployment", new SearchO
 });
 ```
 
+### The documents a document links to
+
+```csharp
+#pragma warning disable ANNKEEXP004
+var processor = new DocumentProcessor(http, extractors, chunker, store)
+{
+    Hyperlinks = new HyperlinkOptions(),  // relative links resolve against the document's source id
+};
+
+var linked = await new LinkedDocumentReader(store, catalog).ListAsync("plans/oauth.md");
+// linked[0].Source => "findings/audit.md", with its EffectiveAt and SupersededBy
+```
+
+How they are stored: with `DocumentProcessor.Hyperlinks` set, each hyperlink of a section (`ExtractedSection.Links`)
+that `HyperlinkOptions.Resolve` maps to a source id is written into the metadata of every chunk of that section, as
+`entity:document:{source id}` = `document:{source id}`. The default, `HyperlinkOptions.ResolveRelative`, resolves a
+relative link against the document's own source id and leaves out external URLs and links within the document. The
+links go with the document's chunks when it is indexed again, like the rest of their metadata. Off unless set.
+
+How they are read: `LinkedDocumentReader.ListAsync(source)` lists the chunks of that source through
+`IListableKnowledgeStore`, takes the distinct `entity:document:` keys, and returns each target newest first, with its
+date and what supersedes it from the catalog when one is given, else from the target's own chunks. No model call.
+`KnowledgeCatalogTools.CreateLinks(reader)` (in `Ananke.Orchestration`) exposes it as the `list_linked_documents` tool.
+
 ### Cross-document linking
 
 ```csharp
@@ -96,6 +142,8 @@ services.AddKnowledgeLinking(options =>
 | `SlidingWindowChunker` | Class | Sliding window chunker with configurable overlap |
 | `DocumentProcessor` | Class | Orchestrates the full extract → chunk → embed → store pipeline |
 | `DocumentSummarizer` | Class | Uses an LLM to generate knowledge base descriptions |
+| `HyperlinkOptions` | Record | How `DocumentProcessor` stores a section's hyperlinks as links to other documents |
+| `LinkedDocumentReader` | Class | Lists the documents a document links to, from the stored links |
 | `DocumentLinkExtractor` | Class | Discovers semantic links between documents via LLM |
 | `LinkedKnowledgeStore` | Class | Decorator — expands search results through document link graph |
 | `KnowledgeBase` | Class | Combines a store, catalog entry, and description into a named unit |

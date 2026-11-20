@@ -88,8 +88,9 @@ or custom business rules. Middleware chains compose cleanly and are applied in o
 
 ### What is circuit breaking?
 
-When `AbstractStateMachine.OperationalStatus` is set to `Faulted`, all transitions are blocked
-until `ResetAsync()` is called. This prevents cascading failures in distributed systems.
+When `AbstractStateMachine.FaultAsync(context, reason)` marks a context `Faulted`, that context's
+transitions are refused on every instance that shares the store until `ResetAsync()` is called.
+Other contexts keep moving. This prevents cascading failures in distributed systems.
 
 ---
 

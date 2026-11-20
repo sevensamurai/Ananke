@@ -65,12 +65,14 @@ StateMachine.Create<S, T>(initialState, b => b
     .WithAction(action))  ← optional side effect
 
 FireAsync(transition, payload?)               (StateMachine<S, T>)
-TransitionAsync(context, transition)          (AbstractStateMachine<C, S, T, N> — adds:)
-  → acquire the distributed lock (context.Id)
-  → load the persisted state
-  → check the guards
-  → run the actions and middleware
+TransitionAsync(context, transition, ct)      (AbstractStateMachine<C, S, T, N> — adds:)
+  → acquire the distributed lock ({KeyPrefix}:{MachineName}:{context.Id})
+  → load the persisted context (same key)
+  → refuse it when the context is Faulted
+  → run the middleware, with the context's stored state
+  → check the guard, run the exit action
   → save the new state
+  → run the enter action and the after-transition action
   → release the lock
   → return TransitionResult<S>
 ```

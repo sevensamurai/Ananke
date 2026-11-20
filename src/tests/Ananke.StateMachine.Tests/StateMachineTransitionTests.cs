@@ -27,7 +27,7 @@ public class StateMachineTransitionTests
         result.Success.ShouldBeTrue();
         result.PreviousState.ShouldBe(Light.Off);
         result.CurrentState.ShouldBe(Light.On);
-        machine.CurrentState.ShouldBe(Light.On);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(Light.On);
     }
 
     [Test]
@@ -40,7 +40,7 @@ public class StateMachineTransitionTests
         (await machine.TransitionAsync(ctx, LightAction.Blink)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, LightAction.Stabilize)).Success.ShouldBeTrue();
 
-        machine.CurrentState.ShouldBe(Light.On);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(Light.On);
     }
 
     [Test]
@@ -67,7 +67,7 @@ public class StateMachineTransitionTests
 
         await machine.TransitionAsync(ctx, LightAction.TurnOff); // invalid
 
-        machine.CurrentState.ShouldBe(Light.Off);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(Light.Off);
     }
 
     // ── Self-transitions ─────────────────────────────────────────────

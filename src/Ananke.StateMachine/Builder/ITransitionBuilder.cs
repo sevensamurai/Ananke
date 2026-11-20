@@ -1,3 +1,5 @@
+using Ananke.Abstractions;
+
 namespace Ananke.StateMachine.Builder;
 
 /// <summary>
@@ -78,24 +80,30 @@ public interface ITransitionConfigBuilder<S, T> : ITransitionBuilder<S, T>
     where T : Enum
 {
     /// <summary>
-    /// Adds a guard condition that must be met for the transition to occur
+    /// Adds a guard condition that must be met for the transition to occur. It gets the context
+    /// being transitioned and the transition's token: one machine instance serves every context,
+    /// so a guard reads what it checks from the context (cast to the machine's own context type),
+    /// not from the instance.
     /// </summary>
-    ITransitionConfigBuilder<S, T> When(Func<bool> condition);
+    ITransitionConfigBuilder<S, T> When(Func<IBaseContext, CancellationToken, bool> condition);
 
     /// <summary>
-    /// Adds an async guard condition that must be met for the transition to occur
+    /// Adds an async guard condition that must be met for the transition to occur. It gets the
+    /// context being transitioned and the transition's token.
     /// </summary>
-    ITransitionConfigBuilder<S, T> WhenAsync(Func<Task<bool>> condition);
+    ITransitionConfigBuilder<S, T> WhenAsync(Func<IBaseContext, CancellationToken, Task<bool>> condition);
 
     /// <summary>
-    /// Adds an action to execute after the transition completes
+    /// Adds an action to execute after the transition completes. It gets the context being
+    /// transitioned and the transition's token.
     /// </summary>
-    ITransitionConfigBuilder<S, T> WithAction(Func<Task> action);
+    ITransitionConfigBuilder<S, T> WithAction(Func<IBaseContext, CancellationToken, Task> action);
 
     /// <summary>
-    /// Adds an action to execute after the transition that can modify the final state
+    /// Adds an action to execute after the transition that can modify the final state. It gets the
+    /// context being transitioned and the transition's token.
     /// </summary>
-    ITransitionConfigBuilder<S, T> WithAction(Func<Task<S>> action);
+    ITransitionConfigBuilder<S, T> WithAction(Func<IBaseContext, CancellationToken, Task<S>> action);
 }
 
 /// <summary>
@@ -106,14 +114,16 @@ public interface IStateConfigBuilder<S, T> : ITransitionBuilder<S, T>
     where T : Enum
 {
     /// <summary>
-    /// Action to execute when entering this state
+    /// Action to execute when entering this state. It gets the context being transitioned and the
+    /// transition's token.
     /// </summary>
-    IStateConfigBuilder<S, T> OnEnter(Func<Task> action);
+    IStateConfigBuilder<S, T> OnEnter(Func<IBaseContext, CancellationToken, Task> action);
 
     /// <summary>
-    /// Action to execute when exiting this state
+    /// Action to execute when exiting this state. It gets the context being transitioned and the
+    /// transition's token.
     /// </summary>
-    IStateConfigBuilder<S, T> OnExit(Func<Task> action);
+    IStateConfigBuilder<S, T> OnExit(Func<IBaseContext, CancellationToken, Task> action);
 }
 
 /// <summary>
@@ -126,8 +136,8 @@ public class TransitionConfig<S, T>
     public required S InitialState { get; init; }
     public required T Transition { get; init; }
     public required S FinalState { get; init; }
-    public Func<Task<bool>>? GuardCondition { get; set; }
-    public Func<Task<S>>? AfterTransitionAction { get; set; }
+    public Func<IBaseContext, CancellationToken, Task<bool>>? GuardCondition { get; set; }
+    public Func<IBaseContext, CancellationToken, Task<S>>? AfterTransitionAction { get; set; }
 
     /// <summary>When <c>true</c>, the current state is pushed onto the interrupt stack before transitioning.</summary>
     public bool IsInterrupt { get; init; }
@@ -143,6 +153,6 @@ public class StateConfig<S>
     where S : Enum
 {
     public required S State { get; init; }
-    public Func<Task>? OnEnterAction { get; set; }
-    public Func<Task>? OnExitAction { get; set; }
+    public Func<IBaseContext, CancellationToken, Task>? OnEnterAction { get; set; }
+    public Func<IBaseContext, CancellationToken, Task>? OnExitAction { get; set; }
 }

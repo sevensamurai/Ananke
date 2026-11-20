@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
@@ -127,18 +128,44 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     public int Count => _documents.Count;
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+#pragma warning disable ANNKEEXP004 // implements the experimental listing
+    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
+        KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegative(limit);
 
-        IReadOnlyList<KnowledgeChunk> listed = [.. _documents
-            .Where(d => MatchesFilter(d.Value.Metadata, filter))
-            .OrderBy(d => d.Key, StringComparer.Ordinal)
+        var matches = _documents.Where(d => MatchesFilter(d.Value.Metadata, filter));
+        IEnumerable<KeyValuePair<string, StoredDocument>> ordered;
+        if (order is null)
+        {
+            ordered = matches.OrderBy(d => d.Key, StringComparer.Ordinal);
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(order.Key, nameof(order));
+            ordered = matches
+                .Select(d => (Document: d, Date: DateIn(d.Value.Metadata, order.Key)))
+                .Where(d => order.Since is not { } since || d.Date >= since)
+                .OrderByDescending(d => d.Date.HasValue)
+                .ThenByDescending(d => d.Date)
+                .ThenBy(d => d.Document.Key, StringComparer.Ordinal)
+                .Select(d => d.Document);
+        }
+
+        IReadOnlyList<KnowledgeChunk> listed = [.. ordered
             .Take(limit)
             .Select(d => new KnowledgeChunk { Id = d.Key, Text = d.Value.Text, Score = 0f, Metadata = d.Value.Metadata })];
         return Task.FromResult(listed);
     }
+#pragma warning restore ANNKEEXP004
+
+    /// <summary>The date under <paramref name="key"/>, when it is there and parses as an ISO 8601 date and time.</summary>
+    private static DateTimeOffset? DateIn(IReadOnlyDictionary<string, string> metadata, string key) =>
+        metadata.TryGetValue(key, out var text)
+        && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)
+            ? date
+            : null;
 
     private async Task<IReadOnlyList<(string Id, float Score)>> RankByEmbeddingAsync(
         string query,
@@ -241,7 +268,7 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     private static bool MatchesFilter(
         IReadOnlyDictionary<string, string> metadata, KnowledgeFilter? filter)
     {
-        if (filter is null or { Count: 0 })
+        if (filter is null)
             return true;
 
         foreach (var (key, value) in filter)
@@ -249,6 +276,14 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
             if (!metadata.TryGetValue(key, out var actual) || actual != value)
                 return false;
         }
+
+#pragma warning disable ANNKEEXP004 // applies the experimental AnyOf
+        foreach (var (key, values) in filter.AnyOf)
+        {
+            if (!metadata.TryGetValue(key, out var actual) || !values.Contains(actual, StringComparer.Ordinal))
+                return false;
+        }
+#pragma warning restore ANNKEEXP004
 
         return true;
     }

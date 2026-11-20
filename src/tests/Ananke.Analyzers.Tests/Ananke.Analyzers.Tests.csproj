@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Analyzers\Ananke.Analyzers.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration.Analyzers\Ananke.Orchestration.Analyzers.csproj" />
     <ProjectReference Include="..\..\Ananke.Analyzers.CodeFixes\Ananke.Analyzers.CodeFixes.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>

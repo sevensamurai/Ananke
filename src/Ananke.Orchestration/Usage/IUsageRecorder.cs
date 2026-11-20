@@ -8,8 +8,8 @@ namespace Ananke.Orchestration.Usage;
 /// </summary>
 /// <param name="Usage">Tokens consumed by the call.</param>
 /// <param name="ModelCost">
-/// Per-call cost when model-specific rates are available (a cost-resolving router).
-/// <c>null</c> when only token counts are known.
+/// Per-call cost when the provider reported one or model-specific rates are available (a
+/// cost-resolving router). <c>null</c> when only token counts are known.
 /// </param>
 /// <param name="Priced">
 /// Whether another record already carries the cost of <paramref name="Usage"/> — the agent job
@@ -32,7 +32,7 @@ public sealed record UsageSnapshot
     public TokenUsage Usage { get; init; } = TokenUsage.Zero;
 
     /// <summary>
-    /// Cost accumulated from model-specific rates. Meaningful only when
+    /// Cost accumulated from what providers reported and from model-specific rates. Meaningful only when
     /// <see cref="HasModelBasedCost"/> is <c>true</c>.
     /// </summary>
     public decimal AccumulatedCost { get; init; }

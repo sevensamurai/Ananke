@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
@@ -20,8 +22,19 @@ namespace Ananke.Postgres;
 /// the embedder's <see cref="IEmbeddingModel.Identity"/>, and a store whose embedder differs is refused.
 /// </para>
 /// <para>
-/// Keyword search matches any of the query's words, ranked by <c>ts_rank_cd</c>. A filter matches rows whose
-/// metadata contains every key and value given. Deletes remove rows.
+/// Dense search reads the HNSW index with <c>hnsw.ef_search</c> raised to the rows asked and, on pgvector 0.8 or
+/// later, <c>hnsw.iterative_scan</c> on, so a filter or a score threshold doesn't cut the rows returned short (see
+/// <see cref="PostgresKnowledgeOptions.HnswEfSearch"/> and <see cref="PostgresKnowledgeOptions.HnswIterativeScan"/>).
+/// A filter matches rows whose metadata contains every key and value given, and for each key in
+/// <see cref="KnowledgeFilter.AnyOf"/> one of its values. Deletes remove rows.
+/// </para>
+/// <para>
+/// Keyword search ranks by BM25 (k1 1.2, b 0.75, as <see cref="InMemoryKnowledgeStore"/>), from lexeme counts kept in
+/// <c>&lt;table&gt;_lexemes</c>: how many rows hold each lexeme, and the table's rows and length. Triggers on the table
+/// keep them as rows are inserted, updated and deleted, and writes to one table run one at a time. A table made without
+/// them gets them, filled from <c>ts_stat</c>, on first use. Only rows holding a rare query term are scored (see
+/// <see cref="PostgresKnowledgeOptions.RareTermShare"/>); a query with no rare term requires all its terms. The counts
+/// are over the whole table, not the rows a filter keeps.
 /// </para>
 /// </remarks>
 [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
@@ -29,19 +42,29 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
 {
     private const int ReciprocalRankK = 60;
     private const int CandidatesPerTopK = 4;
+    private const double Bm25K1 = 1.2;
+    private const double Bm25B = 0.75;
 
     private readonly NpgsqlDataSource _dataSource;
     private readonly IEmbeddingModel _embedder;
     private readonly PostgresSchema _schema;
+    private readonly string _lexemes;
+    private readonly double _rareTermShare;
 
     /// <summary>Creates a store over <paramref name="dataSource"/>; nothing is created until it is first used.</summary>
     public PostgresKnowledgeStore(NpgsqlDataSource dataSource, IEmbeddingModel embedder, PostgresKnowledgeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(dataSource);
         ArgumentNullException.ThrowIfNull(embedder);
+        options ??= new PostgresKnowledgeOptions();
         _dataSource = dataSource;
         _embedder = embedder;
-        _schema = new PostgresSchema(dataSource, embedder, options ?? new PostgresKnowledgeOptions());
+        _schema = new PostgresSchema(dataSource, embedder, options);
+        _lexemes = _schema.Table + "_lexemes";
+        _rareTermShare = options.RareTermShare is > 0 and <= 1
+            ? options.RareTermShare
+            : throw new ArgumentOutOfRangeException(nameof(options), options.RareTermShare,
+                $"{nameof(PostgresKnowledgeOptions.RareTermShare)} must be more than 0 and at most 1.");
     }
 
     /// <inheritdoc />
@@ -73,24 +96,28 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         if (list.Count == 0)
             return;
 
+        // One statement, so the lexeme counts are updated once for the whole batch. One statement can't write a row
+        // twice, so the last document given for an id is the one kept.
+        list = [.. Enumerable.Reverse(list).DistinctBy(d => d.Id).Reverse()];
         await EnsureAsync(ct).ConfigureAwait(false);
         var embeddings = await _embedder.EmbedBatchAsync([.. list.Select(d => d.Text)], ct).ConfigureAwait(false);
 
-        await using var connection = await _dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
-        await using var batch = new NpgsqlBatch(connection);
-        for (var i = 0; i < list.Count; i++)
-        {
-            var command = new NpgsqlBatchCommand(
-                $"INSERT INTO {_schema.Table} (id, text, metadata, embedding) VALUES ($1, $2, $3, $4::vector) " +
-                "ON CONFLICT (id) DO UPDATE SET text = EXCLUDED.text, metadata = EXCLUDED.metadata, embedding = EXCLUDED.embedding");
-            command.Parameters.Add(new NpgsqlParameter { Value = list[i].Id });
-            command.Parameters.Add(new NpgsqlParameter { Value = list[i].Text });
-            command.Parameters.Add(new NpgsqlParameter { Value = JsonSerializer.Serialize(list[i].Metadata), NpgsqlDbType = NpgsqlDbType.Jsonb });
-            command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embeddings[i]) });
-            batch.BatchCommands.Add(command);
-        }
-
-        await batch.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await WriteAsync(
+            $"INSERT INTO {_schema.Table} (id, text, metadata, embedding) " +
+            "SELECT id, text, metadata, embedding::vector " +
+            "FROM unnest($1::text[], $2::text[], $3::jsonb[], $4::text[]) AS u(id, text, metadata, embedding) " +
+            "ON CONFLICT (id) DO UPDATE SET text = EXCLUDED.text, metadata = EXCLUDED.metadata, embedding = EXCLUDED.embedding",
+            [
+                new NpgsqlParameter { Value = list.Select(d => d.Id).ToArray() },
+                new NpgsqlParameter { Value = list.Select(d => d.Text).ToArray() },
+                new NpgsqlParameter
+                {
+                    Value = list.Select(d => JsonSerializer.Serialize(d.Metadata)).ToArray(),
+                    NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Jsonb,
+                },
+                new NpgsqlParameter { Value = embeddings.Select(e => PostgresSchema.VectorText(e)).ToArray() },
+            ],
+            ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -100,23 +127,76 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         ArgumentNullException.ThrowIfNull(filter);
         await EnsureAsync(ct).ConfigureAwait(false);
 
-        await using var command = _dataSource.CreateCommand($"DELETE FROM {_schema.Table} WHERE metadata @> $1");
-        command.Parameters.Add(Filter(filter));
-        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        var (where, parameters) = Where(filter, first: 1);
+        await WriteAsync($"DELETE FROM {_schema.Table} WHERE {where}", parameters, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+    /// <remarks>
+    /// With <paramref name="order"/>, the key's value is cast to <c>timestamptz</c> in the query; a value that isn't a
+    /// date and time is read as none (<c>pg_input_is_valid</c>, PostgreSQL 16 or later).
+    /// </remarks>
+    public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
+        KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegative(limit);
         await EnsureAsync(ct).ConfigureAwait(false);
 
-        await using var command = _dataSource.CreateCommand(
-            $"SELECT id, text, metadata, 0::float8 AS score FROM {_schema.Table} WHERE metadata @> $1 ORDER BY id LIMIT $2");
-        command.Parameters.Add(Filter(filter));
-        command.Parameters.Add(new NpgsqlParameter { Value = limit });
-        return await ReadAsync(command, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            var (where, parameters) = Where(filter, first: 2);
+            await using var byId = _dataSource.CreateCommand(
+                $"SELECT id, text, metadata, 0::float8 AS score FROM {_schema.Table} WHERE {where} ORDER BY id LIMIT $1");
+            byId.Parameters.Add(new NpgsqlParameter { Value = limit });
+            byId.Parameters.AddRange(parameters);
+            return await ReadAsync(byId, ct).ConfigureAwait(false);
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(order.Key, nameof(order));
+
+        // A value that isn't a date and time is read as no date, rather than failing the cast.
+        var (filtered, filterParameters) = Where(filter, first: 4);
+        await using var byDate = _dataSource.CreateCommand(
+            "SELECT id, text, metadata, 0::float8 AS score FROM (" +
+            "SELECT id, text, metadata, " +
+            "CASE WHEN pg_input_is_valid(metadata ->> $2, 'timestamptz') THEN (metadata ->> $2)::timestamptz END AS dated " +
+            $"FROM {_schema.Table} WHERE {filtered}) listed " +
+            "WHERE $3::timestamptz IS NULL OR dated >= $3 " +
+            "ORDER BY dated DESC NULLS LAST, id LIMIT $1");
+        byDate.Parameters.Add(new NpgsqlParameter { Value = limit });
+        byDate.Parameters.Add(new NpgsqlParameter { Value = order.Key, NpgsqlDbType = NpgsqlDbType.Text });
+        byDate.Parameters.Add(new NpgsqlParameter
+        {
+            Value = (object?)order.Since?.ToUniversalTime() ?? DBNull.Value,
+            NpgsqlDbType = NpgsqlDbType.TimestampTz,
+        });
+        byDate.Parameters.AddRange(filterParameters);
+        return await ReadAsync(byDate, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The table's write lock: held from the start of each write to its commit, so writes to one table run one at a
+    /// time, and two writes can't deadlock on rows or on lexeme counts. The triggers take it too, before a statement
+    /// from elsewhere touches a row. It is keyed by the table's oid, so every spelling of the table's name takes the
+    /// same lock.
+    /// </summary>
+    /// <param name="relation">SQL for the table's oid.</param>
+    private static string WriteLock(string relation) =>
+        $"pg_advisory_xact_lock(hashtext('ananke_knowledge_lexemes'), hashtext(({relation})::oid::text))";
+
+    private async Task WriteAsync(string sql, NpgsqlParameter[] parameters, CancellationToken ct)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await PostgresSchema.ExecuteAsync(connection, $"SELECT {WriteLock($"'{_schema.Table}'::regclass")}", ct).ConfigureAwait(false);
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
+        {
+            command.Parameters.AddRange(parameters);
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
     }
 
     private Task EnsureAsync(CancellationToken ct) =>
@@ -127,36 +207,157 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
                 $"CREATE INDEX IF NOT EXISTS {_schema.IndexName("tsv")} ON {{0}} USING gin (tsv)",
                 $"CREATE INDEX IF NOT EXISTS {_schema.IndexName("metadata")} ON {{0}} USING gin (metadata jsonb_path_ops)",
             ],
-            ct);
+            ct,
+            EnsureLexemesAsync);
+
+    /// <summary>The triggers that keep the lexeme counts. Trigger names are per table, so they carry no table name.</summary>
+    private static readonly string[] LexemeTriggers =
+        ["ananke_lexemes_lock", "ananke_lexemes_insert", "ananke_lexemes_update", "ananke_lexemes_delete", "ananke_lexemes_truncate"];
+
+    /// <summary>
+    /// Creates the lexeme counts and the triggers that keep them, and fills them from the rows already in the table,
+    /// when the table doesn't have every trigger (a table made by an earlier version, or dropped and made again, whose
+    /// counts are then refilled). Runs under the schema lock; creating the triggers locks out writers until it commits.
+    /// </summary>
+    /// <remarks>
+    /// One row per lexeme, as <c>ts_stat</c> gives it: <c>ndoc</c> the rows holding it, <c>nentry</c> its occurrences.
+    /// The row with the empty word, which no lexeme is, holds the table's rows and the sum of every row's length.
+    /// </remarks>
+    private async Task EnsureLexemesAsync(NpgsqlConnection connection, CancellationToken ct)
+    {
+        await using (var exists = new NpgsqlCommand(
+            "SELECT to_regclass($1) IS NOT NULL AND " +
+            "(SELECT count(*) FROM pg_trigger WHERE tgrelid = to_regclass($2) AND tgname = ANY($3)) = cardinality($3)",
+            connection))
+        {
+            exists.Parameters.Add(new NpgsqlParameter { Value = _lexemes });
+            exists.Parameters.Add(new NpgsqlParameter { Value = _schema.Table });
+            exists.Parameters.Add(new NpgsqlParameter { Value = LexemeTriggers });
+            if (await exists.ExecuteScalarAsync(ct).ConfigureAwait(false) is true)
+                return;
+        }
+
+        var table = _schema.Table;
+        var function = _lexemes + "_count";
+        string[] statements =
+        [
+            $"CREATE TABLE IF NOT EXISTS {_lexemes} (word text PRIMARY KEY, ndoc bigint NOT NULL, nentry bigint NOT NULL)",
+            $"TRUNCATE {_lexemes}",
+            $"""
+            CREATE OR REPLACE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            DECLARE emptied text[];
+            BEGIN
+                PERFORM {WriteLock("TG_RELID")};
+                IF TG_WHEN = 'BEFORE' THEN
+                    RETURN NULL;
+                ELSIF TG_OP = 'TRUNCATE' THEN
+                    DELETE FROM {_lexemes} WHERE word <> '';
+                    UPDATE {_lexemes} SET ndoc = 0, nentry = 0 WHERE word = '';
+                    RETURN NULL;
+                ELSIF TG_OP = 'INSERT' THEN
+                    {CountChanges("SELECT tsv, 1 FROM added")}
+                ELSIF TG_OP = 'UPDATE' THEN
+                    {CountChanges("SELECT tsv, -1 FROM removed UNION ALL SELECT tsv, 1 FROM added")}
+                ELSE
+                    {CountChanges("SELECT tsv, -1 FROM removed")}
+                END IF;
+                IF emptied IS NOT NULL THEN
+                    DELETE FROM {_lexemes} WHERE word = ANY(emptied) AND ndoc = 0;
+                END IF;
+                RETURN NULL;
+            END
+            $fn$
+            """,
+            .. LexemeTriggers.Select(name => $"DROP TRIGGER IF EXISTS {name} ON {table}"),
+            $"CREATE TRIGGER {LexemeTriggers[0]} BEFORE INSERT OR UPDATE OR DELETE ON {table} " +
+                $"FOR EACH STATEMENT EXECUTE FUNCTION {function}()",
+            $"CREATE TRIGGER {LexemeTriggers[1]} AFTER INSERT ON {table} " +
+                $"REFERENCING NEW TABLE AS added FOR EACH STATEMENT EXECUTE FUNCTION {function}()",
+            $"CREATE TRIGGER {LexemeTriggers[2]} AFTER UPDATE ON {table} " +
+                $"REFERENCING OLD TABLE AS removed NEW TABLE AS added FOR EACH STATEMENT EXECUTE FUNCTION {function}()",
+            $"CREATE TRIGGER {LexemeTriggers[3]} AFTER DELETE ON {table} " +
+                $"REFERENCING OLD TABLE AS removed FOR EACH STATEMENT EXECUTE FUNCTION {function}()",
+            $"CREATE TRIGGER {LexemeTriggers[4]} AFTER TRUNCATE ON {table} " +
+                $"FOR EACH STATEMENT EXECUTE FUNCTION {function}()",
+            $"INSERT INTO {_lexemes} (word, ndoc, nentry) SELECT word, ndoc, nentry FROM ts_stat('SELECT tsv FROM {table}')",
+            $"INSERT INTO {_lexemes} (word, ndoc, nentry) " +
+                $"SELECT '', (SELECT count(*) FROM {table}), (SELECT coalesce(sum(nentry), 0) FROM {_lexemes})",
+        ];
+        foreach (var statement in statements)
+            await PostgresSchema.ExecuteAsync(connection, statement, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The trigger's statement that adds the changed rows' lexemes to the counts, in word order, and collects into
+    /// <c>emptied</c> the words no row holds any more.
+    /// </summary>
+    /// <param name="changes">The changed rows, as (<c>tsv</c>, 1 for a row added or -1 for a row removed).</param>
+    private string CountChanges(string changes) =>
+        $"WITH changes(tsv, sign) AS ({changes}), " +
+        "terms AS (SELECT t.lexeme AS word, c.sign, greatest(coalesce(cardinality(t.positions), 0), 1) AS n " +
+        "FROM changes c, unnest(c.tsv) AS t), " +
+        "delta AS (SELECT word, sum(sign) AS ndoc, sum(sign * n) AS nentry FROM terms GROUP BY word UNION ALL " +
+        "SELECT '', (SELECT coalesce(sum(sign), 0) FROM changes), (SELECT coalesce(sum(sign * n), 0) FROM terms)), " +
+        $"counted AS (INSERT INTO {_lexemes} AS l (word, ndoc, nentry) " +
+        "SELECT word, ndoc, nentry FROM delta WHERE ndoc <> 0 OR nentry <> 0 ORDER BY word " +
+        "ON CONFLICT (word) DO UPDATE SET ndoc = l.ndoc + EXCLUDED.ndoc, nentry = l.nentry + EXCLUDED.nentry " +
+        "RETURNING word, ndoc) " +
+        "SELECT array_agg(word) INTO emptied FROM counted WHERE ndoc = 0 AND word <> '';";
 
     private async Task<IReadOnlyList<KnowledgeChunk>> RankByEmbeddingAsync(
         string query, SearchOptions options, int take, CancellationToken ct)
     {
         var embedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
-        await using var command = _dataSource.CreateCommand(
-            $"SELECT id, text, metadata, 1 - (embedding <=> $1::vector) AS score FROM {_schema.Table} " +
-            "WHERE metadata @> $2 AND 1 - (embedding <=> $1::vector) >= $3 " +
-            "ORDER BY embedding <=> $1::vector LIMIT $4");
-        command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
-        command.Parameters.Add(Filter(options.Filter));
-        command.Parameters.Add(new NpgsqlParameter { Value = (double)options.ScoreThreshold });
-        command.Parameters.Add(new NpgsqlParameter { Value = take });
-        return await ReadAsync(command, ct).ConfigureAwait(false);
+        var (where, parameters) = Where(options.Filter, first: 4);
+        // The score threshold is applied to the nearest rows, outside the scan: rows come in distance order, so it
+        // keeps the same rows, and an iterative scan doesn't read on to hnsw.max_scan_tuples for rows it would drop.
+        return await _schema.NearestAsync(take, command =>
+        {
+            command.CommandText =
+                "SELECT id, text, metadata, score FROM (" +
+                $"SELECT id, text, metadata, 1 - (embedding <=> $1::vector) AS score FROM {_schema.Table} " +
+                $"WHERE {where} ORDER BY embedding <=> $1::vector LIMIT $3) AS nearest " +
+                "WHERE score >= $2 ORDER BY score DESC";
+            command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
+            command.Parameters.Add(new NpgsqlParameter { Value = (double)options.ScoreThreshold });
+            command.Parameters.Add(new NpgsqlParameter { Value = take });
+            command.Parameters.AddRange(parameters);
+            return ReadAsync(command, ct);
+        }, ct).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<KnowledgeChunk>> RankByTermsAsync(
         string query, KnowledgeFilter? filter, int take, CancellationToken ct)
     {
-        // The query's own lexemes, each quoted and joined with OR, so a row needs only one of them, as BM25 does.
+        // terms: the query's lexemes some row holds, each with its IDF and whether it is rare. m: the rows to score, those
+        // holding a rare term, or with none rare those holding every term; the tsquery is built from the lexemes as they
+        // are, quoted (chr 39) with backslashes and quotes escaped (chr 92), so they aren't read through the
+        // configuration again. Each row is then scored by BM25 over every term it holds; its length is its occurrences.
         var config = _schema.TextSearchConfiguration;
+        var (where, parameters) = Where(filter, first: 6);
         await using var command = _dataSource.CreateCommand(
-            $"WITH q AS (SELECT to_tsquery('{config}', coalesce(nullif(array_to_string(ARRAY(" +
-            $"SELECT quote_literal(l) FROM unnest(tsvector_to_array(to_tsvector('{config}', $1))) AS l), ' | '), ''), '')) AS query) " +
-            $"SELECT id, text, metadata, ts_rank_cd(tsv, q.query)::float8 AS score FROM {_schema.Table}, q " +
-            "WHERE tsv @@ q.query AND metadata @> $2 ORDER BY score DESC, id LIMIT $3");
+            "WITH q AS (SELECT l.word, coalesce(s.ndoc, 0)::float8 AS df " +
+            $"FROM unnest(tsvector_to_array(to_tsvector('{config}', $1))) AS l(word) LEFT JOIN {_lexemes} s ON s.word = l.word), " +
+            $"totals AS (SELECT ndoc::float8 AS n, nentry::float8 / greatest(ndoc, 1) AS avgdl FROM {_lexemes} WHERE word = ''), " +
+            "terms AS (SELECT q.word, ln(1 + (t.n - q.df + 0.5) / (q.df + 0.5)) AS idf, q.df <= ceil($3::numeric * t.n::numeric) AS rare " +
+            "FROM q, totals t WHERE q.df > 0), " +
+            "m AS (SELECT (CASE WHEN bool_or(rare) THEN string_agg(lit, ' | ') FILTER (WHERE rare) " +
+            "ELSE string_agg(lit, ' & ') END)::tsquery AS query FROM (" +
+            "SELECT rare, chr(39) || replace(replace(word, chr(92), chr(92) || chr(92)), chr(39), chr(92) || chr(39)) || chr(39) AS lit " +
+            "FROM terms) AS x) " +
+            "SELECT r.id, r.text, r.metadata, s.score " +
+            $"FROM {_schema.Table} r CROSS JOIN m CROSS JOIN totals t CROSS JOIN LATERAL (" +
+            "SELECT sum(terms.idf * f.n * ($4 + 1) / (f.n + $4 * (1 - $5 + $5 * f.length / greatest(t.avgdl, 1))))::float8 AS score " +
+            "FROM (SELECT lexeme, n, sum(n) OVER () AS length FROM (" +
+            "SELECT lexeme, greatest(coalesce(cardinality(positions), 0), 1)::float8 AS n FROM unnest(r.tsv)) AS u) AS f " +
+            "JOIN terms ON terms.word = f.lexeme) AS s " +
+            $"WHERE r.tsv @@ m.query AND {where} ORDER BY s.score DESC, r.id LIMIT $2");
         command.Parameters.Add(new NpgsqlParameter { Value = query });
-        command.Parameters.Add(Filter(filter));
         command.Parameters.Add(new NpgsqlParameter { Value = take });
+        command.Parameters.Add(new NpgsqlParameter { Value = _rareTermShare });
+        command.Parameters.Add(new NpgsqlParameter { Value = Bm25K1 });
+        command.Parameters.Add(new NpgsqlParameter { Value = Bm25B });
+        command.Parameters.AddRange(parameters);
         return await ReadAsync(command, ct).ConfigureAwait(false);
     }
 
@@ -200,9 +401,36 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
             .ToList();
     }
 
-    private static NpgsqlParameter Filter(KnowledgeFilter? filter) => new()
+    /// <summary>
+    /// The condition a row's metadata meets to match <paramref name="filter"/>, and its parameters, numbered from
+    /// <paramref name="first"/>: containment of the filter's entries, and for each key in
+    /// <see cref="KnowledgeFilter.AnyOf"/> containment of any one of its values. The values are joined with
+    /// <c>OR</c> rather than <c>@&gt; ANY(array)</c> so the metadata's GIN index serves each one.
+    /// </summary>
+    private static (string Sql, NpgsqlParameter[] Parameters) Where(KnowledgeFilter? filter, int first)
     {
-        Value = JsonSerializer.Serialize(filter ?? new KnowledgeFilter()),
+        filter ??= new KnowledgeFilter();
+        var sql = new StringBuilder($"metadata @> ${first}");
+        List<NpgsqlParameter> parameters = [Jsonb(filter)];
+#pragma warning disable ANNKEEXP004 // applies the experimental AnyOf
+        foreach (var (key, values) in filter.AnyOf)
+#pragma warning restore ANNKEEXP004
+        {
+            List<string> any = [];
+            foreach (var value in values.Distinct(StringComparer.Ordinal))
+            {
+                any.Add(string.Create(CultureInfo.InvariantCulture, $"metadata @> ${first + parameters.Count}"));
+                parameters.Add(Jsonb(new Dictionary<string, string> { [key] = value }));
+            }
+            sql.Append(any.Count == 0 ? " AND false" : $" AND ({string.Join(" OR ", any)})");
+        }
+
+        return (sql.ToString(), [.. parameters]);
+    }
+
+    private static NpgsqlParameter Jsonb(IDictionary<string, string> value) => new()
+    {
+        Value = JsonSerializer.Serialize(value),
         NpgsqlDbType = NpgsqlDbType.Jsonb,
     };
 }

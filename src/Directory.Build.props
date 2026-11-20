@@ -10,7 +10,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <!-- ANNKE001: deprecated-model-constant usage (see Models.cs / docs/reference/model-deprecations.md).
-         ANNKE002: deprecated-model string literal (Ananke.Analyzers/DeprecatedModelLiteralAnalyzer).
+         ANNKE002: deprecated-model string literal (Ananke.Orchestration.Analyzers/DeprecatedModelLiteralAnalyzer).
          ANNKE003: retired-model string literal.
          All three fail the build like any other warning
          (TreatWarningsAsErrors above) — a deprecated/retired model reference in new code is a
@@ -23,10 +23,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!-- Coordinated version across all packages -->
+  <!-- Coordinated version across all packages. MsExtensionsVersion, the Microsoft.Extensions.*
+       version, is pinned in Directory.Packages.props. -->
   <PropertyGroup>
-    <VersionPrefix>0.9.1</VersionPrefix>
-    <MsExtensionsVersion>10.0.7</MsExtensionsVersion>
+    <VersionPrefix>0.9.2</VersionPrefix>
   </PropertyGroup>
 
   <!-- NuGet package metadata (applies when IsPackable=true in individual csproj) -->
@@ -44,14 +44,20 @@
     <Copyright>Copyright © sevensamurai</Copyright>
   </PropertyGroup>
 
-  <!-- Wire Ananke.Analyzers into every project except itself and its test project.
-       OutputItemType="Analyzer" ensures it runs as a Roslyn analyzer rather than a
+  <!-- Wire the analyzers into every project except themselves: Ananke.Analyzers (this
+       repository's own rules, never packed) and Ananke.Orchestration.Analyzers (the rules a
+       product gets from the Ananke.Orchestration package).
+       OutputItemType="Analyzer" ensures each runs as a Roslyn analyzer rather than a
        compile-time reference. ReferenceOutputAssembly="false" keeps it out of the
-       output directory. The condition excludes the analyzer project itself
-       (IsRoslynComponent=true) and the analyzer test project (IsTestProject=true
-       combined with a direct ProjectReference to the analyzer csproj). -->
+       output directory. The condition excludes the analyzer projects themselves
+       (IsRoslynComponent=true). -->
   <ItemGroup Condition="'$(IsRoslynComponent)' != 'true'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)Ananke.Analyzers\Ananke.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      PrivateAssets="all" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Ananke.Orchestration.Analyzers\Ananke.Orchestration.Analyzers.csproj"
                       ReferenceOutputAssembly="false"
                       OutputItemType="Analyzer"
                       SetTargetFramework="TargetFramework=netstandard2.0"
@@ -64,14 +70,23 @@
                       OutputItemType="Analyzer"
                       SetTargetFramework="TargetFramework=netstandard2.0"
                       PrivateAssets="all" />
-    <!-- ANNKE002/ANNKE003 (Ananke.Analyzers/DeprecatedModelLiteralAnalyzer) reads this file via
-         AdditionalFiles at compile time. AdditionalFiles declared inside Ananke.Analyzers.csproj
-         itself only apply when compiling that project — an analyzer running inside a *consuming*
-         project's compilation (which is how every other project uses it, via the ProjectReference
-         above) only sees AdditionalFiles declared in that consuming project, so this has to be
-         wired here too, not just in Ananke.Analyzers.csproj. -->
+    <!-- ANNKE002/ANNKE003 (Ananke.Orchestration.Analyzers/DeprecatedModelLiteralAnalyzer) read a
+         model-lifecycle.json given as AdditionalFiles in place of the copy embedded in the
+         analyzer. Here it is the working copy, so an edit to it takes effect without rebuilding
+         the analyzer. -->
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)Ananke.Abstractions\Agents\model-lifecycle.json" />
   </ItemGroup>
+
+  <!-- Every Ananke package is released at one version and depends on the others at exactly that
+       version: a project reference becomes a dependency on [$(VersionPrefix)] instead of NuGet's
+       default lower bound. -->
+  <Target Name="ExactProjectReferenceVersions" AfterTargets="_GetProjectReferenceVersions">
+    <ItemGroup>
+      <_ProjectReferencesWithVersions Condition="'%(_ProjectReferencesWithVersions.ProjectVersion)' != '' And !$([System.String]::Copy('%(_ProjectReferencesWithVersions.ProjectVersion)').StartsWith('['))">
+        <ProjectVersion>[%(_ProjectReferencesWithVersions.ProjectVersion)]</ProjectVersion>
+      </_ProjectReferencesWithVersions>
+    </ItemGroup>
+  </Target>
 
   <!-- Include per-project README if present, otherwise fall back to repo-root README -->
   <ItemGroup Condition="'$(IsPackable)' == 'true'">

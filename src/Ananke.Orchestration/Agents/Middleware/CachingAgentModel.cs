@@ -5,6 +5,8 @@ using System.Text.Json;
 using Ananke.Abstractions.Distributed;
 
 using Ananke.Abstractions.Agents;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Ananke.Orchestration.Agents.Middleware;
 
@@ -26,6 +28,10 @@ namespace Ananke.Orchestration.Agents.Middleware;
 /// they do not affect model output.
 /// </para>
 /// <para>
+/// A cache that throws on read or write never fails the call: the read counts as a miss, the
+/// response is returned without being stored, and each failure is logged as a warning.
+/// </para>
+/// <para>
 /// <b>Instances wrapping different models must use distinct <c>cacheScope</c> values</b>
 /// when they share one <see cref="IKeyValueDataAdapter"/> (the normal case with a single Redis) —
 /// otherwise identical prompts sent to different models collide on the same cache key and each
@@ -45,6 +51,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     private readonly string _keyPrefix;
     private readonly string _cacheScope;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Creates a caching wrapper around an existing streaming agent model.
@@ -63,13 +70,18 @@ public sealed class CachingAgentModel : IStreamingAgentModel
     /// Clock used for cache expiry. Defaults to <see cref="TimeProvider.System"/>; inject a fake
     /// in tests to assert TTL behavior without sleeping.
     /// </param>
+    /// <param name="logger">
+    /// Receives a warning each time the cache cannot be read or written; the call then goes on as
+    /// a cache miss.
+    /// </param>
     public CachingAgentModel(
         IStreamingAgentModel inner,
         IKeyValueDataAdapter cache,
         TimeSpan ttl,
         string keyPrefix = "ananke:llm-cache",
         string? cacheScope = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(cache);
@@ -82,6 +94,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         _keyPrefix = keyPrefix;
         _cacheScope = cacheScope ?? inner.GetType().FullName!;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <inheritdoc />
@@ -143,6 +156,7 @@ public sealed class CachingAgentModel : IStreamingAgentModel
             request.Messages,
             request.Tools,
             request.ResponseFormat,
+            request.MaxOutputTokens,
 #pragma warning disable ANNKEEXP003 // a request's own fields are experimental
             RequestFields = request.RequestFields?
                 .OrderBy(field => field.Key, StringComparer.Ordinal)
@@ -154,25 +168,46 @@ public sealed class CachingAgentModel : IStreamingAgentModel
         return $"{_keyPrefix}:{Convert.ToHexStringLower(hash)}";
     }
 
+    /// <summary>
+    /// Returns the cached response, or <c>null</c> on a miss. A cache that cannot be read, or an
+    /// entry that cannot be deserialized, is logged as a warning and counts as a miss.
+    /// </summary>
     private async Task<AgentResponse?> TryGetCachedAsync(string cacheKey, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
-        var json = await _cache.GetValueAsync(cacheKey, ct).ConfigureAwait(false);
-        if (json is null)
-            return null;
+        CacheEntry? entry;
+        try
+        {
+            var json = await _cache.GetValueAsync(cacheKey, ct).ConfigureAwait(false);
+            if (json is null)
+                return null;
 
-        var entry = JsonSerializer.Deserialize<CacheEntry>(json, JsonOptions);
+            entry = JsonSerializer.Deserialize<CacheEntry>(json, JsonOptions);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Model response cache read failed for {CacheKey}; treating it as a miss", cacheKey);
+            return null;
+        }
+
         if (entry is null || _timeProvider.GetUtcNow() >= entry.ExpiresAt)
         {
             try { await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false); }
-            catch (Exception) { /* best-effort cleanup — errors logged by the adapter */ }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Model response cache could not remove expired {CacheKey}", cacheKey);
+            }
             return null;
         }
 
         return entry.Response;
     }
 
+    /// <summary>
+    /// Stores the response. A cache that cannot be written is logged as a warning; the response
+    /// is still returned to the caller.
+    /// </summary>
     private async Task CacheResponseAsync(string cacheKey, AgentResponse response, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -183,8 +218,15 @@ public sealed class CachingAgentModel : IStreamingAgentModel
             ExpiresAt = _timeProvider.GetUtcNow().Add(_ttl)
         };
 
-        var json = JsonSerializer.Serialize(entry, JsonOptions);
-        await _cache.SetValueAsync(cacheKey, json, ct).ConfigureAwait(false);
+        try
+        {
+            var json = JsonSerializer.Serialize(entry, JsonOptions);
+            await _cache.SetValueAsync(cacheKey, json, _ttl, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Model response cache write failed for {CacheKey}", cacheKey);
+        }
     }
 
     private sealed record CacheEntry

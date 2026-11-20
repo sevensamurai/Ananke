@@ -91,7 +91,7 @@ Executes the compiled graph. Responsibilities:
 
 `ICheckpointStore` persists workflow state at each step boundary:
 - `InMemoryCheckpointStore` — tests and single-process scenarios (state lost on restart)
-- `RedisCheckpointStore` (in `Ananke.Redis`) — distributed, TTL-based expiry via `EXPIREAT`
+- `KeyValueCheckpointStore` — over an `IKeyValueDataAdapter` (Redis, through `AddRedis` in `Ananke.Redis`): distributed, expiry from `ExpiresAt` set natively by Redis
 - Any custom implementation backed by SQL, blob storage, etc.
 
 ### Streaming

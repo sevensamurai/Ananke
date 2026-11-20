@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What Seren takes: the state machine with its Redis lock and store and MQTT channels,
+       and no orchestration or model packages. -->
+  <ItemGroup>
+    <PackageReference Include="Ananke.StateMachine" />
+    <PackageReference Include="Ananke.Redis" />
+    <PackageReference Include="Ananke.MQTT" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

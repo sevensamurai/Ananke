@@ -85,6 +85,9 @@ Haiku35
 Gemini20Flash
 Gemini20FlashLite
 Gemini31Flash       # gemini-3.1-flash: the API answers 404 for it (checked 2026-08-30)
+Gpt41Nano           # gpt-4.1-nano: shut down 2026-10-23
+O3Mini              # o3-mini: shut down 2026-10-23
+O4Mini              # o4-mini: shut down 2026-10-23
 
 # --- External library / BCL / SDK types named in prose ---
 ActivityListener

@@ -21,7 +21,9 @@ public static class DatedRecordTools
     /// </param>
     /// <param name="name">Name for the returned <see cref="ToolKit"/>. Default is <c>"dated_records"</c>.</param>
     /// <param name="describe">How a record is written in the list. Default is its text.</param>
-    /// <param name="maxRecords">How many records a list shows at most; the rest are counted. Default is 200.</param>
+    /// <param name="maxRecords">
+    /// How many records a list shows at most, the newest; when more match, the list says so. Default is 200.
+    /// </param>
     public static ToolKit Create<TRecord>(
         DatedRecordReader<TRecord> reader,
         IReadOnlyList<string> filterFields,
@@ -62,7 +64,9 @@ public static class DatedRecordTools
                                 filter[field] = value;
                         }
 
-                        var records = await reader.ListAsync(filter, since, ct: ct).ConfigureAwait(false);
+                        // One more than is shown, to tell whether more match.
+                        var records = await reader.ListAsync(
+                            filter, since, maxRecords == int.MaxValue ? maxRecords : maxRecords + 1, ct).ConfigureAwait(false);
                         return Format(records, describe, maxRecords);
                     });
             });
@@ -74,7 +78,9 @@ public static class DatedRecordTools
         if (records.Count == 0)
             return "No record matches.";
 
-        var text = new StringBuilder($"{records.Count} record(s), newest first:\n");
+        var text = new StringBuilder(records.Count > maxRecords
+            ? $"More than {maxRecords} records match; the newest {maxRecords}:\n"
+            : $"{records.Count} record(s), newest first:\n");
         foreach (var record in records.Take(maxRecords))
         {
             var date = record.EffectiveAt?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "undated";
@@ -85,7 +91,7 @@ public static class DatedRecordTools
         }
 
         if (records.Count > maxRecords)
-            text.Append($"… and {records.Count - maxRecords} more; narrow the list with a value or 'since'.\n");
+            text.Append("Narrow the list with a value or 'since' to see the rest.\n");
         return text.ToString();
     }
 }

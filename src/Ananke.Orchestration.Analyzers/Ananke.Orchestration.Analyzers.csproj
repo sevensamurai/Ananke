@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The analyzers a product gets: packed into Ananke.Orchestration as an analyzer asset
+       (see Ananke.Orchestration.csproj). This repository's own rules are in Ananke.Analyzers,
+       which is never packed. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Loaded as an analyzer asset, never as a library. No deps.json and no shared compiler:
+         both are held open by parallel builds and cause CS2012 / MSB4018 lock failures. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <!-- ANNKE002/ANNKE003 read this file when the compilation is given none as AdditionalFiles,
+         which is the case in every product. The same file Ananke.Abstractions embeds for
+         ModelLifecycleData's runtime reader. -->
+    <EmbeddedResource Include="..\Ananke.Abstractions\Agents\model-lifecycle.json"
+                      LogicalName="Ananke.Orchestration.Analyzers.model-lifecycle.json"
+                      Visible="false" />
+  </ItemGroup>
+
+</Project>

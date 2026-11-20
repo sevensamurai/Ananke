@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Knowledge.Catalog;
 
 /// <summary>Time-decay function applied to catalog-aware search results.</summary>
@@ -32,6 +34,26 @@ public sealed record TimeDecayOptions
     /// Default is <c>0.3</c> (30 %).
     /// </summary>
     public float FloorWeight { get; init; } = 0.3f;
+}
+
+/// <summary>
+/// What <see cref="CatalogAwareKnowledgeStore.SearchAsync"/> does with a result whose document is superseded: its own
+/// <c>superseded_by</c> metadata, or its catalog entry's <see cref="CatalogEntry.SupersededBy"/>, names what supersedes it.
+/// </summary>
+[Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+public enum SupersededResults
+{
+    /// <summary>Marked with what supersedes it, and ranked as the store ranks it. The default.</summary>
+    Mark,
+
+    /// <summary>Marked, and ranked below the current results the store returned with it.</summary>
+    Demote,
+
+    /// <summary>
+    /// Left out. The store is asked for more results, doubling <see cref="SearchOptions.TopK"/>, until that many current
+    /// ones are found, it has no more, or it has been asked for 16 times <see cref="SearchOptions.TopK"/>.
+    /// </summary>
+    Exclude
 }
 
 /// <summary>A document-level entry in the knowledge catalog.</summary>

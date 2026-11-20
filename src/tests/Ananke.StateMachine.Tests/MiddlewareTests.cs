@@ -113,13 +113,69 @@ public class MiddlewareTests
         result.Success.ShouldBeTrue();
     }
 
+    [Test]
+    public async Task InvokeAsync_TransitionCancelled_MiddlewareReturnsAndLockIsFree()
+    {
+        var waiting = new WaitingMiddleware();
+        var machine = new LightMachine(_lock, _lock);
+        machine.UseMiddleware(waiting);
+        var ctx = new TestContext("1");
+        using var cts = new CancellationTokenSource();
+
+        var transition = machine.TransitionAsync(ctx, LightAction.TurnOn, cts.Token);
+        await waiting.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => transition.WaitAsync(TimeSpan.FromSeconds(5)));
+        var probe = await _lock.RunCoordinatedActionAsync(machine.GetContextKey(ctx.Id), () => Task.FromResult(true));
+        probe.LockAcquired.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task InvokeAsync_NextGivenCancelledToken_TransitionFailsAndStoresNothing()
+    {
+        var machine = new LightMachine(_lock, _lock);
+        machine.UseMiddleware(new CancelledTokenMiddleware());
+        var ctx = new TestContext("1");
+
+        var result = await machine.TransitionAsync(ctx, LightAction.TurnOn).WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Success.ShouldBeFalse();
+        result.Exception.ShouldBeAssignableTo<OperationCanceledException>();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(Light.Off);
+    }
+
     // ── Test helpers ─────────────────────────────────────────────────
+
+    /// <summary>Continues with a token of its own that is already cancelled.</summary>
+    private sealed class CancelledTokenMiddleware : ITransitionMiddleware<TestContext, Light, LightAction>
+    {
+        public Task<TransitionResult<Light>> InvokeAsync(
+            TestContext context, LightAction transition, Light currentState,
+            Func<CancellationToken, Task<TransitionResult<Light>>> next, CancellationToken ct) =>
+            next(new CancellationToken(canceled: true));
+    }
+
+    /// <summary>Signals that it runs, then waits for the transition's token.</summary>
+    private sealed class WaitingMiddleware : ITransitionMiddleware<TestContext, Light, LightAction>
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<TransitionResult<Light>> InvokeAsync(
+            TestContext context, LightAction transition, Light currentState,
+            Func<CancellationToken, Task<TransitionResult<Light>>> next, CancellationToken ct)
+        {
+            Entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return await next(ct);
+        }
+    }
 
     private sealed class BlockingMiddleware : ITransitionMiddleware<TestContext, Light, LightAction>
     {
         public Task<TransitionResult<Light>> InvokeAsync(
             TestContext context, LightAction transition, Light currentState,
-            Func<Task<TransitionResult<Light>>> next) =>
+            Func<CancellationToken, Task<TransitionResult<Light>>> next, CancellationToken ct) =>
             Task.FromResult(TransitionResult<Light>.Failed(currentState, "Blocked by middleware"));
     }
 
@@ -128,10 +184,10 @@ public class MiddlewareTests
     {
         public async Task<TransitionResult<Light>> InvokeAsync(
             TestContext context, LightAction transition, Light currentState,
-            Func<Task<TransitionResult<Light>>> next)
+            Func<CancellationToken, Task<TransitionResult<Light>>> next, CancellationToken ct)
         {
             order.Add(id);
-            return await next();
+            return await next(ct);
         }
     }
 

@@ -42,7 +42,7 @@ public sealed class StateMachineTriggerJob<TWorkflowState, TContext, TState, TTr
     {
         var context = contextSelector(state);
         var transition = transitionSelector(state);
-        var result = await stateMachine.TransitionAsync(context, transition);
+        var result = await stateMachine.TransitionAsync(context, transition, ct);
 
         if (!result.Success)
             throw new InvalidOperationException(

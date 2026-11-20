@@ -74,13 +74,15 @@ public static class TerminalProviderError
     /// </remarks>
     public static bool Is(Exception? exception)
     {
+        // Known by type, so checked first: a message that merely quotes a delay (a repeated reply
+        // that says "retry in 5 seconds") must not make it retryable.
+        if (IsRepeatOrTimeout(exception))
+            return true;
+
         // Said to wait, so waiting is the answer. Checked once over the whole chain, before any
         // message is read: a provider that quotes a delay has already classified its own error.
         if (ProviderRetryDelay.From(exception) is not null)
             return false;
-
-        if (IsRepeatOrTimeout(exception))
-            return true;
 
         for (var current = exception; current is not null; current = current.InnerException)
         {

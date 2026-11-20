@@ -65,7 +65,7 @@ public class SimpleStateMachineTests
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
                 .From(SimplePhase.Searching).On(SimpleAction.StartPaperwork).To(SimplePhase.Paperwork)
-                    .When(() => allow));
+                    .When((_, _) => allow));
 
         var result = await machine.FireAsync(SimpleAction.StartPaperwork);
 
@@ -82,12 +82,27 @@ public class SimpleStateMachineTests
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
                 .From(SimplePhase.Searching).On(SimpleAction.StartPaperwork).To(SimplePhase.Paperwork)
-                    .When(() => allow));
+                    .When((_, _) => allow));
 
         var result = await machine.FireAsync(SimpleAction.StartPaperwork);
 
         result.Success.ShouldBeTrue();
         machine.CurrentState.ShouldBe(SimplePhase.Paperwork);
+    }
+
+    [Test]
+    public async Task FireAsync_Guard_GetsTheToken()
+    {
+        CancellationToken seen = default;
+        var machine = StateMachine.Create<SimplePhase, SimpleAction>(
+            SimplePhase.Searching, b => b
+                .From(SimplePhase.Searching).On(SimpleAction.StartPaperwork).To(SimplePhase.Paperwork)
+                    .When((_, ct) => { seen = ct; return true; }));
+        using var cts = new CancellationTokenSource();
+
+        await machine.FireAsync(SimpleAction.StartPaperwork, ct: cts.Token);
+
+        seen.ShouldBe(cts.Token);
     }
 
     [Test]
@@ -432,7 +447,7 @@ public class SimpleStateMachineTests
         var machine = StateMachine.Create<SimplePhase, SimpleAction>(
             SimplePhase.Searching, b => b
                 .From(SimplePhase.Searching).On(SimpleAction.Interrupt).ToInterrupt(SimplePhase.Searching)
-                    .When(() => false)
+                    .When((_, _) => false)
                 .From(SimplePhase.Searching).On(SimpleAction.Resume).ToResume())
             .OnInterrupt((_, _) =>
             {

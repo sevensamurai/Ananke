@@ -9,8 +9,7 @@ namespace Ananke.Qdrant.Tests;
 /// <see cref="QdrantEmpiricalMemory.MapPayloadToEntry"/> — the part of the class that is
 /// Ananke's own responsibility, as opposed to Qdrant's behavior. No Qdrant connection or
 /// Docker is needed: both methods are plain functions over an <see cref="EmpiricalEntry"/>
-/// and a payload dictionary. Mirrors the pattern established by
-/// <c>Ananke.Redis.Tests.RedisCheckpointStoreTests</c>.
+/// and a payload dictionary.
 /// </summary>
 [TestFixture]
 public class QdrantEmpiricalMemoryPayloadTests

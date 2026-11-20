@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace Ananke.Analyzers;
+namespace Ananke.Orchestration.Analyzers;
 
 /// <summary>
 /// Offers to replace an <c>ANNKE002</c>/<c>ANNKE003</c>-flagged string literal with a reference

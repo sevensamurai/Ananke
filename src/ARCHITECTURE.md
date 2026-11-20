@@ -66,7 +66,7 @@ graph TD
         OKN[Ananke.Orchestration.Knowledge]
         ORC[Ananke.Orchestration]
         SM[Ananke.StateMachine]
-        ANZ[Ananke.Analyzers]
+        ANZ[Ananke.Orchestration.Analyzers]
     end
 
     subgraph Intelligence
@@ -124,7 +124,6 @@ graph TD
 
     %% Core → Infrastructure
     RED --> ABS
-    RED --> ORC
     MQTT --> ABS
     OTEL --> ABS
     GAB --> ABS
@@ -183,7 +182,8 @@ graph TD
 | `Ananke.Orchestration` | `Ananke.Orchestration` | Workflow engine, tool system, streaming chat, agentic patterns, checkpointing, middleware | `Ananke.Abstractions`, `Ananke.Orchestration.Knowledge`, Polly |
 | `Ananke.Orchestration.Knowledge` | `Ananke.Orchestration.Knowledge` | Knowledge pipeline — vector stores, document processing, chunking, embedding abstractions, knowledge catalog, document linking | `Ananke.Abstractions` |
 | `Ananke.StateMachine` | `Ananke.StateMachine` | Distributed state machine with transition guards, middleware, fault/reset, channel-driven transitions | `Ananke.Abstractions` |
-| `Ananke.Analyzers` | _(bundled in Orchestration)_ | Roslyn analyzer — validates `Job`/`Then`/`Decide` name references at compile time | .NET Standard 2.0, Microsoft.CodeAnalysis |
+| `Ananke.Orchestration.Analyzers` | _(bundled in Orchestration)_ | Roslyn analyzers a product gets — `ANANKE001` (job name references), `ANNKE002`/`ANNKE003` (deprecated and retired model literals) | .NET Standard 2.0, Microsoft.CodeAnalysis |
+| `Ananke.Analyzers` | _(not packed)_ | This repository's own rule — `ANANKE_ASYNC_001` (`ConfigureAwait(false)` in library code) | .NET Standard 2.0, Microsoft.CodeAnalysis |
 
 ### Intelligence
 
@@ -199,7 +199,7 @@ graph TD
 
 | Project | NuGet ID | Role | Dependencies |
 |---------|----------|------|-------------|
-| `Ananke.Redis` | `Ananke.Redis` | `IDistributedLock` (RedLock), `IKeyValueDataAdapter`, `ICheckpointStore`, `IConversationMemory` via Redis | `Ananke.Abstractions`, `Ananke.Orchestration`, StackExchange.Redis, RedLock.net |
+| `Ananke.Redis` | `Ananke.Redis` | `IDistributedLock` (RedLock), `IKeyValueDataAdapter`, `IConversationMemory` via Redis | `Ananke.Abstractions`, StackExchange.Redis, RedLock.net |
 | `Ananke.Qdrant` | `Ananke.Qdrant` | `IKnowledgeStore`, `IEmpiricalMemory`, `IEpisodeStore`, `IKnowledgeCatalog` via Qdrant vector DB | `Ananke.Orchestration.Knowledge`, `Ananke.Learning`, `Ananke.Organics`, Qdrant.Client |
 | `Ananke.MQTT` | `Ananke.MQTT` | `IChannelReader/Writer`, `IHandoffChannel` via MQTT (MQTTnet) | `Ananke.Abstractions`, MQTTnet, MessagePack |
 | `Ananke.OpenTelemetry` | `Ananke.OpenTelemetry` | `IWorkflowTracer` via OpenTelemetry, OTLP export builder | `Ananke.Abstractions`, OpenTelemetry SDK |
@@ -415,7 +415,7 @@ dotnet test src/tests/Ananke.Orchestration.Tests
 ```
 
 - `TreatWarningsAsErrors` is on globally — zero warnings allowed
-- Roslyn analyzer (`Ananke.Analyzers`) is bundled into `Ananke.Orchestration` NuGet package
+- Roslyn analyzers (`Ananke.Orchestration.Analyzers`, with the code fix in `Ananke.Analyzers.CodeFixes`) are bundled into the `Ananke.Orchestration` NuGet package; `Ananke.Analyzers` is not
 - Central Package Management via `Directory.Packages.props`
 
 ## CLI Namespace Exception
@@ -428,7 +428,7 @@ Rationale: CLI entry-point projects are never referenced as libraries. The `Tool
 
 ## Roslyn Analyzer Packaging Note
 
-`Ananke.Analyzers` is a Roslyn analyzer (`IsRoslynComponent=true`, `IsPackable=false`). It is **not** a runtime dependency. The `<ProjectReference>` in `Ananke.Orchestration.csproj` exists solely so the analyzer is packed as an analyzer asset inside the `Ananke.Orchestration` NuGet package. Consumers of `Ananke.Orchestration` receive the analyzer automatically; they do not reference `Ananke.Analyzers` directly.
+The analyzer projects are Roslyn components (`IsRoslynComponent=true`, `IsPackable=false`), not runtime dependencies. `src/Directory.Build.props` wires all three into every project in this repository. `Ananke.Orchestration.csproj` packs two of them as analyzer assets: `Ananke.Orchestration.Analyzers` and `Ananke.Analyzers.CodeFixes`. Consumers of `Ananke.Orchestration` receive those automatically and do not reference them directly. `Ananke.Analyzers` holds this repository's own rule, `ANANKE_ASYNC_001`, and is never packed: a product's code is not held to it. `model-lifecycle.json` is embedded in `Ananke.Orchestration.Analyzers`; a file of that name given as `AdditionalFiles` is read in its place.
 
 ## Coding Conventions
 

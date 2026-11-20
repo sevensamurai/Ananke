@@ -1,0 +1,22 @@
+# Valkey and Mosquitto for the fleet demo. run.sh gives the project its name and ports (from devenv).
+services:
+  valkey:
+    image: valkey/valkey:8
+    ports:
+      - "127.0.0.1:${FLEET_VALKEY_PORT:?start it with ./run.sh}:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "127.0.0.1:${FLEET_MOSQUITTO_PORT:?start it with ./run.sh}:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 1s
+      timeout: 5s
+      retries: 30

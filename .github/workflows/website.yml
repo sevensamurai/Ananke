@@ -3,7 +3,7 @@ name: Deploy docs to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths: ["docs/**"]
+    paths: ["docs/**", "scripts/build-search-index.ps1"]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +29,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Build the search index
+        shell: pwsh
+        run: pwsh scripts/build-search-index.ps1
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

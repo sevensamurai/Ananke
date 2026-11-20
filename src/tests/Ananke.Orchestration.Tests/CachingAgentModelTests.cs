@@ -5,6 +5,7 @@ using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Context;
 using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Agents.Routing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
@@ -40,6 +41,17 @@ public class CachingAgentModelTests
     }
 
     [Test]
+    public async Task GenerateAsync_CacheMiss_WritesEntryWithTtlAsExpiry()
+    {
+        var recording = new RecordingCache();
+        var caching = new CachingAgentModel(_inner, recording, TimeSpan.FromMinutes(5));
+
+        await caching.GenerateAsync(MakeRequest("What?"));
+
+        recording.Expiries.ShouldBe([TimeSpan.FromMinutes(5)]);
+    }
+
+    [Test]
     public async Task GenerateAsync_CacheHit_ReturnsFromCacheWithoutCallingInner()
     {
         var caching = new CachingAgentModel(_inner, _cache, TimeSpan.FromMinutes(5));
@@ -61,6 +73,32 @@ public class CachingAgentModelTests
         await caching.GenerateAsync(MakeRequest("Request B"));
 
         _inner.GenerateCallCount.ShouldBe(2); // different keys
+    }
+
+    [Test]
+    public async Task GenerateAsync_DifferentMaxOutputTokens_SeparateCacheEntries()
+    {
+        var caching = new CachingAgentModel(_inner, _cache, TimeSpan.FromMinutes(5));
+
+        await caching.GenerateAsync(MakeRequest("Same") with { MaxOutputTokens = 10 });
+        await caching.GenerateAsync(MakeRequest("Same") with { MaxOutputTokens = 1000 });
+        await caching.GenerateAsync(MakeRequest("Same") with { MaxOutputTokens = 1000 }); // hit
+        await caching.GenerateAsync(MakeRequest("Same")); // none: its own entry
+        await caching.GenerateAsync(MakeRequest("Same")); // hit
+
+        _inner.GenerateCallCount.ShouldBe(3);
+    }
+
+    [Test]
+    public async Task GenerateStreamAsync_DifferentMaxOutputTokens_SeparateCacheEntries()
+    {
+        var caching = new CachingAgentModel(_inner, _cache, TimeSpan.FromMinutes(5));
+
+        await CollectTextDeltas(caching.GenerateStreamAsync(MakeRequest("Same") with { MaxOutputTokens = 10 }));
+        await CollectTextDeltas(caching.GenerateStreamAsync(MakeRequest("Same") with { MaxOutputTokens = 1000 }));
+        await CollectTextDeltas(caching.GenerateStreamAsync(MakeRequest("Same") with { MaxOutputTokens = 1000 })); // hit
+
+        _inner.StreamCallCount.ShouldBe(2);
     }
 
     // ── Tool-call responses not cached ───────────────────────────
@@ -204,6 +242,74 @@ public class CachingAgentModelTests
         second.GenerateCallCount.ShouldBe(0); // never actually called — collision confirmed
     }
 
+    // ── Cache unavailable: a miss, with a warning ────────────────
+
+    [Test]
+    public async Task GenerateAsync_CacheReadThrows_AnswersFromInnerAndLogsWarning()
+    {
+        var logger = new CollectingLogger();
+        var cache = new ThrowingCache(failReads: true, failWrites: false);
+        var caching = new CachingAgentModel(_inner, cache, TimeSpan.FromMinutes(5), logger: logger);
+
+        var response = await caching.GenerateAsync(MakeRequest("What?"));
+
+        response.Text.ShouldBe("hello world");
+        _inner.GenerateCallCount.ShouldBe(1);
+        logger.Entries.ShouldContain(e => e.Level == LogLevel.Warning && e.Exception is InvalidOperationException);
+    }
+
+    [Test]
+    public async Task GenerateAsync_CacheWriteThrows_AnswersAndLogsWarning()
+    {
+        var logger = new CollectingLogger();
+        var cache = new ThrowingCache(failReads: false, failWrites: true);
+        var caching = new CachingAgentModel(_inner, cache, TimeSpan.FromMinutes(5), logger: logger);
+
+        var response = await caching.GenerateAsync(MakeRequest("What?"));
+
+        response.Text.ShouldBe("hello world");
+        logger.Entries.ShouldContain(e => e.Level == LogLevel.Warning && e.Exception is InvalidOperationException);
+    }
+
+    [Test]
+    public async Task GenerateStreamAsync_CacheDown_StreamsFromInnerAndLogsWarnings()
+    {
+        var logger = new CollectingLogger();
+        var cache = new ThrowingCache(failReads: true, failWrites: true);
+        var caching = new CachingAgentModel(_inner, cache, TimeSpan.FromMinutes(5), logger: logger);
+
+        var chunks = await CollectTextDeltas(caching.GenerateStreamAsync(MakeRequest("Stream this")));
+
+        chunks.ShouldBe(["hello", " world"]);
+        logger.Entries.Count(e => e.Level == LogLevel.Warning).ShouldBe(2);
+    }
+
+    [Test]
+    public async Task GenerateAsync_CachedValueNotJson_TreatedAsMiss()
+    {
+        var logger = new CollectingLogger();
+        var cache = new ThrowingCache(failReads: false, failWrites: false, storedValue: "not json");
+        var caching = new CachingAgentModel(_inner, cache, TimeSpan.FromMinutes(5), logger: logger);
+
+        var response = await caching.GenerateAsync(MakeRequest("What?"));
+
+        response.Text.ShouldBe("hello world");
+        _inner.GenerateCallCount.ShouldBe(1);
+        logger.Entries.ShouldContain(e => e.Level == LogLevel.Warning);
+    }
+
+    [Test]
+    public async Task GenerateAsync_Cancelled_ThrowsInsteadOfMiss()
+    {
+        var cache = new ThrowingCache(failReads: false, failWrites: false);
+        var caching = new CachingAgentModel(_inner, cache, TimeSpan.FromMinutes(5));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => caching.GenerateAsync(MakeRequest("What?"), cts.Token));
+        _inner.GenerateCallCount.ShouldBe(0);
+    }
+
     // ── Validation ───────────────────────────────────────────────
 
     [Test]
@@ -236,6 +342,77 @@ public class CachingAgentModelTests
                 deltas.Add(chunk.TextDelta);
         }
         return deltas;
+    }
+
+    /// <summary>
+    /// Cache whose reads or writes throw, as a store that cannot be reached does; otherwise every
+    /// read returns <c>storedValue</c> and writes are dropped.
+    /// </summary>
+    private sealed class ThrowingCache(bool failReads, bool failWrites, string? storedValue = null) : IKeyValueDataAdapter
+    {
+        private static Exception Down() => new InvalidOperationException("cache unreachable");
+
+        public Task<string?> GetValueAsync(string key, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return failReads ? Task.FromException<string?>(Down()) : Task.FromResult(storedValue);
+        }
+
+        public Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default) =>
+            failReads ? Task.FromException<T?>(Down()) : Task.FromResult<T?>(default);
+
+        public Task SetValueAsync(string key, string value, TimeSpan? expiry, CancellationToken ct = default) =>
+            failWrites ? Task.FromException(Down()) : Task.CompletedTask;
+
+        public Task SetValueAsync<T>(string key, T value, TimeSpan? expiry, CancellationToken ct = default) =>
+            failWrites ? Task.FromException(Down()) : Task.CompletedTask;
+
+        public Task<bool> RemoveAsync(string key, CancellationToken ct = default) =>
+            failWrites ? Task.FromException<bool>(Down()) : Task.FromResult(false);
+
+        public Task<bool> ExistsAsync(string key, CancellationToken ct = default) =>
+            failReads ? Task.FromException<bool>(Down()) : Task.FromResult(false);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    /// <summary>Cache that records the expiry of each write.</summary>
+    private sealed class RecordingCache : IKeyValueDataAdapter
+    {
+        public List<TimeSpan?> Expiries { get; } = [];
+
+        public Task<string?> GetValueAsync(string key, CancellationToken ct = default) => Task.FromResult<string?>(null);
+
+        public Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default) => Task.FromResult<T?>(default);
+
+        public Task SetValueAsync(string key, string value, TimeSpan? expiry, CancellationToken ct = default)
+        {
+            Expiries.Add(expiry);
+            return Task.CompletedTask;
+        }
+
+        public Task SetValueAsync<T>(string key, T value, TimeSpan? expiry, CancellationToken ct = default) =>
+            SetValueAsync(key, "", expiry, ct);
+
+        public Task<bool> RemoveAsync(string key, CancellationToken ct = default) => Task.FromResult(false);
+
+        public Task<bool> ExistsAsync(string key, CancellationToken ct = default) => Task.FromResult(false);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
+
+    private sealed class CollectingLogger : ILogger
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
     }
 
     /// <summary>

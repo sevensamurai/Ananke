@@ -93,7 +93,7 @@ AgentModelFactory.RegisterProvider("OpenAI",
     embeddingFactory: (key, model) => OpenAIEmbeddingModel.Create(key, model));
 
 AgentModelFactory.RegisterProvider("Google",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-3.6-flash",
     agentFactory: (key, model) => GeminiAgentModel.Create(key, model));
 
 // Read from configuration (secrets.json / appsettings.json)

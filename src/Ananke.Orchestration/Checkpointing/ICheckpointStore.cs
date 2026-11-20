@@ -11,14 +11,15 @@ namespace Ananke.Orchestration.Checkpointing;
 ///   <item><see cref="FileCheckpointStore"/> — one JSON file per execution, so a paused run outlives
 ///   its process. What a workflow is waiting to be told lives in workflow state, so a run that pauses
 ///   for a person needs this or something like it to survive the wait</item>
+///   <item><see cref="KeyValueCheckpointStore"/> — one JSON string per execution in an
+///   <c>IKeyValueDataAdapter</c>, expiring with <see cref="Checkpoint{TState}.ExpiresAt"/>; over Redis
+///   (<c>AddRedis</c> in <c>Ananke.Redis</c>), for several processes</item>
 /// </list>
 /// </para>
 /// <para>
-/// <b>Distributed deployments:</b> implement this interface backed by Redis, SQL, or any store that
-/// several processes can reach. A Redis implementation can delegate to <c>RedisDataAdapter</c> from
-/// <c>Ananke.Redis</c> for get/set/delete and use <c>EXPIREAT</c> for TTL-based expiry
-/// (maps to <see cref="Checkpoint{TState}.ExpiresAt"/>). Key format suggestion:
-/// <c>checkpoint:{executionId}</c>. Serialization: <see cref="System.Text.Json.JsonSerializer"/>.
+/// <b>Other stores:</b> implement this interface over SQL or any store that several processes can
+/// reach. Key format suggestion: <c>checkpoint:{executionId}</c>. Serialization:
+/// <see cref="System.Text.Json.JsonSerializer"/>.
 /// </para>
 /// </remarks>
 public interface ICheckpointStore

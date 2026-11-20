@@ -1,0 +1,22 @@
+<Project>
+
+  <!-- Third-party versions are src/'s, so a consumer resolves what the packages were built
+       against; every Ananke package is the version ci.sh just packed. -->
+  <Import Project="..\..\src\Directory.Packages.props" />
+
+  <ItemGroup>
+    <PackageVersion Include="Ananke.Orchestration" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Orchestration.OpenAI" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Orchestration.Google" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Orchestration.Knowledge" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Documents" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Embeddings.Onnx" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Design" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.MCP" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Skills" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.StateMachine" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.Redis" Version="$(AnankeVersion)" />
+    <PackageVersion Include="Ananke.MQTT" Version="$(AnankeVersion)" />
+  </ItemGroup>
+
+</Project>

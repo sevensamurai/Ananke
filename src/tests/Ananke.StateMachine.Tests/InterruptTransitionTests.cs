@@ -26,15 +26,15 @@ sealed class ConvoMachine(IDistributedLock locker, IKeyValueDataAdapter store, S
         .From(ConvoState.Listening).On(ConvoAction.Respond).To(ConvoState.Responding)
         .From(ConvoState.Responding).On(ConvoAction.Done).To(ConvoState.Idle)
         .From(ConvoState.Responding).On(ConvoAction.Interrupt).ToInterrupt(ConvoState.Interrupted)
-            .When(() => AllowInterrupt)
+            .When((_, _) => AllowInterrupt)
         .From(ConvoState.Interrupted).On(ConvoAction.Resume).ToResume();
 
     public override Task<TransitionResult<ConvoState>> TransitionAsync(
-        TestContext context, ConvoAction transition) =>
-        InternalTransitionAsync(context, transition);
+        TestContext context, ConvoAction transition, CancellationToken ct = default) =>
+        InternalTransitionAsync(context, transition, ct);
 
     public override Task NotifyAsync(
-        TestContext context, ConvoNotify notification) =>
+        TestContext context, ConvoNotify notification, CancellationToken ct = default) =>
         Task.CompletedTask;
 }
 
@@ -55,11 +55,11 @@ sealed class DeepInterruptMachine(IDistributedLock locker, IKeyValueDataAdapter 
         .FromAny(DeepState.B, DeepState.C, DeepState.D).On(DeepAction.Resume).ToResume();
 
     public override Task<TransitionResult<DeepState>> TransitionAsync(
-        TestContext context, DeepAction transition) =>
-        InternalTransitionAsync(context, transition);
+        TestContext context, DeepAction transition, CancellationToken ct = default) =>
+        InternalTransitionAsync(context, transition, ct);
 
     public override Task NotifyAsync(
-        TestContext context, DeepNotify notification) =>
+        TestContext context, DeepNotify notification, CancellationToken ct = default) =>
         Task.CompletedTask;
 }
 
@@ -84,7 +84,7 @@ public class InterruptTransitionTests
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
-        machine.CurrentState.ShouldBe(ConvoState.Responding);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Responding);
 
         var result = await machine.TransitionAsync(ctx, ConvoAction.Interrupt);
 
@@ -92,8 +92,8 @@ public class InterruptTransitionTests
         result.WasInterrupt.ShouldBeTrue();
         result.PreviousState.ShouldBe(ConvoState.Responding);
         result.CurrentState.ShouldBe(ConvoState.Interrupted);
-        machine.CurrentState.ShouldBe(ConvoState.Interrupted);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Interrupted);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
     }
 
     // ── Basic resume ─────────────────────────────────────────────
@@ -107,7 +107,7 @@ public class InterruptTransitionTests
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
         await machine.TransitionAsync(ctx, ConvoAction.Interrupt);
-        machine.CurrentState.ShouldBe(ConvoState.Interrupted);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Interrupted);
 
         var result = await machine.TransitionAsync(ctx, ConvoAction.Resume);
 
@@ -115,8 +115,8 @@ public class InterruptTransitionTests
         result.WasResume.ShouldBeTrue();
         result.ResumedFromState.ShouldBe(ConvoState.Interrupted);
         result.CurrentState.ShouldBe(ConvoState.Responding);
-        machine.CurrentState.ShouldBe(ConvoState.Responding);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Responding);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Nested interrupts ────────────────────────────────────────
@@ -131,38 +131,38 @@ public class InterruptTransitionTests
         var r1 = await machine.TransitionAsync(ctx, DeepAction.InterruptToB);
         r1.Success.ShouldBeTrue();
         r1.WasInterrupt.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.B);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.B);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         // B -> interrupt -> C
         var r2 = await machine.TransitionAsync(ctx, DeepAction.InterruptToC);
         r2.Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.C);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.C);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         // C -> interrupt -> D
         var r3 = await machine.TransitionAsync(ctx, DeepAction.InterruptToD);
         r3.Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.D);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.D);
 
         // D -> resume -> C
         var r4 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r4.Success.ShouldBeTrue();
         r4.WasResume.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.C);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.C);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         // C -> resume -> B
         var r5 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r5.Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.B);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.B);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         // B -> resume -> A
         var r6 = await machine.TransitionAsync(ctx, DeepAction.Resume);
         r6.Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.A);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.A);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Guard on interrupt transition ────────────────────────────
@@ -181,8 +181,8 @@ public class InterruptTransitionTests
         result.Success.ShouldBeFalse();
         result.ErrorMessage.ShouldNotBeNull();
         result.ErrorMessage!.ShouldContain("guard");
-        machine.CurrentState.ShouldBe(ConvoState.Responding);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Responding);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Max depth exceeded ───────────────────────────────────────
@@ -204,7 +204,7 @@ public class InterruptTransitionTests
         result.Success.ShouldBeFalse();
         result.ErrorMessage.ShouldNotBeNull();
         result.ErrorMessage!.ShouldContain("Maximum interrupt depth");
-        machine.CurrentState.ShouldBe(DeepState.C);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.C);
     }
 
     // ── Resume with empty stack ──────────────────────────────────
@@ -219,19 +219,19 @@ public class InterruptTransitionTests
         // Let's interrupt first, resume, then try resuming again.
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(DeepState.A);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(DeepState.A);
 
         // Now interrupt again so we're in B (where Resume is defined), then resume twice
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue();
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
 
         // Interrupt once more, then try resume from B where stack is empty after first resume
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToB)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.InterruptToC)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // C -> B
         (await machine.TransitionAsync(ctx, DeepAction.Resume)).Success.ShouldBeTrue(); // B -> A
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── IsInterrupted tracks state correctly ─────────────────────
@@ -242,19 +242,19 @@ public class InterruptTransitionTests
         var machine = new ConvoMachine(_lock, _lock);
         var ctx = new TestContext("1");
 
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
 
         await machine.TransitionAsync(ctx, ConvoAction.Listen);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
 
         await machine.TransitionAsync(ctx, ConvoAction.Respond);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
 
         await machine.TransitionAsync(ctx, ConvoAction.Interrupt);
-        machine.IsInterrupted.ShouldBeTrue();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         await machine.TransitionAsync(ctx, ConvoAction.Resume);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Persistence round-trip ───────────────────────────────────
@@ -276,14 +276,14 @@ public class InterruptTransitionTests
         var result = await machine2.TransitionAsync(ctx, DeepAction.Resume);
         result.Success.ShouldBeTrue();
         result.WasResume.ShouldBeTrue();
-        machine2.CurrentState.ShouldBe(DeepState.B);
-        machine2.IsInterrupted.ShouldBeTrue();
+        (await machine2.GetStatusAsync(ctx)).State.ShouldBe(DeepState.B);
+        (await machine2.GetStatusAsync(ctx)).IsInterrupted.ShouldBeTrue();
 
         // Resume again: B -> A
         var result2 = await machine2.TransitionAsync(ctx, DeepAction.Resume);
         result2.Success.ShouldBeTrue();
-        machine2.CurrentState.ShouldBe(DeepState.A);
-        machine2.IsInterrupted.ShouldBeFalse();
+        (await machine2.GetStatusAsync(ctx)).State.ShouldBe(DeepState.A);
+        (await machine2.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Normal transitions still work alongside interrupts ───────
@@ -299,8 +299,8 @@ public class InterruptTransitionTests
         (await machine.TransitionAsync(ctx, ConvoAction.Respond)).Success.ShouldBeTrue();
         (await machine.TransitionAsync(ctx, ConvoAction.Done)).Success.ShouldBeTrue();
 
-        machine.CurrentState.ShouldBe(ConvoState.Idle);
-        machine.IsInterrupted.ShouldBeFalse();
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Idle);
+        (await machine.GetStatusAsync(ctx)).IsInterrupted.ShouldBeFalse();
     }
 
     // ── Interrupt then normal flow after resume ──────────────────
@@ -319,7 +319,7 @@ public class InterruptTransitionTests
         // Back at Responding — can complete normally
         var result = await machine.TransitionAsync(ctx, ConvoAction.Done);
         result.Success.ShouldBeTrue();
-        machine.CurrentState.ShouldBe(ConvoState.Idle);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Idle);
     }
 
     // ── Interrupt payload ────────────────────────────────────────
@@ -339,7 +339,7 @@ public class InterruptTransitionTests
         result.Success.ShouldBeTrue();
         result.WasInterrupt.ShouldBeTrue();
         result.InterruptPayload.ShouldBe(payload);
-        machine.CurrentState.ShouldBe(ConvoState.Interrupted);
+        (await machine.GetStatusAsync(ctx)).State.ShouldBe(ConvoState.Interrupted);
     }
 
     [Test]

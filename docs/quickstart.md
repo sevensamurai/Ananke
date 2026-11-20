@@ -117,7 +117,7 @@ using Ananke.Orchestration.Google;
 
 IStreamingAgentModel model = GeminiAgentModel.Create(
     apiKey,
-    "gemini-2.5-pro");
+    "gemini-3.6-flash");
 ```
 
 ### Local Or OpenAI-Compatible Endpoints

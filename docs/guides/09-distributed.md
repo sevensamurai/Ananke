@@ -15,10 +15,12 @@ The distributed layer is not a rewrite — it is a wiring change. The same `Work
 
 | Package | What it provides |
 |---|---|
-| `Ananke.Redis` | `IDistributedLock` via RedLock.net · `IKeyValueDataAdapter` via StackExchange.Redis |
+| `Ananke.Redis` | `IDistributedLock` via RedLock.net · `IKeyValueDataAdapter` and `IConversationMemory` via StackExchange.Redis |
 | `Ananke.MQTT` | `IChannelReader` / `IChannelWriter` via MQTTnet · MessagePack serialization |
 
-Both have zero-config in-memory alternatives for dev/test.
+Each has zero-config in-memory alternatives for dev/test. `Ananke.Redis` and `Ananke.MQTT` depend on
+`Ananke.Abstractions` only. Workflow checkpoints in Redis use `KeyValueCheckpointStore` (in `Ananke.Orchestration`) over the
+`IKeyValueDataAdapter` that `AddRedis` registers.
 
 ---
 
@@ -30,8 +32,9 @@ Safe coordination across multiple service instances:
 dotnet add package Ananke.Redis
 ```
 
-`RedisDistributedLock` takes a `CacheConfig` (host/port/credentials) via `IOptions<CacheConfig>`,
-not a pre-built connection — it establishes the actual Redis connection lazily on first use:
+`RedisDistributedLock` takes a `CacheConfig` (host/port/credentials) via `IOptions<CacheConfig>`
+and establishes the Redis connection lazily on first use, or uses an `IConnectionMultiplexer` the
+host passes in:
 
 ```csharp
 using Ananke.Abstractions.Config;
@@ -54,6 +57,13 @@ var result = await locker.RunCoordinatedActionAsync("my-resource", async () =>
 });
 // result.LockAcquired / result.Success / result.Result
 ```
+
+`RunCoordinatedActionAsync` tries the lock once: when another holder has it, `LockAcquired` is false and the action
+doesn't run. `RunCoordinatedActionWithRetryAsync`, an extension method for any `IDistributedLock`, retries taking the
+lock, `maxRetries` times with a delay that doubles, then returns `LockFailed`. Either way the action runs at most
+once: an exception it throws comes back in `result.Exception`, and a cancelled token throws
+`OperationCanceledException`. `InMemoryDistributedLock` behaves the same for callers that share one instance; two
+instances don't exclude each other.
 
 For dev/test, use the in-memory alternative:
 
@@ -78,8 +88,20 @@ await adapter.SetValueAsync("key", "value");
 var value = await adapter.GetValueAsync("key");
 ```
 
-Used by `CachingAgentModel` for LLM response caching and by
-`RedisConversationMemory` for chat history persistence.
+A read returns `null` only when the key does not exist. When Redis cannot answer (unreachable,
+timed out, or a value that does not deserialize), every operation throws instead, so a failure is
+never read as a missing key: a state machine transition fails without writing, and the persisted
+state is unchanged once Redis is back.
+
+`SetValueAsync(key, value, expiry)` stores a value that is gone after `expiry`, in Redis and in
+`InMemoryDistributedLock` alike.
+
+Credentials, TLS (`Ssl`), a `ConnectionString`, the `Database`, a `KeyPrefix` for every key and
+lock name, and the connect, sync and async timeouts (`ConnectTimeoutMs`, `SyncTimeoutMs`,
+`AsyncTimeoutMs`) are set on `CacheConfig`; values and locks share one connection, or the
+`IConnectionMultiplexer` the host registers. See the `Ananke.Redis` README.
+
+Used by `CachingAgentModel` for LLM response caching.
 
 ---
 
@@ -191,17 +213,29 @@ lives in the other jobs. The Bridge extension infers all generic type parameters
 
 ## Conversation Memory — Redis
 
-Persist chat history across requests with Redis:
+Persist chat history across requests with Redis, from `Ananke.Redis`:
+
+```bash
+dotnet add package Ananke.Redis
+```
 
 ```csharp
-using Ananke.Orchestration.Memory;
+using Ananke.Redis;
+using StackExchange.Redis;
 
+var redis = await ConnectionMultiplexer.ConnectAsync("localhost:6379");
 var memory = new RedisConversationMemory(redis, ttl: TimeSpan.FromHours(1));
 ```
+
+Each append and its expiry go to Redis in one transaction. Workflow checkpoints go through
+`KeyValueCheckpointStore` (`Ananke.Orchestration`), over the `IKeyValueDataAdapter` that `AddRedis` registers:
+`new KeyValueCheckpointStore(sp.GetRequiredService<IKeyValueDataAdapter>())`.
 
 Or in-memory for dev/test:
 
 ```csharp
+using Ananke.Orchestration.Memory;
+
 var memory = new InMemoryConversationMemory(ttl: TimeSpan.FromHours(1));
 ```
 

@@ -1,4 +1,4 @@
-using Ananke.Analyzers;
+using Ananke.Orchestration.Analyzers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;

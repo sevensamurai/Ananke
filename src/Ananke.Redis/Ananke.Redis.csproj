@@ -3,7 +3,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Ananke.Redis</PackageId>
-    <Description>Redis infrastructure for Ananke — IDistributedLock via RedLock and IKeyValueDataAdapter via StackExchange.Redis. Provides services.AddAnankeRedis() for DI registration.</Description>
+    <Description>Redis infrastructure for Ananke — IDistributedLock via RedLock, IKeyValueDataAdapter and IConversationMemory via StackExchange.Redis. Provides services.AddRedis() for DI registration.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ananke.Abstractions\Ananke.Abstractions.csproj" />
-    <ProjectReference Include="..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
   </ItemGroup>
 
 </Project>

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 
-namespace Ananke.Analyzers;
+namespace Ananke.Orchestration.Analyzers;
 
 /// <summary>
 /// Reports job names used in <c>Then</c>, <c>Loop</c>, <c>Join</c>, <c>Chain</c>,

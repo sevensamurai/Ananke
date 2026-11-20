@@ -254,10 +254,24 @@ var decisions = await new DatedRecordReader<Decision>(records).SearchAsync("tele
 var current = decisions.Where(d => d.ReplacedBy is null);
 ```
 
+**Superseded passages in a search.** `CatalogAwareKnowledgeStore.SearchAsync` writes each result's document date
+(`effective_at`) and what supersedes it (`superseded_by`) from the catalog entry when the chunk doesn't carry them, so
+a passage of a document only a newer one says it replaces (RFC 7231, replaced by RFC 9110) comes back marked, and
+`search_knowledge` prints `Date:` and `Superseded by:` for it. By default that is all: the ranking is the store's.
+`SupersededResults` (experimental: `ANNKEEXP004`) changes what happens to them — `Demote` ranks them below the
+current results returned with them, `Exclude` leaves them out and asks the store for more until `TopK` current results
+are found (asking for at most 16 times `TopK`):
+
+```csharp
+var store = new CatalogAwareKnowledgeStore(inner, catalog) { SupersededResults = SupersededResults.Demote };
+```
+
 **Lists, not searches.** A search returns the closest few, so a roundup ("every decision parked this quarter") can
 miss some. A store that implements `IListableKnowledgeStore` — the in-memory, Postgres and Qdrant stores do, and the
-scoped and catalog-aware stores pass it through — lists every chunk whose metadata matches a filter. Name the record
-properties to keep as metadata with `DatedRecordOptions.Fields`, then list by them:
+scoped and catalog-aware stores pass it through — lists every chunk whose metadata matches a filter. Given a
+`KnowledgeDateOrder`, it lists newest first by a date in metadata, with an optional lower bound, ordered and cut at the
+limit in the store's own query; chunks without the date come last. Name the record properties to keep as metadata with
+`DatedRecordOptions.Fields`, then list by them:
 
 ```csharp
 Fields = d => new Dictionary<string, string> { ["status"] = d.Status.ToString().ToLowerInvariant() },
@@ -265,8 +279,9 @@ Fields = d => new Dictionary<string, string> { ["status"] = d.Status.ToString().
 var parked = await reader.ListAsync(new KnowledgeFilter { ["status"] = "parked" }, since: quarterStart);
 ```
 
-`DatedRecordTools.Create(reader, ["status"])` gives agents the same as a `list_records` tool, with an optional
-parameter for each property named and `since`. Both are experimental: `ANNKEEXP004`.
+The reader lists the newest records first, by their `effective_at`. `DatedRecordTools.Create(reader, ["status"])`
+gives agents the same as a `list_records` tool, with an optional parameter for each property named and `since`; when
+more records match than it shows, it says so. Both are experimental: `ANNKEEXP004`.
 
 ### Links by Pattern
 
@@ -297,6 +312,29 @@ var mentions = await store.SearchAsync("ZEN-6", new SearchOptions
 Anchor a pattern to what it means in your documents: a loose `[A-Z]+-\d+` finds `UTF-8` and `SHA-256` as readily as
 a ticket key. `DocumentStructureBuilder` (in `Ananke.Learning`)
 turns the same metadata into `mentions` edges on an `IKnowledgeGraph`, marked `EdgeProvenance.Extracted`.
+
+### Links to Other Documents
+
+A document's own hyperlinks say what it builds on. Set `DocumentProcessor.Hyperlinks` (experimental: `ANNKEEXP004`)
+and each hyperlink an extractor found in a section (`ExtractedSection.Links`) that resolves to a source id is written
+into the metadata of that section's chunks as `entity:document:{source id}`. Relative links resolve against the
+document's own source id by default, as a browser resolves them against the page's address; external URLs are
+left out. Give `Resolve` your own mapping when your source ids are named otherwise:
+
+```csharp
+#pragma warning disable ANNKEEXP004
+var processor = new DocumentProcessor(http, extractors, chunker, store)
+{
+    Hyperlinks = new HyperlinkOptions(),   // or: new() { Resolve = (sourceId, uri) => ... }
+};
+
+// The documents plans/oauth.md links to, newest first, with their dates and what supersedes them:
+var linked = await new LinkedDocumentReader(store, catalog).ListAsync("plans/oauth.md");
+```
+
+`LinkedDocumentReader` needs a store that lists (`IListableKnowledgeStore`); the catalog is optional.
+`KnowledgeCatalogTools.CreateLinks(reader)` gives agents the same as a `list_linked_documents` tool. The documents
+that link *to* one are an exact filter on `entity:document:{source id}`.
 
 ---
 
@@ -428,7 +466,7 @@ See [17 — Local & self-hosted models](17-local-models.md) for the rest of the 
 
 A host that already runs Postgres can keep its knowledge there, with pgvector (package `Ananke.Postgres`,
 experimental: `ANNKEEXP004`). It does all three search modes: embedding (`Dense`), keyword (`Sparse`, Postgres
-full-text search) and both fused (`Hybrid`):
+full-text search ranked by BM25 from the table's own lexeme counts) and both fused (`Hybrid`):
 
 ```csharp
 #pragma warning disable ANNKEEXP004

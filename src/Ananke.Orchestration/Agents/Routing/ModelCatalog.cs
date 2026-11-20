@@ -130,12 +130,14 @@ public static class ModelCatalog
     public static IReadOnlyList<ModelProfileTemplate> All { get; } =
     [
         // OpenAI
-        OpenAI.Gpt4_1, OpenAI.Gpt4_1Mini, OpenAI.Gpt4_1Nano,
-        OpenAI.O3, OpenAI.O3Mini, OpenAI.O4Mini,
+        OpenAI.Gpt4_1, OpenAI.Gpt4_1Mini,
+        OpenAI.O3,
         OpenAI.Gpt4o, OpenAI.Gpt4oMini,
         OpenAI.Gpt5, OpenAI.Gpt5Mini, OpenAI.Gpt5Nano, OpenAI.Gpt52,
         OpenAI.Gpt54, OpenAI.Gpt54Mini, OpenAI.Gpt54Nano, OpenAI.Gpt55,
         OpenAI.Gpt56Sol, OpenAI.Gpt56Terra, OpenAI.Gpt56Luna,
+        OpenAI.Gpt6Sol, OpenAI.Gpt6Luna, OpenAI.Gpt6Astra,
+        OpenAI.Gpt61Sol, OpenAI.Gpt61Terra, OpenAI.Gpt62Sol, OpenAI.Gpt62Astra,
 
         // Anthropic
         Anthropic.ClaudeOpus4_8, Anthropic.ClaudeSonnet4_6, Anthropic.ClaudeHaiku4_5,
@@ -147,6 +149,7 @@ public static class ModelCatalog
         Google.Gemini2_5Pro, Google.Gemini2_5Flash,
         Google.Gemini3_5Flash, Google.Gemini3_1FlashLite,
         Google.Gemini3_6Flash, Google.Gemini3_7Flash, Google.Gemini3_5FlashLite,
+        Google.Gemini3_8Flash, Google.Gemini4Carbon, Google.Gemini4Argon, Google.Gemini4Hydrogen,
         Google.Gemma4,
 
         // Meta (open-weight — self-hosted)
@@ -267,21 +270,9 @@ public static class ModelCatalog
         public static ModelProfileTemplate Gpt4_1Mini { get; } =
             CreateTemplate(Models.OpenAI.Gpt41Mini, FullModel | ModelCapability.Vision, intelligenceTier: 3, maxContextTokens: 1_047_576, speedTier: 4, family: "gpt");
 
-        /// <summary>GPT-4.1 Nano — fastest, cheapest GPT-4.1 variant.</summary>
-        public static ModelProfileTemplate Gpt4_1Nano { get; } =
-            CreateTemplate(Models.OpenAI.Gpt41Nano, ChatModel | ModelCapability.LargeContext, intelligenceTier: 2, maxContextTokens: 1_047_576, speedTier: 5, family: "gpt");
-
         /// <summary>o3 — frontier reasoning model.</summary>
         public static ModelProfileTemplate O3 { get; } =
             CreateTemplate(Models.OpenAI.O3, FrontierModel, intelligenceTier: 5, maxContextTokens: 200_000, speedTier: 1, family: "o");
-
-        /// <summary>o3-mini — fast reasoning.</summary>
-        public static ModelProfileTemplate O3Mini { get; } =
-            CreateTemplate(Models.OpenAI.O3Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3, family: "o");
-
-        /// <summary>o4-mini — latest compact reasoning model.</summary>
-        public static ModelProfileTemplate O4Mini { get; } =
-            CreateTemplate(Models.OpenAI.O4Mini, FrontierModel, intelligenceTier: 4, maxContextTokens: 200_000, speedTier: 3, family: "o");
 
         /// <summary>GPT-4o — prior-gen frontier model.</summary>
         public static ModelProfileTemplate Gpt4o { get; } =
@@ -315,7 +306,7 @@ public static class ModelCatalog
         public static ModelProfileTemplate Gpt54Mini { get; } =
             CreateTemplate(Models.OpenAI.Gpt54Mini, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 400_000, speedTier: 4, family: "gpt");
 
-        /// <summary>GPT-5.4 Nano — legacy, fastest, cheapest of the 5.4 line.</summary>
+        /// <summary>GPT-5.4 Nano — deprecated, fastest, cheapest of the 5.4 line.</summary>
         public static ModelProfileTemplate Gpt54Nano { get; } =
             CreateTemplate(Models.OpenAI.Gpt54Nano, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 400_000, speedTier: 5, family: "gpt");
 
@@ -334,6 +325,37 @@ public static class ModelCatalog
         /// <summary>GPT-5.6 Luna — current-gen fastest, lowest-cost of the 5.6 line (nano-tier equivalent).</summary>
         public static ModelProfileTemplate Gpt56Luna { get; } =
             CreateTemplate(Models.OpenAI.Gpt56Luna, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 1_050_000, speedTier: 5, family: "gpt");
+
+        // The GPT-6 line: windows as OpenAI reports them (1.05M in, 128K out). Capabilities and tiers
+        // follow the matching GPT-5.6 tier (Sol, Terra, Luna), with Astra as the flagship.
+
+        /// <summary>GPT-6 Sol — frontier reasoning, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt6Sol { get; } =
+            CreateTemplate(Models.OpenAI.Gpt6Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2, family: "gpt");
+
+        /// <summary>GPT-6 Luna — fastest, lowest-cost of the GPT-6 line, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt6Luna { get; } =
+            CreateTemplate(Models.OpenAI.Gpt6Luna, FullModel | ModelCapability.Reasoning, intelligenceTier: 3, maxContextTokens: 1_050_000, speedTier: 5, family: "gpt");
+
+        /// <summary>GPT-6 Astra — flagship of the first GPT-6 release, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt6Astra { get; } =
+            CreateTemplate(Models.OpenAI.Gpt6Astra, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 1, family: "gpt");
+
+        /// <summary>GPT-6.1 Sol — frontier reasoning, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt61Sol { get; } =
+            CreateTemplate(Models.OpenAI.Gpt61Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2, family: "gpt");
+
+        /// <summary>GPT-6.1 Terra — balances capability and cost, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt61Terra { get; } =
+            CreateTemplate(Models.OpenAI.Gpt61Terra, FullModel | ModelCapability.Reasoning, intelligenceTier: 4, maxContextTokens: 1_050_000, speedTier: 4, family: "gpt");
+
+        /// <summary>GPT-6.2 Sol — balances intelligence and cost at the frontier, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt62Sol { get; } =
+            CreateTemplate(Models.OpenAI.Gpt62Sol, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 2, family: "gpt");
+
+        /// <summary>GPT-6.2 Astra — OpenAI's flagship, 1.05M context, 128K output.</summary>
+        public static ModelProfileTemplate Gpt62Astra { get; } =
+            CreateTemplate(Models.OpenAI.Gpt62Astra, FrontierModel, intelligenceTier: 5, maxContextTokens: 1_050_000, speedTier: 1, family: "gpt");
 
 #pragma warning restore ANNKE001
 
@@ -464,6 +486,26 @@ public static class ModelCatalog
             CreateTemplate(Models.Google.Gemini35FlashLite,
                 FullModel | ModelCapability.Vision | ModelCapability.AudioInput | ModelCapability.VideoInput,
                 intelligenceTier: 2, maxContextTokens: 1_000_000, speedTier: 5, family: "gemini");
+
+        // Gemini 3.8 Flash and the Gemini 4 line: windows as the API reports them. Capabilities and
+        // tiers carried forward from Gemini 3.7 Flash, with Carbon and Argon slower as Google's
+        // reasoning models; nothing independent has confirmed them.
+
+        /// <summary>Gemini 3.8 Flash — 1,048,576-token window, 65,536-token output.</summary>
+        public static ModelProfileTemplate Gemini3_8Flash { get; } =
+            CreateTemplate(Models.Google.Gemini38Flash, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 4, family: "gemini");
+
+        /// <summary>Gemini 4 Carbon — strongest reasoning, 1,048,576-token window, 32,768-token output.</summary>
+        public static ModelProfileTemplate Gemini4Carbon { get; } =
+            CreateTemplate(Models.Google.Gemini4Carbon, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 2, family: "gemini");
+
+        /// <summary>Gemini 4 Argon — efficient frontier reasoning, 1,048,576-token window, 32,768-token output.</summary>
+        public static ModelProfileTemplate Gemini4Argon { get; } =
+            CreateTemplate(Models.Google.Gemini4Argon, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 3, family: "gemini");
+
+        /// <summary>Gemini 4 Hydrogen — the widely available Gemini 4 model, 1,048,576-token window, 65,536-token output.</summary>
+        public static ModelProfileTemplate Gemini4Hydrogen { get; } =
+            CreateTemplate(Models.Google.Gemini4Hydrogen, FrontierModel | ModelCapability.AudioInput | ModelCapability.VideoInput, intelligenceTier: 5, maxContextTokens: 1_048_576, speedTier: 4, family: "gemini");
 
 #pragma warning restore ANNKE001
 

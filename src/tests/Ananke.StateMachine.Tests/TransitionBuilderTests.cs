@@ -62,7 +62,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder.From(Light.Off).On(LightAction.TurnOn).To(Light.On)
-            .When(() => true);
+            .When((_, _) => true);
         builder.Build();
 
         var key = TransitionBuilder<Light, LightAction>.GetKey(Light.Off, LightAction.TurnOn);
@@ -74,7 +74,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder.From(Light.Off).On(LightAction.TurnOn).To(Light.On)
-            .WhenAsync(() => Task.FromResult(true));
+            .WhenAsync((_, _) => Task.FromResult(true));
         builder.Build();
 
         var key = TransitionBuilder<Light, LightAction>.GetKey(Light.Off, LightAction.TurnOn);
@@ -88,7 +88,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder.From(Light.Off).On(LightAction.TurnOn).To(Light.On)
-            .WithAction(() => Task.CompletedTask);
+            .WithAction((_, _) => Task.CompletedTask);
         builder.Build();
 
         var key = TransitionBuilder<Light, LightAction>.GetKey(Light.Off, LightAction.TurnOn);
@@ -104,13 +104,13 @@ public class TransitionBuilderTests
         var builder = new TransitionBuilder<Light, LightAction>();
         builder
             .From(Light.Off).On(LightAction.TurnOn).To(Light.On)
-                .WithAction(() => Task.CompletedTask)
+                .WithAction((_, _) => Task.CompletedTask)
             .From(Light.On).On(LightAction.Blink).To(Light.Blinking);
         builder.Build();
 
         var key = TransitionBuilder<Light, LightAction>.GetKey(Light.Off, LightAction.TurnOn);
         var action = builder.Transitions[key].AfterTransitionAction!;
-        var result = await action();
+        var result = await action(new TestContext("1"), CancellationToken.None);
 
         // Must be Light.On (the target state at definition time), not Light.Off (default)
         result.ShouldBe(Light.On);
@@ -121,7 +121,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder.From(Light.Off).On(LightAction.TurnOn).To(Light.On)
-            .WithAction(() => Task.FromResult(Light.Blinking));
+            .WithAction((_, _) => Task.FromResult(Light.Blinking));
         builder.Build();
 
         var key = TransitionBuilder<Light, LightAction>.GetKey(Light.Off, LightAction.TurnOn);
@@ -135,7 +135,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder
-            .State(Light.On).OnEnter(() => Task.CompletedTask);
+            .State(Light.On).OnEnter((_, _) => Task.CompletedTask);
         builder.Build();
 
         builder.StateConfigs.ShouldContainKey(Light.On);
@@ -147,7 +147,7 @@ public class TransitionBuilderTests
     {
         var builder = new TransitionBuilder<Light, LightAction>();
         builder
-            .State(Light.On).OnExit(() => Task.CompletedTask);
+            .State(Light.On).OnExit((_, _) => Task.CompletedTask);
         builder.Build();
 
         builder.StateConfigs[Light.On].OnExitAction.ShouldNotBeNull();
@@ -159,8 +159,8 @@ public class TransitionBuilderTests
         var builder = new TransitionBuilder<Light, LightAction>();
         builder
             .State(Light.On)
-                .OnEnter(() => Task.CompletedTask)
-                .OnExit(() => Task.CompletedTask);
+                .OnEnter((_, _) => Task.CompletedTask)
+                .OnExit((_, _) => Task.CompletedTask);
         builder.Build();
 
         builder.StateConfigs[Light.On].OnEnterAction.ShouldNotBeNull();
