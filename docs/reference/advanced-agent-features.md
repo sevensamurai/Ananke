@@ -149,9 +149,10 @@ unchanged.
 | Aspect | Detail |
 |---|---|
 | **Cache key** | SHA256 hash of `SystemPrompt` + `Messages` + `Tools` + `ResponseFormat`. `Metadata` and `StoreCompletions` are excluded (they don't affect model output). |
-| **TTL** | Stored alongside the response as an `ExpiresAt` timestamp. Expired entries are treated as cache misses and cleaned up on read. |
+| **TTL** | Stored alongside the response as an `ExpiresAt` timestamp. The same TTL is set as the key's expiry, so the store drops expired entries itself; one read after expiry is a miss and is cleaned up. |
 | **Tool-call responses** | Never cached. Responses where `RequiresAction == true` are always fetched fresh, because tool results depend on external state. |
 | **Key prefix** | Defaults to `"ananke:llm-cache"`. Configurable via the `keyPrefix` constructor parameter for multi-tenant or multi-model isolation. |
+| **Cache unavailable** | A cache that throws on read or write never fails the call: the read counts as a miss, the response is returned unstored, and each failure is logged as a warning to the `logger` constructor parameter. |
 
 ---
 

@@ -21,12 +21,13 @@ public class StateMachineChannelWorkerTests
     [Test]
     public async Task HandleAsync_NullContext_SkipsTransitionLeavesStateUnchanged()
     {
-        var machine = new LightMachine(_lock, _lock);
+        var locker = new CountingLock(_lock);
+        var machine = new LightMachine(locker, _lock);
         await using var worker = new StateMachineChannelWorker<TestContext, Light, LightAction, LightNotify>(machine);
 
         await worker.HandleAsync(null, LightAction.TurnOn, CancellationToken.None);
 
-        machine.CurrentState.ShouldBe(Light.Off);
+        locker.Calls.ShouldBe(0);
     }
 
     [Test]
@@ -54,7 +55,7 @@ public class StateMachineChannelWorkerTests
 
         await worker.HandleAsync(new TestContext("1"), LightAction.TurnOn, CancellationToken.None);
 
-        machine.CurrentState.ShouldBe(Light.On);
+        (await machine.GetStatusAsync(new TestContext("1"))).State.ShouldBe(Light.On);
     }
 
     [Test]
@@ -102,7 +103,7 @@ public class StateMachineChannelWorkerTests
 
         await worker.HandleAsync(new TestContext("1"), LightAction.TurnOff, CancellationToken.None);
 
-        machine.CurrentState.ShouldBe(Light.Off);
+        (await machine.GetStatusAsync(new TestContext("1"))).State.ShouldBe(Light.Off);
     }
 
     // ── HandleAsync: post-transition worker ──────────────────────────
@@ -199,5 +200,18 @@ public class StateMachineChannelWorkerTests
     {
         public Task HandleAsync(TransitionEvent<TestContext, Light, LightAction>? item, CancellationToken token)
             => Task.CompletedTask;
+    }
+
+    /// <summary>Counts the attempts to take the lock a machine makes.</summary>
+    private sealed class CountingLock(IDistributedLock inner) : IDistributedLock
+    {
+        public int Calls { get; private set; }
+
+        public Task<CoordinatedActionResult<R>> RunCoordinatedActionAsync<R>(
+            string resourceId, Func<Task<R>> action, CancellationToken ct = default)
+        {
+            Calls++;
+            return inner.RunCoordinatedActionAsync(resourceId, action, ct);
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Ananke.Orchestration.Knowledge;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
@@ -34,6 +35,7 @@ public sealed class QdrantKnowledgeStore : IListableKnowledgeStore
     private readonly string _collectionName;
     private readonly uint _vectorSize;
     private readonly SemaphoreSlim _initLock = new(1, 1);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _dateIndexes = new(StringComparer.Ordinal);
     private bool _initialized;
 
     /// <summary>
@@ -152,20 +154,106 @@ public sealed class QdrantKnowledgeStore : IListableKnowledgeStore
     }
 
     /// <inheritdoc />
-    /// <remarks>Qdrant scrolls by point id, which is derived from the chunk's id, so that is the order.</remarks>
-    public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+    /// <remarks>
+    /// Without <paramref name="order"/>, Qdrant scrolls by point id, a hash of the chunk's id. With it, the store makes a
+    /// datetime payload index on its key the first time it is asked, scrolls the dated points by it, newest first, and,
+    /// when there is room left and no lower bound, adds the points without a date (or whose value isn't one) by point
+    /// id.
+    /// </remarks>
+#pragma warning disable ANNKEEXP004 // implements the experimental listing
+    public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
+        KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegative(limit);
         await EnsureCollectionAsync(ct).ConfigureAwait(false);
+        if (limit == 0)
+            return [];
+        if (order is null)
+            return await ScrollAsync(BuildFilter(filter), limit, ct).ConfigureAwait(false);
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(order.Key, nameof(order));
+        await EnsureDateIndexAsync(order.Key, ct).ConfigureAwait(false);
+
+        var listed = await ScrollByDateAsync(filter, order, limit, ct).ConfigureAwait(false);
+        if (listed.Count >= limit || order.Since is not null)
+            return listed;
+
+        var undated = BuildFilter(filter) ?? new Filter();
+        undated.MustNot.Add(Conditions.DatetimeRange(order.Key, gte: DateTimeOffset.MinValue.UtcDateTime));
+        listed.AddRange(await ScrollAsync(undated, limit - listed.Count, ct).ConfigureAwait(false));
+        return listed;
+    }
+
+    /// <summary>
+    /// The dated points matching <paramref name="filter"/>, newest first by <paramref name="order"/>'s key, at most
+    /// <paramref name="limit"/>, 256 to a page. Ordered scrolling has no page offset, so each page starts at the oldest
+    /// date the one before reached and leaves out the points already listed at that date.
+    /// </summary>
+    private async Task<List<KnowledgeChunk>> ScrollByDateAsync(
+        KnowledgeFilter filter, KnowledgeDateOrder order, int limit, CancellationToken ct)
+    {
+        var since = (order.Since ?? DateTimeOffset.MinValue).UtcDateTime;
+        var listed = new List<KnowledgeChunk>();
+        var atOldest = new List<Guid>();
+        DateTime? oldest = null;
+        while (listed.Count < limit)
+        {
+            var dated = BuildFilter(filter) ?? new Filter();
+            dated.Must.Add(Conditions.DatetimeRange(order.Key, gte: since, lte: oldest));
+            if (atOldest.Count > 0)
+                dated.MustNot.Add(Conditions.HasId(atOldest));
+
+            var size = Math.Min(256, limit - listed.Count);
+            var page = await _client.ScrollAsync(
+                _collectionName,
+                filter: dated,
+                limit: (uint)size,
+                payloadSelector: true,
+                orderBy: new OrderBy { Key = order.Key, Direction = Direction.Desc },
+                cancellationToken: ct).ConfigureAwait(false);
+
+            foreach (var point in page.Result)
+            {
+                listed.Add(MapPayload(point.Id, point.Payload, 0f));
+
+                // A value Qdrant reads as a date and .NET doesn't leaves no date to start the next page from.
+                if (DateIn(point.Payload, order.Key) is not { } date)
+                    return listed;
+                if (date != oldest)
+                {
+                    oldest = date;
+                    atOldest.Clear();
+                }
+
+                atOldest.Add(Guid.Parse(point.Id.Uuid));
+            }
+
+            if (page.Result.Count < size)
+                break;
+        }
+
+        return listed;
+    }
+
+    /// <summary>The date under <paramref name="key"/> in UTC, to the microsecond as Qdrant holds it; none when it isn't one.</summary>
+    private static DateTime? DateIn(IDictionary<string, Value> payload, string key) =>
+        payload.TryGetValue(key, out var value)
+        && DateTimeOffset.TryParse(value.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
+            ? new DateTime(date.UtcTicks - (date.UtcTicks % 10), DateTimeKind.Utc)
+            : null;
+#pragma warning restore ANNKEEXP004
+
+    /// <summary>The points matching <paramref name="filter"/>, by point id, at most <paramref name="limit"/>.</summary>
+    private async Task<List<KnowledgeChunk>> ScrollAsync(Filter? filter, int limit, CancellationToken ct)
+    {
         var listed = new List<KnowledgeChunk>();
         PointId? offset = null;
         while (listed.Count < limit)
         {
             var page = await _client.ScrollAsync(
                 _collectionName,
-                filter: BuildFilter(filter),
+                filter: filter,
                 limit: (uint)Math.Min(256, limit - listed.Count),
                 offset: offset,
                 payloadSelector: true,
@@ -175,7 +263,19 @@ public sealed class QdrantKnowledgeStore : IListableKnowledgeStore
                 break;
             offset = page.NextPageOffset;
         }
+
         return listed;
+    }
+
+    /// <summary>Makes a datetime payload index on <paramref name="key"/>, once per store; ordering by a key needs one.</summary>
+    private async Task EnsureDateIndexAsync(string key, CancellationToken ct)
+    {
+        if (_dateIndexes.ContainsKey(key))
+            return;
+
+        await _client.CreatePayloadIndexAsync(_collectionName, key, PayloadSchemaType.Datetime, wait: true, cancellationToken: ct)
+            .ConfigureAwait(false);
+        _dateIndexes.TryAdd(key, true);
     }
 
     private async Task EnsureCollectionAsync(CancellationToken ct)
@@ -213,14 +313,18 @@ public sealed class QdrantKnowledgeStore : IListableKnowledgeStore
 
     private static Filter? BuildFilter(KnowledgeFilter? filter)
     {
-        if (filter is null or { Count: 0 })
+        if (filter is null)
             return null;
 
-        var conditions = filter
-            .Select(kv => Conditions.MatchKeyword(kv.Key, kv.Value))
-            .ToList();
+#pragma warning disable ANNKEEXP004 // applies the experimental AnyOf
+        List<Condition> conditions =
+        [
+            .. filter.Select(kv => Conditions.MatchKeyword(kv.Key, kv.Value)),
+            .. filter.AnyOf.Select(kv => Conditions.Match(kv.Key, kv.Value)),
+        ];
+#pragma warning restore ANNKEEXP004
 
-        return new Filter { Must = { conditions } };
+        return conditions.Count == 0 ? null : new Filter { Must = { conditions } };
     }
 
     private static KnowledgeChunk MapScoredPoint(ScoredPoint point) => MapPayload(point.Id, point.Payload, point.Score);

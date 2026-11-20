@@ -122,7 +122,7 @@ See [`Graph/README.md`](./Graph/README.md) for graph-specific guidance.
 | `Ananke.StateMachine` | Stateful transition engine built on distributed locking abstractions |
 | `Ananke.Learning` | Episode tracking, empirical memory, and graph-based learning over the shared substrate |
 | `Ananke.Organics` | Colony topology projection and graph-based mesh analysis |
-| `Ananke.Redis` | Redis-backed distributed lock, key/value, and conversation-memory implementations |
+| `Ananke.Redis` | Redis-backed distributed lock, key/value and conversation memory implementations |
 | `Ananke.MQTT` | MQTT-backed channel readers, writers, and handoff implementations |
 | `Ananke.OpenTelemetry` | OpenTelemetry-backed tracing implementation |
 

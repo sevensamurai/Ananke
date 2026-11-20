@@ -52,8 +52,8 @@
        Only guides/ and reference/ are indexed — about/ and learning.md are editorial. -->
 
   <!--
-    Generates obj/TemplateEngine.Versions.g.cs from the two version properties in
-    Directory.Build.props so TemplateEngine.cs never drifts from the source of truth.
+    Generates obj/TemplateEngine.Versions.g.cs from VersionPrefix (Directory.Build.props) and
+    MsExtensionsVersion (Directory.Packages.props) so TemplateEngine.cs never drifts from them.
   -->
   <Target Name="GenerateTemplateEngineVersions" BeforeTargets="BeforeCompile">
     <PropertyGroup>
@@ -69,7 +69,7 @@ internal static partial class TemplateEngine
     public const string AnankeVersion = "$(VersionPrefix)"%3B
 
     /// &lt;summary&gt;
-    /// Microsoft.Extensions.* package version baked in at build time from Directory.Build.props &lt;c&gt;MsExtensionsVersion&lt;/c&gt;.
+    /// Microsoft.Extensions.* package version baked in at build time from Directory.Packages.props &lt;c&gt;MsExtensionsVersion&lt;/c&gt;.
     /// &lt;/summary&gt;
     public const string MsExtensionsVersion = "$(MsExtensionsVersion)"%3B
 }

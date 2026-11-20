@@ -684,6 +684,16 @@
             color: var(--toc-text);
         }
 
+        .search-results .search-item .search-heading {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--toc-text);
+        }
+
+        .search-results .search-item .search-heading::before {
+            content: "§ ";
+        }
+
         .search-empty {
             padding: 1.5rem 1rem;
             text-align: center;
@@ -926,6 +936,7 @@
             let siteData = null;
             let flatItems = [];   // ordered list of { title, path } for prev/next
             let activePath = '';
+            let searchPages = null;   // search-index.json's pages, loaded when search first opens
 
             // ── Hamburger menu ────────────────────────────────────────
             function closeMenu() { menuPanel.classList.remove('open'); menuBackdrop.classList.remove('open'); }
@@ -1421,11 +1432,29 @@
             }
 
             // ── Search ────────────────────────────────────────────────
+            // search-index.json is built by scripts/build-search-index.ps1 before each deploy: every
+            // page's tags, headings with their anchors, and keywords from its text. Without it (a local
+            // preview that has not run the script) search falls back to site.json's titles and tags.
+            async function loadSearchPages() {
+                if (searchPages) return;
+                try {
+                    const resp = await fetch('search-index.json');
+                    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+                    searchPages = (await resp.json()).pages;
+                } catch {
+                    searchPages = siteData.sections.flatMap(section => section.items.map(item => ({
+                        path: item.path, title: item.title, section: section.title,
+                        tags: item.tags || [], headings: [], keywords: []
+                    })));
+                }
+            }
+
             function openSearch() {
                 searchOverlay.classList.add('open');
                 searchInput.value = '';
                 searchInput.focus();
                 renderSearchResults('');
+                loadSearchPages().then(() => renderSearchResults(searchInput.value.trim()));
             }
 
             function closeSearch() {
@@ -1484,30 +1513,44 @@
                     return;
                 }
 
-                const q = query.toLowerCase();
-                const matches = [];
+                if (!searchPages) return;   // still loading; openSearch renders again when it is in
 
-                for (const section of siteData.sections) {
-                    for (const item of section.items) {
-                        const haystack = [
-                            item.title,
-                            section.title,
-                            ...(item.tags || [])
-                        ].join(' ').toLowerCase();
-                        if (haystack.includes(q)) {
-                            matches.push({ title: item.title, path: item.path, section: section.title });
-                        }
+                // Every word must appear somewhere. The title counts 3, the section, tags and headings
+                // 2, the keywords 1; site.json order breaks ties.
+                const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+                const matches = [];
+                searchPages.forEach((page, order) => {
+                    const title = page.title.toLowerCase();
+                    const terms = [page.section, ...page.tags].join(' ').toLowerCase();
+                    const headings = page.headings.map(h => h.text.toLowerCase());
+                    let score = 0;
+                    for (const word of words) {
+                        const points = title.includes(word) ? 3
+                            : terms.includes(word) || headings.some(h => h.includes(word)) ? 2
+                            : page.keywords.some(k => k.includes(word)) ? 1
+                            : 0;
+                        if (points === 0) return;
+                        score += points;
                     }
-                }
+                    // Open the section when one heading holds every word and the title does not.
+                    // The landing page is drawn around a hero and has no heading anchors.
+                    const heading = page.path !== 'welcome.md' && !words.every(w => title.includes(w))
+                        ? page.headings.find(h => words.every(w => h.text.toLowerCase().includes(w)))
+                        : undefined;
+                    matches.push({ page, score, order, heading });
+                });
+                matches.sort((a, b) => b.score - a.score || a.order - b.order);
 
                 if (matches.length === 0) {
                     searchResults.innerHTML = `<div class="search-empty">No pages matching "${escapeAttr(query)}"</div>`;
                     return;
                 }
 
-                searchResults.innerHTML = matches.map(m =>
-                    `<a class="search-item" href="#${m.path}"><span class="search-section">${m.section}</span> ${m.title}</a>`
-                ).join('');
+                searchResults.innerHTML = matches.slice(0, 30).map(({ page, heading }) => {
+                    const href = heading ? `#${page.path}?anchor=${heading.anchor}` : `#${page.path}`;
+                    const section = heading ? `<span class="search-heading">${escapeAttr(heading.text)}</span>` : '';
+                    return `<a class="search-item" href="${escapeAttr(href)}"><span class="search-section">${escapeAttr(page.section)}</span> ${escapeAttr(page.title)}${section}</a>`;
+                }).join('');
 
                 searchResults.querySelectorAll('.search-item').forEach(a => {
                     a.addEventListener('click', closeSearch);

@@ -91,7 +91,7 @@ relevant documentation guide and demo (where available).
 | **Distributed locking** | Safe coordination across instances via `IDistributedLock` | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Middleware pipeline** | `ITransitionMiddleware<TContext, TState, TTransition>` — intercept every transition for logging, metrics, validation | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Guard conditions** | Block transitions based on runtime state | [08 — State Machine](../guides/08-state-machine.md) | — |
-| **Circuit breaking** | `OperationalStatus.Faulted` blocks all transitions until `ResetAsync` | [08 — State Machine](../guides/08-state-machine.md) | — |
+| **Circuit breaking** | `FaultAsync` refuses one context's transitions, on every node, until `ResetAsync` | [08 — State Machine](../guides/08-state-machine.md) | — |
 | **Lifecycle hooks** | `OnEnter` / `OnExit` per state | [08 — State Machine](../guides/08-state-machine.md) | — |
 
 ## Production Resilience

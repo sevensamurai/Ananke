@@ -64,15 +64,55 @@ public class StreamedAgentModelTests
     [Test]
     public async Task GenerateAsync_AnAnswerThatRepeatsOnePassage_IsStoppedAsItArrives_WhichIsTerminal()
     {
-        var inner = new Repeats("The step is written so it leaves the codebase working on its own: existing callers and "
-            + "tests keep passing because the default behavior is byte-identical to today's. ", times: 2_000);
+        const string passage = "The step is written so it leaves the codebase working on its own: existing callers and "
+            + "tests keep passing because the default behavior is byte-identical to today's. ";
+        var inner = new Repeats(passage, times: 2_000);
 
         var thrown = await Should.ThrowAsync<RepeatedOutputException>(
             () => inner.Streamed().GenerateAsync(Request).WaitAsync(TimeSpan.FromSeconds(10)));
 
-        inner.Sent.ShouldBeLessThan(20);
+        // Stopped on the piece that brings the repeat to about 20,000 characters, long before the 2,000
+        // pieces end. Sent counts the pieces before it.
+        ((inner.Sent + 1) * passage.Length).ShouldBeInRange(RepeatedOutput.MinStreamedRepeatedLength, 22_000);
         TerminalProviderError.Is(thrown).ShouldBeTrue();
     }
+
+    [Test]
+    public async Task GenerateAsync_RowsAskedFor_InAReplyTheModelEnded_AreReturnedWhole()
+    {
+        var rows = Rows();
+        var inner = new Streams([.. rows], new AgentResponse { Text = string.Concat(rows), StopReason = AgentStopReason.EndTurn });
+
+        var response = await inner.Streamed().GenerateAsync(Request).WaitAsync(TimeSpan.FromSeconds(10));
+
+        response.Text.ShouldBe(string.Concat(rows));
+    }
+
+    [TestCase(AgentStopReason.MaxTokens)]
+    [TestCase(AgentStopReason.Unknown)]
+    public async Task AgentJob_ARepeatingStreamedReplyTheModelDidNotEnd_Throws(AgentStopReason stop)
+    {
+        var rows = Rows();
+        var inner = new Streams([.. rows], new AgentResponse { Text = string.Concat(rows), StopReason = stop });
+
+        await Should.ThrowAsync<RepeatedOutputException>(
+            () => Rows(inner.Streamed()).ExecuteAsync("sixty rows of zeros").WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    [Test]
+    public async Task AgentJob_ARepeatingStreamWithNoCompletedResponse_Throws()
+    {
+        var inner = new Streams([.. Rows()], completed: null);
+
+        await Should.ThrowAsync<RepeatedOutputException>(
+            () => Rows(inner.Streamed()).ExecuteAsync("sixty rows of zeros").WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    private static TextAgentJob<string> Rows(IAgentModel model) =>
+        AgentJobFactory.Create<string>("rows", model).WithPrompt(s => s).MapResult((_, reply) => reply).Build();
+
+    // Sixty identical rows, 1,200 characters: over the repeat an unstreamed reply is checked for.
+    private static string[] Rows() => [.. Enumerable.Repeat("0,0,0,0,0,0,0,0,0,0\n", 60)];
 
     [Test]
     public void ResolveContextWindow_IsTheInnerModels()

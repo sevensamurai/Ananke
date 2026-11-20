@@ -50,7 +50,7 @@ services.AddRedis(c => { c.Host = "localhost"; });
 | `Ananke.Orchestration.Anthropic` | Anthropic / Claude provider |
 | `Ananke.Orchestration.Google` | Google Gemini + Gemini Enterprise Agent Platform provider |
 | `Ananke.MCP` | Expose tools and workflows as MCP server capabilities |
-| `Ananke.Redis` | Redis-backed distributed lock and key-value store |
+| `Ananke.Redis` | Redis-backed distributed lock, key-value store and conversation memory |
 | `Ananke.MQTT` | MQTT-backed pub/sub channels |
 | `Ananke.Documents` | PDF + Markdown document extractors for the knowledge pipeline |
 | `Ananke.Qdrant` | Qdrant vector database for persistent long-term memory |

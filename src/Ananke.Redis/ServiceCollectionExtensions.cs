@@ -2,6 +2,9 @@ using Ananke.Abstractions.Config;
 using Ananke.Abstractions.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace Ananke.Redis;
 
@@ -12,7 +15,9 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers Redis-backed <see cref="IDistributedLock"/> and <see cref="IKeyValueDataAdapter"/>
-    /// using the provided <see cref="CacheConfig"/>.
+    /// using the provided <see cref="CacheConfig"/>, over one connection for both.
+    /// When the host registers its own <see cref="IConnectionMultiplexer"/>, before or after this call,
+    /// that connection is used and none is made from the config; the host keeps owning it.
     /// Replaces any previously registered <see cref="IDistributedLock"/> (e.g. the in-memory
     /// fallback from <c>AddStateMachine</c>), so call order does not matter.
     /// </summary>
@@ -23,7 +28,10 @@ public static class ServiceCollectionExtensions
         services.Configure(configure);
 
         services.RemoveAll<IDistributedLock>();
-        services.AddSingleton<RedisDistributedLock>();
+        services.AddSingleton(sp => new RedisDistributedLock(
+            sp.GetRequiredService<IOptions<CacheConfig>>(),
+            sp.GetService<ILogger<RedisDistributedLock>>(),
+            sp.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<IDistributedLock>(sp => sp.GetRequiredService<RedisDistributedLock>());
         services.AddSingleton<IKeyValueDataAdapter>(sp => sp.GetRequiredService<RedisDistributedLock>());
 

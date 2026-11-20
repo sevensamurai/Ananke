@@ -56,6 +56,25 @@ public class KnowledgeStoreListingTests
     }
 
     [Test]
+    public async Task ListAsync_ByDateThroughTheCatalogAwareStore_OrdersInTheStoreItWraps()
+    {
+        var store = new InMemoryKnowledgeStore(new InMemoryEmbedder());
+        await store.UpsertAsync([Dated("a", "2026-10-01"), Dated("b", "2026-11-01"), Dated("c", "2026-09-01")]);
+        var wrapped = new CatalogAwareKnowledgeStore(store, new InMemoryKnowledgeCatalog(new InMemoryEmbedder()));
+
+        var listed = await wrapped.ListAsync(new KnowledgeFilter(), limit: 2, order: new KnowledgeDateOrder("effective_at"));
+
+        listed.Select(c => c.Id).ShouldBe(["b", "a"]);
+    }
+
+    private static KnowledgeDocument Dated(string id, string day) => new()
+    {
+        Id = id,
+        Text = $"Note {id}",
+        Metadata = new Dictionary<string, string> { ["effective_at"] = $"{day}T00:00:00.0000000+00:00" },
+    };
+
+    [Test]
     public async Task ListAsync_WrappingAStoreThatCantList_Throws()
     {
         var store = new CatalogAwareKnowledgeStore(new SearchOnly(), new InMemoryKnowledgeCatalog(new InMemoryEmbedder()));

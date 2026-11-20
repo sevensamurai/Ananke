@@ -67,7 +67,7 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 |---|---|---|
 | **Abstractions** | `Ananke.Abstractions` | Interfaces & shared types: `IAgentModel`, `IDistributedLock`, `IChannelReader/Writer`, `IConversationMemory`, `IEmbeddingModel`, `IWorkflowTracer` |
 | **Knowledge** | `Ananke.Orchestration.Knowledge` | Vector stores, document processing, chunking, catalog, embeddings, document linking. Depends only on Abstractions. |
-| **Orchestration** | `Ananke.Orchestration` | Workflow engine, agents, tools, checkpointing, routing, streaming, agentic patterns. Depends on Abstractions + Knowledge. Bundles `Ananke.Analyzers` (Roslyn). |
+| **Orchestration** | `Ananke.Orchestration` | Workflow engine, agents, tools, checkpointing, routing, streaming, agentic patterns. Depends on Abstractions + Knowledge. Bundles `Ananke.Orchestration.Analyzers` and its code fix (Roslyn). |
 | **StateMachine** | `Ananke.StateMachine` | Distributed FSM with middleware, guards, circuit breaking. Depends on Abstractions. |
 | **Learning** | `Ananke.Learning` | Empirical memory, episodes, offline learning, skill packaging, exploration strategies. Depends on Orchestration. |
 | **Design** | `Ananke.Design` | YAML manifest import, Mermaid export. Depends on Orchestration. |
@@ -78,9 +78,9 @@ Ananke is a **.NET 10 framework** for building AI agent systems. It is organized
 | **Organics** | `Ananke.Organics` | Self-organizing colony architecture (cell division, sensing, routing). Depends on Learning + Design. |
 | **Tool.Shared** | `Ananke.Tool.Shared` | Shared tool primitives reused by organic hosts and CLI tools. Depends on Organics. |
 | **Graph** | `Ananke.Graph.Abstractions`, `Ananke.Graph.Memgraph` | Knowledge graph abstraction layer and Memgraph DB adapter. Depend on Abstractions. |
-| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant`, `Ananke.Postgres`, `Ananke.Embeddings.Onnx` | External service adapters implementing Abstractions interfaces. Redis + Qdrant also depend on Orchestration / Knowledge / Learning; Postgres on Knowledge; the ONNX embedder on Abstractions only. |
+| **Infrastructure** | `Ananke.Redis`, `Ananke.MQTT`, `Ananke.OpenTelemetry`, `Ananke.Qdrant`, `Ananke.Postgres`, `Ananke.Embeddings.Onnx` | External service adapters implementing Abstractions interfaces. Redis, MQTT and the ONNX embedder depend on Abstractions only; Qdrant on Knowledge / Learning; Postgres on Knowledge. |
 | **Web** | `Ananke.AspNetCore` | SSE streaming, session management, organic host registration. Depends on Orchestration + Organics + StateMachine. |
-| **Tooling** | `nnke` (design CLI), `Ananke.Analyzers` | Design-time CLI; Roslyn analyzers. |
+| **Tooling** | `nnke` (design CLI), `Ananke.Analyzers` | Design-time CLI; this repository's own Roslyn rules, never packed. |
 | **Meta** | `Ananke` | Meta-package that bundles everything. |
 
 ---
@@ -161,7 +161,6 @@ graph TD
 
     %% Infrastructure
     REDIS --> ABS
-    REDIS --> ORCH
     MQTT --> ABS
     OTEL --> ABS
     QDRANT --> ABS
@@ -224,7 +223,7 @@ Each project is organized by vertical slices (sub-folders = sub-namespaces). Her
 | `Jobs/` | `...Jobs` | `IJob`, `DelegateJob`, `SubFlowJob`, `HandoffJob`, `JobDescriptor` |
 | `Routing/` | `...Routing` | `IRouter`, `AgentRouter`, `DelegateRouter`, `ForkMode`, `JoinDescriptor` |
 | `Execution/` | `...Execution` | `IWorkflowRunner`, `WorkflowRunner` |
-| `Checkpointing/` | `...Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore` (the other implementation, `RedisCheckpointStore`, ships in `Ananke.Redis`) |
+| `Checkpointing/` | `...Checkpointing` | `ICheckpointStore`, `InMemoryCheckpointStore` (the other implementations, `FileCheckpointStore` and `KeyValueCheckpointStore`, over any `IKeyValueDataAdapter`, Redis's included) |
 | `Streaming/` | `...Streaming` | `WorkflowEvent`, `WorkflowStreamOptions` |
 | `Patterns/` | `...Patterns` | `ReviewCritiqueBuilder`, `IterativeRefinementBuilder`, `InterviewBuilder`, `Interview<TState>` |
 | `Knowledge/` | `...Knowledge` | `KnowledgeSearchTool`, `KnowledgeCatalogTools` |
@@ -359,13 +358,13 @@ These are the **interface boundaries** that define the system. Any redesign shou
 | `IDistributedLock` | Abstractions | Distributed mutual exclusion | `InMemoryDistributedLock`, Redis |
 | `IKeyValueDataAdapter` | Abstractions | Key-value persistence | Redis impl |
 | `IChannelReader<T>` / `IChannelWriter<T>` | Abstractions | Pub/sub messaging | `InMemoryChannelReader/Writer`, MQTT |
-| `IConversationMemory` | Abstractions | Chat history storage | `InMemoryConversationMemory` |
+| `IConversationMemory` | Abstractions | Chat history storage | `InMemoryConversationMemory`, `RedisConversationMemory` |
 | `IWorkflowTracer` | Abstractions | Distributed tracing | `NullTracer`, OpenTelemetry |
 | `IKnowledgeStore` | Knowledge | Vector-indexed chunk storage | `InMemoryKnowledgeStore`, Qdrant |
 | `IKnowledgeCatalog` | Knowledge | Enriched document metadata | `InMemoryKnowledgeCatalog`, Qdrant |
 | `IDocumentExtractor` | Knowledge | Extract text from documents | PDF, Markdown (Documents pkg) |
 | `IDocumentChunker` | Knowledge | Split text into chunks | `SlidingWindowChunker` |
-| `ICheckpointStore` | Orchestration | Workflow state persistence | `InMemoryCheckpointStore`, `RedisCheckpointStore` |
+| `ICheckpointStore` | Orchestration | Workflow state persistence | `InMemoryCheckpointStore`, `KeyValueCheckpointStore` |
 | `IRouter` | Orchestration | Workflow step routing | `DelegateRouter`, `AgentRouter` |
 | `IModelRouter` | Orchestration | Capability-based model selection | `CapabilityModelRouter` |
 | `IJob` | Orchestration | Workflow step execution | `DelegateJob`, `AgentJob`, `SubFlowJob` |
@@ -389,7 +388,7 @@ These are the **interface boundaries** that define the system. Any redesign shou
 - **Shared settings**: `src/Directory.Build.props` — owns `TargetFramework` (net10.0), `Nullable`, `ImplicitUsings`, `VersionPrefix`, `TreatWarningsAsErrors`
 - **Individual csproj files** only set: `IsPackable`, `PackageId`, `Description`, optionally `PackageTags`
 - **Version**: Single source of truth in `Directory.Build.props` → `<VersionPrefix>` (0.8.9 at the time of writing; read the file rather than trusting this line)
-- **Analyzers**: `Ananke.Analyzers` targets `netstandard2.0` and is bundled into `Ananke.Orchestration`'s NuGet package
+- **Analyzers**: two `netstandard2.0` assemblies. `Ananke.Orchestration.Analyzers` (`ANANKE001`, `ANNKE002`, `ANNKE003`) and `Ananke.Analyzers.CodeFixes` are bundled into `Ananke.Orchestration`'s NuGet package; `Ananke.Analyzers` (`ANANKE_ASYNC_001`) runs on this repository's code only
 - **Meta-package**: `Ananke` (the root package) references all other packages
 
 ---

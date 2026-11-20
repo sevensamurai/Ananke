@@ -86,7 +86,7 @@ detail to come back to.
 |------|-----------|---------|
 | `KnowledgeDocument` | Root | Input document for upsert (id + text + metadata) |
 | `KnowledgeChunk` | Root | Search result (id + text + score + metadata) |
-| `KnowledgeFilter` | Root | Metadata filter for search/delete (key-value pairs) |
+| `KnowledgeFilter` | Root | Metadata filter for search, listing and delete (key-value pairs; `AnyOf` for a key with several values) |
 | `SearchOptions` | Root | `TopK`, `ScoreThreshold`, `SearchMode`, `Filter`, `SearchResultFormatting` |
 | `ProcessingResult` | Root | Pipeline output summary (section count, chunk count) |
 | `CatalogEntry` | Catalog | Source metadata: summary, keywords, category, timestamp |

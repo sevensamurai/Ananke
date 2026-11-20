@@ -19,7 +19,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
-    <None Include="..\Ananke.Analyzers\bin\$(Configuration)\netstandard2.0\Ananke.Analyzers.dll"
+    <!-- The analyzers and code fix a product gets. Ananke.Analyzers, this repository's own rules,
+         is not packed. Both are built through the analyzer references in Directory.Build.props. -->
+    <None Include="..\Ananke.Orchestration.Analyzers\bin\$(Configuration)\netstandard2.0\Ananke.Orchestration.Analyzers.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="..\Ananke.Analyzers.CodeFixes\bin\$(Configuration)\netstandard2.0\Ananke.Analyzers.CodeFixes.dll"
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 

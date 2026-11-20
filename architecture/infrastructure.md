@@ -44,10 +44,18 @@ stateDiagram-v2
 |---|---|---|
 | `IDistributedLock` | `RedisDistributedLock` (RedLock-based) | Redis via RedLock.net |
 | `IKeyValueDataAdapter` | `RedisDataAdapter` | Redis key-value via StackExchange.Redis |
-| `ICheckpointStore` | `RedisCheckpointStore` | Workflow checkpoint persistence; TTL via `EXPIREAT` |
-| `IConversationMemory` | `RedisConversationMemory` | Multi-turn conversation history per session; optional TTL |
 
-Registration: `services.AddRedis(options)`
+Registration: `services.AddRedis(options)`. `Ananke.Redis` depends on `Ananke.Abstractions` only.
+
+`Ananke.Redis` also holds `RedisConversationMemory`, constructed over the host's `IConnectionMultiplexer` (no
+registration):
+
+| Interface | Implementation | Backend |
+|---|---|---|
+| `IConversationMemory` | `RedisConversationMemory` | Multi-turn conversation history per session; optional TTL, set in the same transaction as each append |
+
+Workflow checkpoints go through `KeyValueCheckpointStore` in `Ananke.Orchestration`, over the `IKeyValueDataAdapter`
+that `AddRedis` registers; the expiry is set with the `SET`.
 
 ---
 

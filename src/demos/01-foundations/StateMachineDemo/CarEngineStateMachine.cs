@@ -12,18 +12,12 @@ sealed class CarEngineStateMachine(
     : AbstractStateMachine<CarContext, EngineState, EngineTransition, EngineNotification>(
         EngineState.Parked, locker, store, options)
 {
-    /// <summary>
-    /// Guard state: fuel level of the vehicle currently being transitioned.
-    /// Set before calling <c>Drive</c> — the guard closes over this value.
-    /// </summary>
-    public double CurrentFuelLevel { get; set; }
-
     protected override Action<ITransitionBuilder<EngineState, EngineTransition>> Transitions => b => b
         .From(EngineState.Parked)
             .On(EngineTransition.Start).To(EngineState.Running)
         .From(EngineState.Running)
             .On(EngineTransition.Drive).To(EngineState.Moving)
-                .When(() => CurrentFuelLevel > 0)
+                .When((car, _) => ((CarContext)car).FuelLevel > 0)
         .From(EngineState.Moving)
             .On(EngineTransition.Halt).To(EngineState.Idle)
         .From(EngineState.Idle)
@@ -32,21 +26,17 @@ sealed class CarEngineStateMachine(
             .On(EngineTransition.Park).To(EngineState.Parked)
         // Lifecycle hooks
         .State(EngineState.Running)
-            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Running — engine started"))
-            .OnExit(async () => Console.WriteLine("    ?? [OnExit]  Running — engine state changing"))
+            .OnEnter(async (_, _) => Console.WriteLine("    ?? [OnEnter] Running — engine started"))
+            .OnExit(async (_, _) => Console.WriteLine("    ?? [OnExit]  Running — engine state changing"))
         .State(EngineState.Moving)
-            .OnEnter(async () => Console.WriteLine("    ?? [OnEnter] Moving — trip segment started"))
-            .OnExit(async () => Console.WriteLine("    ?? [OnExit]  Moving — trip segment ended"));
+            .OnEnter(async (_, _) => Console.WriteLine("    ?? [OnEnter] Moving — trip segment started"))
+            .OnExit(async (_, _) => Console.WriteLine("    ?? [OnExit]  Moving — trip segment ended"));
 
     public override Task<TransitionResult<EngineState>> TransitionAsync(
-        CarContext ctx, EngineTransition t)
-    {
-        // Sync guard state from the incoming context
-        CurrentFuelLevel = ctx.FuelLevel;
-        return InternalTransitionAsync(ctx, t);
-    }
+        CarContext ctx, EngineTransition t, CancellationToken ct = default) =>
+        InternalTransitionAsync(ctx, t, ct);
 
-    public override Task NotifyAsync(CarContext ctx, EngineNotification n) =>
+    public override Task NotifyAsync(CarContext ctx, EngineNotification n, CancellationToken ct = default) =>
         Task.CompletedTask;
 }
 

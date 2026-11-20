@@ -17,14 +17,14 @@ dotnet add package Ananke.Orchestration.Google
 using Ananke.Orchestration.Google;
 
 // Gemini Developer API (API key)
-IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-2.5-flash");
+IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-3.6-flash");
 
 // Gemini Enterprise Agent Platform (project + location, uses Application Default Credentials)
-IStreamingAgentModel model = GeminiAgentModel.CreateAgentPlatform(project, location, "gemini-2.5-flash");
+IStreamingAgentModel model = GeminiAgentModel.CreateAgentPlatform(project, location, "gemini-3.6-flash");
 
 // Or from an existing Google.GenAI.Client
 var client = new Google.GenAI.Client(apiKey: apiKey);
-IStreamingAgentModel model = new GeminiAgentModel(client, "gemini-2.5-flash");
+IStreamingAgentModel model = new GeminiAgentModel(client, "gemini-3.6-flash");
 ```
 
 ### Use in a workflow agent job
@@ -45,7 +45,7 @@ var agentJob = AgentJobFactory
 models:
   gemini:
     provider: gemini
-    model: gemini-2.5-flash
+    model: gemini-3.6-flash
 ```
 
 ```csharp

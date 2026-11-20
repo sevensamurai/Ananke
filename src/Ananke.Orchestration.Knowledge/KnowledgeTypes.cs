@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ananke.Orchestration.Knowledge;
 
 /// <summary>Search mode for knowledge store queries.</summary>
@@ -50,9 +52,38 @@ public sealed record KnowledgeChunk
 
 /// <summary>
 /// Metadata filter for knowledge store operations. Each entry is a key-value pair
-/// that must match exactly on the stored document metadata.
+/// that must match exactly on the stored document metadata; each entry of <see cref="AnyOf"/> is a key whose stored
+/// value must be one of several. A document matches when every entry of both holds.
 /// </summary>
-public sealed class KnowledgeFilter : Dictionary<string, string>;
+/// <remarks>
+/// A store applies <see cref="AnyOf"/> wherever it applies the filter: in search, listing and delete. A filter whose
+/// entries and <see cref="AnyOf"/> are both empty matches every document.
+/// </remarks>
+public sealed class KnowledgeFilter : Dictionary<string, string>
+{
+    /// <summary>
+    /// Keys a document matches when its value is any of the values given, as in
+    /// <c>new KnowledgeFilter { AnyOf = { ["outlet"] = ["TechCrunch", "The Verge"] } }</c>. A key with no values
+    /// matches no document. A key both here and in the filter's own entries must match both.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public IDictionary<string, IReadOnlyList<string>> AnyOf { get; } = new Dictionary<string, IReadOnlyList<string>>();
+
+    /// <summary>
+    /// The values a document's <paramref name="key"/> may hold to match: the entry's value, or the values in
+    /// <see cref="AnyOf"/>, or, when the key is in both, the entry's value only if it is among them. <see langword="null"/>
+    /// when the filter doesn't limit the key.
+    /// </summary>
+    internal IReadOnlyList<string>? ValuesOf(string key)
+    {
+#pragma warning disable ANNKEEXP004 // reads AnyOf, experimental outside this assembly
+        var anyOf = AnyOf.TryGetValue(key, out var values) ? values : null;
+#pragma warning restore ANNKEEXP004
+        if (TryGetValue(key, out var value))
+            return anyOf is null || anyOf.Contains(value, StringComparer.Ordinal) ? [value] : [];
+        return anyOf is null ? null : [.. anyOf.Distinct(StringComparer.Ordinal)];
+    }
+}
 
 /// <summary>Options controlling knowledge store search behavior.</summary>
 public sealed record SearchOptions

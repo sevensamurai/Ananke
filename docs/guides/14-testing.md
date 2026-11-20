@@ -22,7 +22,7 @@ no Docker containers, and no network access.
 | `IKnowledgeStore` | `QdrantKnowledgeStore` | `InMemoryKnowledgeStore` |
 | `IKnowledgeCatalog` | `QdrantKnowledgeCatalog` | `InMemoryKnowledgeCatalog` |
 | `IConversationMemory` | `RedisConversationMemory` | `InMemoryConversationMemory` |
-| `ICheckpointStore` | *(bring your own)* | `InMemoryCheckpointStore` |
+| `ICheckpointStore` | `KeyValueCheckpointStore` over `RedisDataAdapter` | `InMemoryCheckpointStore` |
 | `IHandoffChannel` | `MqttHandoffChannel` | `InMemoryHandoffChannel` |
 | `IKeyValueDataAdapter` | `RedisDataAdapter` | (in-memory via `Dictionary`) |
 
@@ -177,7 +177,7 @@ public async Task Ticket_follows_happy_path()
     Assert.Equal(TicketState.InProgress, r1.CurrentState);
 
     // InProgress → Resolved (with guard)
-    machine.ResolutionNote = "Fixed";
+    ticket.ResolutionNote = "Fixed";
     var r2 = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
     Assert.True(r2.Success);
     Assert.Equal(TicketState.Resolved, r2.CurrentState);
@@ -192,7 +192,7 @@ public async Task Guard_blocks_resolve_without_note()
 
     await machine.TransitionAsync(ticket, TicketTransition.Assign);
 
-    machine.ResolutionNote = null;
+    ticket.ResolutionNote = null;
     var result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
     Assert.False(result.Success);
 }

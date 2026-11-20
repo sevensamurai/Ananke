@@ -17,12 +17,13 @@ public class OperationalStatusTests
     // ── Default status ───────────────────────────────────────────────
 
     [Test]
-    public void NewMachine_StatusIsOperative()
+    public async Task NewMachine_StatusIsOperative()
     {
         var machine = new LightMachine(_lock, _lock);
+        var ctx = new TestContext("1");
 
-        machine.OperationalStatus.ShouldBe(OperationalStatus.Operative);
-        machine.OperationalStatusReason.ShouldBeNull();
+        (await machine.GetStatusAsync(ctx)).OperationalStatus.ShouldBe(OperationalStatus.Operative);
+        (await machine.GetStatusAsync(ctx)).OperationalStatusReason.ShouldBeNull();
     }
 
     // ── Fault ────────────────────────────────────────────────────────
@@ -40,8 +41,8 @@ public class OperationalStatusTests
         change.CurrentStatus.ShouldBe(OperationalStatus.Faulted);
         change.Reason.ShouldBe("Hardware failure");
 
-        machine.OperationalStatus.ShouldBe(OperationalStatus.Faulted);
-        machine.OperationalStatusReason.ShouldBe("Hardware failure");
+        (await machine.GetStatusAsync(ctx)).OperationalStatus.ShouldBe(OperationalStatus.Faulted);
+        (await machine.GetStatusAsync(ctx)).OperationalStatusReason.ShouldBe("Hardware failure");
     }
 
     [Test]
@@ -87,8 +88,8 @@ public class OperationalStatusTests
         change.CurrentStatus.ShouldBe(OperationalStatus.Operative);
         change.Reason.ShouldBe("Repaired");
 
-        machine.OperationalStatus.ShouldBe(OperationalStatus.Operative);
-        machine.OperationalStatusReason.ShouldBeNull();
+        (await machine.GetStatusAsync(ctx)).OperationalStatus.ShouldBe(OperationalStatus.Operative);
+        (await machine.GetStatusAsync(ctx)).OperationalStatusReason.ShouldBeNull();
     }
 
     [Test]
@@ -128,16 +129,13 @@ public class OperationalStatusTests
         await machine.TransitionAsync(ctx, LightAction.TurnOn);
         await machine.FaultAsync(ctx, "Hardware error");
 
-        // Create a second machine instance pointing at the same lock/store.
-        // When it loads the persisted context, it should see Faulted.
+        // A second instance over the same store reads the stored status.
         var machine2 = new LightMachine(_lock, _lock);
         var result = await machine2.TransitionAsync(ctx, LightAction.TurnOff);
 
-        // The transition should be blocked because persisted status is Faulted
-        // (loaded inside TryExecuteTransitionAsync -> GetPersistedContextAsync)
-        // OR succeed if the gate check uses the fresh instance status (Operative).
-        // Either way, the persisted state records the fault.
-        machine.OperationalStatus.ShouldBe(OperationalStatus.Faulted);
+        result.Success.ShouldBeFalse();
+        result.ErrorMessage!.ShouldContain("Hardware error");
+        (await machine2.GetStatusAsync(ctx)).OperationalStatus.ShouldBe(OperationalStatus.Faulted);
     }
 
     [Test]
@@ -152,6 +150,6 @@ public class OperationalStatusTests
         // After reset, transitions should work
         var result = await machine.TransitionAsync(ctx, LightAction.TurnOn);
         result.Success.ShouldBeTrue();
-        machine.OperationalStatus.ShouldBe(OperationalStatus.Operative);
+        (await machine.GetStatusAsync(ctx)).OperationalStatus.ShouldBe(OperationalStatus.Operative);
     }
 }

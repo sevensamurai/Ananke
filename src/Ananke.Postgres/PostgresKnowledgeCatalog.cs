@@ -11,7 +11,8 @@ namespace Ananke.Postgres;
 /// </summary>
 /// <remarks>
 /// Its table is <see cref="PostgresKnowledgeOptions.Table"/>, default <c>ananke_catalog</c> here. It is created on
-/// first use and stamped with the embedder's identity, as <see cref="PostgresKnowledgeStore"/>'s is.
+/// first use and stamped with the embedder's identity, and discovery reads the HNSW index with the same settings, as
+/// <see cref="PostgresKnowledgeStore"/>'s does.
 /// </remarks>
 [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public sealed class PostgresKnowledgeCatalog : IKnowledgeCatalog
@@ -90,12 +91,16 @@ public sealed class PostgresKnowledgeCatalog : IKnowledgeCatalog
         await EnsureAsync(ct).ConfigureAwait(false);
         var embedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
 
-        await using var command = _dataSource.CreateCommand(
-            $"SELECT {Columns}, 1 - (embedding <=> $1::vector) FROM {_schema.Table} " +
-            "WHERE superseded_by IS NULL ORDER BY embedding <=> $1::vector LIMIT $2");
-        command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
-        command.Parameters.Add(new NpgsqlParameter { Value = topK });
-        return [.. (await ReadAsync(command, ct).ConfigureAwait(false)).Select(r => new CatalogSearchResult { Entry = r.Entry, Score = r.Score })];
+        var rows = await _schema.NearestAsync(topK, command =>
+        {
+            command.CommandText =
+                $"SELECT {Columns}, 1 - (embedding <=> $1::vector) FROM {_schema.Table} " +
+                "WHERE superseded_by IS NULL ORDER BY embedding <=> $1::vector LIMIT $2";
+            command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
+            command.Parameters.Add(new NpgsqlParameter { Value = topK });
+            return ReadAsync(command, ct);
+        }, ct).ConfigureAwait(false);
+        return [.. rows.Select(r => new CatalogSearchResult { Entry = r.Entry, Score = r.Score })];
     }
 
     /// <inheritdoc />

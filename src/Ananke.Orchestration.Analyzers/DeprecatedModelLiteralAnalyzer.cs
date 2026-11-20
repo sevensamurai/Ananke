@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace Ananke.Analyzers;
+namespace Ananke.Orchestration.Analyzers;
 
 /// <summary>
 /// Flags string literals equal to a <c>Deprecated</c> or <c>Retired</c> model identifier, read
@@ -14,6 +14,11 @@ namespace Ananke.Analyzers;
 /// <c>Ananke.Design.ModelCatalog</c> and <c>Ananke.Orchestration.Agents.Routing.ModelCatalog</c>
 /// read at runtime via <c>Ananke.Abstractions.Agents.ModelLifecycleData</c>) so all three
 /// consumers agree on lifecycle without hand-syncing three separate tables.
+/// <para>
+/// The file is embedded in this assembly, so the rules work in a product that references the
+/// package. A file named <c>model-lifecycle.json</c> given as <c>AdditionalFiles</c> is read in
+/// its place, not merged with it.
+/// </para>
 /// <para>
 /// A literal equal to a <c>Deprecated</c> id reports <see cref="DiagnosticId"/> as a warning
 /// (still callable, just superseded). A literal equal to a <c>Retired</c> id reports
@@ -66,7 +71,7 @@ public sealed class DeprecatedModelLiteralAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(compilationContext =>
         {
-            var lifecycleData = LoadLifecycleData(compilationContext.Options.AdditionalFiles);
+            var lifecycleData = LoadLifecycleData(compilationContext.Options.AdditionalFiles, compilationContext.CancellationToken);
             if (lifecycleData.IsEmpty)
                 return;
 
@@ -119,15 +124,36 @@ public sealed class DeprecatedModelLiteralAnalyzer : DiagnosticAnalyzer
         "\"(?<name>id|status|replacedBy)\"\\s*:\\s*(?:\"(?<value>[^\"]*)\"|null)",
         RegexOptions.Compiled);
 
+    private const string LifecycleFileName = "model-lifecycle.json";
+    private const string EmbeddedLifecycleResource = "Ananke.Orchestration.Analyzers." + LifecycleFileName;
+
+    private static readonly Lazy<ImmutableDictionary<string, LifecycleEntry>> EmbeddedLifecycleData =
+        new(() => Parse(ReadEmbeddedLifecycleFile()));
+
     private static ImmutableDictionary<string, LifecycleEntry> LoadLifecycleData(
-        ImmutableArray<AdditionalText> additionalFiles)
+        ImmutableArray<AdditionalText> additionalFiles, CancellationToken cancellationToken)
     {
         var file = additionalFiles.FirstOrDefault(f =>
-            f.Path.EndsWith("model-lifecycle.json", StringComparison.OrdinalIgnoreCase));
+            string.Equals(Path.GetFileName(f.Path), LifecycleFileName, StringComparison.OrdinalIgnoreCase));
         if (file is null)
-            return ImmutableDictionary<string, LifecycleEntry>.Empty;
+            return EmbeddedLifecycleData.Value;
 
-        var text = file.GetText()?.ToString();
+        return Parse(file.GetText(cancellationToken)?.ToString());
+    }
+
+    private static string? ReadEmbeddedLifecycleFile()
+    {
+        using var stream = typeof(DeprecatedModelLiteralAnalyzer).Assembly
+            .GetManifestResourceStream(EmbeddedLifecycleResource);
+        if (stream is null)
+            return null;
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static ImmutableDictionary<string, LifecycleEntry> Parse(string? text)
+    {
         if (string.IsNullOrEmpty(text))
             return ImmutableDictionary<string, LifecycleEntry>.Empty;
 

@@ -51,6 +51,9 @@ public static class Models
     /// <summary>OpenAI model identifiers. Already short — these are the wire names.</summary>
     public static class OpenAI
     {
+        // Retired models are removed outright, as for Anthropic. Their ids, dates and replacements:
+        // docs/reference/model-deprecations.md, "Removed models".
+
         /// <summary>GPT-4.1 — flagship reasoning model.</summary>
         [Obsolete("gpt-4.1 is deprecated; use Models.OpenAI.Gpt56Sol.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
@@ -60,11 +63,6 @@ public static class Models
         [Obsolete("gpt-4.1-mini is deprecated; use Models.OpenAI.Gpt56Terra.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Gpt41Mini = "gpt-4.1-mini";
-
-        /// <summary>GPT-4.1 Nano — smallest, cheapest.</summary>
-        [Obsolete("gpt-4.1-nano is deprecated; use Models.OpenAI.Gpt56Luna.",
-            DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
-        public const string Gpt41Nano = "gpt-4.1-nano";
 
         /// <summary>GPT-4o — multimodal flagship (prior generation).</summary>
         [Obsolete("gpt-4o is deprecated; use Models.OpenAI.Gpt56Sol.",
@@ -80,16 +78,6 @@ public static class Models
         [Obsolete("o3 is deprecated; use Models.OpenAI.Gpt56Sol.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string O3 = "o3";
-
-        /// <summary>o3-mini — compact reasoning.</summary>
-        [Obsolete("o3-mini is deprecated; use Models.OpenAI.Gpt56Terra.",
-            DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
-        public const string O3Mini = "o3-mini";
-
-        /// <summary>o4-mini — latest compact reasoning.</summary>
-        [Obsolete("o4-mini is deprecated; use Models.OpenAI.Gpt56Terra.",
-            DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
-        public const string O4Mini = "o4-mini";
 
         /// <summary>GPT-5 — prior generation, reasoning and coding.</summary>
         [Obsolete("gpt-5 is deprecated; use Models.OpenAI.Gpt56Sol.",
@@ -117,7 +105,9 @@ public static class Models
         /// <summary>GPT-5.4 Mini — legacy, fast distillation of GPT-5.4.</summary>
         public const string Gpt54Mini = "gpt-5.4-mini";
 
-        /// <summary>GPT-5.4 Nano — legacy, fastest and cheapest of the 5.4 line.</summary>
+        /// <summary>GPT-5.4 Nano — fastest and cheapest of the 5.4 line; shuts down 2027-04-01.</summary>
+        [Obsolete("gpt-5.4-nano is deprecated; use Models.OpenAI.Gpt6Luna.",
+            DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Gpt54Nano = "gpt-5.4-nano";
 
         /// <summary>GPT-5.5 — legacy flagship, complex reasoning and coding.</summary>
@@ -131,6 +121,37 @@ public static class Models
 
         /// <summary>GPT-5.6 Luna — current generation, fastest and lowest-cost of the 5.6 line.</summary>
         public const string Gpt56Luna = "gpt-5.6-luna";
+
+        // The GPT-6 line below: each id is in OpenAI's list-models answer and answered a live call
+        // (through OpenRouter, openai/<id>) on 2026-11-18. The -pro and :batch variants are not listed.
+
+        /// <summary>GPT-6 Sol — first GPT-6 release, frontier reasoning, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18; not on OpenAI's models page, which lists GPT-6.2 Sol.</remarks>
+        public const string Gpt6Sol = "gpt-6-sol";
+
+        /// <summary>GPT-6 Luna — fastest and lowest-cost of the GPT-6 line, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18.</remarks>
+        public const string Gpt6Luna = "gpt-6-luna";
+
+        /// <summary>GPT-6 Astra — flagship of the first GPT-6 release, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18; not on OpenAI's models page, which lists GPT-6.2 Astra.</remarks>
+        public const string Gpt6Astra = "gpt-6-astra";
+
+        /// <summary>GPT-6.1 Sol — frontier reasoning, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18; not on OpenAI's models page, which lists GPT-6.2 Sol.</remarks>
+        public const string Gpt61Sol = "gpt-6.1-sol";
+
+        /// <summary>GPT-6.1 Terra — balances capability and cost for everyday tasks, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18.</remarks>
+        public const string Gpt61Terra = "gpt-6.1-terra";
+
+        /// <summary>GPT-6.2 Sol — balances intelligence and cost at the frontier, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18.</remarks>
+        public const string Gpt62Sol = "gpt-6.2-sol";
+
+        /// <summary>GPT-6.2 Astra — OpenAI's flagship, 1.05M context, 128K output.</summary>
+        /// <remarks>Served and answering a live call on 2026-11-18.</remarks>
+        public const string Gpt62Astra = "gpt-6.2-astra";
 
         /// <summary>The OpenAI model Ananke suggests by default — see the <see cref="Models"/> remarks.</summary>
         public const string Starred = Gpt56Luna;
@@ -227,19 +248,39 @@ public static class Models
         /// </summary>
         public const string Gemini37Flash = "gemini-3.7-flash";
 
+        /// <summary>
+        /// Gemini 3.8 Flash — current generation, 1,048,576-token window, 65,536-token output.
+        /// Whether it supersedes <see cref="Gemini37Flash"/> or <see cref="Gemini36Flash"/> is not
+        /// recorded: all three are served.
+        /// </summary>
+        /// <remarks>In Google's list-models answer and answering a live call (through OpenRouter) on 2026-11-18.</remarks>
+        public const string Gemini38Flash = "gemini-3.8-flash";
+
+        /// <summary>Gemini 4 Carbon — Google's strongest reasoning model, 1,048,576-token window, 32,768-token output.</summary>
+        /// <remarks>In Google's list-models answer and answering a live call (through OpenRouter) on 2026-11-18.</remarks>
+        public const string Gemini4Carbon = "gemini-4-carbon";
+
+        /// <summary>Gemini 4 Argon — efficient Gemini 4 frontier reasoning, 1,048,576-token window, 32,768-token output.</summary>
+        /// <remarks>In Google's list-models answer and answering a live call (through OpenRouter) on 2026-11-18.</remarks>
+        public const string Gemini4Argon = "gemini-4-argon";
+
+        /// <summary>Gemini 4 Hydrogen — the widely available Gemini 4 model, 1,048,576-token window, 65,536-token output.</summary>
+        /// <remarks>In Google's list-models answer and answering a live call (through OpenRouter) on 2026-11-18.</remarks>
+        public const string Gemini4Hydrogen = "gemini-4-hydrogen";
+
         /// <summary>Gemma 4 — open-weight model available via Agent Platform / Model Garden.</summary>
         public const string Gemma4 = "gemma-4";
 
         /// <summary>Lyria 3 — Google DeepMind music / audio generation model.</summary>
         public const string Lyria3 = "lyria-3";
 
-        /// <summary>Gemini 2.5 Pro — flagship, complex tasks.</summary>
-        [Obsolete("gemini-2.5-pro is deprecated; use Models.Google.Gemini31Pro.",
+        /// <summary>Gemini 2.5 Pro — flagship, complex tasks. From 2026-12-01 the API routes it to gemini-3.8-flash.</summary>
+        [Obsolete("gemini-2.5-pro is deprecated; use Models.Google.Gemini38Flash.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Gemini25Pro = "gemini-2.5-pro";
 
-        /// <summary>Gemini 2.5 Flash — fast, balanced.</summary>
-        [Obsolete("gemini-2.5-flash is deprecated; use Models.Google.Gemini36Flash.",
+        /// <summary>Gemini 2.5 Flash — fast, balanced. From 2026-12-01 the API routes it to gemini-3.5-flash-lite.</summary>
+        [Obsolete("gemini-2.5-flash is deprecated; use Models.Google.Gemini35FlashLite.",
             DiagnosticId = "ANNKE001", UrlFormat = DeprecationDocs)]
         public const string Gemini25Flash = "gemini-2.5-flash";
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Ananke.Orchestration.Tools;
 
@@ -59,6 +60,21 @@ public static class KnowledgeSearchTool
                 paramDescription: "Natural language search query");
     }
 
+#pragma warning disable ANNKEEXP004 // the metadata keys DocumentHeaderOptions writes a document's date and superseding under
+    private const string EffectiveAtKey = Documents.DocumentHeaderOptions.EffectiveAtKey;
+    private const string SupersededByKey = Documents.DocumentHeaderOptions.SupersededByKey;
+#pragma warning restore ANNKEEXP004
+
+    /// <summary>The day of an ISO 8601 date and time, as <c>yyyy-MM-dd</c>; the text as it is when it doesn't parse.</summary>
+    private static string Day(string date) =>
+        DateTimeOffset.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
+            ? at.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : date;
+
+    /// <summary>
+    /// The results as text for a model: each one's score, source, page, its document's date (<c>effective_at</c>) and
+    /// what supersedes it (<c>superseded_by</c>) when its metadata has them, then its text.
+    /// </summary>
     internal static string FormatResults(
         IReadOnlyList<KnowledgeChunk> chunks,
         SearchResultFormatting? formatting = null)
@@ -88,6 +104,12 @@ public static class KnowledgeSearchTool
 
             if (formatting.IncludePage && chunk.Metadata.TryGetValue("page", out var page))
                 sb.AppendLine($"Page: {page}");
+
+            if (chunk.Metadata.TryGetValue(EffectiveAtKey, out var date) && date.Length > 0)
+                sb.AppendLine($"Date: {Day(date)}");
+
+            if (chunk.Metadata.TryGetValue(SupersededByKey, out var supersededBy) && supersededBy.Length > 0)
+                sb.AppendLine($"Superseded by: {supersededBy}");
 
             sb.AppendLine(chunk.Text);
             sb.AppendLine();

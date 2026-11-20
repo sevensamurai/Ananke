@@ -37,7 +37,7 @@ detail to come back to.
 
 - `Ananke.Abstractions` (project)
 - `Ananke.Orchestration.Knowledge` (project)
-- `Ananke.Analyzers` (bundled as Roslyn analyzer in NuGet package)
+- `Ananke.Orchestration.Analyzers` and `Ananke.Analyzers.CodeFixes` (bundled as Roslyn analyzers in the NuGet package)
 - `Polly` (resilience)
 
 ## Namespace → Folder Map

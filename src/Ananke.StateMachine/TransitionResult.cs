@@ -18,9 +18,18 @@ public record TransitionResult<S> where S : Enum
     public required S PreviousState { get; init; }
 
     /// <summary>
-    /// The current state after the transition attempt
+    /// The current state after the transition attempt. When the context could not be read (the
+    /// lock was not acquired, or the store could not be read) the state is not known, and this is
+    /// the machine's initial state: check <see cref="Success"/> before using it.
     /// </summary>
     public required S CurrentState { get; init; }
+
+    /// <summary>
+    /// Whether this attempt stored a new record for the context. <c>true</c> for every successful
+    /// transition, and for a failed one whose enter or after-transition action threw after the
+    /// state was stored: <see cref="CurrentState"/> is then the stored state.
+    /// </summary>
+    public bool StateStored { get; init; }
 
     /// <summary>
     /// Error message if the transition failed

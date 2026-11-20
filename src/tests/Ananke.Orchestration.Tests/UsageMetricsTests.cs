@@ -6,6 +6,7 @@ using Ananke.Abstractions.Budget;
 using Ananke.Orchestration.Agents;
 using Ananke.Orchestration.Agents.Routing;
 using Ananke.Orchestration.Agents.Simulation;
+using Ananke.Orchestration.Usage;
 using Ananke.Orchestration.Workflows;
 using Shouldly;
 
@@ -65,6 +66,69 @@ public class UsageMetricsTests
         listener.Sum(UsageInstrumentNames.TokensIn, name).ShouldBe(1_000_000);
         listener.Sum(UsageInstrumentNames.Cost, name).ShouldBe(2.0, tolerance: 1e-9);
     }
+
+    [Test]
+    public async Task ReportAsync_ACostTheProviderReported_IsRecordedAndPublishedWithTheWorkflow()
+    {
+        using var listener = new UsageListener();
+        var name = $"usage-{Guid.NewGuid():N}";
+        var recorder = new InMemoryUsageRecorder();
+        var response = Response(cost: 0.0125m);
+
+        using (UsageRecording.BeginScope(recorder, name))
+            await UsageRecording.ReportAsync(response);
+
+        var snapshot = await recorder.ReadAsync();
+        snapshot.AccumulatedCost.ShouldBe(0.0125m);
+        snapshot.HasModelBasedCost.ShouldBeTrue();
+        snapshot.UncostedUsage.ShouldBe(TokenUsage.Zero);
+        listener.Sum(UsageInstrumentNames.Cost, name).ShouldBe(0.0125, tolerance: 1e-9);
+    }
+
+    [Test]
+    public async Task ReportAsync_ACallARouterPriced_IsCountedOnceAtTheRoutersCost()
+    {
+        using var listener = new UsageListener();
+        var name = $"usage-{Guid.NewGuid():N}";
+        var recorder = new InMemoryUsageRecorder();
+        var response = Response(cost: 0.0125m);
+
+        using (UsageRecording.BeginScope(recorder, name))
+        {
+            await UsageRecording.ReportCostAsync(0.5m, response);
+            await UsageRecording.ReportAsync(response);
+        }
+
+        var snapshot = await recorder.ReadAsync();
+        snapshot.AccumulatedCost.ShouldBe(0.5m);
+        snapshot.UncostedUsage.ShouldBe(TokenUsage.Zero);
+        listener.Sum(UsageInstrumentNames.Cost, name).ShouldBe(0.5, tolerance: 1e-9);
+    }
+
+    [Test]
+    public async Task ReportAsync_NoCostReported_LeavesTheTokensUncosted()
+    {
+        using var listener = new UsageListener();
+        var name = $"usage-{Guid.NewGuid():N}";
+        var recorder = new InMemoryUsageRecorder();
+        var response = Response(cost: null);
+
+        using (UsageRecording.BeginScope(recorder, name))
+            await UsageRecording.ReportAsync(response);
+
+        var snapshot = await recorder.ReadAsync();
+        snapshot.AccumulatedCost.ShouldBe(0m);
+        snapshot.HasModelBasedCost.ShouldBeFalse();
+        snapshot.UncostedUsage.InputTokens.ShouldBe(100);
+        snapshot.UncostedUsage.OutputTokens.ShouldBe(20);
+        listener.Sum(UsageInstrumentNames.Cost, name).ShouldBe(0);
+    }
+
+    private static AgentResponse Response(decimal? cost) => new()
+    {
+        Text = "hi",
+        Usage = new TokenUsage { InputTokens = 100, OutputTokens = 20, Cost = cost }
+    };
 
     private static Task Ask(string workflow, IAgentModel model) =>
         new Workflow<State>(workflow)

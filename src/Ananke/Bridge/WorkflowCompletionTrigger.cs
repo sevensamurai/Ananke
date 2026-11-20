@@ -53,7 +53,7 @@ public sealed class WorkflowCompletionTrigger<TWorkflowState, TContext, TState, 
         if (execution.Result is not null)
         {
             var transition = transitionSelector(execution.Result);
-            var result = await stateMachine.TransitionAsync(fsmContext, transition);
+            var result = await stateMachine.TransitionAsync(fsmContext, transition, ct);
 
             if (!result.Success)
                 throw new InvalidOperationException(

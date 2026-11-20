@@ -12,12 +12,14 @@ namespace Ananke.Redis;
 /// Each session is stored as a Redis List keyed by <c>{prefix}:{sessionId}</c> with optional TTL.
 /// </summary>
 /// <remarks>
-/// Messages are serialized to JSON. TTL is applied per-session and refreshed on every write,
-/// keeping active conversations alive while expired ones are cleaned up by Redis automatically.
+/// Messages are serialized to JSON. TTL is applied per-session and refreshed on every write, in the
+/// same transaction as the append, keeping active conversations alive while expired ones are
+/// cleaned up by Redis automatically. Cancelling an operation stops the wait for the server; a
+/// write already sent may still be applied.
 /// </remarks>
 public sealed class RedisConversationMemory : IConversationMemory
 {
-    private readonly ConnectionMultiplexer _redis;
+    private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RedisConversationMemory> _logger;
     private readonly string _prefix;
     private readonly TimeSpan? _ttl;
@@ -30,7 +32,7 @@ public sealed class RedisConversationMemory : IConversationMemory
     /// <summary>
     /// Creates a new Redis-backed conversation memory.
     /// </summary>
-    /// <param name="redis">An existing Redis connection multiplexer.</param>
+    /// <param name="redis">An existing Redis connection, which the caller keeps owning.</param>
     /// <param name="prefix">Key prefix for session keys. Defaults to <c>"ananke:memory"</c>.</param>
     /// <param name="ttl">
     /// Optional time-to-live per session. When set, Redis automatically expires keys
@@ -39,7 +41,7 @@ public sealed class RedisConversationMemory : IConversationMemory
     /// </param>
     /// <param name="logger">Optional logger.</param>
     public RedisConversationMemory(
-        ConnectionMultiplexer redis,
+        IConnectionMultiplexer redis,
         string prefix = "ananke:memory",
         TimeSpan? ttl = null,
         ILogger<RedisConversationMemory>? logger = null)
@@ -59,6 +61,8 @@ public sealed class RedisConversationMemory : IConversationMemory
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
         ArgumentNullException.ThrowIfNull(messages);
 
+        ct.ThrowIfCancellationRequested();
+
         var key = Key(sessionId);
         var values = messages.Select(m => (RedisValue)JsonSerializer.Serialize(m, JsonOptions)).ToArray();
 
@@ -66,12 +70,10 @@ public sealed class RedisConversationMemory : IConversationMemory
 
         try
         {
-            var db = _redis.GetDatabase();
-            await db.ListRightPushAsync(key, values).ConfigureAwait(false);
-            await RefreshTtlAsync(db, key).ConfigureAwait(false);
+            await AppendAsync(key, values, ct).ConfigureAwait(false);
             _logger.LogDebug("Added {Count} message(s) to session {SessionId}", values.Length, sessionId);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _logger.LogError(ex, "Failed to add {Count} message(s) to session {SessionId}", values.Length, sessionId);
             throw;
@@ -84,16 +86,16 @@ public sealed class RedisConversationMemory : IConversationMemory
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
         ArgumentNullException.ThrowIfNull(message);
 
+        ct.ThrowIfCancellationRequested();
+
         var key = Key(sessionId);
 
         try
         {
-            var db = _redis.GetDatabase();
-            await db.ListRightPushAsync(key, JsonSerializer.Serialize(message, JsonOptions)).ConfigureAwait(false);
-            await RefreshTtlAsync(db, key).ConfigureAwait(false);
+            await AppendAsync(key, [JsonSerializer.Serialize(message, JsonOptions)], ct).ConfigureAwait(false);
             _logger.LogDebug("Added message to session {SessionId}", sessionId);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _logger.LogError(ex, "Failed to add message to session {SessionId}", sessionId);
             throw;
@@ -105,15 +107,17 @@ public sealed class RedisConversationMemory : IConversationMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
+        ct.ThrowIfCancellationRequested();
+
         var key = Key(sessionId);
         RedisValue[] values;
 
         try
         {
             var db = _redis.GetDatabase();
-            values = await db.ListRangeAsync(key).ConfigureAwait(false);
+            values = await db.ListRangeAsync(key).WaitForAsync(ct).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             // Rethrown: an empty history reads as a new conversation, and the caller would carry on
             // without anything it had been told.
@@ -149,15 +153,17 @@ public sealed class RedisConversationMemory : IConversationMemory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
+        ct.ThrowIfCancellationRequested();
+
         var key = Key(sessionId);
 
         try
         {
             var db = _redis.GetDatabase();
-            await db.KeyDeleteAsync(key).ConfigureAwait(false);
+            await db.KeyDeleteAsync(key).WaitForAsync(ct).ConfigureAwait(false);
             _logger.LogDebug("Cleared session {SessionId}", sessionId);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _logger.LogError(ex, "Failed to clear session {SessionId}", sessionId);
             throw;
@@ -168,14 +174,33 @@ public sealed class RedisConversationMemory : IConversationMemory
     public Task CleanupExpiredAsync(CancellationToken ct = default)
     {
         // Redis handles TTL expiry natively — no manual cleanup needed.
-        return Task.CompletedTask;
+        return ct.IsCancellationRequested ? Task.FromCanceled(ct) : Task.CompletedTask;
     }
 
     private string Key(string sessionId) => $"{_prefix}:{sessionId}";
 
-    private async Task RefreshTtlAsync(IDatabase db, string key)
+    /// <summary>
+    /// Appends <paramref name="values"/> to the session list. With a TTL, the append and the expiry go in one
+    /// transaction (<c>MULTI</c>/<c>EXEC</c>), so a session is never written without its expiry.
+    /// </summary>
+    private async Task AppendAsync(string key, RedisValue[] values, CancellationToken ct)
     {
-        if (_ttl.HasValue)
-            await db.KeyExpireAsync(key, _ttl.Value).ConfigureAwait(false);
+        var db = _redis.GetDatabase();
+        if (_ttl is not { } ttl)
+        {
+            await db.ListRightPushAsync(key, values).WaitForAsync(ct).ConfigureAwait(false);
+            return;
+        }
+
+        var transaction = db.CreateTransaction();
+        var push = transaction.ListRightPushAsync(key, values);
+        var expire = transaction.KeyExpireAsync(key, ttl);
+        // Awaited below only once the transaction commits.
+        RedisCommand.Observe(push);
+        RedisCommand.Observe(expire);
+        var committed = await transaction.ExecuteAsync().WaitForAsync(ct).ConfigureAwait(false);
+        if (!committed)
+            throw new RedisException($"The append to '{key}' was not committed");
+        await Task.WhenAll(push, expire).ConfigureAwait(false);
     }
 }

@@ -18,7 +18,7 @@ namespace Ananke.Qdrant;
 /// <para>
 /// Catalog metadata is stored as Qdrant payload fields:
 /// <c>source</c>, <c>keywords</c> (comma-separated), <c>category</c>,
-/// <c>indexed_at</c> (ISO 8601), optional <c>effective_at</c>, <c>chunk_count</c>, and optional <c>superseded_by</c>.
+/// <c>indexed_at</c> and optional <c>effective_at</c> (Unix seconds), <c>chunk_count</c>, and optional <c>superseded_by</c>.
 /// </para>
 /// </remarks>
 public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
@@ -43,6 +43,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
     private readonly uint _vectorSize;
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private bool _initialized;
+    private bool _effectiveAtIndexed;
 
     /// <summary>
     /// Creates a Qdrant-backed knowledge catalog.
@@ -173,33 +174,56 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
 
         if (options.NotOlderThan is not null)
         {
-            // ISO 8601 dates are lexicographically sortable, so string range works
+            // indexed_at is held as Unix seconds.
             filter.Must.Add(Conditions.Range(
                 IndexedAtPayloadKey,
                 new global::Qdrant.Client.Grpc.Range { Gte = options.NotOlderThan.Value.ToUnixTimeSeconds() }));
         }
 
-        // Qdrant Scroll API supports explicit ordering in recent versions (v1.7+)
-        // via the 'order_by' parameter, but the .NET client method signature used here
-        // might not expose it directly in this version.
-        // We rely on indexed_at filtering to reduce the result set, but Scroll order
-        // is implementation-defined (usually by ID).
-        // To get true time-ordered browsing, we would need to use Recommendation or Search APIs
-        // with a custom score, or client-side sorting if result set is small.
-        // Given 'Limit' is applied at DB level, we might miss recent items if not sorted by time.
-        // For now, we apply filters to narrow down the scope.
+        if (options.Order == CatalogBrowseOrder.IndexedAt)
+            return await ScrollAsync(filter, IndexedAtPayloadKey, options.Limit, ct).ConfigureAwait(false);
 
-        var scrollResponse = await _client.ScrollAsync(
-           _collectionName,
-           filter: filter,
-           limit: (uint)options.Limit,
-           payloadSelector: true,
-           cancellationToken: ct).ConfigureAwait(false);
+        // By each document's own date, else when it was indexed: the newest of those with a date, ordered by it, and of
+        // those without, ordered by when they were indexed, hold the newest of all.
+        await EnsureEffectiveAtIndexAsync(ct).ConfigureAwait(false);
+        var dated = filter.Clone();
+        dated.MustNot.Add(Conditions.IsEmpty(EffectiveAtPayloadKey));
+        var undated = filter.Clone();
+        undated.Must.Add(Conditions.IsEmpty(EffectiveAtPayloadKey));
+        var both = await Task.WhenAll(
+            ScrollAsync(dated, EffectiveAtPayloadKey, options.Limit, ct),
+            ScrollAsync(undated, IndexedAtPayloadKey, options.Limit, ct)).ConfigureAwait(false);
+        return [.. both.SelectMany(e => e).OrderByDescending(e => e.EffectiveAt ?? e.IndexedAt).Take(options.Limit)];
+    }
 
-        return scrollResponse.Result
-            .Select(MapRetrievedPoint)
-            .OrderByDescending(e => options.Order == CatalogBrowseOrder.EffectiveAt ? e.EffectiveAt ?? e.IndexedAt : e.IndexedAt)
-            .ToList();
+    /// <summary>
+    /// Makes the integer index on effective_at that ordering by it needs, once per catalog, the first time entries are
+    /// browsed by it; a collection made earlier gets it too.
+    /// </summary>
+    private async Task EnsureEffectiveAtIndexAsync(CancellationToken ct)
+    {
+        if (_effectiveAtIndexed)
+            return;
+
+        await _client.CreatePayloadIndexAsync(
+            _collectionName, EffectiveAtPayloadKey, PayloadSchemaType.Integer, wait: true, cancellationToken: ct).ConfigureAwait(false);
+        _effectiveAtIndexed = true;
+    }
+
+    /// <summary>The entries matching <paramref name="filter"/>, newest first by the integer payload <paramref name="key"/>.</summary>
+    private async Task<List<CatalogEntry>> ScrollAsync(Filter filter, string key, int limit, CancellationToken ct)
+    {
+        if (limit <= 0)
+            return [];
+
+        var scrolled = await _client.ScrollAsync(
+            _collectionName,
+            filter: filter,
+            limit: (uint)limit,
+            payloadSelector: true,
+            orderBy: new OrderBy { Key = key, Direction = Direction.Desc },
+            cancellationToken: ct).ConfigureAwait(false);
+        return [.. scrolled.Result.Select(MapRetrievedPoint)];
     }
 
     private async Task EnsureCollectionAsync(CancellationToken ct)

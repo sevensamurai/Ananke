@@ -84,7 +84,7 @@ var response = await model.GenerateAsync(request);
 | Aspect | Detail |
 |---|---|
 | **Cache key** | SHA256 of SystemPrompt + Messages + Tools + ResponseFormat |
-| **TTL** | Stored with the response; expired entries treated as misses |
+| **TTL** | Stored with the response and set as the key's expiry; expired entries are treated as misses and dropped by the store |
 | **Tool-call responses** | Never cached (depend on external state) |
 | **Streaming** | Cache hits replay as a single chunk — SSE consumers work unchanged |
 

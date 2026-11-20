@@ -65,7 +65,7 @@ static class MqttSection
                 await SendAsync(mqttWriter, mqttCar, EngineTransition.Halt);
                 await SendAsync(mqttWriter, mqttCar, EngineTransition.Park);
 
-                DemoConsole.Say($"  Final state: {mqttEngine.CurrentState}");
+                DemoConsole.Say($"  Final state: {(await mqttEngine.GetStatusAsync(mqttCar)).State}");
             }
         }
         catch (Exception ex)

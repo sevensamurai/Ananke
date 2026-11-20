@@ -3,7 +3,9 @@ using Ananke.Abstractions.Config;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
+using MQTTnet.Protocol;
 using System.Buffers;
+using System.Threading.Channels;
 
 namespace Ananke.MQTT;
 
@@ -25,6 +27,10 @@ namespace Ananke.MQTT;
 ///   <item><see cref="ConfigureAsync(ChannelConfig, IBackgroundWorker{M}, A, CancellationToken)"/>
 ///   — single-action subscription with untyped worker.</item>
 /// </list>
+/// From <c>ConfigureAsync</c> until <see cref="ClearAsync"/> or dispose, a lost connection is retried with
+/// a capped delay between attempts, and the topic is subscribed again, at the configured
+/// <see cref="ChannelConfig.QualityOfService"/>, on every connect. A message whose payload can't be
+/// deserialized is logged and dropped; the next one is delivered.
 /// </remarks>
 /// <typeparam name="M">Message type (any class; no longer requires <see cref="IMqttContext"/>).</typeparam>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
@@ -36,12 +42,27 @@ public sealed class MqttChannelReader<M, A>(
 {
     private readonly ILogger<MqttChannelReader<M, A>> _logger = logger ?? NullLogger<MqttChannelReader<M, A>>.Instance;
 
-    private IMqttClient? _client;
-    private MqttClientOptions? _options;
+    private MqttConnection? _connection;
     private string? _topic;
-    private bool _linked;
+    private MqttQualityOfServiceLevel _qualityOfService;
+    private bool _keepSession;
     private bool _disposed;
     private IAsyncDisposable? _processor;
+
+    /// <summary>The wait between reconnect attempts.</summary>
+    internal MqttReconnectDelay ReconnectDelay { get; init; } = MqttReconnectDelay.Default;
+
+    /// <summary>Replaces the validation of the broker's TLS certificate against the trusted roots.</summary>
+    internal Func<MqttClientCertificateValidationEventArgs, bool>? CertificateValidation { get; init; }
+
+    /// <summary>
+    /// Whether the client is connected to the broker now and subscribed to its topic: false after a reconnect
+    /// until the subscription is set up again.
+    /// </summary>
+    public bool IsConnected => _connection?.IsReady == true;
+
+    /// <summary>How many connects have completed, each with its subscription.</summary>
+    internal int ConnectCount => _connection?.ConnectCount ?? 0;
 
     private static byte[] GetPayloadBytes(ReadOnlySequence<byte> payload)
     {
@@ -51,7 +72,7 @@ public sealed class MqttChannelReader<M, A>(
     /// <inheritdoc />
     public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M> consumer, CancellationToken token = default)
     {
-        ValidateConfig(config);
+        MqttConnection.Validate(config);
         ArgumentNullException.ThrowIfNull(consumer);
 
         var topic = NamespaceMapper.GetTopicWildcard<A>(config.Namespace);
@@ -64,14 +85,14 @@ public sealed class MqttChannelReader<M, A>(
             onInfo: msg => _logger.LogDebug("{Message}", msg));
 
         return await SetupClient(config, topic, processor,
-            onMessage: (message, _) => processor.EnqueueAsync(message),
+            onMessage: (message, _, ct) => processor.EnqueueAsync(message, ct),
             setCommandOnMessage: true, token: token).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M> consumer, A action, CancellationToken token = default)
     {
-        ValidateConfig(config);
+        MqttConnection.Validate(config);
         ArgumentNullException.ThrowIfNull(consumer);
 
         var topic = NamespaceMapper.GetTopic(config.Namespace, action);
@@ -84,14 +105,14 @@ public sealed class MqttChannelReader<M, A>(
             onInfo: msg => _logger.LogDebug("{Message}", msg));
 
         return await SetupClient(config, topic, processor,
-            onMessage: (message, _) => processor.EnqueueAsync(message),
+            onMessage: (message, _, ct) => processor.EnqueueAsync(message, ct),
             setCommandOnMessage: false, token: token).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<bool> ConfigureAsync(ChannelConfig config, IBackgroundWorker<M, A> consumer, CancellationToken token = default)
     {
-        ValidateConfig(config);
+        MqttConnection.Validate(config);
         ArgumentNullException.ThrowIfNull(consumer);
 
         var topic = NamespaceMapper.GetTopicWildcard<A>(config.Namespace);
@@ -104,7 +125,7 @@ public sealed class MqttChannelReader<M, A>(
             onInfo: msg => _logger.LogDebug("{Message}", msg));
 
         return await SetupClient(config, topic, processor,
-            onMessage: (message, action) => processor.EnqueueAsync(message, action),
+            onMessage: (message, action, ct) => processor.EnqueueAsync(message, action, ct),
             setCommandOnMessage: false, token: token).ConfigureAwait(false);
     }
 
@@ -112,11 +133,26 @@ public sealed class MqttChannelReader<M, A>(
         ChannelConfig config,
         string topic,
         IAsyncDisposable processor,
-        Func<M, A, ValueTask> onMessage,
+        Func<M, A, CancellationToken, ValueTask> onMessage,
         bool setCommandOnMessage,
         CancellationToken token)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // A second ConfigureAsync replaces the client, and its reconnect loop, with a new one.
+        await StopConnectionAsync(CancellationToken.None).ConfigureAwait(false);
+
+        // Throws when the client id is in use in the process, before anything is started.
+        // A type's ToString() is its full name, with no assembly version in a generic type's arguments.
+        var connection = new MqttConnection(
+            MqttConnection.OptionsFor(config, ["reader", typeof(A).ToString(), typeof(M).ToString()], CertificateValidation),
+            SubscribeAsync, ReconnectDelay, "RX Channel", _logger);
+        // Held from here, so a clear or dispose frees its client id whatever throws below.
+        _connection = connection;
+
         _topic = topic;
+        _qualityOfService = MqttConnection.QualityOfServiceFor(config);
+        _keepSession = !config.CleanSession;
 
         // Dispose previous processor if ConfigureAsync is called again
         if (_processor is not null)
@@ -130,132 +166,110 @@ public sealed class MqttChannelReader<M, A>(
             pa.Start(token);
 
         _logger.LogInformation("RX Channel subscribing to {Topic}", _topic);
-        _client = new MqttClientFactory().CreateMqttClient();
 
-        _options = new MqttClientOptionsBuilder()
-            .WithTcpServer(config.Host, config.Port)
-            .WithCredentials(config.Username, config.Password)
-            .WithWillQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .WithCleanSession()
-            .Build();
+        var lifetime = connection.Lifetime;
+        connection.Client.ApplicationMessageReceivedAsync +=
+            e => OnMessageReceivedAsync(e, onMessage, setCommandOnMessage, lifetime);
 
-        _client.ApplicationMessageReceivedAsync += async e =>
-        {
-            var data = GetPayloadBytes(e.ApplicationMessage.Payload);
-            var message = DataSerializer.Deserialize<M>(data);
-
-            if (message is null)
-            {
-                _logger.LogWarning("RX Channel failed to deserialize message from {Topic} ({Size}B), message dropped",
-                    e.ApplicationMessage.Topic, data.Length);
-                return;
-            }
-
-            var actionStr = NamespaceMapper.GetActionFromTopic(e.ApplicationMessage.Topic);
-
-            // Legacy: set Command on IMqttContext if the message type supports it
-            if (setCommandOnMessage && message is IMqttContext mqttCtx)
-                mqttCtx.Command = actionStr;
-
-            if (!Enum.TryParse(typeof(A), actionStr, ignoreCase: true, out var parsed) || parsed is not A action)
-            {
-                _logger.LogWarning("RX Channel could not parse action '{Action}' as {EnumType} from {Topic}",
-                    actionStr, typeof(A).Name, e.ApplicationMessage.Topic);
-                return;
-            }
-
-            _logger.LogDebug("Received message from {Topic}", e.ApplicationMessage.Topic);
-
-            try
-            {
-                await onMessage(message, action).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("RX Channel enqueue cancelled for {Topic}", e.ApplicationMessage.Topic);
-            }
-        };
-
-        _client.ConnectedAsync += async _ =>
-        {
-            _logger.LogDebug("RX Channel connected");
-            if (_client is not null && !string.IsNullOrEmpty(_topic))
-                await _client.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(_topic).Build()).ConfigureAwait(false);
-        };
-
-        _client.DisconnectedAsync += async _ =>
-        {
-            _logger.LogWarning("RX Channel disconnected");
-            if (!_disposed)
-                await ReconnectAsync().ConfigureAwait(false);
-        };
-
-        return await ConnectAsync(token).ConfigureAwait(false);
+        return await connection.StartAsync(token).ConfigureAwait(false);
     }
 
-    private async Task<bool> ConnectAsync(CancellationToken token)
+    // Never throws: an exception here would reach the client's receive loop.
+    private async Task OnMessageReceivedAsync(
+        MqttApplicationMessageReceivedEventArgs e,
+        Func<M, A, CancellationToken, ValueTask> onMessage,
+        bool setCommandOnMessage,
+        CancellationToken lifetime)
     {
-        if (_client is null || _options is null)
-        {
-            _linked = false;
-            return false;
-        }
+        var topic = e.ApplicationMessage.Topic;
+        var data = GetPayloadBytes(e.ApplicationMessage.Payload);
 
+        M? message = null;
+        Exception? error = null;
         try
         {
-            var resp = await _client.ConnectAsync(_options, token).ConfigureAwait(false);
-            _linked = resp.ResultCode == MqttClientConnectResultCode.Success;
-            return _linked;
+            message = DataSerializer.Deserialize<M>(data);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "RX Channel unable to connect");
-            _linked = false;
-            return false;
+            error = ex;
+        }
+
+        if (message is null)
+        {
+            _logger.LogWarning(error, "RX Channel message from {Topic} ({Size}B) could not be deserialized, message dropped",
+                topic, data.Length);
+            return;
+        }
+
+        var actionStr = NamespaceMapper.GetActionFromTopic(topic);
+
+        // Legacy: set Command on IMqttContext if the message type supports it
+        if (setCommandOnMessage && message is IMqttContext mqttCtx)
+            mqttCtx.Command = actionStr;
+
+        if (!Enum.TryParse(typeof(A), actionStr, ignoreCase: true, out var parsed) || parsed is not A action)
+        {
+            _logger.LogWarning("RX Channel could not parse action '{Action}' as {EnumType} from {Topic}",
+                actionStr, typeof(A).Name, topic);
+            return;
+        }
+
+        _logger.LogDebug("Received message from {Topic}", topic);
+
+        try
+        {
+            // Waits while the queue is full; the client's dispose cancels the wait.
+            await onMessage(message, action, lifetime).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ChannelClosedException)
+        {
+            // Left unacknowledged: a kept session has the broker send it again on the next connect.
+            e.AutoAcknowledge = false;
+            _logger.LogDebug("RX Channel stopped before the message from {Topic} was queued; message not acknowledged", topic);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RX Channel failed to queue the message from {Topic}; message dropped", topic);
         }
     }
 
-    private async Task ReconnectAsync()
+    // Runs on every connect: a clean session starts with no subscriptions; a kept one is subscribed again unchanged.
+    private async Task SubscribeAsync(IMqttClient client, CancellationToken ct)
     {
-        const int maxAttempts = 5;
-        var delay = TimeSpan.FromSeconds(1);
+        if (string.IsNullOrEmpty(_topic)) return;
 
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            if (_disposed) return;
-
-            try
-            {
-                await Task.Delay(delay).ConfigureAwait(false);
-                if (await ConnectAsync(CancellationToken.None).ConfigureAwait(false))
-                {
-                    _logger.LogInformation("RX Channel reconnected after {Attempt} attempt(s)", attempt);
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "RX Channel reconnection attempt {Attempt}/{MaxAttempts} failed",
-                    attempt, maxAttempts);
-            }
-
-            delay *= 2;
-        }
-
-        _logger.LogError("RX Channel failed to reconnect after {MaxAttempts} attempts", maxAttempts);
+        var result = await client.SubscribeAsync(new MqttTopicFilterBuilder()
+            .WithTopic(_topic)
+            .WithQualityOfServiceLevel(_qualityOfService)
+            .Build(), ct).ConfigureAwait(false);
+        MqttConnection.EnsureGranted(result);
+        _logger.LogDebug("RX Channel subscribed to {Topic}", _topic);
     }
 
     /// <inheritdoc />
-    public async Task ClearAsync(CancellationToken ct = default)
+    public Task ClearAsync(CancellationToken ct = default) => StopConnectionAsync(ct);
+
+    // Unsubscribes (unless asked not to), then stops the reconnect loop and disconnects.
+    private async Task StopConnectionAsync(CancellationToken ct, bool unsubscribe = true)
     {
-        if (_client is not null && _client.IsConnected)
+        var connection = _connection;
+        if (connection is null) return;
+        _connection = null;
+
+        try
         {
-            if (!string.IsNullOrEmpty(_topic))
-                await _client.UnsubscribeAsync(_topic, cancellationToken: ct).ConfigureAwait(false);
-            await _client.DisconnectAsync(cancellationToken: ct).ConfigureAwait(false);
+            if (unsubscribe && connection.IsConnected && !string.IsNullOrEmpty(_topic))
+                await connection.Client.UnsubscribeAsync(_topic, cancellationToken: ct).ConfigureAwait(false);
         }
-        _linked = false;
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "RX Channel unsubscribe failed");
+        }
+        finally
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -267,21 +281,9 @@ public sealed class MqttChannelReader<M, A>(
         if (_processor is not null)
             await _processor.DisposeAsync().ConfigureAwait(false);
 
-        await ClearAsync().ConfigureAwait(false);
-
-        if (_client is not null)
-        {
-            _client.Dispose();
-            _client = null;
-        }
+        // A kept session stays subscribed, so the broker holds messages for it until the next connect.
+        await StopConnectionAsync(CancellationToken.None, unsubscribe: !_keepSession).ConfigureAwait(false);
 
         GC.SuppressFinalize(this);
-    }
-
-    private static void ValidateConfig(ChannelConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Namespace);
     }
 }

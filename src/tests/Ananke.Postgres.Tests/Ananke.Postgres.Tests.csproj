@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Ananke.Postgres\Ananke.Postgres.csproj" />
+    <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
+    <Compile Include="..\Ananke.Orchestration.Tests\DatedRecordListingCases.cs" Link="DatedRecordListingCases.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -50,7 +50,7 @@ services.AddStateMachine<OrderMachine, OrderCtx, OrderState, OrderTransition, Or
 - **Distributed locking** — safe coordination across instances via `IDistributedLock`
 - **Composable middleware** — intercept every transition for logging, metrics, validation
 - **Guard conditions** — block transitions based on runtime state
-- **Fault / Reset** — circuit-breaker pattern (`OperationalStatus.Faulted` blocks all transitions until `ResetAsync`)
+- **Fault / Reset** — circuit breaker per context (`FaultAsync` refuses one context's transitions, on every node, until `ResetAsync`)
 - **Lifecycle hooks** — `OnEnter` / `OnExit` per state
 - **OpenTelemetry tracing** — built-in `ActivitySource` for transition spans
 

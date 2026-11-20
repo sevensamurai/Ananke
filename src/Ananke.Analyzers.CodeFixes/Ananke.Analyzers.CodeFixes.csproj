@@ -9,7 +9,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
-    <!-- Same packaging rationale as Ananke.Analyzers.csproj — this DLL is loaded as an analyzer
+    <!-- Same packaging rationale as Ananke.Orchestration.Analyzers.csproj, and packed beside it — this DLL is loaded as an analyzer
          asset (CodeFixProviders live in the same analyzers/dotnet/cs slot as DiagnosticAnalyzers),
          not referenced as an ordinary library. -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -20,7 +20,7 @@
     <UseSharedCompilation>false</UseSharedCompilation>
   </PropertyGroup>
 
-  <!-- Separate from Ananke.Analyzers.csproj because RS1038 forbids a DiagnosticAnalyzer assembly
+  <!-- Separate from Ananke.Orchestration.Analyzers.csproj because RS1038 forbids a DiagnosticAnalyzer assembly
        from referencing Microsoft.CodeAnalysis.Workspaces (unavailable during command-line/CI
        compilation) — but CodeFixProviders need Workspaces types (CodeAction, Document, etc.). -->
   <ItemGroup>
@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ananke.Analyzers\Ananke.Analyzers.csproj" />
+    <ProjectReference Include="..\Ananke.Orchestration.Analyzers\Ananke.Orchestration.Analyzers.csproj" />
   </ItemGroup>
 
 </Project>

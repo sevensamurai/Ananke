@@ -14,6 +14,14 @@ namespace Ananke.Orchestration.Agents;
 /// similar items or a line of dashes differ or stop well before that.
 /// </para>
 /// <para>
+/// <b>A reply the model ended itself is not checked.</b> Asked for sixty identical rows, a model
+/// repeats one passage and stops; only a reply cut at its output limit, or one whose provider did not
+/// say why it stopped, is checked with <see cref="ThrowIfRepeating(string?)"/>. A stream cannot know yet why it
+/// will stop, so <see cref="StreamedAgentModel"/> watches it for a far longer repeat,
+/// <see cref="MinStreamedRepeatedLength"/> characters, and the whole reply is checked as above once
+/// it ends.
+/// </para>
+/// <para>
 /// <b>Not retried.</b> Asked again, the same model is as likely to repeat itself again, so
 /// <see cref="TerminalProviderError.Is"/> reads <see cref="RepeatedOutputException"/> as terminal and
 /// the run ends rather than paying for the same reply twice.
@@ -30,22 +38,45 @@ public sealed class RepeatedOutput
     /// <summary>How long the repeated stretch has to be, whatever the passage's length.</summary>
     public const int MinRepeatedLength = 1_000;
 
+    /// <summary>
+    /// How long the repeated stretch has to be for <see cref="StreamedAgentModel"/> to stop a reply
+    /// before it ends: far beyond any repeat asked for, well short of an output limit.
+    /// </summary>
+    public const int MinStreamedRepeatedLength = 20_000;
+
     // A stream is checked each time this much more has arrived, not on every piece.
     private const int CheckEvery = 256;
 
-    // The end of the reply that is searched: room for the longest passage, repeated.
+    // The end of a whole reply that is searched: room for the longest passage, repeated.
     private const int Searched = LongestPassage * (MinRepeats + 1);
 
     // A passage is found from the places its last characters appear earlier.
     private const int Probe = 32;
 
     private readonly StringBuilder _end = new();
+    private readonly int _minRepeatedLength;
+    private readonly int _searched;
     private int _sinceChecked;
     private int _length;
 
+    /// <summary>Watches a stream for a repeated stretch of at least <see cref="MinRepeatedLength"/> characters.</summary>
+    public RepeatedOutput()
+        : this(MinRepeatedLength)
+    {
+    }
+
+    /// <summary>Watches a stream for a repeated stretch of at least <paramref name="minRepeatedLength"/> characters.</summary>
+    public RepeatedOutput(int minRepeatedLength)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(minRepeatedLength, MinRepeatedLength);
+        _minRepeatedLength = minRepeatedLength;
+        // Room for the stretch and a passage before it, so a repeat need not fill the whole window.
+        _searched = Math.Max(Searched, minRepeatedLength + LongestPassage);
+    }
+
     /// <summary>
     /// Fed each piece of a streamed reply as it arrives; throws <see cref="RepeatedOutputException"/>
-    /// once the reply so far ends repeating one passage.
+    /// once the reply so far ends repeating one passage over the length this watch was made with.
     /// </summary>
     public void Add(string? delta)
     {
@@ -56,31 +87,35 @@ public sealed class RepeatedOutput
         _length += delta.Length;
         _sinceChecked += delta.Length;
 
-        if (_end.Length > 2 * Searched)
-            _end.Remove(0, _end.Length - Searched);
+        if (_end.Length > 2 * _searched)
+            _end.Remove(0, _end.Length - _searched);
 
         if (_sinceChecked < CheckEvery)
             return;
 
         _sinceChecked = 0;
 
-        if (Find(_end.ToString()) is { } passage)
+        var tail = Math.Min(_end.Length, _searched);
+        if (Find(_end.ToString(_end.Length - tail, tail), _minRepeatedLength, _searched) is { } passage)
             throw Repeating(passage, _length);
     }
 
     /// <summary>Throws <see cref="RepeatedOutputException"/> when a whole reply ends repeating one passage.</summary>
     public static void ThrowIfRepeating(string? text)
     {
-        if (text is not null && Find(text) is { } passage)
+        if (text is not null && Find(text, MinRepeatedLength, Searched) is { } passage)
             throw Repeating(passage, text.Length);
     }
 
-    /// <summary>The passage the end of <paramref name="text"/> repeats, or <see langword="null"/>.</summary>
-    private static string? Find(string text)
+    /// <summary>
+    /// The passage the last <paramref name="searched"/> characters of <paramref name="text"/> end
+    /// repeating over at least <paramref name="minRepeatedLength"/> characters, or <see langword="null"/>.
+    /// </summary>
+    private static string? Find(string text, int minRepeatedLength, int searched)
     {
-        var end = text.AsSpan(Math.Max(0, text.Length - Searched));
+        var end = text.AsSpan(Math.Max(0, text.Length - searched));
 
-        if (end.Length < MinRepeatedLength)
+        if (end.Length < minRepeatedLength)
             return null;
 
         var probe = end[^Probe..];
@@ -99,7 +134,7 @@ public sealed class RepeatedOutput
                 repeated++;
 
             // Reported as it first appears, where it reads from its own start.
-            if (repeated >= Math.Max(MinRepeats * passage, MinRepeatedLength))
+            if (repeated >= Math.Max(MinRepeats * passage, minRepeatedLength))
                 return end.Slice(end.Length - repeated, passage).ToString();
 
             before = at + Probe - 1;

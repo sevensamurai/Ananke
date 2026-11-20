@@ -17,7 +17,7 @@ public class StateMachineOptions
     public int LockRetryCount { get; set; } = 3;
 
     /// <summary>
-    /// Delay between lock retry attempts in milliseconds. Default is 100.
+    /// Delay before the first lock retry in milliseconds; it doubles before each further retry. Default is 100.
     /// </summary>
     public int LockRetryDelayMs { get; set; } = 100;
 
@@ -31,4 +31,20 @@ public class StateMachineOptions
     /// <see cref="TimeProvider.System"/>.
     /// </summary>
     public TimeProvider Clock { get; set; } = TimeProvider.System;
+
+    /// <summary>
+    /// First part of each context's store key and lock resource:
+    /// <c>{KeyPrefix}:{MachineName}:{context id}</c>. Default is <c>"statemachine"</c>; empty
+    /// leaves it out.
+    /// </summary>
+    public string KeyPrefix { get; set; } = "statemachine";
+
+    /// <summary>
+    /// Middle part of each context's store key and lock resource. <c>null</c> (the default) uses the
+    /// machine's type name with its type arguments, so two machine types keep separate records for
+    /// the same context id. Set it when two types in different namespaces share a name, or to keep
+    /// the keys when the type is renamed. Empty leaves it out: with <see cref="KeyPrefix"/> empty
+    /// too, the key is the bare context id.
+    /// </summary>
+    public string? MachineName { get; set; }
 }

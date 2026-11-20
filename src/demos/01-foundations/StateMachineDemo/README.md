@@ -78,7 +78,7 @@ docker compose -f demos/StateMachineDemo/docker-compose.yml down
 | File | Purpose |
 |------|---------|
 | `Program.cs` | Entry point; wires infrastructure and runs sections 1–4 |
-| `CarEngineStateMachine.cs` | `AbstractStateMachine` subclass with transition table, lifecycle hooks and guard state |
+| `CarEngineStateMachine.cs` | `AbstractStateMachine` subclass with transition table, lifecycle hooks and a guard that reads the fuel level from the context |
 | `MqttSection.cs` | Section 4 — MQTT-specific setup and sends |
 | `TripReporter.cs` | Observer that records per-car trip metrics |
 | `DemoConsole.cs` | Coloured console output helpers |
@@ -88,7 +88,7 @@ docker compose -f demos/StateMachineDemo/docker-compose.yml down
 
 - **`AbstractStateMachine<TCtx, TState, TTransition, TNotification>`** — base class that manages state, the distributed lock and the key-value store.
 - **`StateMachineChannelWorker`** — generic bridge between a channel reader and the FSM; no hand-written worker loop needed.
-- **Guard conditions** — per-transition `.When(Func<bool>)` predicates evaluated at dispatch time.
+- **Guard conditions** — per-transition `.When((context, ct) => ...)` predicates evaluated at dispatch time, reading the context being transitioned.
 - **Lifecycle hooks** — `.OnEnter` / `.OnExit` callbacks declared fluently in the transition builder.
 - **Middleware** — `LoggingMiddleware` attached via `UseMiddleware` for cross-cutting concerns.
 - **`FaultAsync` / `ResetAsync`** — operational status management; faulted machines reject all transitions.

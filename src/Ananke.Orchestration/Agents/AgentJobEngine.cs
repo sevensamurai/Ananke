@@ -520,21 +520,7 @@ internal sealed class AgentJobEngine<TState, TResult>
                 messages.Add(nudge);
             }
 
-            // PreCompaction fails on the raw accumulated history without paying for the strategy,
-            // which may itself issue a model call.
-            if (_maxContextTokens.HasValue && _contextLimitMode == ContextLimitMode.PreCompaction)
-                EnforceContextLimit(messages, toolRound);
-
-            IReadOnlyList<AgentMessage> requestMessages = messages;
-            if (_contextStrategy is not null)
-                requestMessages = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
-
-            // PostCompaction (the default) measures what is actually about to be sent, so a
-            // strategy that brings the payload back under the limit prevents the throw.
-            if (_maxContextTokens.HasValue && _contextLimitMode == ContextLimitMode.PostCompaction)
-                EnforceContextLimit(requestMessages, toolRound);
-
-            request = request with { Messages = requestMessages };
+            request = request with { Messages = await NextRequestMessagesAsync(messages, toolRound, ct).ConfigureAwait(false) };
             result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
         }
 
@@ -735,17 +721,39 @@ internal sealed class AgentJobEngine<TState, TResult>
         synthetic.Add(nudge);
         messages.Add(nudge);
 
-        IReadOnlyList<AgentMessage> requestMessages = messages;
-        if (_contextStrategy is not null)
-            requestMessages = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
-
-        request = request with { Messages = requestMessages };
+        // Held to the limit as a tool round is, but named as the model call: no tool round follows it.
+        request = request with { Messages = await NextRequestMessagesAsync(messages, toolRound: null, ct).ConfigureAwait(false) };
         var result = await GenerateWithRetryAsync(request, snapshotBuilder, llmSpan, ct).ConfigureAwait(false);
 
         if (result.RequiresAction)
             throw new InvalidOperationException(failure);
 
         return result;
+    }
+
+    /// <summary>
+    /// What the tool loop's next call sends: <paramref name="messages"/> compacted by the context strategy,
+    /// held to the configured limit on the raw history (<see cref="ContextLimitMode.PreCompaction"/>) or on
+    /// what is sent (<see cref="ContextLimitMode.PostCompaction"/>).
+    /// </summary>
+    private async Task<IReadOnlyList<AgentMessage>> NextRequestMessagesAsync(
+        List<AgentMessage> messages, int? toolRound, CancellationToken ct)
+    {
+        // PreCompaction fails on the raw accumulated history without paying for the strategy,
+        // which may itself issue a model call.
+        if (_maxContextTokens.HasValue && _contextLimitMode == ContextLimitMode.PreCompaction)
+            EnforceContextLimit(messages, toolRound);
+
+        IReadOnlyList<AgentMessage> requestMessages = messages;
+        if (_contextStrategy is not null)
+            requestMessages = (await CompactAsync(messages, ct).ConfigureAwait(false)).Messages;
+
+        // PostCompaction (the default) measures what is actually about to be sent, so a
+        // strategy that brings the payload back under the limit prevents the throw.
+        if (_maxContextTokens.HasValue && _contextLimitMode == ContextLimitMode.PostCompaction)
+            EnforceContextLimit(requestMessages, toolRound);
+
+        return requestMessages;
     }
 
     /// <summary>

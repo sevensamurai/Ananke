@@ -78,16 +78,29 @@ public class DatedRecordToolsTests
     }
 
     [Test]
-    public async Task ListRecords_MoreThanItShows_CountsTheRest()
+    public async Task ListRecords_MoreThanItShows_SaysMoreMatch()
     {
         for (var day = 1; day <= 5; day++)
             await StoreAsync($"d{day}.md", $"2026-10-0{day}", new Decision($"Decision {day}", "decided"));
 
         var result = await ListAsync([], maxRecords: 2);
 
+        result.Value.ShouldStartWith("More than 2 records match; the newest 2:");
         result.Value.ShouldContain("Decision 5");
-        result.Value.ShouldNotContain("Decision 1");
-        result.Value.ShouldContain("3 more");
+        result.Value.ShouldContain("Decision 4");
+        result.Value.ShouldNotContain("Decision 3");
+    }
+
+    [Test]
+    public async Task ListRecords_AsManyAsItShows_DoesntSayMoreMatch()
+    {
+        for (var day = 1; day <= 2; day++)
+            await StoreAsync($"d{day}.md", $"2026-10-0{day}", new Decision($"Decision {day}", "decided"));
+
+        var result = await ListAsync([], maxRecords: 2);
+
+        result.Value.ShouldStartWith("2 record(s), newest first:");
+        result.Value.ShouldNotContain("More than");
     }
 
     [Test]

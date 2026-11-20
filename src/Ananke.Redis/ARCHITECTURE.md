@@ -1,13 +1,15 @@
 # Ananke.Redis — Architecture
 
-> Redis infrastructure — distributed locks, key-value persistence,
-> checkpointing, and conversation memory via StackExchange.Redis.
+> Redis infrastructure — distributed locks and key-value persistence
+> via StackExchange.Redis and RedLock.net.
 
 ## Role
 
 Provides production-grade implementations of Ananke's infrastructure
 abstractions using Redis-compatible stores. Required for distributed
-`AbstractStateMachine` deployments and persistent conversation memory.
+`AbstractStateMachine` deployments. Depends on `Ananke.Abstractions` only:
+workflow checkpoints go through `KeyValueCheckpointStore` in
+`Ananke.Orchestration`, over the key-value adapter `AddRedis` registers.
 
 ---
 
@@ -18,15 +20,13 @@ detail to come back to.
 
 1. `RedisDistributedLock` — `IDistributedLock` via the RedLock algorithm, multi-instance safe — `src/Ananke.Redis/RedisDistributedLock.cs`
 2. `RedisDataAdapter` — `IKeyValueDataAdapter` for key-value persistence with JSON serialization — `src/Ananke.Redis/RedisDataAdapter.cs`
-3. `RedisConversationMemory` — `IConversationMemory` for session-scoped conversation history — `src/Ananke.Redis/RedisConversationMemory.cs`
-4. `ServiceCollectionExtensions` — `services.AddRedis(options => ...)` DI registration, the usual starting point for wiring this package in — `src/Ananke.Redis/ServiceCollectionExtensions.cs`
+3. `ServiceCollectionExtensions` — `services.AddRedis(options => ...)` DI registration, the usual starting point for wiring this package in — `src/Ananke.Redis/ServiceCollectionExtensions.cs`
 
 ---
 
 ## Dependencies
 
 - `Ananke.Abstractions` (project)
-- `Ananke.Orchestration` (project)
 - `StackExchange.Redis`
 - `RedLock.net`
 
@@ -36,8 +36,6 @@ detail to come back to.
 |------|------|---------|--------|
 | `RedisDistributedLock` | Class | `IDistributedLock` via RedLock algorithm (multi-instance safe) | `src/Ananke.Redis/RedisDistributedLock.cs` |
 | `RedisDataAdapter` | Class | `IKeyValueDataAdapter` — key-value persistence with JSON serialization | `src/Ananke.Redis/RedisDataAdapter.cs` |
-| `RedisCheckpointStore` | Class | `ICheckpointStore` — workflow checkpoint persistence. Not auto-registered by `AddRedis(...)`; takes a `ConnectionMultiplexer` directly — see README for manual wiring | `src/Ananke.Redis/RedisCheckpointStore.cs` |
-| `RedisConversationMemory` | Class | `IConversationMemory` — session-scoped conversation history | `src/Ananke.Redis/RedisConversationMemory.cs` |
 | `ServiceCollectionExtensions` | Static class | `services.AddRedis(options => ...)` DI registration | `src/Ananke.Redis/ServiceCollectionExtensions.cs` |
 
 ## Redis API Surface Used
@@ -46,10 +44,8 @@ Only basic Redis 2.6 commands — all Redis-compatible stores support these:
 
 | Command | Used By |
 |---------|---------|
-| `GET` / `SET` | `RedisDataAdapter`, `RedisCheckpointStore` |
-| `DEL` / `EXISTS` | `RedisDataAdapter`, `RedisCheckpointStore`, `RedisConversationMemory` |
-| `EXPIRE` / `EXPIREAT` | `RedisCheckpointStore`, `RedisConversationMemory` |
-| `RPUSH` / `LRANGE` | `RedisConversationMemory` |
+| `GET` / `SET` | `RedisDataAdapter` |
+| `DEL` / `EXISTS` | `RedisDataAdapter` |
 | `SET NX EX` (Lua) | `RedisDistributedLock` (via RedLock.net) |
 
 ## Compatible Stores
@@ -73,5 +69,29 @@ services.AddRedis(c =>
 {
     c.Host = "localhost";  // Points at Dragonfly/Valkey/Redis — same port, same protocol
     c.Port = 6379;
+});
+```
+
+## Timeouts
+
+`CacheConfig.ConnectTimeoutMs`, `SyncTimeoutMs` and `AsyncTimeoutMs` set how long connecting, a synchronous
+command and an asynchronous command may wait, in milliseconds. They apply to the one connection that
+`RedisDataAdapter` and the lock's RedLock endpoint share, whether it is built from the parts or from
+`ConnectionString` (where a value set in `CacheConfig` wins); a connection the host registers keeps its own. `null` keeps the client's defaults (5000 ms, async
+taking the sync value), which is how long an operation waits before failing when the server is unreachable. Value
+reads and writes are asynchronous; the lock makes synchronous calls. The client checks async timeouts once a
+second. While the connection is not connected (a server that rejects the password, or a reconnect in progress) the
+lock answers `LockFailed` at once rather than waiting; a server that stays connected but doesn't answer still makes
+it wait for these timeouts. The first connect, made on the first operation, is one attempt (unless the connection
+string sets `connectRetry`), so it waits at most `ConnectTimeoutMs`; an operation's token ends its own wait for it,
+and the connect goes on for the other callers.
+
+```csharp
+services.AddRedis(c =>
+{
+    c.Host = "localhost";
+    c.ConnectTimeoutMs = 1000;
+    c.SyncTimeoutMs = 1000;
+    c.AsyncTimeoutMs = 1000;
 });
 ```

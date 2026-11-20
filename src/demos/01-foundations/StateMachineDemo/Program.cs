@@ -132,7 +132,7 @@ var faultLock = new InMemoryDistributedLock();
 var faultEngine = new CarEngineStateMachine(faultLock, faultLock, options);
 var car3 = new CarContext { Id = "CAR-003", Model = "Corolla", FuelLevel = 70.0 };
 
-DemoConsole.Say($"  Car: {car3.Id}, status: {faultEngine.OperationalStatus}");
+DemoConsole.Say($"  Car: {car3.Id}, status: {(await faultEngine.GetStatusAsync(car3)).OperationalStatus}");
 Console.WriteLine();
 
 var fault = await faultEngine.FaultAsync(car3, "Check engine light — cylinder misfire detected");

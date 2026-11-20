@@ -7,8 +7,9 @@ This file and the skills in `.claude/skills/` are the only standing instructions
 must hold in every session goes here, not in auto-memory.
 
 # Start here
-- Read `internals/STATUS.md` first: what is in flight, what is next, and which tracker or ADR holds
-  the detail. Then open that tracker — not the rest of `internals/design/`.
+- Work is on the NNK board in Zenzique: `zz features NNK` for what is in flight and what is next,
+  `zz show <card>` for the card in hand. Open the design note the card or its feature links — not
+  the rest of `internals/design/`. `internals/STATUS.md` is no longer kept up.
 - Use `MAP.md` to find the doc, guide and source folder for a concept.
 - Use `codegraph_explore` before reading files; fall back to `rg` only when it finds nothing.
 
@@ -44,23 +45,29 @@ must hold in every session goes here, not in auto-memory.
 - Build and test after every change set.
 
 # Before a pull request
-- `dotnet format src/Ananke.slnx --verify-no-changes`. To fix what it reports, prefer
-  `dotnet format whitespace src/Ananke.slnx` — plain `dotnet format` also applies style fixes.
-- `pwsh -File scripts/fix-encoding.ps1 -Check` — no file may have a UTF-8 BOM.
-- If `docs/`, a `README.md` or an `ARCHITECTURE.md` changed: `pwsh -File scripts/check-docs.ps1`.
+- **`bash scripts/ci.sh` is the check before a PR** (and what `card verify` runs): the encoding
+  check (no UTF-8 BOM), the internal-refs check, `scripts/check-docs.ps1`, the docs search index,
+  the release notes for the version, then restore, Release build, `dotnet format --verify-no-changes`
+  and test of `src/Ananke.slnx`; then it packs every package into `artifacts/ci/packages` and
+  builds the two consumers in `scripts/consumers` (Seren-shaped, Zenzique-shaped) from that folder
+  only. It stops at the first failure with a non-zero exit.
+- To strip a BOM it reports: `pwsh -File scripts/fix-encoding.ps1`. To fix what the format check
+  reports, prefer `dotnet format whitespace src/Ananke.slnx` — plain `dotnet format` also applies
+  style fixes.
 
 # Code
 - Vertical slices: `Features/<FeatureName>/`.
 - `TimeProvider`, not `DateTime.Now` / `UtcNow`. Primary constructors for services. Records for DTOs
   and value objects. `CancellationToken` on every public async method. Collection expressions
   (`[.. list]`) over LINQ `Concat`.
-- Ask before changing any `.csproj`.
+- No change needs approval before it is made, a `.csproj` or a new project included. The build, the
+  tests and the checks under *Before a pull request* decide whether it stands.
 - **Before adding a mechanism, check what the framework already has** (`codegraph_explore`) and say
   in one line what you found. The plan code once grew three hand-written parsers while `AgentJob`
   already constrained model output to a JSON schema.
 - **Comments say what the code does, and any constraint the code itself does not show.** No history
   ("used to", "this cost N runs"), no rule or item ids (`R27`, `S8`), no ADR ids or `internals/`
-  paths. History goes in the commit or the tracker. ADR and `internals/` citations in `src/`,
+  paths. History goes in the commit or on the card. ADR and `internals/` citations in `src/`,
   `docs/` and root Markdown fail `scripts/check-internal-refs.sh` (pre-commit hook and CI).
 - **Use words already in the code or the domain.** No slogans or coined phrases in comments,
   READMEs or commit messages. A new term must exist as a type or member name before prose uses it.
@@ -79,16 +86,20 @@ must hold in every session goes here, not in auto-memory.
   Put a timeout (`WaitAsync`) on any assertion that could hang.
 - Demos (`src/demos/**`) get no unit tests. They must build, and are checked by running them.
 
-# Plans, trackers and ADRs (`internals/`)
+# Design, plan, execute (`internals/`)
 - `internals/` is never pushed publicly (`.public-exclude`, `push-public.sh`).
-- **`STATUS.md` is one screen.** It links to trackers and ADRs and repeats neither; one sentence
-  per cell. Update it when a large piece of work lands or when asked, not continuously.
-- **One tracker per iteration** (a few days to a week): `internals/design/<yyyyMMdd>-plan-<name>.md`,
-  at most ~250 lines and ~5 steps, each step committable on its own. When the iteration ends, mark
-  the tracker **Closed** in its header and take it out of STATUS's *In flight*.
-- A tracker says what to do; an ADR says why. Open an ADR before an architectural change.
-- **Check every code-level instruction against the source before writing it into a plan.** A plan
-  that is confidently wrong gets followed.
+- **The flow is the workspace's:** `/design` when a choice needs settling, `/plan` for a feature
+  card and its ready cards, `/execute` to build them. A feature card is the plan: its cards are the
+  steps, a card's checklist the steps inside it, card notes the log.
+- **A design note in place of an ADR**, only when a change touches a public contract or a package
+  boundary, or has more than one workable option: `internals/design/<yyyyMMdd>-design-<name>.md`,
+  one page — what was observed, the options, the decision and its reason, what changes for a
+  product that upgrades, how we'll know. Linked from its feature card. A decision that changes
+  edits the note in place.
+- **No new ADRs or trackers.** Those in `internals/design/` are history: read one when a card or
+  note cites it, and don't extend it.
+- **Check every code-level instruction against the source before writing it into a card or a
+  note.** A plan that is confidently wrong gets followed.
 - **Ids carry their document** — `048·R50`, not a bare `R50`. Letters are reused across documents.
 - **Record what was observed and what changed**, quoting the actual error or output. Do not reply
   to an earlier draft, an earlier session or the author inside the document.
@@ -96,17 +107,19 @@ must hold in every session goes here, not in auto-memory.
 - For design that will take several iterations to settle, use the `spike` skill.
 
 # Demos
-- **Before changing a demo, name the tracker step the change belongs to.** If no tracker says what
-  the demo must show, stop and ask. Do not change the scenario to make a finding fit.
+- **Before changing a demo, name the card or tracker step the change belongs to.** If neither says
+  what the demo must show, leave the demo as it is and put the question on the card. Do not change
+  the scenario to make a finding fit.
 
-# Stop and tell the user
+# Put the question on the card, and go on with what doesn't depend on it
+In a session with the user, say it; in unattended work, block the card with the question:
 - when a document has been rewritten three times in this session;
 - when the reason for a decision is text you wrote earlier, rather than a run, a test or the user;
-- when tracked work needs a concept, term or mechanism its tracker does not mention.
+- when a card's work needs a concept, term or mechanism neither the card nor its design note mentions.
 
 # Commits and releases
 - Commit subject: imperative, ~60 characters, says what changed ("Rename World to TripService").
-  Body: 1–2 lines naming the tracker step. The reasoning belongs in the tracker or the ADR.
+  Body: 1–2 lines and `Work-Item: NNK-<n>`. The reasoning belongs in the design note or on the card.
 - Downstream repos (Zenzique, PoC-*) take the NuGet packages at a version bump and decide from the
   release notes; there is no cross-repo CI. Call out behaviour changes and public API breaks in
   `releases/vX.Y.Z.md`.

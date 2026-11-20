@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using StackExchange.Redis.KeyspaceIsolation;
 using System.Net;
 using System.Text.Json;
 
@@ -11,215 +12,253 @@ namespace Ananke.Redis;
 
 /// <summary>
 /// Redis-backed implementation of <see cref="IKeyValueDataAdapter"/>.
-/// Connection is established lazily on first use from the <see cref="CacheConfig"/>
-/// provided via <see cref="IOptions{CacheConfig}"/>.
+/// Uses the <see cref="IConnectionMultiplexer"/> the host passes in, or else connects on first use from the
+/// <see cref="CacheConfig"/> provided via <see cref="IOptions{CacheConfig}"/>. Keys are prefixed with
+/// <see cref="CacheConfig.KeyPrefix"/> and live in <see cref="CacheConfig.Database"/>.
 /// </summary>
 public class RedisDataAdapter : IKeyValueDataAdapter
 {
-    private readonly ILogger<RedisDataAdapter> _logger;
-    private ConnectionMultiplexer? _redis;
-    private CacheConfig? _deferredConfig;
-    private readonly SemaphoreSlim _connectLock = new(1, 1);
-    private bool _disposed;
+    private readonly ILogger _logger;
+    private readonly CacheConfig _config;
+    private readonly bool _ownsConnection;
+    private IConnectionMultiplexer? _redis;
+    private IDatabase? _database;
+    private readonly Lock _connectGate = new();
+    private Task<IConnectionMultiplexer>? _connecting;
+    private int _disposed;
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>
-    /// DI constructor. Stores the config for deferred connection — the Redis connection
-    /// is established lazily on the first operation, avoiding sync-over-async in the constructor.
+    /// DI constructor. Without <paramref name="connection"/>, the Redis connection is made from the config on the
+    /// first operation, avoiding sync-over-async in the constructor, and is closed on dispose.
     /// </summary>
-    public RedisDataAdapter(IOptions<CacheConfig> options, ILogger<RedisDataAdapter>? logger = null)
+    /// <param name="options">Connection, database and key prefix settings.</param>
+    /// <param name="logger">Optional logger.</param>
+    /// <param name="connection">
+    /// An existing connection to use instead of making one from <paramref name="options"/>. It stays the
+    /// caller's: disposing the adapter does not close it.
+    /// </param>
+    public RedisDataAdapter(
+        IOptions<CacheConfig> options,
+        ILogger<RedisDataAdapter>? logger = null,
+        IConnectionMultiplexer? connection = null)
+        : this(options.Value, connection, logger)
     {
-        ArgumentNullException.ThrowIfNull(options.Value);
-        _deferredConfig = options.Value;
-        _logger = logger ?? NullLogger<RedisDataAdapter>.Instance;
     }
 
     /// <summary>
-    /// Internal constructor for subclasses that manage their own config lifecycle.
+    /// Constructor for subclasses, which share the adapter's connection.
     /// </summary>
-    private protected RedisDataAdapter(CacheConfig? config, ILogger<RedisDataAdapter>? logger)
-    {
-        _deferredConfig = config;
-        _logger = logger ?? NullLogger<RedisDataAdapter>.Instance;
-    }
-
-    private async Task ConnectAsync(CacheConfig config)
+    private protected RedisDataAdapter(CacheConfig config, IConnectionMultiplexer? connection, ILogger? logger)
     {
         ArgumentNullException.ThrowIfNull(config);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
+        _config = config;
+        _redis = connection;
+        _ownsConnection = connection is null;
+        _logger = logger ?? NullLogger.Instance;
+    }
 
-        var configOptions = new ConfigurationOptions
+    /// <summary>The configuration this adapter was created with.</summary>
+    private protected CacheConfig Config => _config;
+
+    /// <summary>The connection that is open or was passed in; null until the first operation otherwise.</summary>
+    internal IConnectionMultiplexer? Connection => _redis;
+
+    /// <summary>Whether a connection is open or was passed in; false until the first operation otherwise.</summary>
+    internal bool HasConnection => Connection is not null;
+
+    /// <summary>
+    /// The client options for <paramref name="config"/>: its <see cref="CacheConfig.ConnectionString"/> when set,
+    /// else host, port, user name, password, TLS and database; on both, the connect, sync and async timeouts that are
+    /// set. The first connect makes one attempt, unless the connection string sets <c>connectRetry</c>, so it takes at
+    /// most the connect timeout. A failed first connect does not abort: the client keeps trying in the background,
+    /// unless the connection string sets <c>abortConnect</c>. A timeout that is zero or negative throws: the client
+    /// would fail every command at once, or, at -1, wait forever.
+    /// </summary>
+    internal static ConfigurationOptions BuildOptions(CacheConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        ConfigurationOptions options;
+        if (!string.IsNullOrWhiteSpace(config.ConnectionString))
         {
-            EndPoints = { new DnsEndPoint(config.Host, config.Port) },
-            Password = config.Password,
-            AbortOnConnectFail = false,
-            Ssl = false,
-        };
-        _redis = await ConnectionMultiplexer.ConnectAsync(configOptions).ConfigureAwait(false);
-        _deferredConfig = null;
+            options = ConfigurationOptions.Parse(config.ConnectionString);
+            // The client trims each key, so "connectRetry = 4" sets it too.
+            var keys = config.ConnectionString.Split(',')
+                .Where(option => option.Contains('=', StringComparison.Ordinal))
+                .Select(option => option[..option.IndexOf('=', StringComparison.Ordinal)].Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!keys.Contains("abortConnect"))
+                options.AbortOnConnectFail = false;
+            if (!keys.Contains("connectRetry"))
+                options.ConnectRetry = 1;
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
+            options = new ConfigurationOptions
+            {
+                EndPoints = { new DnsEndPoint(config.Host, config.Port) },
+                User = config.Username,
+                Password = config.Password,
+                Ssl = config.Ssl,
+                DefaultDatabase = config.Database,
+                AbortOnConnectFail = false,
+                ConnectRetry = 1,
+            };
+        }
+
+        if (config.ConnectTimeoutMs is { } connectTimeout)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(connectTimeout, nameof(CacheConfig.ConnectTimeoutMs));
+            options.ConnectTimeout = connectTimeout;
+        }
+        if (config.SyncTimeoutMs is { } syncTimeout)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(syncTimeout, nameof(CacheConfig.SyncTimeoutMs));
+            options.SyncTimeout = syncTimeout;
+        }
+        if (config.AsyncTimeoutMs is { } asyncTimeout)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(asyncTimeout, nameof(CacheConfig.AsyncTimeoutMs));
+            options.AsyncTimeout = asyncTimeout;
+        }
+        return options;
     }
 
     /// <summary>
-    /// Establishes the Redis connection from deferred config on first use.
-    /// No-op if already connected.
+    /// Returns the connection, connecting from the config on first use when none was passed in. Callers share one
+    /// connect: <paramref name="ct"/> ends this caller's wait for it, and the connect goes on for the others.
+    /// Throws when the connection cannot be set up; the next call tries again.
     /// </summary>
-    private async Task EnsureConnectedAsync()
+    private protected async Task<IConnectionMultiplexer> GetConnectionAsync(CancellationToken ct = default)
     {
-        if (_redis is not null || _deferredConfig is null) return;
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        if (_redis is not null) return _redis;
 
-        await _connectLock.WaitAsync().ConfigureAwait(false);
-        try
+        Task<IConnectionMultiplexer> connecting;
+        lock (_connectGate)
         {
-            if (_redis is not null || _deferredConfig is null) return;
-            await ConnectAsync(_deferredConfig).ConfigureAwait(false);
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
+            if (_connecting is null || _connecting.IsFaulted || _connecting.IsCanceled)
+            {
+                // Reads a failure no caller waited for, so it isn't reported as unobserved.
+                _ = _connecting?.Exception;
+                _connecting = ConnectFromConfigAsync();
+            }
+            connecting = _connecting;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Redis deferred connection failed");
-        }
-        finally
-        {
-            _connectLock.Release();
-        }
+        return await connecting.WaitAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<string?> GetValueAsync(string key, CancellationToken ct = default)
+    private async Task<IConnectionMultiplexer> ConnectFromConfigAsync()
+    {
+        _redis = await ConnectionMultiplexer.ConnectAsync(BuildOptions(_config)).ConfigureAwait(false);
+        return _redis;
+    }
+
+    private async Task<IDatabase> GetDatabaseAsync(CancellationToken ct)
+    {
+        if (_database is not null)
+        {
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
+            return _database;
+        }
+
+        var connection = await GetConnectionAsync(ct).ConfigureAwait(false);
+        var database = connection.GetDatabase(_config.Database ?? -1);
+        _database = string.IsNullOrEmpty(_config.KeyPrefix) ? database : database.WithKeyPrefix(_config.KeyPrefix);
+        return _database;
+    }
+
+    /// <summary>
+    /// Runs one Redis command until <paramref name="ct"/> is cancelled; a command no longer waited on keeps running.
+    /// A failure other than that cancellation is logged at Debug with the operation and key, then rethrown; the caller
+    /// decides how loud it is.
+    /// </summary>
+    private async Task<TResult> RunAsync<TResult>(
+        string operation, string key, Func<IDatabase, Task<TResult>> command, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        if (_redis is null)
-        {
-            _logger.LogWarning("Redis GET skipped for key '{Key}': connection not established", key);
-            return null;
-        }
-
         try
         {
-            var db = _redis.GetDatabase();
-            return await db.StringGetAsync(key).ConfigureAwait(false);
+            var db = await GetDatabaseAsync(ct).ConfigureAwait(false);
+            return await command(db).WaitForAsync(ct).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            _logger.LogError(ex, "Redis GET error for key '{Key}'", key);
+            _logger.LogDebug(ex, "Redis {Operation} failed for key '{Key}'", operation, key);
+            throw;
         }
-        return default;
     }
+
+    public async Task<string?> GetValueAsync(string key, CancellationToken ct = default) =>
+        await RunAsync("GET", key, async db => (string?)await db.StringGetAsync(key).ConfigureAwait(false), ct)
+            .ConfigureAwait(false);
 
     public async Task<T?> GetValueAsync<T>(string key, CancellationToken ct = default)
     {
         var value = await GetValueAsync(key, ct).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(value)) return default;
+        if (value is null) return default;
 
         try
         {
             return JsonSerializer.Deserialize<T>(value);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
-            _logger.LogError(ex, "Redis DESERIALIZE error for key '{Key}'", key);
+            _logger.LogDebug(ex, "Redis DESERIALIZE failed for key '{Key}'", key);
+            throw;
         }
-        return default;
     }
 
-    public async Task SetValueAsync(string key, string value, CancellationToken ct = default)
+    public Task SetValueAsync(string key, string value, CancellationToken ct = default) =>
+        SetValueAsync(key, value, null, ct);
+
+    public Task SetValueAsync<T>(string key, T value, CancellationToken ct = default) =>
+        SetValueAsync(key, JsonSerializer.Serialize(value), null, ct);
+
+    public Task SetValueAsync(string key, string value, TimeSpan? expiry, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        if (_redis is null)
-        {
-            _logger.LogWarning("Redis SET skipped for key '{Key}': connection not established", key);
-            return;
-        }
+        if (expiry is not { } ttl)
+            return RunAsync("SET", key, db => db.StringSetAsync(key, value), ct);
 
-        try
-        {
-            var db = _redis.GetDatabase();
-            await db.StringSetAsync(key, value).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Redis SET error for key '{Key}'", key);
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ttl, TimeSpan.Zero, nameof(expiry));
+        // Redis takes whole milliseconds: a shorter positive expiry would be sent as 0, which the server rejects.
+        if (ttl < TimeSpan.FromMilliseconds(1))
+            ttl = TimeSpan.FromMilliseconds(1);
+        return RunAsync("SET", key, db => db.StringSetAsync(key, value, ttl), ct);
     }
 
-    public async Task SetValueAsync<T>(string key, T value, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        if (_redis is null)
-        {
-            _logger.LogWarning("Redis SET<T> skipped for key '{Key}': connection not established", key);
-            return;
-        }
+    public Task SetValueAsync<T>(string key, T value, TimeSpan? expiry, CancellationToken ct = default) =>
+        SetValueAsync(key, JsonSerializer.Serialize(value), expiry, ct);
 
-        try
-        {
-            var db = _redis.GetDatabase();
-            var json = JsonSerializer.Serialize(value);
-            await db.StringSetAsync(key, json).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Redis SET<T> error for key '{Key}'", key);
-        }
-    }
+    public Task<bool> RemoveAsync(string key, CancellationToken ct = default) =>
+        RunAsync("REMOVE", key, db => db.KeyDeleteAsync(key), ct);
 
-    public async Task<bool> RemoveAsync(string key, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        if (_redis is null)
-        {
-            _logger.LogWarning("Redis REMOVE skipped for key '{Key}': connection not established", key);
-            return false;
-        }
-
-        try
-        {
-            var db = _redis.GetDatabase();
-            return await db.KeyDeleteAsync(key).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Redis REMOVE error for key '{Key}'", key);
-        }
-        return false;
-    }
-
-    public async Task<bool> ExistsAsync(string key, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        if (_redis is null)
-        {
-            _logger.LogWarning("Redis EXISTS skipped for key '{Key}': connection not established", key);
-            return false;
-        }
-
-        try
-        {
-            var db = _redis.GetDatabase();
-            return await db.KeyExistsAsync(key).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Redis EXISTS error for key '{Key}'", key);
-        }
-        return false;
-    }
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default) =>
+        RunAsync("EXISTS", key, db => db.KeyExistsAsync(key), ct);
 
     public virtual async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
-        if (_redis is not null)
+        // Waits for a connect in progress, so the connection it makes is closed here rather than left open.
+        Task<IConnectionMultiplexer>? connecting;
+        lock (_connectGate)
+            connecting = _connecting;
+        if (connecting is not null)
+            await ((Task)connecting).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+        if (_ownsConnection && _redis is not null)
         {
             await _redis.CloseAsync().ConfigureAwait(false);
             await _redis.DisposeAsync().ConfigureAwait(false);
-            _redis = null;
         }
+        _redis = null;
+        _database = null;
 
-        _connectLock.Dispose();
-        _disposed = true;
         GC.SuppressFinalize(this);
     }
 }

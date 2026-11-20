@@ -3,6 +3,7 @@ using Ananke.Abstractions.Config;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
+using MQTTnet.Protocol;
 
 namespace Ananke.MQTT;
 
@@ -10,51 +11,57 @@ namespace Ananke.MQTT;
 /// MQTT-backed implementation of <see cref="IChannelWriter{A}"/>.
 /// Publishes messages to MQTT topics derived from the action enum.
 /// </summary>
+/// <remarks>
+/// From <see cref="ConfigureAsync"/> until <see cref="ClearAsync"/> or dispose, a lost connection is
+/// retried with a capped delay between attempts; <see cref="IsConnected"/> is the client's own state, and
+/// <see cref="SendAsync"/> fails while it is false. Messages are published at the configured
+/// <see cref="ChannelConfig.QualityOfService"/>.
+/// </remarks>
 /// <typeparam name="A">Action/transition enum type used for topic routing.</typeparam>
 public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger = null) : IChannelWriter<A> where A : Enum
 {
     private readonly ILogger<MqttChannelWriter<A>> _logger = logger ?? NullLogger<MqttChannelWriter<A>>.Instance;
 
-    private IMqttClient? _client;
-    private MqttClientOptions? _options;
+    private MqttConnection? _connection;
     private string _namespace = string.Empty;
-    private bool _linked;
+    private MqttQualityOfServiceLevel _qualityOfService;
     private bool _disposed;
 
-    public bool IsConnected => _linked && _client?.IsConnected == true;
+    /// <summary>The wait between reconnect attempts.</summary>
+    internal MqttReconnectDelay ReconnectDelay { get; init; } = MqttReconnectDelay.Default;
+
+    /// <summary>Replaces the validation of the broker's TLS certificate against the trusted roots.</summary>
+    internal Func<MqttClientCertificateValidationEventArgs, bool>? CertificateValidation { get; init; }
+
+    /// <summary>How many connects have completed.</summary>
+    internal int ConnectCount => _connection?.ConnectCount ?? 0;
+
+    public bool IsConnected => _connection?.IsConnected == true;
 
     public async Task<bool> ConfigureAsync(ChannelConfig credentials, CancellationToken token = default)
     {
-        ArgumentNullException.ThrowIfNull(credentials);
-        ArgumentException.ThrowIfNullOrWhiteSpace(credentials.Host);
-        ArgumentException.ThrowIfNullOrWhiteSpace(credentials.Namespace);
+        MqttConnection.Validate(credentials);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // A second ConfigureAsync replaces the client, and its reconnect loop, with a new one.
+        await ClearAsync(CancellationToken.None).ConfigureAwait(false);
+
+        var connection = new MqttConnection(
+            MqttConnection.OptionsFor(credentials, ["writer", typeof(A).ToString()], CertificateValidation),
+            (_, _) => Task.CompletedTask, ReconnectDelay, "TX Channel", _logger);
         _namespace = credentials.Namespace;
-        _client = new MqttClientFactory().CreateMqttClient();
-
-        _options = new MqttClientOptionsBuilder()
-            .WithTcpServer(credentials.Host, credentials.Port)
-            .WithCredentials(credentials.Username, credentials.Password)
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .WithCleanSession()
-            .Build();
-
-        _client.DisconnectedAsync += async _ =>
-        {
-            _logger.LogWarning("TX Channel disconnected");
-            if (!_disposed)
-                await ReconnectAsync().ConfigureAwait(false);
-        };
-
-        return await ConnectAsync(token).ConfigureAwait(false);
+        _qualityOfService = MqttConnection.QualityOfServiceFor(credentials);
+        _connection = connection;
+        return await connection.StartAsync(token).ConfigureAwait(false);
     }
 
     public async Task<ChannelSendResult> SendAsync(object message, A action, CancellationToken ct = default)
     {
-        if (_client is null)
+        var connection = _connection;
+        if (connection is null)
             return ChannelSendResult.Failed("Client not configured");
 
-        if (!IsConnected)
+        if (!connection.IsConnected)
             return ChannelSendResult.Failed("Client not connected");
 
         try
@@ -65,80 +72,30 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
             var applicationMessage = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)
                 .WithPayload(payload)
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
+                .WithQualityOfServiceLevel(_qualityOfService)
                 .Build();
 
-            var resp = await _client.PublishAsync(applicationMessage, ct).ConfigureAwait(false);
+            var resp = await connection.Client.PublishAsync(applicationMessage, ct).ConfigureAwait(false);
             _logger.LogDebug("TX Channel sent to {Topic} ({Size}B) -> {Status}", topic, payload.Length, resp.ReasonCode);
 
             return resp.ReasonCode == MqttClientPublishReasonCode.Success
                 ? ChannelSendResult.Succeeded()
                 : ChannelSendResult.Failed($"MQTT publish failed: {resp.ReasonCode}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _logger.LogError(ex, "TX Channel send error");
             return ChannelSendResult.Failed(ex.Message);
         }
     }
 
+    /// <summary>Stops the reconnect loop and disconnects.</summary>
     public async Task ClearAsync(CancellationToken ct = default)
     {
-        if (_client is not null)
-            await _client.DisconnectAsync(cancellationToken: ct).ConfigureAwait(false);
-        _linked = false;
-    }
-
-    private async Task<bool> ConnectAsync(CancellationToken token)
-    {
-        if (_client is null || _options is null)
-        {
-            _linked = false;
-            return false;
-        }
-
-        try
-        {
-            var resp = await _client.ConnectAsync(_options, token).ConfigureAwait(false);
-            _linked = resp.ResultCode == MqttClientConnectResultCode.Success;
-            return _linked;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "TX Channel unable to connect");
-            _linked = false;
-            return false;
-        }
-    }
-
-    private async Task ReconnectAsync()
-    {
-        const int maxAttempts = 5;
-        var delay = TimeSpan.FromSeconds(1);
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            if (_disposed) return;
-
-            try
-            {
-                await Task.Delay(delay).ConfigureAwait(false);
-                if (await ConnectAsync(CancellationToken.None).ConfigureAwait(false))
-                {
-                    _logger.LogInformation("TX Channel reconnected after {Attempt} attempt(s)", attempt);
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "TX Channel reconnection attempt {Attempt}/{MaxAttempts} failed",
-                    attempt, maxAttempts);
-            }
-
-            delay *= 2;
-        }
-
-        _logger.LogError("TX Channel failed to reconnect after {MaxAttempts} attempts", maxAttempts);
+        var connection = _connection;
+        if (connection is null) return;
+        _connection = null;
+        await connection.DisposeAsync().ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
@@ -146,12 +103,7 @@ public sealed class MqttChannelWriter<A>(ILogger<MqttChannelWriter<A>>? logger =
         if (_disposed) return;
         _disposed = true;
 
-        if (_client is not null)
-        {
-            await _client.DisconnectAsync().ConfigureAwait(false);
-            _client.Dispose();
-            _client = null;
-        }
+        await ClearAsync().ConfigureAwait(false);
 
         GC.SuppressFinalize(this);
     }

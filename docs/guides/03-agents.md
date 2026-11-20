@@ -60,7 +60,7 @@ dotnet add package Ananke.Orchestration.Google
 ```csharp
 using Ananke.Orchestration.Google;
 
-IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-2.5-pro");
+IStreamingAgentModel model = GeminiAgentModel.Create(apiKey, "gemini-3.6-flash");
 ```
 
 ### Local / Custom Endpoints

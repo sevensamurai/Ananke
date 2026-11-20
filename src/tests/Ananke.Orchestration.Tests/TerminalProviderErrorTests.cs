@@ -1,3 +1,4 @@
+#pragma warning disable ANNKEEXP004
 using System.Net;
 using System.Runtime.CompilerServices;
 using Ananke.Abstractions.Agents;
@@ -65,6 +66,18 @@ public class TerminalProviderErrorTests
             + "https://ai.studio/projects to manage your project and billing. Learn more at "
             + "https://ai.google.dev/gemini-api/docs/billing#prepay. "))
             .ShouldBeTrue();
+
+    [Test]
+    public void Is_ATerminalTypeWhoseMessageStatesADelay_IsStillTerminal()
+    {
+        // The type decides, not a retry hint quoted in its message or a wrapped exception's.
+        TerminalProviderError.Is(new RepeatedOutputException("The reply repeats itself: retry in 5 seconds."))
+            .ShouldBeTrue();
+        TerminalProviderError.Is(new CallTimeoutException("Timed out. Please retry in 30s.")).ShouldBeTrue();
+        TerminalProviderError.Is(new InvalidOperationException(
+            "Please retry in 30s.", new SpendingLimitExceededException("Limit reached. Retry in 5 seconds.")))
+            .ShouldBeTrue();
+    }
 
     // ── What is not, and why ──
 

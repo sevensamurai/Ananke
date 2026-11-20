@@ -25,7 +25,9 @@ public interface IStateMachine<S, T>
     /// <param name="payload">Optional payload, used by interrupt transitions.</param>
     /// <param name="ct">
     /// Abandons the wait for the serialization gate. Transitions are gate-serialized, so a caller
-    /// can otherwise be blocked indefinitely behind an in-flight transition with no way out.
+    /// can otherwise be blocked indefinitely behind an in-flight transition with no way out. The
+    /// builder's guards get it too; its actions get <see cref="CancellationToken.None"/>, as they
+    /// run once the old state's work is cancelled.
     /// </param>
     Task<TransitionResult<S>> FireAsync(T transition, object? payload = null, CancellationToken ct = default);
 
@@ -92,6 +94,10 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
     private readonly Dictionary<S, Func<CancellationToken, Task>> _stateWork = [];
     private readonly Dictionary<S, Func<Task>> _stateExitWork = [];
     private readonly SemaphoreSlim _gate = new(1, 1);
+
+    // The builder's guards and actions take a context; this machine has none, so it passes one
+    // with an empty id.
+    private static readonly IBaseContext Context = new MachineContext(string.Empty);
 
     private Func<object?, CancellationToken, Task>? _onInterrupt;
     private CancellationTokenSource? _currentStateCts;
@@ -266,7 +272,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return await ExecuteTransitionAsync(transition, payload).ConfigureAwait(false);
+            return await ExecuteTransitionAsync(transition, payload, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -274,7 +280,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         }
     }
 
-    private async Task<TransitionResult<S>> ExecuteTransitionAsync(T transition, object? payload)
+    private async Task<TransitionResult<S>> ExecuteTransitionAsync(T transition, object? payload, CancellationToken ct)
     {
         var previousState = CurrentState;
 
@@ -293,7 +299,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Check guard condition
         if (config.GuardCondition is not null)
         {
-            if (!await config.GuardCondition().ConfigureAwait(false))
+            if (!await config.GuardCondition(Context, ct).ConfigureAwait(false))
                 return TransitionResult<S>.GuardFailed(CurrentState);
         }
 
@@ -336,7 +342,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Builder-level OnExit (lightweight, synchronous hooks)
         if (_builder.StateConfigs.TryGetValue(previousState, out var exitStateConfig)
             && exitStateConfig.OnExitAction is not null)
-            await exitStateConfig.OnExitAction().ConfigureAwait(false);
+            await exitStateConfig.OnExitAction(Context, CancellationToken.None).ConfigureAwait(false);
 
         // Machine-level OnExit
         if (_stateExitWork.TryGetValue(previousState, out var exitWork))
@@ -352,7 +358,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // After-transition action (may modify final state)
         if (config.AfterTransitionAction is not null)
         {
-            var actionResult = await config.AfterTransitionAction().ConfigureAwait(false);
+            var actionResult = await config.AfterTransitionAction(Context, CancellationToken.None).ConfigureAwait(false);
             if (!EqualityComparer<S>.Default.Equals(actionResult, resolvedFinalState))
                 CurrentState = actionResult;
         }
@@ -362,7 +368,7 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         // Builder-level OnEnter (lightweight, synchronous hooks)
         if (_builder.StateConfigs.TryGetValue(CurrentState, out var enterStateConfig)
             && enterStateConfig.OnEnterAction is not null)
-            await enterStateConfig.OnEnterAction().ConfigureAwait(false);
+            await enterStateConfig.OnEnterAction(Context, CancellationToken.None).ConfigureAwait(false);
 
         // Machine-level OnEnter (background, cancellable work)
         StartStateWork(CurrentState);
@@ -461,4 +467,6 @@ public sealed class StateMachine<S, T> : IStateMachine<S, T>, IDisposable
         _currentWork = null;
         _gate.Dispose();
     }
+
+    private sealed record MachineContext(string Id) : IBaseContext;
 }

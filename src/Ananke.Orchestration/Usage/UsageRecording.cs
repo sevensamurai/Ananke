@@ -66,13 +66,15 @@ public static class UsageRecording
     }
 
     /// <summary>
-    /// Publishes a model response's tokens on the usage meter and reports them to the ambient
-    /// recorder. A call outside a workflow publishes with no workflow tag and records nothing; a
-    /// response with no usage does neither.
+    /// Publishes a model response's tokens, and the cost the provider reported, on the usage meter
+    /// and reports them to the ambient recorder. A call outside a workflow publishes with no workflow
+    /// tag and records nothing; a response with no usage does neither.
     /// </summary>
     /// <remarks>
     /// Tokens of a response a cost-resolving router has priced are recorded as
     /// <see cref="UsageRecord.Priced"/>, so a budget does not price them at flat rates as well.
+    /// Otherwise the cost the provider reported (<see cref="TokenUsage.Cost"/>), when it reported
+    /// one, is published and recorded with the tokens as their <see cref="UsageRecord.ModelCost"/>.
     /// </remarks>
     internal static Task ReportAsync(AgentResponse response, CancellationToken ct = default)
     {
@@ -81,9 +83,13 @@ public static class UsageRecording
 
         UsageMetrics.PublishTokens(response.Usage, AmbientWorkflow.Value);
 
+        var priced = PricedResponses.TryGetValue(response, out _);
+        var providerCost = priced ? null : response.Usage.Cost;
+        if (providerCost is { } cost)
+            UsageMetrics.PublishCost(cost, AmbientWorkflow.Value);
+
         return Ambient.Value is { } recorder
-            ? recorder.RecordUsageAsync(
-                new UsageRecord(response.Usage, Priced: PricedResponses.TryGetValue(response, out _)), ct)
+            ? recorder.RecordUsageAsync(new UsageRecord(response.Usage, providerCost, priced), ct)
             : Task.CompletedTask;
     }
 
@@ -101,12 +107,11 @@ public static class UsageRecording
     internal static Task ReportCostAsync(decimal modelCost, AgentResponse response, CancellationToken ct = default)
     {
         UsageMetrics.PublishCost(modelCost, AmbientWorkflow.Value);
-
-        if (Ambient.Value is not { } recorder)
-            return Task.CompletedTask;
-
         PricedResponses.AddOrUpdate(response, response);
-        return recorder.RecordUsageAsync(new UsageRecord(TokenUsage.Zero, modelCost), ct);
+
+        return Ambient.Value is { } recorder
+            ? recorder.RecordUsageAsync(new UsageRecord(TokenUsage.Zero, modelCost), ct)
+            : Task.CompletedTask;
     }
 
     /// <summary>Restores the ambient recorder that was in place before the scope began.</summary>

@@ -34,8 +34,9 @@ public sealed class ModelCatalogTests
     [TestCase("openai", "o3", "gpt-5.6-sol")]
     [TestCase("openai", "gpt-5", "gpt-5.6-sol")]
     [TestCase("openai", "gpt-5.2", "gpt-5.6-sol")]
-    [TestCase("google", "gemini-2.5-pro", "gemini-3.1-pro-preview")]
-    [TestCase("google", "gemini-2.5-flash", "gemini-3.6-flash")]
+    [TestCase("openai", "gpt-5.4-nano", "gpt-6-luna")]
+    [TestCase("google", "gemini-2.5-pro", "gemini-3.8-flash")]
+    [TestCase("google", "gemini-2.5-flash", "gemini-3.5-flash-lite")]
     public void Deprecated_known_model_is_valid_with_replacement_suggestion(
         string provider, string model, string expectedReplacement)
     {

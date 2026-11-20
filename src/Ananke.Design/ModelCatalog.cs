@@ -48,15 +48,17 @@ public static class ModelCatalog
     {
         ["openai"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["gpt-4.1"] = [Models.OpenAI.Gpt41, Models.OpenAI.Gpt41Mini, Models.OpenAI.Gpt41Nano],
+            ["gpt-4.1"] = [Models.OpenAI.Gpt41, Models.OpenAI.Gpt41Mini],
             ["gpt-4o"] = [Models.OpenAI.Gpt4o, Models.OpenAI.Gpt4oMini],
-            ["o3"] = [Models.OpenAI.O3, Models.OpenAI.O3Mini],
-            ["o4"] = [Models.OpenAI.O4Mini],
+            ["o3"] = [Models.OpenAI.O3],
             ["gpt-5"] = [Models.OpenAI.Gpt5, Models.OpenAI.Gpt5Mini, Models.OpenAI.Gpt5Nano],
             ["gpt-5.2"] = [Models.OpenAI.Gpt52],
             ["gpt-5.4"] = [Models.OpenAI.Gpt54, Models.OpenAI.Gpt54Mini, Models.OpenAI.Gpt54Nano],
             ["gpt-5.5"] = [Models.OpenAI.Gpt55],
             ["gpt-5.6"] = [Models.OpenAI.Gpt56Sol, Models.OpenAI.Gpt56Terra, Models.OpenAI.Gpt56Luna],
+            ["gpt-6"] = [Models.OpenAI.Gpt6Sol, Models.OpenAI.Gpt6Luna, Models.OpenAI.Gpt6Astra],
+            ["gpt-6.1"] = [Models.OpenAI.Gpt61Sol, Models.OpenAI.Gpt61Terra],
+            ["gpt-6.2"] = [Models.OpenAI.Gpt62Sol, Models.OpenAI.Gpt62Astra],
         },
         ["anthropic"] = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -67,9 +69,9 @@ public static class ModelCatalog
         },
         ["google"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["gemini"] = [Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Pro, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
+            ["gemini"] = [Models.Google.Gemini4Carbon, Models.Google.Gemini4Argon, Models.Google.Gemini4Hydrogen, Models.Google.Gemini38Flash, Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31Pro, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Pro, Models.Google.Gemini25Flash],
             ["pro"] = [Models.Google.Gemini31Pro, Models.Google.Gemini25Pro],
-            ["flash"] = [Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
+            ["flash"] = [Models.Google.Gemini38Flash, Models.Google.Gemini37Flash, Models.Google.Gemini36Flash, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite, Models.Google.Gemini31FlashLite, Models.Google.Gemini25Flash],
         },
     };
 
@@ -78,13 +80,15 @@ public static class ModelCatalog
     {
         ["openai"] = new(StringComparer.OrdinalIgnoreCase)
         {
-            Models.OpenAI.Gpt41, Models.OpenAI.Gpt41Mini, Models.OpenAI.Gpt41Nano,
+            Models.OpenAI.Gpt41, Models.OpenAI.Gpt41Mini,
             Models.OpenAI.Gpt4o, Models.OpenAI.Gpt4oMini,
-            Models.OpenAI.O3, Models.OpenAI.O3Mini, Models.OpenAI.O4Mini,
+            Models.OpenAI.O3,
             Models.OpenAI.Gpt5, Models.OpenAI.Gpt5Mini, Models.OpenAI.Gpt5Nano,
             Models.OpenAI.Gpt52, Models.OpenAI.Gpt54, Models.OpenAI.Gpt54Mini,
             Models.OpenAI.Gpt54Nano, Models.OpenAI.Gpt55,
             Models.OpenAI.Gpt56Sol, Models.OpenAI.Gpt56Terra, Models.OpenAI.Gpt56Luna,
+            Models.OpenAI.Gpt6Sol, Models.OpenAI.Gpt6Luna, Models.OpenAI.Gpt6Astra,
+            Models.OpenAI.Gpt61Sol, Models.OpenAI.Gpt61Terra, Models.OpenAI.Gpt62Sol, Models.OpenAI.Gpt62Astra,
         },
         ["anthropic"] = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -96,7 +100,8 @@ public static class ModelCatalog
         {
             Models.Google.Gemini31Pro, Models.Google.Gemini31FlashImage,
             Models.Google.Gemini31FlashLite, Models.Google.Gemini35Flash, Models.Google.Gemini35FlashLite,
-            Models.Google.Gemini36Flash, Models.Google.Gemini37Flash,
+            Models.Google.Gemini36Flash, Models.Google.Gemini37Flash, Models.Google.Gemini38Flash,
+            Models.Google.Gemini4Carbon, Models.Google.Gemini4Argon, Models.Google.Gemini4Hydrogen,
             Models.Google.Gemma4, Models.Google.Lyria3,
             Models.Google.Gemini25Pro, Models.Google.Gemini25Flash,
         },

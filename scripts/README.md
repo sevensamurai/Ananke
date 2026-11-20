@@ -5,6 +5,7 @@ Local developer scripts.
 | Script | Shell | When |
 |---|---|---|
 | [`install-hooks.sh`](#install-hookssh--git-hook-setup) | `bash` | **Once, after cloning** |
+| `ci.sh` | `bash` | Before opening a pull request (`card verify`), and as the build before publishing (`pipeline.yml`): the encoding, internal-refs and docs checks, the docs search index and the release notes, then restore, build, format check and test of `src/Ananke.slnx`, then it packs every package into `artifacts/ci/packages` and builds the two consumers in `consumers/` (restored into `artifacts/consumer-packages`; needs nuget.org) from that folder only |
 | [`check-docs.ps1`](#check-docsps1--documentation-drift-check) | `pwsh` | Before opening a pull request |
 | [`fix-encoding.ps1`](#fix-encodingps1--utf-8-bom-check) | `pwsh` | Before opening a pull request |
 

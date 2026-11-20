@@ -37,6 +37,7 @@ See [`secrets.json.template`](./secrets.json.template) for the full key referenc
 | 05 | [AgenticWebDemo](#agenticwebdemo) | ASP.NET Core streaming chat · tool-calling agent · trade approval HITL | OpenAI · BetterStack (optional) |
 | 05 | [PetAdoptionDemo](#petadoptiondemo) | Full-stack RAG app · stateful phases · SSE streaming · mid-gen interrupts · voice/photo | OpenAI or Gemini · Docker (optional) |
 | 06 | [AgentToAgentProtocolDemo](#agenttoagentprotocoldemo) | A2A server · agent card · C# + Python clients · cross-language interop | None |
+| 06 | [FleetDemo](#fleetdemo) | One state machine for 20 devices on two nodes · fault per device · broker outage | Docker (Valkey, Mosquitto) · devenv |
 | 06 | [McpServerDemo](#mcpserverdemo) | MCP server exposing Ananke tools and a workflow to VS Code / Claude Desktop | None |
 
 ---
@@ -268,6 +269,21 @@ An Ananke agent exposed as an **A2A-compliant HTTP server** called from two inde
 - Python client: plain HTTP + JSON-RPC, no Ananke SDK, no third-party packages
 
 **Secrets required:** None
+
+---
+
+
+#### FleetDemo
+
+**[`06-interop-and-channels/FleetDemo`](./06-interop-and-channels/FleetDemo)** · [`README`](./06-interop-and-channels/FleetDemo/README.md)
+
+One `AbstractStateMachine` for 20 simulated devices, run by two node processes that share one
+Valkey (state, step, fault and lock per device) and one Mosquitto (readings in, updates out).
+[`06-interop-and-channels/FleetDemo/run.sh`](./06-interop-and-channels/FleetDemo/run.sh) starts it; its `fault device-3`
+stops one device on both nodes while the others keep moving, and its `broker-outage 60` shows both
+nodes reconnecting and every device moving on from its stored state.
+
+**Secrets required:** None · **Needs:** Docker, `devenv`
 
 ---
 

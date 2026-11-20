@@ -76,6 +76,16 @@ public sealed class DocumentProcessor
     public IReadOnlyDictionary<string, System.Text.RegularExpressions.Regex>? LinkPatterns { get; init; }
 
     /// <summary>
+    /// How a section's hyperlinks (<see cref="ExtractedSection.Links"/>) are stored as links to other documents, if at
+    /// all. When set, each hyperlink <see cref="HyperlinkOptions.Resolve"/> maps to a source id is written into the
+    /// metadata of every chunk of its section, as <c>entity:document:{source id}</c>, and the chunker is given one
+    /// section at a time so each chunk has one section. Relative links resolve against the document's own source id by
+    /// default.
+    /// </summary>
+    [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
+    public HyperlinkOptions? Hyperlinks { get; init; }
+
+    /// <summary>
     /// Section headings, compared without case, whose sections are left out of chunks and records: an
     /// <c>Authors' Addresses</c>, an attendee list, a template's checklist. The header is read before they are dropped.
     /// </summary>
@@ -204,8 +214,8 @@ public sealed class DocumentProcessor
         var (prefix, headerFields, kept) = ReadHeader(extracted, tags);
         extracted = Shaped(extracted);
 
-        // 4. Chunk
-        var chunks = _chunker.Chunk(extracted);
+        // 4. Chunk, each with the documents its section links to when the host asked for them
+        var (chunks, links) = Chunk(extracted, sourceId);
 
         if (chunks.Count == 0)
             throw new InvalidOperationException(
@@ -232,6 +242,8 @@ public sealed class DocumentProcessor
                 foreach (var (key, value) in DocumentLinks.Find(patterns, c.Text))
                     metadata.TryAdd(key, value);
             }
+            foreach (var target in links[i])
+                metadata.TryAdd(HyperlinkOptions.KeyFor(target), $"{HyperlinkOptions.DocumentKind}:{target}");
 #pragma warning restore ANNKEEXP004
 
             if (description is { Length: > 0 })
@@ -307,6 +319,37 @@ public sealed class DocumentProcessor
 
         var shown = kept.Select(key => $"{key}: {read[key]}").ToList();
         return (shown.Count == 0 ? null : $"[{string.Join(" · ", shown)}]", fields, kept);
+    }
+
+    /// <summary>
+    /// The document's chunks, and for each the source ids of the documents its section links to. Without
+    /// <see cref="Hyperlinks"/> the chunker is given the whole document and no chunk has links; with it, one section at a
+    /// time, so each chunk's section is known.
+    /// </summary>
+    private (IReadOnlyList<DocumentChunk> Chunks, IReadOnlyList<IReadOnlyList<string>> Links) Chunk(
+        ExtractedDocument extracted, string sourceId)
+    {
+        if (Hyperlinks is not { } hyperlinks)
+        {
+            var whole = _chunker.Chunk(extracted);
+            return (whole, [.. whole.Select(_ => (IReadOnlyList<string>)[])]);
+        }
+
+        var chunks = new List<DocumentChunk>();
+        var links = new List<IReadOnlyList<string>>();
+        foreach (var section in extracted.Sections)
+        {
+            var sectionChunks = _chunker.Chunk(extracted with { Sections = [section] });
+            IReadOnlyList<string> targets = [.. (section.Links ?? [])
+                .Select(link => hyperlinks.Resolve(sourceId, link.Uri))
+                .OfType<string>()
+                .Where(target => target.Length > 0)
+                .Distinct(StringComparer.Ordinal)];
+            chunks.AddRange(sectionChunks);
+            links.AddRange(sectionChunks.Select(_ => targets));
+        }
+
+        return (chunks, links);
     }
 
     /// <summary>The document with <see cref="DropSections"/> left out and <see cref="CleanText"/> applied.</summary>

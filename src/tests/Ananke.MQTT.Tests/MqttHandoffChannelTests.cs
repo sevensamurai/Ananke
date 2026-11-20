@@ -1,27 +1,14 @@
 using Ananke.Abstractions.Config;
-using Ananke.MQTT;
 using Shouldly;
 
-namespace Ananke.Orchestration.Tests;
+namespace Ananke.MQTT.Tests;
 
 /// <summary>
-/// Phase 6.4 — <see cref="MqttHandoffChannel"/> reconnect-bound tests.
-/// <para>
-/// These tests exercise the observable public contract of the channel without
-/// requiring a live MQTT broker. Reconnect-loop behaviour (bounded at 10 attempts
-/// with exponential back-off) is verified via:
-/// <list type="bullet">
-///   <item>The <see cref="MqttHandoffChannel.IsConnected"/> property after a failed configure.</item>
-///   <item>The <c>SendAsync</c> guard that throws when the channel is not connected.</item>
-///   <item>The <c>CompleteAsync</c> guard under the same condition.</item>
-///   <item>A constant-bound assertion: the declared maximum must remain 10.</item>
-/// </list>
-/// End-to-end reconnect-loop coverage (driving 10 consecutive failures) is an
-/// integration test that requires a controllable broker and lives outside CI.
-/// </para>
+/// <see cref="MqttHandoffChannel"/> without a broker: configure failures, the send and complete guards,
+/// disposal and config validation. The broker tests are in <see cref="MqttHandoffChannelBrokerTests"/>.
 /// </summary>
 [TestFixture]
-public class MqttHandoffChannelReconnectTests
+public class MqttHandoffChannelTests
 {
     private static readonly ChannelConfig BadConfig = new()
     {
@@ -106,23 +93,6 @@ public class MqttHandoffChannelReconnectTests
 
         await Should.ThrowAsync<ObjectDisposedException>(
             () => channel.CompleteAsync<object>("topic", "corr-1", new { }));
-    }
-
-    // ── reconnect-bound constant ──────────────────────────────────────────────
-
-    [Test]
-    public void MaxReconnectAttempts_IsExactlyTen()
-    {
-        // Verifies the bounded reconnect loop constant hasn't been silently removed or changed to unbounded (0 / int.MaxValue).
-        // Because MaxReconnectAttempts is private const, we read it via reflection.
-        var field = typeof(MqttHandoffChannel).GetField(
-            "MaxReconnectAttempts",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-
-        field.ShouldNotBeNull("MaxReconnectAttempts constant must exist on MqttHandoffChannel.");
-        var value = (int)field!.GetValue(null)!;
-        value.ShouldBe(10,
-            "MqttHandoffChannel must limit reconnect attempts to exactly 10.");
     }
 
     // ── config validation ─────────────────────────────────────────────────────

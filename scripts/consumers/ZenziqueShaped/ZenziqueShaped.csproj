@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The nine packages Zenzique's products take (Telos, Kira, Axioma). -->
+  <ItemGroup>
+    <PackageReference Include="Ananke.Orchestration" />
+    <PackageReference Include="Ananke.Orchestration.OpenAI" />
+    <PackageReference Include="Ananke.Orchestration.Google" />
+    <PackageReference Include="Ananke.Orchestration.Knowledge" />
+    <PackageReference Include="Ananke.Documents" />
+    <PackageReference Include="Ananke.Embeddings.Onnx" />
+    <PackageReference Include="Ananke.Design" />
+    <PackageReference Include="Ananke.MCP" />
+    <PackageReference Include="Ananke.Skills" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

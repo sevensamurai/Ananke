@@ -13,7 +13,10 @@ conditions, composable middleware, lifecycle hooks, and circuit breaking.
 ## Core Concepts
 
 `AbstractStateMachine` is a distributed FSM engine designed for long-running
-services where multiple instances must coordinate safely. It provides:
+services where multiple instances must coordinate safely. One machine serves
+every context of its kind (every ticket, every device): each context's state,
+step, interrupt stack and operational status are stored under its own key, and
+each transition of a context runs under that context's lock. It provides:
 
 - **Typed states and transitions** — compile-time safety
 - **Distributed locking** — safe coordination across instances
@@ -40,6 +43,7 @@ enum TicketNotification { None }
 sealed record TicketContext(string Id) : IBaseContext
 {
     public string? Title { get; set; }
+    public string? ResolutionNote { get; set; }
 }
 
 // 3. Implement the state machine
@@ -47,8 +51,6 @@ sealed class TicketMachine(IDistributedLock locker, IKeyValueDataAdapter store, 
     : AbstractStateMachine<TicketContext, TicketState, TicketTransition, TicketNotification>(
         TicketState.Open, locker, store, options)
 {
-    public string? ResolutionNote { get; set; }
-
     protected override Action<ITransitionBuilder<TicketState, TicketTransition>> Transitions => b => b
         .From(TicketState.Open)
             .On(TicketTransition.Assign).To(TicketState.InProgress)
@@ -60,10 +62,10 @@ sealed class TicketMachine(IDistributedLock locker, IKeyValueDataAdapter store, 
             .On(TicketTransition.Close).To(TicketState.Closed);
 
     public override Task<TransitionResult<TicketState>> TransitionAsync(
-        TicketContext ctx, TicketTransition t) =>
-        InternalTransitionAsync(ctx, t);
+        TicketContext ctx, TicketTransition t, CancellationToken ct = default) =>
+        InternalTransitionAsync(ctx, t, ct);
 
-    public override Task NotifyAsync(TicketContext ctx, TicketNotification n) =>
+    public override Task NotifyAsync(TicketContext ctx, TicketNotification n, CancellationToken ct = default) =>
         Task.CompletedTask;
 }
 ```
@@ -85,12 +87,37 @@ Console.WriteLine($"{result.PreviousState} → {result.CurrentState}");
 // Open → InProgress
 
 // InProgress → Resolved
-machine.ResolutionNote = "Fixed null-reference in AuthController";
+ticket.ResolutionNote = "Fixed null-reference in AuthController";
 result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 
 // Resolved → Closed
 result = await machine.TransitionAsync(ticket, TicketTransition.Close);
+
+// A context's state and status are read from the store, not from the machine
+var status = await machine.GetStatusAsync(ticket);
+Console.WriteLine($"{status.State} after {status.Step} transitions, {status.OperationalStatus}");
+// Closed after 3 transitions, Operative
 ```
+
+### Keys
+
+Each context is stored, and locked, under `{KeyPrefix}:{MachineName}:{context id}`; the ticket
+above is under statemachine:TicketMachine:1. `MachineName` defaults to the machine's type name with
+its type arguments, so two machine types never share a record for the same id. Set either part in
+`StateMachineOptions` (`MachineName = "tickets"`); an empty part is left out. Set `MachineName` when
+two machine types in different namespaces have the same name, and before renaming a machine type
+whose records you keep. `machine.GetContextKey(id)` returns the key.
+
+### Cancellation
+
+Every `TransitionAsync` takes a `CancellationToken`. A cancelled token stops the transition with
+`OperationCanceledException` while it waits for the lock, reads the context, runs a guard or runs
+the exit action: guards and actions get the token, and an exit action that throws on it has done
+what it did before the throw while the state stays old. Once the exit action has run, the new state
+is stored whether or not the token is cancelled. The enter and after-transition actions get the
+token too; one that throws on it leaves the new state stored and returns a failed result with
+`StateStored` set, like any other throw from them, and a state the after-transition action would
+have returned is not stored.
 
 ---
 
@@ -116,27 +143,31 @@ Console.WriteLine(result.ErrorMessage);  // "Invalid transition 'Resolve' from s
 ## Guard Conditions
 
 Block transitions based on runtime state. Guards are evaluated before the
-transition executes:
+transition executes. A guard gets the context being transitioned and the transition's
+`CancellationToken`; it casts the context to the machine's own context type:
 
 ```csharp
 protected override Action<ITransitionBuilder<TicketState, TicketTransition>> Transitions => b => b
     .From(TicketState.InProgress)
         .On(TicketTransition.Resolve)
         .To(TicketState.Resolved)
-        .When(() => !string.IsNullOrEmpty(ResolutionNote));
+        .When((ctx, _) => !string.IsNullOrEmpty(((TicketContext)ctx).ResolutionNote));
 ```
 
-`.When(...)` (and the async `.WhenAsync(...)`) take only the condition — there's no way to
+One machine serves every context, often several at once, so a guard reads what it checks from
+the context, never from a field of the machine: a field holds whichever context set it last.
+
+`.When(...)` (and the async `.WhenAsync(...)`) answer only true or false — there's no way to
 attach a custom message to a specific guard. A failed guard always reports the same
 `ErrorMessage`:
 
 ```csharp
-machine.ResolutionNote = null;
+ticket.ResolutionNote = null;
 var result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 // result.Success == false
 // result.ErrorMessage == "Transition guard condition not met"
 
-machine.ResolutionNote = "Fixed the bug";
+ticket.ResolutionNote = "Fixed the bug";
 result = await machine.TransitionAsync(ticket, TicketTransition.Resolve);
 // result.Success == true
 ```
@@ -154,29 +185,58 @@ machine.UseMiddleware(new LoggingMiddleware<TicketContext, TicketState, TicketTr
     msg => Console.WriteLine($"  ~ {msg}")));
 ```
 
-The middleware runs on every transition — both successful and failed — making it
-ideal for logging, metrics, auditing, and validation.
+The middleware runs on every transition of a context that is Operative — both
+successful and failed — making it ideal for logging, metrics, auditing, and
+validation. It runs inside the context's lock, after the context is read, so its
+`currentState` is the context's stored state. It must not call `TransitionAsync`,
+`FaultAsync` or `ResetAsync` for the same context: each takes that lock, which is
+held, and fails once its retries run out. A transition refused because the lock wasn't acquired, the
+store couldn't be read or the context is Faulted doesn't reach the middleware.
+
+A middleware of your own implements `InvokeAsync(context, transition, currentState, next, ct)` and
+continues with `next(ct)`. `ct` is the `TransitionAsync` token: the lock is held until the middleware
+returns, so pass it to anything the middleware awaits.
 
 ---
 
 ## Lifecycle Hooks
 
-Run code when entering or exiting a state:
+Run code when entering or exiting a state. Like a guard, each action (`OnEnter`, `OnExit`,
+`WithAction`) gets the context being transitioned and the transition's token:
 
 ```csharp
 protected override Action<ITransitionBuilder<TicketState, TicketTransition>> Transitions => b => b
     .From(TicketState.Open)
         .On(TicketTransition.Assign).To(TicketState.InProgress)
-        .OnEnter(() => Console.WriteLine("Entering InProgress"))
-        .OnExit(() => Console.WriteLine("Leaving Open"));
+    .State(TicketState.Open)
+        .OnExit((ctx, _) => { Console.WriteLine($"{ctx.Id} leaving Open"); return Task.CompletedTask; })
+    .State(TicketState.InProgress)
+        .OnEnter((ctx, _) => { Console.WriteLine($"{ctx.Id} entering InProgress"); return Task.CompletedTask; });
 ```
+
+### When actions run, and what a failure leaves
+
+A transition runs, in order: the guard, the exit action of the old state, **the write of the new
+state**, the enter action of the new state, the after-transition action (`WithAction`). So:
+
+| What throws | Stored state | `result.Success` | `result.StateStored` | `result.CurrentState` |
+|---|---|---|---|---|
+| Guard, exit action, or the write | old state | `false` | `false` | old state |
+| Enter or after-transition action | new state | `false` | `true` | new state |
+
+An exit action that throws has already done whatever it did before the throw; the state stays old.
+An enter or after-transition action that throws leaves the context in the new state:
+`result.ErrorMessage` says so, and `result.PreviousState` is the state it left.
 
 ---
 
 ## Circuit Breaking — Fault / Reset
 
-`OperationalStatus` provides a machine-level circuit breaker. When faulted,
-**all transitions are blocked** until the machine is explicitly reset:
+`OperationalStatus` provides a circuit breaker per context. When a context is
+faulted, **its transitions are refused** on every instance that shares the
+store, until it is explicitly reset. Other contexts keep moving. Fault and reset
+take the context's lock, so a transition running at the same time can't write
+over the status:
 
 ```csharp
 // Simulate a critical incident
@@ -197,6 +257,9 @@ Console.WriteLine(reset.CurrentStatus);  // Operative
 result = await machine.TransitionAsync(ticket, TicketTransition.Assign);
 Console.WriteLine(result.Success);  // true
 ```
+
+`(await machine.GetStatusAsync(ticket)).OperationalStatus` reads a context's status, and
+`OperationalStatusReason` the reason it was faulted.
 
 ---
 

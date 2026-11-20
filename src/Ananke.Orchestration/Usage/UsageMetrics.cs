@@ -20,7 +20,7 @@ internal static class UsageMetrics
         UsageInstrumentNames.TokensOut, unit: "{token}", description: "Output tokens produced by model calls.");
 
     private static readonly Counter<double> Cost = Meter.CreateCounter<double>(
-        UsageInstrumentNames.Cost, description: "Cost of model calls priced per call, in the rates' currency.");
+        UsageInstrumentNames.Cost, description: "Cost of model calls priced per call, by the provider or by rates, in their currency.");
 
     internal static void PublishTokens(TokenUsage usage, string? workflow)
     {

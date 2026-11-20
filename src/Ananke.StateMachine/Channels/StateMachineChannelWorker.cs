@@ -67,7 +67,7 @@ public sealed class StateMachineChannelWorker<C, S, T, N>(
         _logger.LogDebug("Dispatching [{Transition}] for context {ContextId}",
             action, item.Id);
 
-        var result = await machine.TransitionAsync(item, action);
+        var result = await machine.TransitionAsync(item, action, token);
 
         if (result.Success)
         {

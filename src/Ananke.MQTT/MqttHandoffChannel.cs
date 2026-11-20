@@ -6,6 +6,8 @@ using Ananke.Abstractions.Config;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
+using MQTTnet.Packets;
+using MQTTnet.Protocol;
 
 namespace Ananke.MQTT;
 
@@ -38,95 +40,78 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     private readonly ConcurrentDictionary<Task, byte> _handlers = new();
     private static readonly TimeSpan HandlerDrain = TimeSpan.FromSeconds(5);
 
-    private const int MaxReconnectAttempts = 10;
-
-    private IMqttClient? _client;
-    private MqttClientOptions? _options;
+    private MqttConnection? _connection;
     private string _namespace = string.Empty;
-    private bool _configured;
+    private MqttQualityOfServiceLevel _qualityOfService;
     private bool _disposed;
-    private bool _reconnectFailed;
+
+    /// <summary>
+    /// Tells this channel's client id from that of another handoff channel in the process with the same
+    /// <see cref="ChannelConfig.ClientId"/> and <see cref="ChannelConfig.Namespace"/>. Default none.
+    /// </summary>
+    public string? Name { get; init; }
+
+    /// <summary>The wait between reconnect attempts.</summary>
+    internal MqttReconnectDelay ReconnectDelay { get; init; } = MqttReconnectDelay.Default;
+
+    /// <summary>Replaces the validation of the broker's TLS certificate against the trusted roots.</summary>
+    internal Func<MqttClientCertificateValidationEventArgs, bool>? CertificateValidation { get; init; }
+
+    /// <summary>How many connects have completed, each with its subscriptions restored.</summary>
+    internal int ConnectCount => _connection?.ConnectCount ?? 0;
 
     /// <summary>Whether the channel is connected to the MQTT broker.</summary>
-    public bool IsConnected => _configured && !_reconnectFailed && _client?.IsConnected == true;
+    public bool IsConnected => _connection?.IsConnected == true;
 
     /// <summary>
     /// Connects to the MQTT broker. Must be called before <see cref="SendAsync{TMessage, TResponse}"/>
     /// or <see cref="CompleteAsync{TResponse}"/>.
     /// </summary>
+    /// <remarks>
+    /// From here until the channel is disposed, a lost connection is retried, with a capped delay
+    /// between attempts, and every subscription and pending reply topic is subscribed again on connect.
+    /// Requests and replies are published, and topics subscribed, at the configured
+    /// <see cref="ChannelConfig.QualityOfService"/>.
+    /// The retries start even when this first connect fails.
+    /// </remarks>
+    /// <returns>Whether the first connect succeeded.</returns>
     public async Task<bool> ConfigureAsync(ChannelConfig config, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(config);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Host);
-        ArgumentException.ThrowIfNullOrWhiteSpace(config.Namespace);
+        MqttConnection.Validate(config);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // A second ConfigureAsync replaces the client, and its reconnect loop, with a new one.
+        if (_connection is not null)
+            await _connection.DisposeAsync().ConfigureAwait(false);
+        _connection = null;
+
+        var connection = new MqttConnection(
+            MqttConnection.OptionsFor(config, Name is null ? ["handoff"] : ["handoff", Name], CertificateValidation),
+            ResubscribeAsync, ReconnectDelay, "Handoff channel", _logger);
         _namespace = config.Namespace;
-        _client = new MqttClientFactory().CreateMqttClient();
+        _qualityOfService = MqttConnection.QualityOfServiceFor(config);
+        connection.Client.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
+        _connection = connection;
 
-        _options = new MqttClientOptionsBuilder()
-            .WithTcpServer(config.Host, config.Port)
-            .WithCredentials(config.Username, config.Password)
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .WithCleanSession()
-            .Build();
-
-        _client.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
-
-        _client.DisconnectedAsync += async _ =>
-        {
-            _logger.LogDebug("Handoff channel disconnected");
-            if (_disposed) return;
-
-            var delay = TimeSpan.FromSeconds(1);
-            var maxDelay = TimeSpan.FromSeconds(30);
-            var attempt = 0;
-
-            while (!_disposed && attempt < MaxReconnectAttempts)
-            {
-                try
-                {
-                    attempt++;
-
-                    // Jittered, so clients that lost the same broker do not all return at once.
-                    await Task.Delay(delay + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000)));
-                    await _client.ConnectAsync(_options, CancellationToken.None);
-                    _logger.LogInformation("Handoff channel reconnected after {Attempt} attempt(s)", attempt);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Handoff channel reconnection attempt {Attempt}/{Max} failed",
-                        attempt, MaxReconnectAttempts);
-                    delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, maxDelay.Ticks));
-                }
-            }
-
-            if (!_disposed)
-            {
-                _reconnectFailed = true;
-                _logger.LogError(
-                    "Handoff channel permanently disconnected after {Max} reconnect attempts",
-                    MaxReconnectAttempts);
-
-                // Fail all pending requests so callers are not blocked indefinitely
-                foreach (var kvp in _pending)
-                    kvp.Value.TrySetException(
-                        new InvalidOperationException("MQTT handoff channel lost connection permanently."));
-            }
-        };
-
-        try
-        {
-            var resp = await _client.ConnectAsync(_options, ct);
-            _configured = resp.ResultCode == MqttClientConnectResultCode.Success;
+        var connected = await connection.StartAsync(ct).ConfigureAwait(false);
+        if (connected)
             _logger.LogInformation("Handoff channel connected to {Host}:{Port}", config.Host, config.Port);
-            return _configured;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Handoff channel failed to connect to {Host}:{Port}", config.Host, config.Port);
-            return false;
-        }
+        return connected;
+    }
+
+    // Runs on every connect: a clean session starts with no subscriptions.
+    private async Task ResubscribeAsync(IMqttClient client, CancellationToken ct)
+    {
+        string[] topics = [.. _subscriptions.Keys.Select(prefix => prefix + "#"), .. _pending.Keys];
+        if (topics.Length == 0) return;
+
+        var builder = new MqttClientSubscribeOptionsBuilder();
+        foreach (var topic in topics)
+            builder.WithTopicFilter(TopicFilter(topic));
+
+        var result = await client.SubscribeAsync(builder.Build(), ct).ConfigureAwait(false);
+        MqttConnection.EnsureGranted(result);
+        _logger.LogDebug("Handoff channel subscribed to {Count} topic(s)", topics.Length);
     }
 
     /// <inheritdoc />
@@ -141,7 +126,8 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_client is null || !IsConnected)
+        var client = _connection?.Client;
+        if (client is null || !IsConnected)
             throw new InvalidOperationException("Handoff channel is not configured. Call ConfigureAsync first.");
 
         var requestTopic = $"{_namespace}/{topic}/request/{correlationId}";
@@ -153,15 +139,15 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         try
         {
             // Subscribe to reply topic before publishing the request
-            await _client.SubscribeAsync(
-                new MqttTopicFilterBuilder().WithTopic(replyTopic).Build(), ct);
+            await client.SubscribeAsync(
+                TopicFilter(replyTopic), ct);
 
             // Publish the request
             var payload = JsonSerializer.SerializeToUtf8Bytes(message, _jsonOptions);
-            await _client.PublishAsync(new MqttApplicationMessageBuilder()
+            await client.PublishAsync(new MqttApplicationMessageBuilder()
                 .WithTopic(requestTopic)
                 .WithPayload(payload)
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
+                .WithQualityOfServiceLevel(_qualityOfService)
                 .Build(), ct);
 
             _logger.LogDebug("Handoff request published to {Topic}", requestTopic);
@@ -183,7 +169,7 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
 
             try
             {
-                await _client.UnsubscribeAsync(replyTopic, ct);
+                await client.UnsubscribeAsync(replyTopic, ct);
             }
             catch (Exception ex)
             {
@@ -202,16 +188,17 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_client is null || !IsConnected)
+        var client = _connection?.Client;
+        if (client is null || !IsConnected)
             throw new InvalidOperationException("Handoff channel is not configured. Call ConfigureAsync first.");
 
         var replyTopic = $"{_namespace}/{topic}/reply/{correlationId}";
         var payload = JsonSerializer.SerializeToUtf8Bytes(response, _jsonOptions);
 
-        await _client.PublishAsync(new MqttApplicationMessageBuilder()
+        await client.PublishAsync(new MqttApplicationMessageBuilder()
             .WithTopic(replyTopic)
             .WithPayload(payload)
-            .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
+            .WithQualityOfServiceLevel(_qualityOfService)
             .Build(), ct);
 
         _logger.LogDebug("Handoff response published to {Topic}", replyTopic);
@@ -243,7 +230,8 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentNullException.ThrowIfNull(handler);
 
-        if (_client is null || !IsConnected)
+        var client = _connection?.Client;
+        if (client is null || !IsConnected)
             throw new InvalidOperationException("Handoff channel is not configured. Call ConfigureAsync first.");
 
         var requestTopicPrefix = $"{_namespace}/{topic}/request/";
@@ -263,8 +251,8 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
             await CompleteAsync(topic, correlationId, response, token);
         };
 
-        await _client.SubscribeAsync(
-            new MqttTopicFilterBuilder().WithTopic(requestTopicFilter).Build(), ct);
+        await client.SubscribeAsync(
+            TopicFilter(requestTopicFilter), ct);
 
         _logger.LogInformation("Handoff subscription active on {TopicFilter}", requestTopicFilter);
     }
@@ -316,6 +304,9 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         return Task.CompletedTask;
     }
 
+    private MqttTopicFilter TopicFilter(string topic) =>
+        new MqttTopicFilterBuilder().WithTopic(topic).WithQualityOfServiceLevel(_qualityOfService).Build();
+
     private static byte[] GetPayloadBytes(ReadOnlySequence<byte> payload) =>
         payload.IsSingleSegment ? payload.FirstSpan.ToArray() : payload.ToArray();
 
@@ -347,12 +338,8 @@ public sealed class MqttHandoffChannel(ILogger<MqttHandoffChannel>? logger = nul
         _pending.Clear();
         _subscriptions.Clear();
 
-        if (_client is not null)
-        {
-            try { await _client.DisconnectAsync(); }
-            catch (Exception ex) { _logger.LogDebug(ex, "MQTT disconnect failed during dispose — ignoring"); }
-            _client.Dispose();
-        }
+        if (_connection is not null)
+            await _connection.DisposeAsync();
 
         _lifetime.Dispose();
         GC.SuppressFinalize(this);

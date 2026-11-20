@@ -7,6 +7,10 @@ namespace Ananke.Learning.EntityMemory;
 /// by injecting entity metadata on upsert and adding entity filters on search
 /// and delete operations.
 /// </summary>
+/// <remarks>
+/// A caller's filter is copied with its <see cref="KnowledgeFilter.AnyOf"/>, and the entity is added as an entry, which
+/// a document must match whatever <see cref="KnowledgeFilter.AnyOf"/> holds, so a filter can't reach another entity.
+/// </remarks>
 /// <param name="inner">The shared knowledge store.</param>
 /// <param name="entityId">The entity to scope to.</param>
 #pragma warning disable ANNKEEXP004 // implements the experimental listing
@@ -53,14 +57,15 @@ public sealed class EntityScopedKnowledgeStore(
 
     /// <inheritdoc />
 #pragma warning disable ANNKEEXP004 // lists through the experimental listing
-    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(KnowledgeFilter filter, int limit = 1000, CancellationToken ct = default)
+    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
+        KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default)
     {
         if (inner is not IListableKnowledgeStore listable)
             throw new NotSupportedException($"The store this one scopes ({inner.GetType().Name}) can't list.");
 
         var scopedFilter = CopyFilter(filter);
         scopedFilter[EntityIdMetadataKey] = entityId;
-        return listable.ListAsync(scopedFilter, limit, ct);
+        return listable.ListAsync(scopedFilter, limit, order, ct);
     }
 #pragma warning restore ANNKEEXP004
 
@@ -71,6 +76,10 @@ public sealed class EntityScopedKnowledgeStore(
         {
             foreach (var (key, value) in source)
                 filter[key] = value;
+#pragma warning disable ANNKEEXP004 // passes the experimental AnyOf through
+            foreach (var (key, values) in source.AnyOf)
+                filter.AnyOf[key] = values;
+#pragma warning restore ANNKEEXP004
         }
         return filter;
     }
