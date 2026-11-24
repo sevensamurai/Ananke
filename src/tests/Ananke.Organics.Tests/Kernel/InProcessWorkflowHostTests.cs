@@ -99,7 +99,27 @@ public class InProcessWorkflowHostTests
         cancelCount.ShouldBe(3);
     }
 
-    // ── Crashed loop ────────────────────────────────────────────────
+    [Test]
+    public async Task DisposeAsync_CellStartedWhileDisposing_IsRefused()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _mesh.StartAsync("slow", _ => release.Task); // ignores its token, so the dispose waits on it
+        await _mesh.WhenStartedAsync("slow").WaitAsync(TimeSpan.FromSeconds(5));
+        var dispose = _mesh.DisposeAsync().AsTask();
+        try
+        {
+            dispose.IsCompleted.ShouldBeFalse();
+
+            await Should.ThrowAsync<ObjectDisposedException>(() => _mesh.StartAsync("late", WorkflowLoops.Park));
+
+            _mesh.ListActive().ShouldNotContain("late");
+        }
+        finally
+        {
+            release.SetResult(); // or the dispose, and the teardown's after it, never ends
+        }
+        await dispose.WaitAsync(TimeSpan.FromSeconds(5));
+    }
 
     [Test]
     public async Task CrashedLoop_RemovedFromAlive()
@@ -178,6 +198,75 @@ public class InProcessWorkflowHostTests
     }
 
     [Test]
+    public async Task ResumeAsync_LoopCrashes_RemovedFromListActive()
+    {
+        var runs = 0;
+        await _mesh.StartAsync("cell", ct =>
+            Interlocked.Increment(ref runs) == 1
+                ? WorkflowLoops.Park(ct)
+                : throw new ApplicationException("boom"));
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        await _mesh.PauseAsync("cell");
+        await _mesh.WhenPausedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+
+        await _mesh.ResumeAsync("cell");
+        await _mesh.WhenStoppedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+
+        _mesh.ListActive().ShouldNotContain("cell");
+    }
+
+    [Test]
+    public async Task ResumeAsync_PauseStillUnwinding_WaitsForTheOldLoop()
+    {
+        var firstRun = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRun = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runs = 0;
+        await _mesh.StartAsync("cell", async ct =>
+        {
+            if (Interlocked.Increment(ref runs) == 1)
+            {
+                firstRun.SetResult();
+                await release.Task; // ignores its token, so the pause cannot unwind it yet
+            }
+            else
+            {
+                secondRun.TrySetResult();
+                await WorkflowLoops.Park(ct);
+            }
+        });
+        await firstRun.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var pause = _mesh.PauseAsync("cell");
+
+        var resume = _mesh.ResumeAsync("cell");
+
+        resume.IsCompleted.ShouldBeFalse();
+        Volatile.Read(ref runs).ShouldBe(1);
+        release.SetResult();
+        await pause.WaitAsync(TimeSpan.FromSeconds(5));
+        await resume.WaitAsync(TimeSpan.FromSeconds(5));
+        await secondRun.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Volatile.Read(ref runs).ShouldBe(2);
+    }
+
+    [Test]
+    public async Task StartAsync_StoppedLoopStillRunning_OldLoopLeavesTheNewCell()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _mesh.StartAsync("cell", _ => release.Task); // ignores its token
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        var oldStopped = _mesh.WhenStoppedAsync("cell");
+        try { await _mesh.StopAsync("cell", new CancellationToken(canceled: true)); }
+        catch (OperationCanceledException) { /* the stop gave up waiting; the old loop still runs */ }
+
+        await _mesh.StartAsync("cell", WorkflowLoops.Park);
+        release.SetResult();
+        await oldStopped.WaitAsync(TimeSpan.FromSeconds(5));
+
+        _mesh.ListActive().ShouldContain("cell");
+    }
+
+    [Test]
     public async Task PauseAsync_ThenStopAsync_GracefulShutdown()
     {
         await _mesh.StartAsync("cell", WorkflowLoops.Park);
@@ -187,6 +276,92 @@ public class InProcessWorkflowHostTests
         await _mesh.StopAsync("cell");
 
         _mesh.ListActive().ShouldNotContain("cell");
+    }
+
+    [Test]
+    public async Task PauseAsync_CallerTokenFires_CellSettlesPausedAndItsTokenSourceIsDisposed()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loopToken = CancellationToken.None;
+        var runs = 0;
+        await _mesh.StartAsync("cell", ct =>
+        {
+            if (Interlocked.Increment(ref runs) > 1)
+                return WorkflowLoops.Park(ct);
+            loopToken = ct;
+            return release.Task; // ignores its token, so the pause cannot unwind it yet
+        });
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        using var caller = new CancellationTokenSource();
+        var pause = _mesh.PauseAsync("cell", caller.Token);
+
+        await caller.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => pause.WaitAsync(TimeSpan.FromSeconds(5)));
+        _mesh.ListActive().ShouldContain("cell");
+        var paused = _mesh.WhenPausedAsync("cell");
+        release.SetResult();
+        await paused.WaitAsync(TimeSpan.FromSeconds(5));
+        Should.Throw<ObjectDisposedException>(() => loopToken.WaitHandle);
+        await _mesh.ResumeAsync("cell");
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        _mesh.ListActive().ShouldContain("cell");
+    }
+
+    [Test]
+    public async Task PauseAsync_LoopCrashesOnceMarkedPaused_RemovedFromListActive()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _mesh.StartAsync("cell", async _ =>
+        {
+            await release.Task; // ignores its token
+            throw new ApplicationException("boom");
+        });
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        var pause = _mesh.PauseAsync("cell");
+
+        release.SetResult();
+
+        await pause.WaitAsync(TimeSpan.FromSeconds(5));
+        _mesh.ListActive().ShouldNotContain("cell");
+    }
+
+    [Test]
+    public async Task StopAsync_PausedCell_DoesNotCancelItsDisposedTokenSource()
+    {
+        await _mesh.StartAsync("cell", WorkflowLoops.Park);
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        await _mesh.PauseAsync("cell");
+
+        await Should.NotThrowAsync(() => _mesh.StopAsync("cell"));
+
+        _mesh.ListActive().ShouldNotContain("cell");
+    }
+
+    [Test]
+    public async Task ResumeAsync_PauseStillUnwinding_PauseSettlesBeforeTheNewLoopStarts()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pausedAtResume = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var paused = Task.CompletedTask;
+        var runs = 0;
+        await _mesh.StartAsync("cell", ct =>
+        {
+            if (Interlocked.Increment(ref runs) == 1)
+                return release.Task; // ignores its token, so the pause cannot unwind it yet
+            pausedAtResume.TrySetResult(paused.IsCompleted);
+            return WorkflowLoops.Park(ct);
+        });
+        await _mesh.WhenStartedAsync("cell").WaitAsync(TimeSpan.FromSeconds(5));
+        var pause = _mesh.PauseAsync("cell");
+        paused = _mesh.WhenPausedAsync("cell");
+        var resume = _mesh.ResumeAsync("cell");
+
+        release.SetResult();
+
+        await resume.WaitAsync(TimeSpan.FromSeconds(5));
+        (await pausedAtResume.Task.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        await pause.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Test]

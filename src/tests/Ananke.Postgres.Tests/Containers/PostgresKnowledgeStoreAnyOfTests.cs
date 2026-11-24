@@ -4,7 +4,7 @@ using Shouldly;
 
 #pragma warning disable ANNKEEXP004 // KnowledgeFilter.AnyOf is experimental
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary>
 /// <see cref="KnowledgeFilter.AnyOf"/> on <see cref="PostgresKnowledgeStore"/>: a key holding several values matches a

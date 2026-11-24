@@ -25,7 +25,7 @@ public sealed class EntityScopedKnowledgeStore(
         string query, SearchOptions? options = null, CancellationToken ct = default)
     {
         options ??= new SearchOptions();
-        var filter = CopyFilter(options.Filter);
+        var filter = (options.Filter ?? new KnowledgeFilter()).Copy();
         filter[EntityIdMetadataKey] = entityId;
 
         return inner.SearchAsync(query, options with { Filter = filter }, ct);
@@ -49,7 +49,13 @@ public sealed class EntityScopedKnowledgeStore(
     /// <inheritdoc />
     public Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
-        var scopedFilter = CopyFilter(filter);
+        ArgumentNullException.ThrowIfNull(filter);
+#pragma warning disable ANNKEEXP004 // reads the experimental AnyOf
+        if (filter.Count == 0 && filter.AnyOf.Count == 0)
+            throw new ArgumentException("A delete with an empty filter would remove every document; name what to delete.", nameof(filter));
+#pragma warning restore ANNKEEXP004
+
+        var scopedFilter = (filter ?? new KnowledgeFilter()).Copy();
         scopedFilter[EntityIdMetadataKey] = entityId;
 
         return inner.DeleteAsync(scopedFilter, ct);
@@ -63,24 +69,25 @@ public sealed class EntityScopedKnowledgeStore(
         if (inner is not IListableKnowledgeStore listable)
             throw new NotSupportedException($"The store this one scopes ({inner.GetType().Name}) can't list.");
 
-        var scopedFilter = CopyFilter(filter);
+        var scopedFilter = (filter ?? new KnowledgeFilter()).Copy();
         scopedFilter[EntityIdMetadataKey] = entityId;
         return listable.ListAsync(scopedFilter, limit, order, ct);
     }
-#pragma warning restore ANNKEEXP004
 
-    private static KnowledgeFilter CopyFilter(KnowledgeFilter? source)
+    /// <inheritdoc />
+    /// <remarks>
+    /// The entity is set in both the listed metadata and the new one, as on upsert, so a chunk of another entity is
+    /// never changed and a chunk never leaves this entity.
+    /// </remarks>
+    public Task UpdateMetadataAsync(KnowledgeChunk listed, IReadOnlyDictionary<string, string> metadata, CancellationToken ct = default)
     {
-        var filter = new KnowledgeFilter();
-        if (source is not null)
-        {
-            foreach (var (key, value) in source)
-                filter[key] = value;
-#pragma warning disable ANNKEEXP004 // passes the experimental AnyOf through
-            foreach (var (key, values) in source.AnyOf)
-                filter.AnyOf[key] = values;
-#pragma warning restore ANNKEEXP004
-        }
-        return filter;
+        ArgumentNullException.ThrowIfNull(listed);
+        ArgumentNullException.ThrowIfNull(metadata);
+        if (inner is not IListableKnowledgeStore listable)
+            throw new NotSupportedException($"The store this one scopes ({inner.GetType().Name}) can't list.");
+
+        var scoped = listed with { Metadata = new Dictionary<string, string>(listed.Metadata) { [EntityIdMetadataKey] = entityId } };
+        return listable.UpdateMetadataAsync(scoped, new Dictionary<string, string>(metadata) { [EntityIdMetadataKey] = entityId }, ct);
     }
+#pragma warning restore ANNKEEXP004
 }

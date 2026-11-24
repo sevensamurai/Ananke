@@ -11,7 +11,8 @@ public sealed record PostgresKnowledgeOptions
 {
     /// <summary>
     /// The table the rows go in, created on first use. Lower-case letters, digits and underscores, starting with a
-    /// letter or underscore; it may be qualified with a schema (<c>knowledge.chunks</c>).
+    /// letter or underscore; it may be qualified with a schema (<c>knowledge.chunks</c>). At most 49 characters without
+    /// the schema, and 52 for the schema and table together (without the dot), so the names derived from it fit Postgres's 63.
     /// </summary>
     public string Table { get; init; } = "ananke_knowledge";
 
@@ -24,9 +25,9 @@ public sealed record PostgresKnowledgeOptions
     /// <summary>
     /// Which rows keyword search scores. A query term is rare when it is found in at most this share of the table's
     /// rows, rounded up to whole rows, so on a small table a term in one row is rare. Only rows holding a rare query
-    /// term are scored, by every query term they hold; a query with no rare term requires all its terms. Default is
-    /// 0.05 (5% of rows); more than 0, at most 1. At 1 every term is rare, and every row holding any query term is
-    /// scored.
+    /// term are scored, by every query term they hold; a query with no rare term requires all its terms. When a filter
+    /// keeps no such row, every term some kept row holds is required, and then any term is enough. Default is 0.05 (5%
+    /// of rows); more than 0, at most 1. At 1 every term is rare, and every row holding any query term is scored.
     /// </summary>
     public double RareTermShare { get; init; } = 0.05;
 

@@ -212,14 +212,18 @@ Install: `dotnet tool install -g nnke`
 ### Long-Term Memory (Knowledge)
 
 ```csharp
-var processor = new DocumentProcessor(extractor, chunker, embedder, store);
-await processor.IngestAsync(document, ct);
-var results = await store.SearchAsync("query text", topK: 5, ct);
+var processor = new DocumentProcessor(http, [new MarkdownExtractor()], new SlidingWindowChunker(), store);
+await processor.ProcessAsync(stream, ".md", sourceId: "notes/a.md", ct: ct);
+var results = await store.SearchAsync("query text", new SearchOptions { TopK = 5, Mode = SearchMode.Hybrid }, ct);
+await store.DeleteAsync(new KnowledgeFilter { ["source"] = "notes/a.md" }, ct); // an empty filter throws
 ```
 
-Interfaces: `IDocumentExtractor`, `IDocumentChunker`, `IEmbeddingModel`, `IKnowledgeStore`
+Interfaces: `IDocumentExtractor`, `IDocumentChunker`, `IEmbeddingModel`, `IKnowledgeStore`, `IListableKnowledgeStore`
 In-memory impl: `InMemoryKnowledgeStore`
-Qdrant impl: `QdrantKnowledgeStore` (`Ananke.Memory.Qdrant`)
+Qdrant impl: `QdrantKnowledgeStore` (`Ananke.Qdrant`)
+Postgres impl: `PostgresKnowledgeStore` (`Ananke.Postgres`, experimental `ANNKEEXP004`)
+Hybrid weights: `SearchOptions.DenseWeight`, `KeywordWeight` (in-memory and Postgres)
+Records: `DatedRecordExtractor<TRecord>` (quote-checked), `DatedRecordWriter<TRecord>` (written by people), `DatedRecordReader<TRecord>`
 
 ### Empirical Memory
 

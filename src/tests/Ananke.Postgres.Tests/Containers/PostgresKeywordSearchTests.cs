@@ -2,7 +2,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
 using Shouldly;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary>
 /// Keyword search on a table of 603 rows under <c>simple</c>, with no stop list: 300 English and 300 Spanish rows from

@@ -2,7 +2,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
 using Shouldly;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary>
 /// <see cref="PostgresKnowledgeStore"/> against Postgres with pgvector. The embedder returns fixed vectors, so the row
@@ -183,4 +183,28 @@ public class PostgresKnowledgeStoreTests
     public void Constructor_ATableNameThatIsntAPlainIdentifier_IsRefused() =>
         Should.Throw<ArgumentException>(() => new PostgresKnowledgeStore(PostgresDatabase.Require(),
             new FixedEmbedder(Vectors), new PostgresKnowledgeOptions { Table = "chunks; DROP TABLE x" }));
+
+    [Test]
+    public void Constructor_ATableNameOver49Characters_IsRefusedNamingTheLimit()
+    {
+        var error = Should.Throw<ArgumentException>(() => new PostgresKnowledgeStore(PostgresDatabase.Require(),
+            new FixedEmbedder(Vectors), new PostgresKnowledgeOptions { Table = "public." + new string('a', 50) }));
+        error.Message.ShouldContain("49");
+    }
+
+    [Test]
+    public async Task Table_Of49Characters_CreatesItsCountsAndSearches()
+    {
+        var table = PostgresDatabase.NewTable("t").PadRight(49, 'x')[..49];
+        var dataSource = PostgresDatabase.Require();
+        var store = new PostgresKnowledgeStore(dataSource, new FixedEmbedder(Vectors), new PostgresKnowledgeOptions { Table = table });
+
+        await store.UpsertAsync([Identity]);
+        var results = await store.SearchAsync(Query, new SearchOptions { Mode = SearchMode.Sparse });
+
+        results.ShouldNotBeEmpty();
+        await using var command = dataSource.CreateCommand(
+            $"SELECT to_regclass('{table}_lexemes') IS NOT NULL AND to_regproc('{table}_lexemes_count') IS NOT NULL");
+        (await command.ExecuteScalarAsync()).ShouldBe(true);
+    }
 }

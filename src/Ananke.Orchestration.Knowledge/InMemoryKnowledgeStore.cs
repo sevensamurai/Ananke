@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Text.RegularExpressions;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Embeddings;
@@ -16,7 +15,7 @@ namespace Ananke.Orchestration.Knowledge;
 /// Terms are runs of letters and digits, lower-cased, keeping inner dots, hyphens and underscores, so
 /// <c>Core.Identity</c> and <c>oauth2-proxy</c> are single terms. Term statistics are taken over the documents
 /// that pass <see cref="SearchOptions.Filter"/>. <see cref="SearchOptions.ScoreThreshold"/> applies to cosine
-/// similarity only. A result's <see cref="KnowledgeChunk.Score"/> is the score of the mode asked for.
+/// similarity only. The key <c>id</c> in a filter is a document's own id, not a metadata key. A result's <see cref="KnowledgeChunk.Score"/> is the score of the mode asked for.
 /// </remarks>
 #pragma warning disable ANNKEEXP004 // implements the experimental listing
 public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
@@ -26,6 +25,7 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     private const double Bm25B = 0.75;
     private const int ReciprocalRankK = 60;
     private const int CandidatesPerTopK = 4;
+    private const string IdKey = "id";
 
     private readonly ConcurrentDictionary<string, StoredDocument> _documents = new();
     private readonly IEmbeddingModel _embedder;
@@ -57,7 +57,10 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
         options ??= new SearchOptions();
-        var candidates = _documents.Where(d => MatchesFilter(d.Value.Metadata, options.Filter)).ToList();
+        if (options is { Mode: SearchMode.Hybrid, DenseWeight: 0, KeywordWeight: 0 })
+            throw new ArgumentException(
+                "Hybrid search needs a DenseWeight or a KeywordWeight above 0.", nameof(options));
+        var candidates = _documents.Where(d => MatchesFilter(d.Key, d.Value.Metadata, options.Filter)).ToList();
 
 #pragma warning disable ANNKEEXP004 // limits per source, an experimental option
         var take = options.Candidates();
@@ -65,8 +68,9 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
         {
             SearchMode.Sparse => RankByTerms(query, candidates, take),
             SearchMode.Hybrid => Fuse(
-                await RankByEmbeddingAsync(query, candidates, options, take * CandidatesPerTopK, ct),
-                RankByTerms(query, candidates, take * CandidatesPerTopK),
+                options.DenseWeight == 0 ? [] : await RankByEmbeddingAsync(query, candidates, options, take * CandidatesPerTopK, ct),
+                options.KeywordWeight == 0 ? [] : RankByTerms(query, candidates, take * CandidatesPerTopK),
+                options,
                 take),
             _ => await RankByEmbeddingAsync(query, candidates, options, take, ct),
         };
@@ -113,11 +117,11 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     /// <inheritdoc />
     public Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(filter);
+        KnowledgeFilter.ThrowIfEmptyForDelete(filter);
 
         foreach (var (id, doc) in _documents)
         {
-            if (MatchesFilter(doc.Metadata, filter))
+            if (MatchesFilter(id, doc.Metadata, filter))
                 _documents.TryRemove(id, out _);
         }
 
@@ -135,7 +139,7 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegative(limit);
 
-        var matches = _documents.Where(d => MatchesFilter(d.Value.Metadata, filter));
+        var matches = _documents.Where(d => MatchesFilter(d.Key, d.Value.Metadata, filter));
         IEnumerable<KeyValuePair<string, StoredDocument>> ordered;
         if (order is null)
         {
@@ -145,7 +149,7 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(order.Key, nameof(order));
             ordered = matches
-                .Select(d => (Document: d, Date: DateIn(d.Value.Metadata, order.Key)))
+                .Select(d => (Document: d, Date: KnowledgeDateOrder.ReadDate(d.Value.Metadata.GetValueOrDefault(order.Key))))
                 .Where(d => order.Since is not { } since || d.Date >= since)
                 .OrderByDescending(d => d.Date.HasValue)
                 .ThenByDescending(d => d.Date)
@@ -158,14 +162,25 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
             .Select(d => new KnowledgeChunk { Id = d.Key, Text = d.Value.Text, Score = 0f, Metadata = d.Value.Metadata })];
         return Task.FromResult(listed);
     }
-#pragma warning restore ANNKEEXP004
 
-    /// <summary>The date under <paramref name="key"/>, when it is there and parses as an ISO 8601 date and time.</summary>
-    private static DateTimeOffset? DateIn(IReadOnlyDictionary<string, string> metadata, string key) =>
-        metadata.TryGetValue(key, out var text)
-        && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)
-            ? date
-            : null;
+    /// <inheritdoc />
+    public Task UpdateMetadataAsync(KnowledgeChunk listed, IReadOnlyDictionary<string, string> metadata, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(listed);
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        // Swapped only for the document read here, so a write or delete since then is kept.
+        if (_documents.TryGetValue(listed.Id, out var stored)
+            && stored.Text == listed.Text
+            && stored.Metadata.Count == listed.Metadata.Count
+            && stored.Metadata.All(kv => listed.Metadata.TryGetValue(kv.Key, out var value) && value == kv.Value))
+        {
+            _documents.TryUpdate(listed.Id, stored with { Metadata = new Dictionary<string, string>(metadata, StringComparer.Ordinal) }, stored);
+        }
+
+        return Task.CompletedTask;
+    }
+#pragma warning restore ANNKEEXP004
 
     private async Task<IReadOnlyList<(string Id, float Score)>> RankByEmbeddingAsync(
         string query,
@@ -226,15 +241,17 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     private static IReadOnlyList<(string Id, float Score)> Fuse(
         IReadOnlyList<(string Id, float Score)> dense,
         IReadOnlyList<(string Id, float Score)> sparse,
+        SearchOptions options,
         int take)
     {
         var fused = new Dictionary<string, float>();
-        foreach (var ranking in (IReadOnlyList<(string Id, float Score)>[])[dense, sparse])
+        foreach (var (ranking, weight) in (ReadOnlySpan<(IReadOnlyList<(string Id, float Score)>, float)>)
+                 [(dense, options.DenseWeight), (sparse, options.KeywordWeight)])
         {
             for (var rank = 0; rank < ranking.Count; rank++)
             {
                 var id = ranking[rank].Id;
-                fused[id] = fused.GetValueOrDefault(id) + 1f / (ReciprocalRankK + rank + 1);
+                fused[id] = fused.GetValueOrDefault(id) + weight / (ReciprocalRankK + rank + 1);
             }
         }
 
@@ -265,22 +282,26 @@ public sealed partial class InMemoryKnowledgeStore : IListableKnowledgeStore
     [GeneratedRegex(@"[\p{L}\p{N}](?:[\p{L}\p{N}._-]*[\p{L}\p{N}])?", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TermPattern();
 
+    /// <summary>Whether a document matches <paramref name="filter"/>; the key <c>id</c> is read as the document's own id.</summary>
     private static bool MatchesFilter(
-        IReadOnlyDictionary<string, string> metadata, KnowledgeFilter? filter)
+        string id, IReadOnlyDictionary<string, string> metadata, KnowledgeFilter? filter)
     {
         if (filter is null)
             return true;
 
+        if (filter.ValuesOf(IdKey) is { } ids && !ids.Contains(id, StringComparer.Ordinal))
+            return false;
+
         foreach (var (key, value) in filter)
         {
-            if (!metadata.TryGetValue(key, out var actual) || actual != value)
+            if (key != IdKey && (!metadata.TryGetValue(key, out var actual) || actual != value))
                 return false;
         }
 
 #pragma warning disable ANNKEEXP004 // applies the experimental AnyOf
         foreach (var (key, values) in filter.AnyOf)
         {
-            if (!metadata.TryGetValue(key, out var actual) || !values.Contains(actual, StringComparer.Ordinal))
+            if (key != IdKey && (!metadata.TryGetValue(key, out var actual) || !values.Contains(actual, StringComparer.Ordinal)))
                 return false;
         }
 #pragma warning restore ANNKEEXP004

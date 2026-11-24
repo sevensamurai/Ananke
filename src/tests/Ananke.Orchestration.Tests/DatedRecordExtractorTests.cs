@@ -1,7 +1,9 @@
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
 using Ananke.Orchestration.Knowledge.Documents;
 using Ananke.Orchestration.Knowledge.Embeddings;
+using Ananke.Orchestration.Knowledge.Linking;
 using Ananke.Orchestration.Knowledge.Records;
 using Shouldly;
 
@@ -62,7 +64,7 @@ public class DatedRecordExtractorTests
     {
         var count = await Extractor().ExtractAsync("0002.md", Document, Header);
 
-        count.ShouldBe(2);
+        count.ShouldBe((2, 0));
         var stored = (await StoredAsync()).OrderBy(c => c.Id).ToList();
         stored.Select(c => c.Id).ShouldBe(["0002.md:record:0", "0002.md:record:1"]);
         stored[0].Text.ShouldBe("Core.Identity is built on OpenIddict");
@@ -158,7 +160,7 @@ public class DatedRecordExtractorTests
     {
         var count = await Extractor(keep: d => !d.Statement.Contains("SigNoz")).ExtractAsync("0002.md", Document, Header);
 
-        count.ShouldBe(1);
+        count.ShouldBe((1, 1));
         (await StoredAsync()).Select(c => c.Id).ShouldBe(["0002.md:record:0"]);
     }
 
@@ -186,8 +188,137 @@ public class DatedRecordExtractorTests
         var result = await processor.ProcessAsync(new MemoryStream(), ".md", "0002.md");
 
         result.Records.ShouldBe(2);
+        result.RecordsRefused.ShouldBe(0);
         result.Chunks.ShouldBeGreaterThan(0);
         (await StoredAsync()).Count.ShouldBe(2);
+    }
+
+    [Test]
+    public void Records_AnExtractorOnTheProcessorsOwnStore_IsRefused()
+    {
+        DocumentProcessor Processor(IKnowledgeStore chunks, IDocumentRecords records) =>
+            new(new HttpClient(), [new OneDocument(Document)], new SlidingWindowChunker(), chunks) { Records = records };
+        var linked = new LinkedKnowledgeStore(_records, new InMemoryDocumentLinkGraph());
+        var catalogAware = new CatalogAwareKnowledgeStore(_records, new InMemoryKnowledgeCatalog(new InMemoryEmbedder()));
+
+        Should.Throw<ArgumentException>(() => Processor(_records, Extractor()))
+            .Message.ShouldContain("store of their own");
+        Should.Throw<ArgumentException>(() => Processor(linked, Extractor()));
+        Should.Throw<ArgumentException>(() => Processor(_records, new DatedRecordExtractor<Decision>(_model, catalogAware, new DatedRecordOptions<Decision>
+        {
+            Instructions = "Extract the decisions this document records.",
+            Text = d => d.Statement,
+        })));
+    }
+
+    public sealed record QuotedDecision(string Statement, string? Quote);
+
+    private static readonly ExtractedDocument TwoSections = new([
+        new ExtractedSection("We weighed Duende and OpenIddict.", SectionTitle: "Context"),
+        new ExtractedSection("Core.Identity is built\non   OpenIddict, which has no per-token fees.", SectionTitle: "Decision"),
+    ]);
+
+    private DatedRecordExtractor<QuotedDecision> QuotingExtractor(
+        Func<QuotedDecision, IReadOnlyDictionary<string, string>>? fields = null) => new(_model, _records, new DatedRecordOptions<QuotedDecision>
+        {
+            Instructions = "Extract the decisions, each with the passage that says it.",
+            Text = d => d.Statement,
+            Quote = d => d.Quote,
+            Fields = fields,
+        });
+
+    [Test]
+    public async Task ExtractAsync_Quote_KeepsOnlyTheRecordsWhoseQuoteIsInTheDocument()
+    {
+        _model.Reply = """
+            {"records": [
+              {"Statement": "Core.Identity is built on OpenIddict", "Quote": "core.identity is BUILT on openiddict"},
+              {"Statement": "Telemetry goes to SigNoz", "Quote": "Telemetry goes to SigNoz"}
+            ]}
+            """;
+
+        var count = await QuotingExtractor().ExtractAsync("0002.md", TwoSections, Header);
+
+        count.ShouldBe((1, 1));
+        (await StoredAsync()).Select(c => c.Text).ShouldBe(["Core.Identity is built on OpenIddict"]);
+    }
+
+    [Test]
+    public async Task ProcessAsync_AModelThatParaphrasesEveryQuote_StoresNoneAndCountsEachRefused()
+    {
+        _model.Reply = """
+            {"records": [
+              {"Statement": "Core.Identity is built on OpenIddict", "Quote": "Core.Identity uses OpenIddict"},
+              {"Statement": "OpenIddict has no per-token fees", "Quote": "OpenIddict charges nothing per token"},
+              {"Statement": "Duende was weighed", "Quote": "We considered Duende"}
+            ]}
+            """;
+        var processor = new DocumentProcessor(
+            new HttpClient(), [new OneDocument(TwoSections)], new SlidingWindowChunker(), new InMemoryKnowledgeStore(new InMemoryEmbedder()))
+        {
+            Records = QuotingExtractor(),
+        };
+
+        var result = await processor.ProcessAsync(new MemoryStream(), ".md", "0002.md");
+
+        result.Records.ShouldBe(0);
+        result.RecordsRefused.ShouldBe(3);
+        (await StoredAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ExtractAsync_Quote_StoresTheQuoteAndTheTitleOfItsSection()
+    {
+        _model.Reply = """{"records": [{"Statement": "Core.Identity is built on OpenIddict", "Quote": "built on OpenIddict"}]}""";
+
+        await QuotingExtractor().ExtractAsync("0002.md", TwoSections, Header);
+
+        var stored = (await StoredAsync()).Single();
+        stored.Metadata[DatedRecordExtractor<QuotedDecision>.QuoteKey].ShouldBe("built on OpenIddict");
+        stored.Metadata[DatedRecordExtractor<QuotedDecision>.SectionKey].ShouldBe("Decision");
+    }
+
+    [Test]
+    public async Task ExtractAsync_QuoteAndARecordWithoutOne_LeavesTheRecordOut()
+    {
+        _model.Reply = """
+            {"records": [
+              {"Statement": "Core.Identity is built on OpenIddict", "Quote": null},
+              {"Statement": "Core.Identity has no per-token fees", "Quote": "  "}
+            ]}
+            """;
+
+        var count = await QuotingExtractor().ExtractAsync("0002.md", TwoSections, Header);
+
+        count.ShouldBe((0, 2));
+        (await StoredAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ExtractAsync_QuoteAcrossTwoSections_LeavesTheRecordOut()
+    {
+        _model.Reply = """{"records": [{"Statement": "OpenIddict", "Quote": "Duende and OpenIddict. Core.Identity is built"}]}""";
+
+        var count = await QuotingExtractor().ExtractAsync("0002.md", TwoSections, Header);
+
+        count.ShouldBe((0, 1));
+    }
+
+    [Test]
+    public async Task ExtractAsync_QuoteInASectionWithoutATitle_StoresNoSectionEvenWhenFieldsGiveOne()
+    {
+        _model.Reply = """{"records": [{"Statement": "Core.Identity is built on OpenIddict", "Quote": "  built on OpenIddict "}]}""";
+        var untitled = new ExtractedDocument([new ExtractedSection("Core.Identity is built on OpenIddict.")]);
+
+        await QuotingExtractor(_ => new Dictionary<string, string>
+        {
+            [DatedRecordExtractor<QuotedDecision>.SectionKey] = "Appendix",
+            [DatedRecordExtractor<QuotedDecision>.QuoteKey] = "something else",
+        }).ExtractAsync("0002.md", untitled, Header);
+
+        var stored = (await StoredAsync()).Single();
+        stored.Metadata[DatedRecordExtractor<QuotedDecision>.QuoteKey].ShouldBe("built on OpenIddict");
+        stored.Metadata.ShouldNotContainKey(DatedRecordExtractor<QuotedDecision>.SectionKey);
     }
 
     /// <summary>Answers every call with <see cref="Reply"/>, keeping the requests.</summary>

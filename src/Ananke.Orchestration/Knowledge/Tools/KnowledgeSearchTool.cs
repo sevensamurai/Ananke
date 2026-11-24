@@ -67,7 +67,7 @@ public static class KnowledgeSearchTool
 
     /// <summary>The day of an ISO 8601 date and time, as <c>yyyy-MM-dd</c>; the text as it is when it doesn't parse.</summary>
     private static string Day(string date) =>
-        DateTimeOffset.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
+        DateTimeOffset.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
             ? at.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             : date;
 

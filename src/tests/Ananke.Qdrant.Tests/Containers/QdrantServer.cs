@@ -2,14 +2,17 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Qdrant.Client;
 
-namespace Ananke.Qdrant.Tests;
+namespace Ananke.Qdrant.Tests.Containers;
 
 /// <summary>
-/// One Qdrant for the whole test run, in a container. Tests that need it are ignored when Docker isn't available, and
-/// fail when Docker is there and the container did not start. Each test uses collections of its own, so they don't see
-/// each other's points.
+/// One Qdrant for the tests of this namespace, in a container. Explicit, with every test under it: it starts only when
+/// those tests are asked for (<c>--filter TestCategory=Containers</c>). Tests that need it are ignored when Docker isn't
+/// available, and fail when Docker is there and the container did not start. Each test uses collections of its own, so
+/// they don't see each other's points.
 /// </summary>
 [SetUpFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class QdrantServer
 {
     private const int GrpcPort = 6334;

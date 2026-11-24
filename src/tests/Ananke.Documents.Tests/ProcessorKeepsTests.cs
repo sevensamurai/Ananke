@@ -187,11 +187,15 @@ public class ProcessorKeepsTests
 
         public IReadOnlyDictionary<string, string>? Header { get; private set; }
 
-        public Task<int> ExtractAsync(string sourceId, ExtractedDocument document, IReadOnlyDictionary<string, string> header, CancellationToken ct = default)
+        public IReadOnlyList<(IKnowledgeStore Store, string? RecordType)> Owns => [];
+
+        public IReadOnlyList<IKnowledgeStore> WritesTo => [];
+
+        public Task<(int Stored, int Refused)> ExtractAsync(string sourceId, ExtractedDocument document, IReadOnlyDictionary<string, string> header, CancellationToken ct = default)
         {
             Document = document;
             Header = header;
-            return Task.FromResult(0);
+            return Task.FromResult((0, 0));
         }
     }
 }

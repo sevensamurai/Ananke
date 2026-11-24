@@ -1,5 +1,9 @@
 using Ananke.Abstractions.Agents;
+using Ananke.Abstractions.Tools;
+using Ananke.Orchestration.Agents.Middleware;
 using Ananke.Orchestration.Routing;
+using Ananke.Orchestration.Tests.Fakes;
+using Ananke.Orchestration.Tools;
 using Shouldly;
 
 namespace Ananke.Orchestration.Tests.Routing;
@@ -108,7 +112,76 @@ public class AgentRouterTests
         model.CallCount.ShouldBe(3);
     }
 
+    // ── Tool calls ────────────────────────────────────────────────────────────
+
+    [Test]
+    public async Task RouteAsync_AToolThatThrows_IsAnsweredToTheModelAndTheRouteItNamesIsReturned()
+    {
+        var kit = new ToolKit("k").AddTool("lookup", "lookup", ToolResult () => throw new InvalidOperationException("boom"));
+        var model = new ScriptedAgentModel(
+            ScriptedAgentModel.Call("c1", "lookup", "{}"),
+            ScriptedAgentModel.Say("JobB"));
+
+        var result = await BuildToolRouter(model, kit).RouteAsync("state", CancellationToken.None);
+
+        result.ShouldBe("JobB");
+        model.Requests.Count.ShouldBe(2);
+        model.Requests[1].Messages.Single(m => m.ToolCallId == "c1").Content
+            .ShouldNotBeNull().ShouldContain("Tool 'lookup' failed: boom");
+    }
+
+    [Test]
+    public async Task RouteAsync_ACallToAToolTheKitDoesNotHave_IsReportedToTheKitsObserverOnce()
+    {
+        var observer = new RecordingObserver();
+        var kit = new ToolKit("k").AddTool("lookup", "lookup", () => ToolResult.Ok("found"))
+            .WithHallucinationObserver(observer);
+        var model = new ScriptedAgentModel(
+            ScriptedAgentModel.Call("c1", "no_such_tool", "{}"),
+            ScriptedAgentModel.Say("JobA"));
+
+        var result = await BuildToolRouter(model, kit).RouteAsync("state", CancellationToken.None);
+
+        result.ShouldBe("JobA");
+        model.Requests.Count.ShouldBe(2);
+        var reported = observer.Events.ShouldHaveSingleItem();
+        reported.RequestedToolName.ShouldBe("no_such_tool");
+        reported.RequestedKitName.ShouldBe("k");
+        model.Requests[1].Messages.Single(m => m.ToolCallId == "c1").Content
+            .ShouldBe("Unknown tool 'no_such_tool': this tool is not registered. Do not call it again.");
+    }
+
+    [Test]
+    public async Task RouteAsync_AToolThatIsCancelled_LeavesAsOperationCanceledException()
+    {
+        var kit = new ToolKit("k").AddTool("lookup", "lookup", ToolResult () => throw new OperationCanceledException());
+        var model = new ScriptedAgentModel(ScriptedAgentModel.Call("c1", "lookup", "{}"));
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => BuildToolRouter(model, kit).RouteAsync("state", CancellationToken.None));
+    }
+
+    [Test]
+    public async Task RouteAsync_AToolThatTripsAGuardrail_LeavesAsGuardrailException()
+    {
+        var kit = new ToolKit("k").AddTool("lookup", "lookup",
+            ToolResult () => throw new GuardrailException("rule", new AgentResponse { Text = "blocked" }));
+        var model = new ScriptedAgentModel(ScriptedAgentModel.Call("c1", "lookup", "{}"));
+
+        var ex = await Should.ThrowAsync<GuardrailException>(
+            () => BuildToolRouter(model, kit).RouteAsync("state", CancellationToken.None));
+
+        ex.RuleName.ShouldBe("rule");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static AgentRouter<string> BuildToolRouter(IAgentModel model, ToolKit kit) =>
+        new AgentRouter<string>.Builder(model)
+            .WithPrompt(s => s)
+            .WithOptions("JobA", "JobB")
+            .WithTools(kit)
+            .Build();
 
     private static AgentRouter<string> BuildRouter(
         SimulatedModel model,
@@ -147,6 +220,17 @@ public class AgentRouterTests
         {
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(_responses.Count > 1 ? _responses.Dequeue() : _responses.Peek());
+        }
+    }
+
+    private sealed class RecordingObserver : IHallucinationObserver
+    {
+        public List<HallucinatedToolCallEvent> Events { get; } = [];
+
+        public ValueTask ReportAsync(HallucinatedToolCallEvent @event, CancellationToken ct = default)
+        {
+            Events.Add(@event);
+            return ValueTask.CompletedTask;
         }
     }
 }

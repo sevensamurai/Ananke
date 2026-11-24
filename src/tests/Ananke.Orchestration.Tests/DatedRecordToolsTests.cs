@@ -78,6 +78,24 @@ public class DatedRecordToolsTests
     }
 
     [Test]
+    public async Task ListRecords_AWrittenRecordWhosePassageIsGone_SaysSo()
+    {
+        var options = new DatedRecordOptions<Decision>
+        {
+            Text = d => d.Statement,
+            Quote = _ => "stays on OpenIddict",
+            Fields = d => new Dictionary<string, string> { ["status"] = d.Status },
+        };
+        await new DatedRecordWriter<Decision>(_records, options).WriteAsync("auth.md", "note-1", new Decision("Ask ops first", "noted"));
+        await new DatedRecordWriter<Decision>(_records, options)
+            .ExtractAsync("auth.md", new ExtractedDocument([new ExtractedSection("Core.Identity moves to Keycloak.")]), new Dictionary<string, string>());
+
+        var result = await ListAsync([]);
+
+        result.Value.ShouldContain("Ask ops first (auth.md) — its passage is gone");
+    }
+
+    [Test]
     public async Task ListRecords_MoreThanItShows_SaysMoreMatch()
     {
         for (var day = 1; day <= 5; day++)

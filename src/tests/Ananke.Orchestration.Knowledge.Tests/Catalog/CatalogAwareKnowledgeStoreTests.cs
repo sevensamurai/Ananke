@@ -31,6 +31,14 @@ public class CatalogAwareKnowledgeStoreTests
             new CatalogAwareKnowledgeStore(_inner, null!));
 
     [Test]
+    public async Task DeleteAsync_EmptyFilter_ThrowsAndDeletesNothing()
+    {
+        await EmptyFilterDeleteCases.Delete_AnEmptyFilter_ThrowsAndDeletesNothing(_store, _inner);
+
+        _catalog.Count.ShouldBe(2);
+    }
+
+    [Test]
     public async Task UpsertAsync_DocumentsWithSource_CreateOneCatalogEntryPerSource()
     {
         await _store.UpsertAsync(

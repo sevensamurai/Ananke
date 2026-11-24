@@ -42,6 +42,15 @@ services.AddWorkflowOrchestration(o => o.UseCheckpointing());
 services.AddRedis(c => { c.Host = "localhost"; });
 ```
 
+A state machine with its lock, state store and channels in one call (`UseRedis` from `Ananke.Redis`, `UseMqtt` from
+`Ananke.MQTT`; either left out stays in memory):
+
+```csharp
+services.AddStateMachine<OrderMachine, OrderCtx, OrderState, OrderTransition, OrderEvent>(b => b
+    .UseRedis(c => c.Host = "localhost")
+    .UseMqtt(c => c.Host = "localhost"));
+```
+
 ## Optional add-ons
 
 | Package | What it adds |

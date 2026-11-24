@@ -1,3 +1,4 @@
+using Ananke.Abstractions;
 using Ananke.Abstractions.Channels;
 using Ananke.Abstractions.Config;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,5 +57,23 @@ public static class ServiceCollectionExtensions
             c.Username = username;
             c.Password = password;
         });
+    }
+
+    /// <summary>
+    /// Makes the state machine's transition and notification channels MQTT-backed:
+    /// <see cref="AddMqtt{TContext, TAction}(IServiceCollection, Action{ChannelConfig})"/> for each enum,
+    /// both from <paramref name="configure"/>; once when both are the same enum.
+    /// </summary>
+    public static StateMachineBuilder<IServiceCollection, TContext, TTransition, TNotification> UseMqtt<TContext, TTransition, TNotification>(
+        this StateMachineBuilder<IServiceCollection, TContext, TTransition, TNotification> builder,
+        Action<ChannelConfig> configure)
+        where TContext : class, IBaseContext
+        where TTransition : Enum
+        where TNotification : Enum
+    {
+        builder.Services.AddMqtt<TContext, TTransition>(configure);
+        if (typeof(TNotification) != typeof(TTransition))
+            builder.Services.AddMqtt<TContext, TNotification>(configure);
+        return builder;
     }
 }

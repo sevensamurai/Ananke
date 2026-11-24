@@ -1,6 +1,7 @@
 using Ananke.Orchestration.Tests;
+using Npgsql;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary><see cref="DatedRecordListingCases"/> on <see cref="PostgresKnowledgeStore"/>.</summary>
 [TestFixture]
@@ -37,4 +38,24 @@ public class PostgresDatedRecordListingTests
     [Test]
     public Task ListAsync_ByDate_OrdersAndBoundsInTheStore() =>
         DatedRecordListingCases.ListAsync_ByDate_OrdersAndBoundsInTheStore(Store());
+
+    [Test]
+    public async Task ListAsync_DateWithoutAnOffset_IsReadAsUtc()
+    {
+        PostgresDatabase.Require();
+        var connection = new NpgsqlConnectionStringBuilder(PostgresDatabase.ConnectionString) { Timezone = "Asia/Tokyo" };
+        await using var aheadOfUtc = NpgsqlDataSource.Create(connection);
+        await DatedRecordListingCases.ListAsync_DateWithoutAnOffset_IsReadAsUtc(new PostgresKnowledgeStore(
+            aheadOfUtc, new HashedEmbedder(8), new PostgresKnowledgeOptions { Table = PostgresDatabase.NewTable("no_offset") }));
+    }
+
+    [Test]
+    public Task ListAsync_ValuesThatArentIsoDates_AreNoDate() =>
+        DatedRecordListingCases.ListAsync_ValuesThatArentIsoDates_AreNoDate(new PostgresKnowledgeStore(
+            PostgresDatabase.Require(), new HashedEmbedder(8), new PostgresKnowledgeOptions { Table = PostgresDatabase.NewTable("not_dates") }));
+
+    [Test]
+    public Task ListAsync_OffsetsAndDatesOutOfRange_AreNoDate() =>
+        DatedRecordListingCases.ListAsync_OffsetsAndDatesOutOfRange_AreNoDate(new PostgresKnowledgeStore(
+            PostgresDatabase.Require(), new HashedEmbedder(8), new PostgresKnowledgeOptions { Table = PostgresDatabase.NewTable("out_of_range") }));
 }

@@ -1,64 +1,30 @@
-using System.Diagnostics;
 using Ananke.Abstractions.Graph;
 using Ananke.Graph.Abstractions;
 using Ananke.Graph.Memgraph;
 using Shouldly;
 
-namespace Ananke.Graph.Memgraph.Tests;
+namespace Ananke.Graph.Memgraph.Tests.Containers;
 
 /// <summary>
-/// Containerised integration tests for <see cref="MemgraphKnowledgeGraph"/>.
-/// All tests are skipped automatically when Docker is unavailable or the
-/// Memgraph container is not reachable.
+/// Integration tests for <see cref="MemgraphKnowledgeGraph"/>, against the Memgraph that <see cref="MemgraphServer"/> starts.
 /// </summary>
-/// <remarks>
-/// Start Memgraph before running:
-/// <code>docker run -d -p 7687:7687 --name memgraph memgraph/memgraph</code>
-/// </remarks>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public class MemgraphKnowledgeGraphTests
 {
-    private MemgraphSessionFactory _factory = null!;
     private MemgraphKnowledgeGraph _graph = null!;
-
-    private static readonly GraphConnectionOptions Options = new()
-    {
-        Uri = "bolt://localhost:7687",
-        Username = "memgraph",
-        Password = string.Empty,
-    };
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
-        if (!IsDockerAvailable())
-            Assert.Ignore("Docker is not available — skipping Memgraph integration tests.");
-
-        _factory = new MemgraphSessionFactory(Options);
-
-        try
-        {
-            await _factory.VerifyConnectivityAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        }
-        catch
-        {
-            Assert.Ignore("Memgraph is not reachable on bolt://localhost:7687 — skipping integration tests.");
-        }
-
-        await new MemgraphKnowledgeGraph(_factory).EnsureSchemaAsync();
+        await new MemgraphKnowledgeGraph(MemgraphServer.Require()).EnsureSchemaAsync();
     }
 
     [SetUp]
     public void SetUp()
     {
-        _graph = new MemgraphKnowledgeGraph(_factory);
-    }
-
-    [OneTimeTearDown]
-    public async ValueTask OneTimeTearDown()
-    {
-        if (_factory is not null)
-            await _factory.DisposeAsync();
+        _graph = new MemgraphKnowledgeGraph(MemgraphServer.Require());
     }
 
     // ── Node round-trip ───────────────────────────────────────────────────────
@@ -169,7 +135,7 @@ public class MemgraphKnowledgeGraphTests
         var b = new GraphNode { Id = $"test-{Guid.NewGuid():N}", Kind = "entry" };
         await _graph.UpsertNodeAsync(a);
         await _graph.UpsertNodeAsync(b);
-        await using (var session = _factory.OpenSession())
+        await using (var session = MemgraphServer.Require().OpenSession())
         {
             await session.ExecuteWriteAsync(async tx =>
             {
@@ -180,7 +146,7 @@ public class MemgraphKnowledgeGraphTests
             });
         }
 
-        var clocked = new MemgraphKnowledgeGraph(_factory, new FixedClock(now));
+        var clocked = new MemgraphKnowledgeGraph(MemgraphServer.Require(), new FixedClock(now));
         var neighbors = await clocked.NeighborsAsync(a.Id, relation: "RAW");
 
         neighbors.Single().ObservedAt.ShouldBe(now);
@@ -227,6 +193,23 @@ public class MemgraphKnowledgeGraphTests
         neighbors[0].Provenance.ShouldBe(EdgeProvenance.Extracted);
     }
 
+    [Test]
+    public async Task UpsertEdge_ProvenancePromotion_Promotes()
+    {
+        var a = MakeNode("entry");
+        var b = MakeNode("entry");
+        await _graph.UpsertNodeAsync(a);
+        await _graph.UpsertNodeAsync(b);
+
+        var edge = new GraphEdge { FromId = a.Id, ToId = b.Id, Relation = "LINKED", Provenance = EdgeProvenance.Ambiguous, Weight = 1f };
+        await _graph.UpsertEdgeAsync(edge);
+        await _graph.UpsertEdgeAsync(edge with { Provenance = EdgeProvenance.Inferred });
+
+        var neighbors = await _graph.NeighborsAsync(a.Id, relation: "LINKED");
+        neighbors.ShouldHaveSingleItem();
+        neighbors[0].Provenance.ShouldBe(EdgeProvenance.Inferred);
+    }
+
     // ── BFS expansion ─────────────────────────────────────────────────────────
 
     [Test]
@@ -270,24 +253,4 @@ public class MemgraphKnowledgeGraphTests
 
     private static GraphNode MakeNode(string kind) =>
         new() { Id = $"test-{Guid.NewGuid():N}", Kind = kind };
-
-    private static bool IsDockerAvailable()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("docker", "info")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            using var process = Process.Start(psi);
-            process?.WaitForExit(3_000);
-            return process?.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

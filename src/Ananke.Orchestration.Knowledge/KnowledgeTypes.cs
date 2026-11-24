@@ -5,7 +5,7 @@ namespace Ananke.Orchestration.Knowledge;
 /// <summary>Search mode for knowledge store queries.</summary>
 /// <remarks>
 /// A store that cannot search in a mode throws <see cref="NotSupportedException"/> rather than search in another.
-/// <see cref="InMemoryKnowledgeStore"/> supports all three; the Qdrant store supports <see cref="Dense"/> only.
+/// <see cref="InMemoryKnowledgeStore"/> and the Postgres store support all three; the Qdrant store supports <see cref="Dense"/> only.
 /// </remarks>
 public enum SearchMode
 {
@@ -57,7 +57,9 @@ public sealed record KnowledgeChunk
 /// </summary>
 /// <remarks>
 /// A store applies <see cref="AnyOf"/> wherever it applies the filter: in search, listing and delete. A filter whose
-/// entries and <see cref="AnyOf"/> are both empty matches every document.
+/// entries and <see cref="AnyOf"/> are both empty matches every document in search and listing; a delete refuses it.
+/// The key <c>id</c>, as an entry or in <see cref="AnyOf"/>, is the chunk's own <see cref="KnowledgeChunk.Id"/>, not a
+/// metadata key, on every store.
 /// </remarks>
 public sealed class KnowledgeFilter : Dictionary<string, string>
 {
@@ -68,6 +70,19 @@ public sealed class KnowledgeFilter : Dictionary<string, string>
     /// </summary>
     [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
     public IDictionary<string, IReadOnlyList<string>> AnyOf { get; } = new Dictionary<string, IReadOnlyList<string>>();
+
+    /// <summary>A new filter with the same entries and <see cref="AnyOf"/>: changing it leaves this one as it was.</summary>
+    public KnowledgeFilter Copy()
+    {
+        var copy = new KnowledgeFilter();
+        foreach (var (key, value) in this)
+            copy[key] = value;
+#pragma warning disable ANNKEEXP004 // copies AnyOf, experimental outside this assembly
+        foreach (var (key, values) in AnyOf)
+            copy.AnyOf[key] = values;
+#pragma warning restore ANNKEEXP004
+        return copy;
+    }
 
     /// <summary>
     /// The values a document's <paramref name="key"/> may hold to match: the entry's value, or the values in
@@ -82,6 +97,19 @@ public sealed class KnowledgeFilter : Dictionary<string, string>
         if (TryGetValue(key, out var value))
             return anyOf is null || anyOf.Contains(value, StringComparer.Ordinal) ? [value] : [];
         return anyOf is null ? null : [.. anyOf.Distinct(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Throws <see cref="ArgumentException"/> when <paramref name="filter"/> has no entries and no <see cref="AnyOf"/>,
+    /// which <see cref="IKnowledgeStore.DeleteAsync"/> refuses.
+    /// </summary>
+    internal static void ThrowIfEmptyForDelete(KnowledgeFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+#pragma warning disable ANNKEEXP004 // reads AnyOf, experimental outside this assembly
+        if (filter.Count == 0 && filter.AnyOf.Count == 0)
+            throw new ArgumentException("A delete with an empty filter would remove every document; name what to delete.", nameof(filter));
+#pragma warning restore ANNKEEXP004
     }
 }
 
@@ -101,6 +129,29 @@ public sealed record SearchOptions
     public SearchMode Mode { get; init; } = SearchMode.Dense;
 
     /// <summary>
+    /// In <see cref="SearchMode.Hybrid"/>, the weight of the dense ranking in the reciprocal rank fusion: a result at
+    /// rank <c>r</c> (from 1) of that ranking adds <c>DenseWeight / (60 + r)</c> to its score; at 0 that ranking isn't
+    /// searched. A finite number, not negative; both 0 is refused by <c>SearchAsync</c> with an
+    /// <see cref="ArgumentException"/>. Default is 1.
+    /// </summary>
+    public float DenseWeight
+    {
+        get;
+        init => field = Weight(value, nameof(DenseWeight));
+    } = 1;
+
+    /// <summary>
+    /// In <see cref="SearchMode.Hybrid"/>, the weight of the keyword ranking in the reciprocal rank fusion, as
+    /// <see cref="DenseWeight"/> is the dense ranking's; at 0 that ranking isn't searched. A finite number, not
+    /// negative; both 0 is refused by <c>SearchAsync</c> with an <see cref="ArgumentException"/>. Default is 1.
+    /// </summary>
+    public float KeywordWeight
+    {
+        get;
+        init => field = Weight(value, nameof(KeywordWeight));
+    } = 1;
+
+    /// <summary>
     /// At most this many results from one document (one <c>source</c>), so a question that needs several documents
     /// isn't answered from the first one alone. A store ranks more candidates to fill <see cref="TopK"/>. Default is no
     /// limit.
@@ -113,6 +164,13 @@ public sealed record SearchOptions
     /// <see langword="false"/>: each chunk is a result of its own.
     /// </summary>
     public bool JoinPerSource { get; init; }
+
+    private static float Weight(float value, string name)
+    {
+        if (!float.IsFinite(value) || value < 0)
+            throw new ArgumentOutOfRangeException(name, value, "Must be a finite number, not negative.");
+        return value;
+    }
 }
 
 /// <summary>

@@ -233,6 +233,124 @@ header's fields, and itself as JSON — `DatedRecordExtractor<Decision>.Read(chu
 `Keep` function applies a rule of yours before anything is stored. A reply that isn't the schema's JSON throws
 `RecordExtractionException`, and the source is left with no records rather than stale ones.
 
+**Records need a store of their own**, never the processor's: each time a document is indexed, the processor deletes
+every chunk of its source in its own store, records included. Setting `Records` to a step that writes to the
+processor's store (an extractor or a `DatedRecordWriter`, as its `IDocumentRecords.WritesTo` names them) throws
+`ArgumentException`, also when either side reaches it through a `LinkedKnowledgeStore` or `CatalogAwareKnowledgeStore`.
+Past those two, stores are told apart by reference: two store instances over one table or collection, or a store
+behind another decorator (an `EntityScopedKnowledgeStore`, one of your own), are not told apart, so a second Postgres
+table means a table of its own, not the same table twice.
+
+**Several record types on one document.** Each record type has its own extractor, with its own schema, instructions
+and model call. To keep them in one store, give each a `RecordType`: its records are stored as
+`{source}:record:{type}:{n}` with the type as `record_type` metadata, and indexing the document again replaces only
+that type's records. Hand the extractors to the processor together as a `CompositeDocumentRecords`, and read each type
+with a reader given the same name. `CompositeDocumentRecords` throws `ArgumentException` for extractors that would
+delete each other's records: one with no `RecordType` beside another extractor on its store, or two with the same
+`RecordType` on one store. A store reached through a `LinkedKnowledgeStore` or `CatalogAwareKnowledgeStore` counts as
+the store they decorate; past that, stores are told apart by reference, so two store instances over one table or
+collection are not told apart: give the extractors the same instance.
+
+```csharp
+public sealed record Question(string Asked, string Owner);
+
+var processor = new DocumentProcessor(http, extractors, chunker, store)
+{
+    Records = new CompositeDocumentRecords(
+        new DatedRecordExtractor<Decision>(extractionModel, records, new DatedRecordOptions<Decision>
+        {
+            Instructions = "Extract the decisions this document records, one sentence each. Name no people.",
+            Text = d => d.Statement,
+            Date = d => d.Date,
+            RecordType = "decision",
+        }),
+        new DatedRecordExtractor<Question>(extractionModel, records, new DatedRecordOptions<Question>
+        {
+            Instructions = "Extract the questions this document leaves open, one sentence each.",
+            Text = q => q.Asked,
+            Fields = q => new Dictionary<string, string> { ["owner"] = q.Owner },
+            RecordType = "question",
+        })),
+};
+// …
+var decisions = await new DatedRecordReader<Decision>(records, recordType: "decision").SearchAsync("telemetry");
+var questions = await new DatedRecordReader<Question>(records, recordType: "question").ListAsync();
+```
+
+The steps run in turn. One whose reply can't be read leaves its type with no records and doesn't stop the others; its
+`RecordExtractionException` is thrown once they have run (an `AggregateException` when more than one failed). Without
+`RecordType` an extractor replaces every extracted record of the source in its store, so each extractor sharing a store needs a
+name of its own. An extractor given a `RecordType` doesn't delete the records it stored without one: delete those by
+their `source` before indexing again.
+
+**A record cites its passage.** A schema checks a record's shape, not whether its document says it. Ask for a quote
+with each record and name it with `Quote`: a record is then stored only when its quote is found in one section of the
+document's text (as the records step receives it, after `CleanText`), ignoring case and runs of whitespace. Nothing is
+matched by similarity, and a record with no quote isn't stored. A stored record keeps its quote as `quote` metadata and
+the title of its section as `section`, and the reader returns both. `ProcessingResult.RecordsRefused` counts the records
+read but not stored, for their quote or by `Keep`: without a `Keep`, a count near `Records` or above it says the model
+paraphrases.
+
+```csharp
+public sealed record Decision(string Statement, string Quote, string? Date);
+
+new DatedRecordOptions<Decision>
+{
+    Instructions = "Extract the decisions this document records, one sentence each, each with the words of the "
+        + "document that say it, copied exactly. Name no people.",
+    Text = d => d.Statement,
+    Quote = d => d.Quote,
+    Date = d => d.Date,
+};
+// …
+foreach (var d in await new DatedRecordReader<Decision>(records).SearchAsync("identity provider"))
+    Console.WriteLine($"{d.Text} ({d.Source}, {d.Section}): \"{d.Quote}\"");
+```
+
+**Records people write.** Notes and highlights people add to a document go into the same store with a
+`DatedRecordWriter<TRecord>` (experimental: `ANNKEEXP004`), with no model call: give it the options its type's
+extractor has (it doesn't read `Instructions` or `Keep`) and store each record under an id of your own. It is stored
+as an extractor stores a record — its text, its own date, what it replaces, its fields, its quote as `quote`, its
+`record_type` — with `written` metadata, and the reader returns it beside the extracted records. An extractor deletes
+only what it extracted (`extracted` metadata), so indexing the document again leaves written records alone. Hand the
+writer to the processor beside the extractors, and each time the document is indexed again it checks every written
+record's quote against the document's text, as an extractor checks quotes: a record whose quote is no longer there is
+kept and marked with `passage_gone` metadata, which the reader returns as `PassageGone` (and `list_records` says);
+once the quote is back, the mark is cleared. A record with no quote is never marked. An id of the form an extractor
+gives (`{source}:record:…`) is refused. What to show or delete is yours: a delete whose filter has
+`written` removes written records only, never extracted ones.
+
+```csharp
+public sealed record Note(string Text, string? Quote, string? Date, string Subject);
+
+var noteOptions = new DatedRecordOptions<Note>
+{
+    Text = n => n.Text,
+    Quote = n => n.Quote,
+    Date = n => n.Date,
+    Fields = n => new Dictionary<string, string> { ["subject"] = n.Subject },
+    RecordType = "note",
+};
+var notes = new DatedRecordWriter<Note>(records, noteOptions);
+var processor = new DocumentProcessor(http, extractors, chunker, store)
+{
+    Records = new CompositeDocumentRecords(decisionExtractor, notes),
+};
+// …
+await notes.WriteAsync("0007.md", noteId, new Note("Ask ops before changing this", "stays on OpenIddict", null, subject));
+foreach (var n in await new DatedRecordReader<Note>(records, recordType: "note").ListAsync(new KnowledgeFilter { ["source"] = "0007.md" }))
+    Console.WriteLine(n.PassageGone ? $"{n.Text} (its passage is gone)" : $"{n.Text}: \"{n.Quote}\"");
+// A person's notes, erased by the product:
+await records.DeleteAsync(new KnowledgeFilter { [DatedRecordWriter<Note>.WrittenKey] = "true", ["subject"] = subject });
+```
+
+The writer lists a document's written records, so its store must be listable (`IListableKnowledgeStore`), and sets or
+clears a mark with the store's `UpdateMetadataAsync`: only the record's metadata changes, its text isn't embedded again,
+and only while the record is as it was listed, so a record written again or erased while its document is indexed keeps
+that write or stays deleted. Records an
+extractor stored before extractors marked theirs as `extracted` aren't deleted by it: delete them by their `source`
+before indexing again.
+
 **What is current.** `DatedRecordReader<TRecord>` searches the records and returns them newest first, each with
 `ReplacedBy` set when it was replaced — explicitly only, never by similarity:
 
@@ -266,11 +384,17 @@ are found (asking for at most 16 times `TopK`):
 var store = new CatalogAwareKnowledgeStore(inner, catalog) { SupersededResults = SupersededResults.Demote };
 ```
 
+A mark set from a newer document's `replaces_sources` follows that document: deleting it, or indexing it again
+without the older source, clears the mark, unless another document still replaces the older one, which then supersedes
+it (the newest). A mark the older document's own header gives stays. Over a store that can't list, marks stay as they
+are.
+
 **Lists, not searches.** A search returns the closest few, so a roundup ("every decision parked this quarter") can
 miss some. A store that implements `IListableKnowledgeStore` — the in-memory, Postgres and Qdrant stores do, and the
-scoped and catalog-aware stores pass it through — lists every chunk whose metadata matches a filter. Given a
+scoped, catalog-aware and linked stores pass it through — lists every chunk whose metadata matches a filter. Given a
 `KnowledgeDateOrder`, it lists newest first by a date in metadata, with an optional lower bound, ordered and cut at the
-limit in the store's own query; chunks without the date come last. Name the record properties to keep as metadata with
+limit in the store's own query; chunks without the date, or whose value isn't an ISO 8601 date and time, come last. `UpdateMetadataAsync` gives a listed chunk new
+metadata without embedding it again, only while it is still stored as it was listed. Name the record properties to keep as metadata with
 `DatedRecordOptions.Fields`, then list by them:
 
 ```csharp
@@ -476,6 +600,11 @@ var catalog = new PostgresKnowledgeCatalog(dataSource, embeddingModel);
 
 var results = await store.SearchAsync(query, new SearchOptions { Mode = SearchMode.Hybrid, TopK = 8 });
 ```
+
+`Hybrid` fuses the two rankings by reciprocal rank, each with a weight of 1. `SearchOptions.DenseWeight` and
+`KeywordWeight` change that: with `KeywordWeight = 2` a keyword match counts twice as much as an embedding match at
+the same rank. Which weights rank best depends on the documents, so measure on your own before changing them. A weight of 0 leaves that ranking out; both 0 leaves
+nothing to search, and `SearchAsync` throws an `ArgumentException`.
 
 Each table records which embedder wrote it, and a store with a different embedder is refused rather than
 returning meaningless matches. See [`Ananke.Postgres`](../../src/Ananke.Postgres/README.md) for the tables and

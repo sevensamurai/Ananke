@@ -42,7 +42,8 @@ var results = await store.SearchAsync("factory method pattern", new SearchOption
 
 Metadata is stored as keyword payload fields. A `KnowledgeFilter` entry matches a point whose field equals its value,
 and a key in `KnowledgeFilter.AnyOf` a point whose field is any of its values, in `SearchAsync`, `ListAsync` and
-`DeleteAsync`.
+`DeleteAsync`. A key, in a filter or a `KnowledgeDateOrder`, is matched as one top-level field even when it holds
+`.`, `:` or `/` (`entity:document:notes/a.md`); Qdrant refuses a key holding `"` or `\`.
 
 ### Knowledge catalog (document-level discovery + time decay)
 
@@ -101,9 +102,14 @@ This enables **two-phase discovery**: the agent first discovers which documents 
 
 Both collections are created automatically on first use with cosine distance.
 
+A point's id is a UUID derived from the document id; the document id itself is kept in an `_id` payload field and
+returned as `KnowledgeChunk.Id`. A point written before 0.9.3 has no `_id` and is returned with its point id.
+
 **Lists and browsing are ordered by Qdrant.** `QdrantKnowledgeStore.ListAsync` with a `KnowledgeDateOrder` creates a
 datetime payload index on the order's key the first time it is asked, scrolls with `order_by` on it, newest first, and
-adds the points without a date after; without an order it scrolls by point id. `QdrantKnowledgeCatalog` creates an
+adds the points without a date after; without an order it scrolls by point id. Qdrant's index reads a few values
+other than ISO 8601 dates as dates (`2026-03-04 10:00:00`, `2026-3-4`), which the other stores list as undated:
+`KnowledgeDateOrder` names them. `QdrantKnowledgeCatalog` creates an
 integer payload index on `effective_at` the first time it browses by it, on a collection made earlier too, and `BrowseAsync` scrolls with `order_by` on
 `indexed_at` or `effective_at`, so with more entries than its limit it returns the newest.
 

@@ -92,7 +92,6 @@ public sealed partial class SlidingWindowChunker : IDocumentChunker
 
         var currentChunk = new List<string>();
         var currentLength = 0;
-        var onlyOverlap = false;
 
         var pieceChars = maxChars - overlapChars;
         foreach (var para in paragraphs.SelectMany(p => p.Length > pieceChars ? SplitLong(p, pieceChars) : [p]))
@@ -102,14 +101,11 @@ public sealed partial class SlidingWindowChunker : IDocumentChunker
 
             if (currentLength + paraLength > maxChars && currentChunk.Count > 0)
             {
-                // A chunk holding only the previous chunk's tail would repeat it; the tail is dropped instead.
-                if (!onlyOverlap)
-                    chunks.Add(CreateChunk(currentChunk, metadata));
+                chunks.Add(CreateChunk(currentChunk, metadata));
 
-                var overlap = onlyOverlap ? string.Empty : BuildOverlap(currentChunk, overlapChars);
+                var overlap = BuildOverlap(currentChunk, overlapChars);
                 currentChunk = [];
                 currentLength = 0;
-                onlyOverlap = false;
 
                 paraLength = para.Length;
                 if (overlap.Length > 0 && overlap.Length + 2 + paraLength <= maxChars)
@@ -117,13 +113,11 @@ public sealed partial class SlidingWindowChunker : IDocumentChunker
                     currentChunk.Add(overlap);
                     currentLength = overlap.Length;
                     paraLength += 2;
-                    onlyOverlap = true;
                 }
             }
 
             currentChunk.Add(para);
             currentLength += paraLength;
-            onlyOverlap = false;
         }
 
         if (currentChunk.Count > 0)

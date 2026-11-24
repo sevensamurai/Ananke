@@ -56,8 +56,11 @@ BM25 instead, computed in SQL from counts it keeps:
   tsquery, through the GIN index), or with none rare those holding every lexeme (AND). The tsquery is built from the
   lexemes as they are, quoted, so they aren't read through the configuration a second time. Each matched row is
   scored by BM25 over every query lexeme it holds, with IDF `ln(1 + (N - df + 0.5) / (df + 0.5))`, k1 1.2, b 0.75.
-- The counts are table-wide: a filter narrows the rows matched, not the statistics. `InMemoryKnowledgeStore` takes
-  its statistics over the rows the filter keeps, and scores every row holding any term.
+- The counts are table-wide: a filter narrows the rows matched, not the statistics. So under a filter, a rule that no
+  row the filter keeps meets gives way to the next: rare lexemes, then every lexeme, then every lexeme some kept row
+  holds (none of them rare by then, so the rare-or-every rule over them is every one), then any lexeme (an `EXISTS` per
+  rule tried, and one per lexeme for the third, in the same statement). Without a filter the rules are as above.
+  `InMemoryKnowledgeStore` takes its statistics over the rows the filter keeps, and scores every row holding any term.
 
 ## Tables
 

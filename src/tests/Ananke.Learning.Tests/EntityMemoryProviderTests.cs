@@ -198,12 +198,24 @@ public class EntityMemoryProviderTests
         await mem1.Knowledge.UpsertAsync([new KnowledgeDocument { Id = "doc-A", Text = "A data" }]);
         await mem2.Knowledge.UpsertAsync([new KnowledgeDocument { Id = "doc-B", Text = "B data" }]);
 
-        await mem1.Knowledge.DeleteAsync(new KnowledgeFilter());
+        // The store scopes the filter to its own entity, whatever entity it names
+        await mem1.Knowledge.DeleteAsync(new KnowledgeFilter { ["entity_id"] = "customer-B" });
 
         // Only customer-A's document should be deleted
         _knowledge.Count.ShouldBe(1);
         var remaining = await _knowledge.SearchAsync("data");
         remaining[0].Metadata["entity_id"].ShouldBe("customer-B");
+    }
+
+    [Test]
+    public async Task Knowledge_DeleteWithAnEmptyFilter_ThrowsAndDeletesNothing()
+    {
+        var mem = _provider.GetOrCreate("customer-A");
+        await mem.Knowledge.UpsertAsync([new KnowledgeDocument { Id = "doc-A", Text = "A data" }]);
+
+        await Should.ThrowAsync<ArgumentException>(() => mem.Knowledge.DeleteAsync(new KnowledgeFilter()));
+
+        _knowledge.Count.ShouldBe(1);
     }
 
     // ── Episode store scoping ───────────────────────────────────

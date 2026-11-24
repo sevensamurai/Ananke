@@ -5,8 +5,9 @@ namespace Ananke.Orchestration.Knowledge;
 /// Implementations handle embedding storage, similarity search, and metadata filtering.
 /// </summary>
 /// <remarks>
-/// Built-in implementations: <see cref="InMemoryKnowledgeStore"/> (tests / single-process)
-/// and <c>QdrantKnowledgeStore</c> (distributed, in the <c>Ananke.Qdrant</c> package).
+/// Built-in implementations: <see cref="InMemoryKnowledgeStore"/> (tests / single-process),
+/// <c>QdrantKnowledgeStore</c> (distributed, in the <c>Ananke.Qdrant</c> package) and <c>PostgresKnowledgeStore</c>
+/// (in the <c>Ananke.Postgres</c> package).
 /// </remarks>
 public interface IKnowledgeStore
 {
@@ -26,5 +27,9 @@ public interface IKnowledgeStore
     /// <summary>
     /// Deletes all documents matching the specified metadata filter.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// The filter is empty (no entries and no <see cref="KnowledgeFilter.AnyOf"/>): every store refuses it, deleting nothing,
+    /// rather than remove every document.
+    /// </exception>
     Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default);
 }

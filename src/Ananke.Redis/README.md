@@ -34,6 +34,9 @@ services.AddRedis("localhost", port: 6379, password: "secret");
 
 Call order with `AddStateMachine()` doesn't matter — `AddRedis` replaces the in-memory fallback automatically.
 
+With the one-call `AddStateMachine<TImpl, TContext, TState, TTransition, TNotification>(b => b.UseRedis(c => ...))`,
+`UseRedis` does the same `AddRedis` on the builder (see the `Ananke.StateMachine` README).
+
 ## Connection
 
 `CacheConfig` holds the connection and how keys are named:

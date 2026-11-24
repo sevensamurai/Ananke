@@ -52,7 +52,9 @@ var results = await store.SearchAsync("chip shortage", new SearchOptions
 
 The in-memory, Postgres and Qdrant stores apply it in `SearchAsync`, `ListAsync` and `DeleteAsync`;
 `EntityScopedKnowledgeStore`, `CatalogAwareKnowledgeStore` and `LinkedKnowledgeStore` pass it on unchanged. A key whose
-`AnyOf` list is empty matches no document.
+`AnyOf` list is empty matches no document. On every store, `id` (an entry or in `AnyOf`) matches the chunk's id, not a
+metadata key. `DeleteAsync` with an empty filter (no entries, no `AnyOf`) throws `ArgumentException` and deletes
+nothing: name what to delete, by `source` for instance.
 
 ### Document ingestion pipeline
 
@@ -128,6 +130,11 @@ services.AddKnowledgeLinking(options =>
 });
 ```
 
+`LinkedKnowledgeStore` adds a linked chunk only when the search's filter matches it, and reads it through the inner
+store's listing when the inner store lists (`IListableKnowledgeStore`), so the query is embedded once per search. It
+lists through its inner store too. Its `DeleteAsync` removes the links of the chunks it deletes before the chunks:
+the ids a filter names, and, when the inner store lists, every chunk the filter matches.
+
 ## Key types
 
 | Type | Kind | Purpose |
@@ -190,8 +197,8 @@ This split allows vector-store and ingestion integrations to depend on the knowl
 
 | Interface | In-memory (this package) | Distributed |
 |-----------|------------------------|-------------|
-| `IKnowledgeStore` | `InMemoryKnowledgeStore` | `QdrantKnowledgeStore` (`Ananke.Qdrant`) |
-| `IKnowledgeCatalog` | `InMemoryKnowledgeCatalog` | `QdrantKnowledgeCatalog` (`Ananke.Qdrant`) |
+| `IKnowledgeStore` | `InMemoryKnowledgeStore` | `QdrantKnowledgeStore` (`Ananke.Qdrant`), `PostgresKnowledgeStore` (`Ananke.Postgres`) |
+| `IKnowledgeCatalog` | `InMemoryKnowledgeCatalog` | `QdrantKnowledgeCatalog` (`Ananke.Qdrant`), `PostgresKnowledgeCatalog` (`Ananke.Postgres`) |
 | `IDocumentLinkGraph` | `InMemoryDocumentLinkGraph` | — |
 | `IDocumentExtractor` | — | `PdfExtractor`, `MarkdownExtractor` (`Ananke.Documents`) |
 | `IEmbeddingModel` | `InMemoryEmbedder` | `OpenAIEmbeddingModel`, `GeminiEmbeddingModel` |

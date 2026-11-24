@@ -49,6 +49,28 @@ public sealed class InMemoryKnowledgeCatalog : IKnowledgeCatalog
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<CatalogEntry>> GetManyAsync(IEnumerable<string> sources, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var entries = new List<CatalogEntry>();
+        foreach (var source in sources.Distinct(StringComparer.Ordinal))
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(source, nameof(sources));
+            if (_entries.TryGetValue(source, out var stored))
+                entries.Add(stored.Entry);
+        }
+        return Task.FromResult<IReadOnlyList<CatalogEntry>>(entries);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<CatalogEntry>> GetReplacingAsync(string source, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        return Task.FromResult<IReadOnlyList<CatalogEntry>>(
+            [.. _entries.Values.Select(s => s.Entry).Where(e => e.Replaces.Contains(source, StringComparer.Ordinal))]);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<CatalogSearchResult>> DiscoverAsync(
         string query, int topK = 5, CancellationToken ct = default)
     {

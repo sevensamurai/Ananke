@@ -1,5 +1,7 @@
 using Ananke.Orchestration.Knowledge;
+using Ananke.Orchestration.Knowledge.Catalog;
 using Ananke.Orchestration.Knowledge.Documents;
+using Ananke.Orchestration.Knowledge.Embeddings;
 using Ananke.Orchestration.Knowledge.Tools;
 using Shouldly;
 
@@ -54,6 +56,26 @@ public class KnowledgeSearchToolTests
 
         result.Value.ShouldContain("Superseded by: rfc9110");
     }
+
+    [Test]
+    public async Task SearchKnowledge_TheNewerDocumentDeleted_SaysNothingSupersedesTheOlder()
+    {
+        var store = new CatalogAwareKnowledgeStore(new InMemoryKnowledgeStore(new InMemoryEmbedder()), new InMemoryKnowledgeCatalog(new InMemoryEmbedder()));
+        await store.UpsertAsync([Document("rfc7231", "HTTP/1.1 semantics")]);
+        await store.UpsertAsync([Document("rfc9110", "HTTP semantics", new() { ["replaces_sources"] = "[\"rfc7231\"]" })]);
+        await store.DeleteAsync(new KnowledgeFilter { ["source"] = "rfc9110" });
+        using var http = new HttpClient();
+        var processor = new DocumentProcessor(http, [], new SlidingWindowChunker(), store);
+
+        var result = await KnowledgeTools.Create(processor, store).Tools["search_knowledge"]
+            .ExecuteAsync(new Dictionary<string, object?> { ["query"] = "HTTP semantics" });
+
+        result.Value.ShouldContain("Source: rfc7231");
+        result.Value.ShouldNotContain("Superseded by:");
+    }
+
+    private static KnowledgeDocument Document(string source, string text, Dictionary<string, string>? metadata = null) =>
+        new() { Id = $"{source}:chunk:0", Text = text, Metadata = new Dictionary<string, string>(metadata ?? []) { ["source"] = source } };
 
     private sealed class StubStore(IReadOnlyList<KnowledgeChunk> results) : IKnowledgeStore
     {

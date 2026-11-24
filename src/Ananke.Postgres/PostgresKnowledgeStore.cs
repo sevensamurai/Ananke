@@ -26,7 +26,7 @@ namespace Ananke.Postgres;
 /// later, <c>hnsw.iterative_scan</c> on, so a filter or a score threshold doesn't cut the rows returned short (see
 /// <see cref="PostgresKnowledgeOptions.HnswEfSearch"/> and <see cref="PostgresKnowledgeOptions.HnswIterativeScan"/>).
 /// A filter matches rows whose metadata contains every key and value given, and for each key in
-/// <see cref="KnowledgeFilter.AnyOf"/> one of its values. Deletes remove rows.
+/// <see cref="KnowledgeFilter.AnyOf"/> one of its values; the key <c>id</c> is the row's own id. Deletes remove rows.
 /// </para>
 /// <para>
 /// Keyword search ranks by BM25 (k1 1.2, b 0.75, as <see cref="InMemoryKnowledgeStore"/>), from lexeme counts kept in
@@ -34,7 +34,8 @@ namespace Ananke.Postgres;
 /// keep them as rows are inserted, updated and deleted, and writes to one table run one at a time. A table made without
 /// them gets them, filled from <c>ts_stat</c>, on first use. Only rows holding a rare query term are scored (see
 /// <see cref="PostgresKnowledgeOptions.RareTermShare"/>); a query with no rare term requires all its terms. The counts
-/// are over the whole table, not the rows a filter keeps.
+/// are over the whole table, not the rows a filter keeps, so when a filter leaves no row matching, every term some
+/// kept row holds is required instead, and then any term is enough.
 /// </para>
 /// </remarks>
 [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
@@ -44,6 +45,8 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
     private const int CandidatesPerTopK = 4;
     private const double Bm25K1 = 1.2;
     private const double Bm25B = 0.75;
+    private const string IdKey = "id";
+    private static readonly Version DateOrderSince = new(16, 0);
 
     private readonly NpgsqlDataSource _dataSource;
     private readonly IEmbeddingModel _embedder;
@@ -73,16 +76,16 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         options ??= new SearchOptions();
+        if (options is { Mode: SearchMode.Hybrid, DenseWeight: 0, KeywordWeight: 0 })
+            throw new ArgumentException(
+                "Hybrid search needs a DenseWeight or a KeywordWeight above 0.", nameof(options));
         await EnsureAsync(ct).ConfigureAwait(false);
 
         var take = options.Candidates();
         var ranked = options.Mode switch
         {
             SearchMode.Sparse => await RankByTermsAsync(query, options.Filter, take, ct).ConfigureAwait(false),
-            SearchMode.Hybrid => Fuse(
-                await RankByEmbeddingAsync(query, options, take * CandidatesPerTopK, ct).ConfigureAwait(false),
-                await RankByTermsAsync(query, options.Filter, take * CandidatesPerTopK, ct).ConfigureAwait(false),
-                take),
+            SearchMode.Hybrid => await HybridAsync(query, options, take, ct).ConfigureAwait(false),
             _ => await RankByEmbeddingAsync(query, options, take, ct).ConfigureAwait(false),
         };
         return ranked.LimitPerSource(options);
@@ -121,10 +124,13 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
     }
 
     /// <inheritdoc />
-    /// <remarks>An empty filter matches every row, so it empties the table.</remarks>
     public async Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
+#pragma warning disable ANNKEEXP004 // reads the experimental AnyOf
+        if (filter.Count == 0 && filter.AnyOf.Count == 0)
+            throw new ArgumentException("A delete with an empty filter would remove every document; name what to delete.", nameof(filter));
+#pragma warning restore ANNKEEXP004
         await EnsureAsync(ct).ConfigureAwait(false);
 
         var (where, parameters) = Where(filter, first: 1);
@@ -133,8 +139,10 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
 
     /// <inheritdoc />
     /// <remarks>
-    /// With <paramref name="order"/>, the key's value is cast to <c>timestamptz</c> in the query; a value that isn't a
-    /// date and time is read as none (<c>pg_input_is_valid</c>, PostgreSQL 16 or later).
+    /// With <paramref name="order"/>, the key's value is cast to <c>timestamptz</c> in the query, as UTC when it has no
+    /// offset; a value that isn't an ISO 8601 date and time, as <see cref="KnowledgeDateOrder"/> says, is read as none
+    /// (<c>pg_input_is_valid</c>, PostgreSQL 16 or later).
+    /// On an earlier server it throws <see cref="NotSupportedException"/>, naming the server's version.
     /// </remarks>
     public async Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
         KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default)
@@ -155,15 +163,28 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
 
         ArgumentException.ThrowIfNullOrWhiteSpace(order.Key, nameof(order));
 
-        // A value that isn't a date and time is read as no date, rather than failing the cast.
+        // A value that isn't an ISO 8601 date and time, in the pattern KnowledgeDateOrder.ReadDate checks, is read as
+        // no date, rather than cast as PostgreSQL reads it ('infinity', 'today', '03/04/2026'). One that ends in an
+        // offset (Z, +hh, +hh:mm, +hhmm after the time) is cast to timestamptz; any other is read as UTC, not in the
+        // session's time zone. One outside DateTimeOffset's range in UTC, which timestamptz holds, is read as no date
+        // too (to 10000-01-01, where PostgreSQL rounds .NET's last tick).
         var (filtered, filterParameters) = Where(filter, first: 4);
-        await using var byDate = _dataSource.CreateCommand(
+        await using var connection = await _dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
+        CheckDateOrder(connection.PostgreSqlVersion);
+        await using var byDate = new NpgsqlCommand(
             "SELECT id, text, metadata, 0::float8 AS score FROM (" +
             "SELECT id, text, metadata, " +
-            "CASE WHEN pg_input_is_valid(metadata ->> $2, 'timestamptz') THEN (metadata ->> $2)::timestamptz END AS dated " +
-            $"FROM {_schema.Table} WHERE {filtered}) listed " +
+            "CASE WHEN at >= '0001-01-01 00:00:00+00' AND at <= '10000-01-01 00:00:00+00' THEN at END AS dated " +
+            $"FROM {_schema.Table} CROSS JOIN LATERAL (SELECT metadata ->> $2 AS value) v " +
+            "CROSS JOIN LATERAL (SELECT " +
+            @"CASE WHEN value !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}(T([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9](\.[0-9]{1,7})?)?(Z|[+-](0[0-9]|1[0-3])(:?[0-5][0-9])?|[+-]14(:?00)?)?)?$' " +
+            "OR NOT pg_input_is_valid(value, 'timestamptz') THEN NULL " +
+            "WHEN value ~ 'T.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN value::timestamptz " +
+            "ELSE value::timestamp AT TIME ZONE 'UTC' END AS at) a " +
+            $"WHERE {filtered}) listed " +
             "WHERE $3::timestamptz IS NULL OR dated >= $3 " +
-            "ORDER BY dated DESC NULLS LAST, id LIMIT $1");
+            "ORDER BY dated DESC NULLS LAST, id LIMIT $1",
+            connection);
         byDate.Parameters.Add(new NpgsqlParameter { Value = limit });
         byDate.Parameters.Add(new NpgsqlParameter { Value = order.Key, NpgsqlDbType = NpgsqlDbType.Text });
         byDate.Parameters.Add(new NpgsqlParameter
@@ -173,6 +194,35 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         });
         byDate.Parameters.AddRange(filterParameters);
         return await ReadAsync(byDate, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>One <c>UPDATE</c> of the row's metadata, where its text and its metadata are still those listed.</remarks>
+    public async Task UpdateMetadataAsync(KnowledgeChunk listed, IReadOnlyDictionary<string, string> metadata, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(listed);
+        ArgumentNullException.ThrowIfNull(metadata);
+        await EnsureAsync(ct).ConfigureAwait(false);
+
+        await WriteAsync(
+            $"UPDATE {_schema.Table} SET metadata = $1 WHERE id = $2 AND text = $3 AND metadata = $4",
+            [
+                Jsonb(metadata),
+                new NpgsqlParameter { Value = listed.Id, NpgsqlDbType = NpgsqlDbType.Text },
+                new NpgsqlParameter { Value = listed.Text, NpgsqlDbType = NpgsqlDbType.Text },
+                Jsonb(listed.Metadata),
+            ],
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Throws when <paramref name="server"/> is older than PostgreSQL 16, which listing by date needs.</summary>
+    internal static void CheckDateOrder(Version server)
+    {
+        if (server < DateOrderSince)
+        {
+            throw new NotSupportedException(
+                $"Listing by date needs PostgreSQL {DateOrderSince.Major} or later (for pg_input_is_valid); this server is PostgreSQL {server}.");
+        }
     }
 
     /// <summary>
@@ -304,6 +354,38 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         "RETURNING word, ndoc) " +
         "SELECT array_agg(word) INTO emptied FROM counted WHERE ndoc = 0 AND word <> '';";
 
+    /// <summary>
+    /// Both rankings, each on its own connection and run at the same time, fused. The keyword query starts first, since
+    /// an embedder can compute the embedding before its task first yields; when one ranking fails the other is cancelled.
+    /// A ranking whose weight is 0 isn't run.
+    /// </summary>
+    private async Task<IReadOnlyList<KnowledgeChunk>> HybridAsync(string query, SearchOptions options, int take, CancellationToken ct)
+    {
+        using var failed = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var sparse = options.KeywordWeight == 0
+            ? Task.FromResult<IReadOnlyList<KnowledgeChunk>>([])
+            : CancelOnFailureAsync(RankByTermsAsync(query, options.Filter, take * CandidatesPerTopK, failed.Token), failed);
+        var dense = options.DenseWeight == 0
+            ? Task.FromResult<IReadOnlyList<KnowledgeChunk>>([])
+            : CancelOnFailureAsync(RankByEmbeddingAsync(query, options, take * CandidatesPerTopK, failed.Token), failed);
+        var rankings = await Task.WhenAll(dense, sparse).ConfigureAwait(false);
+        return Fuse(rankings[0], rankings[1], options, take);
+    }
+
+    private static async Task<IReadOnlyList<KnowledgeChunk>> CancelOnFailureAsync(
+        Task<IReadOnlyList<KnowledgeChunk>> ranking, CancellationTokenSource failed)
+    {
+        try
+        {
+            return await ranking.ConfigureAwait(false);
+        }
+        catch
+        {
+            await failed.CancelAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
     private async Task<IReadOnlyList<KnowledgeChunk>> RankByEmbeddingAsync(
         string query, SearchOptions options, int take, CancellationToken ct)
     {
@@ -311,42 +393,54 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         var (where, parameters) = Where(options.Filter, first: 4);
         // The score threshold is applied to the nearest rows, outside the scan: rows come in distance order, so it
         // keeps the same rows, and an iterative scan doesn't read on to hnsw.max_scan_tuples for rows it would drop.
-        return await _schema.NearestAsync(take, command =>
-        {
-            command.CommandText =
-                "SELECT id, text, metadata, score FROM (" +
-                $"SELECT id, text, metadata, 1 - (embedding <=> $1::vector) AS score FROM {_schema.Table} " +
-                $"WHERE {where} ORDER BY embedding <=> $1::vector LIMIT $3) AS nearest " +
-                "WHERE score >= $2 ORDER BY score DESC";
-            command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
-            command.Parameters.Add(new NpgsqlParameter { Value = (double)options.ScoreThreshold });
-            command.Parameters.Add(new NpgsqlParameter { Value = take });
-            command.Parameters.AddRange(parameters);
-            return ReadAsync(command, ct);
-        }, ct).ConfigureAwait(false);
+        var command = new NpgsqlBatchCommand(
+            "SELECT id, text, metadata, score FROM (" +
+            $"SELECT id, text, metadata, 1 - (embedding <=> $1::vector) AS score FROM {_schema.Table} " +
+            $"WHERE {where} ORDER BY embedding <=> $1::vector LIMIT $3) AS nearest " +
+            "WHERE score >= $2 ORDER BY score DESC");
+        command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
+        command.Parameters.Add(new NpgsqlParameter { Value = (double)options.ScoreThreshold });
+        command.Parameters.Add(new NpgsqlParameter { Value = take });
+        command.Parameters.AddRange(parameters);
+        return await _schema.NearestAsync(take, command, reader => ReadAsync(reader, ct), ct).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<KnowledgeChunk>> RankByTermsAsync(
         string query, KnowledgeFilter? filter, int take, CancellationToken ct)
     {
-        // terms: the query's lexemes some row holds, each with its IDF and whether it is rare. m: the rows to score, those
-        // holding a rare term, or with none rare those holding every term; the tsquery is built from the lexemes as they
-        // are, quoted (chr 39) with backslashes and quotes escaped (chr 92), so they aren't read through the
-        // configuration again. Each row is then scored by BM25 over every term it holds; its length is its occurrences.
+        // terms: the query's lexemes some row holds, each with its IDF and whether it is rare. lits: each as a tsquery
+        // literal, the lexeme as it is, quoted (chr 39) with backslashes and quotes escaped (chr 92), so it isn't read
+        // through the configuration again. m: three tsqueries, the rare terms (none when no term is rare), every term,
+        // and any term. held: every term some row the filter keeps holds, read only when picked reaches it. picked: the
+        // rows to score, those holding a rare term, else those holding every term; under a filter, a rule no row the
+        // filter keeps meets gives way to held (no kept row holds a rare term then, so the rule over the terms kept rows
+        // hold is all of them), and then to any term. It is materialized so its EXISTS run once, not once per row. Each
+        // row is then scored by BM25 over every term it holds; its length is its occurrences.
         var config = _schema.TextSearchConfiguration;
         var (where, parameters) = Where(filter, first: 6);
+#pragma warning disable ANNKEEXP004 // reads the experimental AnyOf
+        var filtered = filter is { Count: > 0 } || filter?.AnyOf.Count > 0;
+#pragma warning restore ANNKEEXP004
+        string Kept(string tsquery) =>
+            filtered ? $"EXISTS (SELECT 1 FROM {_schema.Table} r WHERE r.tsv @@ {tsquery} AND {where})" : "true";
         await using var command = _dataSource.CreateCommand(
             "WITH q AS (SELECT l.word, coalesce(s.ndoc, 0)::float8 AS df " +
             $"FROM unnest(tsvector_to_array(to_tsvector('{config}', $1))) AS l(word) LEFT JOIN {_lexemes} s ON s.word = l.word), " +
             $"totals AS (SELECT ndoc::float8 AS n, nentry::float8 / greatest(ndoc, 1) AS avgdl FROM {_lexemes} WHERE word = ''), " +
             "terms AS (SELECT q.word, ln(1 + (t.n - q.df + 0.5) / (q.df + 0.5)) AS idf, q.df <= ceil($3::numeric * t.n::numeric) AS rare " +
             "FROM q, totals t WHERE q.df > 0), " +
-            "m AS (SELECT (CASE WHEN bool_or(rare) THEN string_agg(lit, ' | ') FILTER (WHERE rare) " +
-            "ELSE string_agg(lit, ' & ') END)::tsquery AS query FROM (" +
-            "SELECT rare, chr(39) || replace(replace(word, chr(92), chr(92) || chr(92)), chr(39), chr(92) || chr(39)) || chr(39) AS lit " +
-            "FROM terms) AS x) " +
+            "lits AS (SELECT rare, chr(39) || replace(replace(word, chr(92), chr(92) || chr(92)), chr(39), chr(92) || chr(39)) || chr(39) AS lit " +
+            "FROM terms), " +
+            "m AS (SELECT (string_agg(lit, ' | ') FILTER (WHERE rare))::tsquery AS rare_terms, " +
+            "string_agg(lit, ' & ')::tsquery AS all_terms, string_agg(lit, ' | ')::tsquery AS any_term FROM lits), " +
+            $"held AS MATERIALIZED (SELECT string_agg(lit, ' & ')::tsquery AS all_terms FROM lits WHERE {Kept("lit::tsquery")}), " +
+            "picked AS MATERIALIZED (SELECT CASE " +
+            $"WHEN m.rare_terms IS NOT NULL AND {Kept("m.rare_terms")} THEN m.rare_terms " +
+            $"WHEN m.rare_terms IS NULL AND (m.all_terms IS NULL OR {Kept("m.all_terms")}) THEN m.all_terms " +
+            $"WHEN {Kept("(SELECT all_terms FROM held)")} THEN (SELECT all_terms FROM held) " +
+            "ELSE m.any_term END AS query FROM m) " +
             "SELECT r.id, r.text, r.metadata, s.score " +
-            $"FROM {_schema.Table} r CROSS JOIN m CROSS JOIN totals t CROSS JOIN LATERAL (" +
+            $"FROM {_schema.Table} r CROSS JOIN picked m CROSS JOIN totals t CROSS JOIN LATERAL (" +
             "SELECT sum(terms.idf * f.n * ($4 + 1) / (f.n + $4 * (1 - $5 + $5 * f.length / greatest(t.avgdl, 1))))::float8 AS score " +
             "FROM (SELECT lexeme, n, sum(n) OVER () AS length FROM (" +
             "SELECT lexeme, greatest(coalesce(cardinality(positions), 0), 1)::float8 AS n FROM unnest(r.tsv)) AS u) AS f " +
@@ -363,8 +457,13 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
 
     private static async Task<IReadOnlyList<KnowledgeChunk>> ReadAsync(NpgsqlCommand command, CancellationToken ct)
     {
-        var chunks = new List<KnowledgeChunk>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        return await ReadAsync(reader, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<IReadOnlyList<KnowledgeChunk>> ReadAsync(NpgsqlDataReader reader, CancellationToken ct)
+    {
+        var chunks = new List<KnowledgeChunk>();
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             chunks.Add(new KnowledgeChunk
@@ -380,16 +479,17 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
     }
 
     private static IReadOnlyList<KnowledgeChunk> Fuse(
-        IReadOnlyList<KnowledgeChunk> dense, IReadOnlyList<KnowledgeChunk> sparse, int take)
+        IReadOnlyList<KnowledgeChunk> dense, IReadOnlyList<KnowledgeChunk> sparse, SearchOptions options, int take)
     {
         var fused = new Dictionary<string, (KnowledgeChunk Chunk, float Score)>();
-        foreach (var ranking in (IReadOnlyList<KnowledgeChunk>[])[dense, sparse])
+        foreach (var (ranking, weight) in (ReadOnlySpan<(IReadOnlyList<KnowledgeChunk>, float)>)
+                 [(dense, options.DenseWeight), (sparse, options.KeywordWeight)])
         {
             for (var rank = 0; rank < ranking.Count; rank++)
             {
                 var chunk = ranking[rank];
                 var score = fused.TryGetValue(chunk.Id, out var seen) ? seen.Score : 0f;
-                fused[chunk.Id] = (chunk, score + 1f / (ReciprocalRankK + rank + 1));
+                fused[chunk.Id] = (chunk, score + weight / (ReciprocalRankK + rank + 1));
             }
         }
 
@@ -402,20 +502,34 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
     }
 
     /// <summary>
-    /// The condition a row's metadata meets to match <paramref name="filter"/>, and its parameters, numbered from
-    /// <paramref name="first"/>: containment of the filter's entries, and for each key in
-    /// <see cref="KnowledgeFilter.AnyOf"/> containment of any one of its values. The values are joined with
-    /// <c>OR</c> rather than <c>@&gt; ANY(array)</c> so the metadata's GIN index serves each one.
+    /// The condition a row meets to match <paramref name="filter"/>, and its parameters, numbered from
+    /// <paramref name="first"/>: containment of the filter's entries in its metadata, and for each key in
+    /// <see cref="KnowledgeFilter.AnyOf"/> containment of any one of its values. The key <c>id</c> is the row's id
+    /// column, not a metadata key. The values are joined with <c>OR</c> rather than <c>@&gt; ANY(array)</c> so the
+    /// metadata's GIN index serves each one.
     /// </summary>
     private static (string Sql, NpgsqlParameter[] Parameters) Where(KnowledgeFilter? filter, int first)
     {
         filter ??= new KnowledgeFilter();
         var sql = new StringBuilder($"metadata @> ${first}");
-        List<NpgsqlParameter> parameters = [Jsonb(filter)];
+        var hasId = filter.TryGetValue(IdKey, out var id);
+        List<NpgsqlParameter> parameters = [Jsonb(hasId ? filter.Where(kv => kv.Key != IdKey).ToDictionary() : filter)];
+        if (hasId)
+        {
+            sql.Append(CultureInfo.InvariantCulture, $" AND id = ${first + parameters.Count}");
+            parameters.Add(new NpgsqlParameter { Value = id, NpgsqlDbType = NpgsqlDbType.Text });
+        }
 #pragma warning disable ANNKEEXP004 // applies the experimental AnyOf
         foreach (var (key, values) in filter.AnyOf)
 #pragma warning restore ANNKEEXP004
         {
+            if (key == IdKey)
+            {
+                sql.Append(CultureInfo.InvariantCulture, $" AND id = ANY(${first + parameters.Count})");
+                parameters.Add(new NpgsqlParameter { Value = values.Distinct(StringComparer.Ordinal).ToArray(), NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text });
+                continue;
+            }
+
             List<string> any = [];
             foreach (var value in values.Distinct(StringComparer.Ordinal))
             {
@@ -428,7 +542,7 @@ public sealed class PostgresKnowledgeStore : IListableKnowledgeStore
         return (sql.ToString(), [.. parameters]);
     }
 
-    private static NpgsqlParameter Jsonb(IDictionary<string, string> value) => new()
+    private static NpgsqlParameter Jsonb(IReadOnlyDictionary<string, string> value) => new()
     {
         Value = JsonSerializer.Serialize(value),
         NpgsqlDbType = NpgsqlDbType.Jsonb,

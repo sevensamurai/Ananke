@@ -60,8 +60,9 @@ The `nnke` .NET global tool (`src/nnke`) provides scaffolding, validation, and s
 | `Ananke.Orchestration.OpenAI` | OpenAI / Azure OpenAI provider |
 | `Ananke.Orchestration.Anthropic` | Anthropic Claude provider |
 | `Ananke.Orchestration.Google` | Google Gemini provider |
-| `Ananke.Memory` | Knowledge pipeline: extract, chunk, embed, store |
-| `Ananke.Memory.Qdrant` | Qdrant vector store adapter |
+| `Ananke.Orchestration.Knowledge` | Knowledge pipeline: extract, chunk, embed, store, catalog, records steps |
+| `Ananke.Qdrant` | Qdrant vector store adapter |
+| `Ananke.Postgres` | PostgreSQL (pgvector) knowledge store and catalog, hybrid search |
 | `Ananke.Learning` | Empirical memory: patterns, skills, heuristics |
 | `Ananke.StateMachine` | `IStateMachine<S,T>`, `AbstractStateMachine` |
 | `Ananke.Design` | DSL + YAML manifest parser, `WorkflowScaffold`, Mermaid export |

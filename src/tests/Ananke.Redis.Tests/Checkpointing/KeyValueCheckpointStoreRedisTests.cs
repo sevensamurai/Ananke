@@ -11,6 +11,8 @@ namespace Ananke.Redis.Tests.Checkpointing;
 /// tests are ignored when Docker isn't available.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class KeyValueCheckpointStoreRedisTests : KeyValueCheckpointStoreContractTests
 {
     private ValkeyServer? _server;

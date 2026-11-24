@@ -12,7 +12,7 @@ Each experimental surface has its own id, so suppressing one does not suppress a
 | `ANNKEEXP001` | The plan tier | 0.9.1 |
 | `ANNKEEXP002` | `OpenAIChatAgentModel.Create` with a credential | 0.9.1 |
 | `ANNKEEXP003` | Fields of an endpoint's own: `OpenAIChatAgentModel.WithRequestFields`, `AgentRequest.RequestFields` | 0.9.1 |
-| `ANNKEEXP004` | The document knowledge base's additions: so far `OnnxEmbeddingModel`, `OnnxEmbeddingOptions`, `OnnxPooling`, `PostgresKnowledgeStore`, `PostgresKnowledgeCatalog`, `PostgresKnowledgeOptions`, `PostgresIterativeScan`, `SpendingLimit`, `DocumentHeaderOptions`, `DocumentHeaders`, `DocumentProcessor.Headers`, `DocumentProcessor.Records`, `DatedRecordExtractor<TRecord>`, `DatedRecordReader<TRecord>`, `DocumentLinks`, `DocumentProcessor.LinkPatterns`, `DocumentProcessor.DropSections`, `DocumentProcessor.CleanText`, `DocumentProcessor.Hyperlinks`, `HyperlinkOptions`, `LinkedDocumentReader`, `LinkedDocument`, `IListableKnowledgeStore`, `KnowledgeDateOrder`, `DatedRecordTools`, `KnowledgeCatalogTools.CreateLinks`, `SearchResultLimits`, `SupersededResults`, `KnowledgeFilter.AnyOf` | 0.9.1 |
+| `ANNKEEXP004` | The document knowledge base's additions: so far `OnnxEmbeddingModel`, `OnnxEmbeddingOptions`, `OnnxPooling`, `PostgresKnowledgeStore`, `PostgresKnowledgeCatalog`, `PostgresKnowledgeOptions`, `PostgresIterativeScan`, `SpendingLimit`, `DocumentHeaderOptions`, `DocumentHeaders`, `DocumentProcessor.Headers`, `DocumentProcessor.Records`, `CompositeDocumentRecords`, `DatedRecordExtractor<TRecord>`, `DatedRecordWriter<TRecord>`, `DatedRecordReader<TRecord>`, `DocumentLinks`, `DocumentProcessor.LinkPatterns`, `DocumentProcessor.DropSections`, `DocumentProcessor.CleanText`, `DocumentProcessor.Hyperlinks`, `HyperlinkOptions`, `LinkedDocumentReader`, `LinkedDocument`, `IListableKnowledgeStore`, `KnowledgeDateOrder`, `DatedRecordTools`, `KnowledgeCatalogTools.CreateLinks`, `SearchResultLimits`, `SupersededResults`, `KnowledgeFilter.AnyOf` | 0.9.1 |
 
 ## ANNKEEXP001 — the plan tier
 
@@ -88,12 +88,12 @@ Suppressing is a statement that you accept the surface may change. Read the rele
 `Ananke.Postgres`, `PostgresKnowledgeStore`, `PostgresKnowledgeCatalog`, `PostgresKnowledgeOptions` and `PostgresIterativeScan`; in
 `Ananke.Orchestration`, `SpendingLimit`, `SpendingLimitedAgentModel`, `SpendingLimitExceededException` and
 `WithSpendingLimit`; in `Ananke.Orchestration.Knowledge`, `DocumentHeaderOptions`, `DocumentHeaders`,
-`DocumentProcessor.Headers`, `IDocumentRecords`, `DocumentProcessor.Records`, `DocumentLinks`, `DocumentProcessor.LinkPatterns`,
+`DocumentProcessor.Headers`, `IDocumentRecords`, `CompositeDocumentRecords`, `DocumentProcessor.Records`, `DocumentLinks`, `DocumentProcessor.LinkPatterns`,
 `DocumentProcessor.DropSections`, `DocumentProcessor.CleanText`, `DocumentProcessor.Hyperlinks`, `HyperlinkOptions`,
 `LinkedDocumentReader`, `LinkedDocument`, `IListableKnowledgeStore`, `KnowledgeDateOrder`, `SearchResultLimits`,
 `SupersededResults`, `CatalogAwareKnowledgeStore.SupersededResults` and `KnowledgeFilter.AnyOf`; in
 `Ananke.Orchestration`,
-`DatedRecordExtractor<TRecord>`, `DatedRecordOptions<TRecord>`, `RecordExtractionException`,
+`DatedRecordExtractor<TRecord>`, `DatedRecordOptions<TRecord>`, `RecordExtractionException`, `DatedRecordWriter<TRecord>`,
 `DatedRecordReader<TRecord>`, `DatedRecord<TRecord>`, `DatedRecordTools` and `KnowledgeCatalogTools.CreateLinks`. The
 knowledge base's other additions take the same id as they ship.
 

@@ -6,9 +6,10 @@ using Ananke.Orchestration.Tools;
 namespace Ananke.Orchestration.Knowledge.Records;
 
 /// <summary>
-/// A <see cref="ToolKit"/> over the records a <see cref="DatedRecordExtractor{TRecord}"/> stored: <c>list_records</c>
-/// lists every record matching the properties given, newest first, so a roundup is answered as a list rather than by
-/// the top few of a search.
+/// A <see cref="ToolKit"/> over the records a <see cref="DatedRecordExtractor{TRecord}"/> or a
+/// <see cref="DatedRecordWriter{TRecord}"/> stored: <c>list_records</c> lists every record matching the properties
+/// given, newest first, so a roundup is answered as a list rather than by the top few of a search. A written record
+/// whose passage is gone (<see cref="DatedRecord{TRecord}.PassageGone"/>) is listed with that said.
 /// </summary>
 [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
 public static class DatedRecordTools
@@ -87,6 +88,8 @@ public static class DatedRecordTools
             text.Append($"- {date} · {describe(record)} ({record.Source})");
             if (record.ReplacedBy is not null)
                 text.Append($" — replaced by {record.ReplacedBy}");
+            if (record.PassageGone)
+                text.Append(" — its passage is gone");
             text.Append('\n');
         }
 

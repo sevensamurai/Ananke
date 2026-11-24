@@ -1,3 +1,4 @@
+using Ananke.Abstractions;
 using Ananke.Abstractions.Config;
 using Ananke.Abstractions.Distributed;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,5 +57,20 @@ public static class ServiceCollectionExtensions
             c.Password = password;
             c.LockExpirySeconds = lockExpirySeconds;
         });
+    }
+
+    /// <summary>
+    /// Makes the state machine's lock and state store Redis-backed: <see cref="AddRedis(IServiceCollection, Action{CacheConfig})"/>
+    /// on the builder's service collection.
+    /// </summary>
+    public static StateMachineBuilder<IServiceCollection, TContext, TTransition, TNotification> UseRedis<TContext, TTransition, TNotification>(
+        this StateMachineBuilder<IServiceCollection, TContext, TTransition, TNotification> builder,
+        Action<CacheConfig> configure)
+        where TContext : class, IBaseContext
+        where TTransition : Enum
+        where TNotification : Enum
+    {
+        builder.Services.AddRedis(configure);
+        return builder;
     }
 }

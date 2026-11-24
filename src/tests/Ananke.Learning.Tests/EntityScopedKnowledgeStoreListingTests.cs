@@ -7,7 +7,7 @@ using Shouldly;
 
 namespace Ananke.Learning.Tests;
 
-/// <summary><see cref="EntityScopedKnowledgeStore"/> lists only its own entity's chunks.</summary>
+/// <summary><see cref="EntityScopedKnowledgeStore"/> lists and updates only its own entity's chunks.</summary>
 [TestFixture]
 public class EntityScopedKnowledgeStoreListingTests
 {
@@ -38,6 +38,37 @@ public class EntityScopedKnowledgeStoreListingTests
         var listed = await mine.ListAsync(new KnowledgeFilter(), limit: 1, order: new KnowledgeDateOrder("effective_at"));
 
         listed.Select(c => c.Id).ShouldBe(["a2"]);
+    }
+
+    [Test]
+    public async Task UpdateMetadataAsync_ItsOwnChunk_UpdatesItInItsEntity()
+    {
+        var shared = new InMemoryKnowledgeStore(new InMemoryEmbedder());
+        var mine = new EntityScopedKnowledgeStore(shared, "org-a");
+        await mine.UpsertAsync([new KnowledgeDocument { Id = "a1", Text = "a plan", Metadata = new Dictionary<string, string> { ["kind"] = "plan" } }]);
+        var listed = (await mine.ListAsync(new KnowledgeFilter())).Single();
+
+        await mine.UpdateMetadataAsync(listed, new Dictionary<string, string> { ["kind"] = "done", ["entity_id"] = "org-b" });
+
+        var stored = (await shared.ListAsync(new KnowledgeFilter())).Single();
+        stored.Metadata["kind"].ShouldBe("done");
+        stored.Metadata["entity_id"].ShouldBe("org-a");
+    }
+
+    [Test]
+    public async Task UpdateMetadataAsync_AnotherEntitysChunk_LeavesItAsItIs()
+    {
+        var shared = new InMemoryKnowledgeStore(new InMemoryEmbedder());
+        var mine = new EntityScopedKnowledgeStore(shared, "org-a");
+        var theirs = new EntityScopedKnowledgeStore(shared, "org-b");
+        await theirs.UpsertAsync([new KnowledgeDocument { Id = "b1", Text = "b plan", Metadata = new Dictionary<string, string> { ["kind"] = "plan" } }]);
+        var listed = (await theirs.ListAsync(new KnowledgeFilter())).Single();
+
+        await mine.UpdateMetadataAsync(listed, new Dictionary<string, string> { ["kind"] = "done" });
+
+        var stored = (await shared.ListAsync(new KnowledgeFilter())).Single();
+        stored.Metadata["kind"].ShouldBe("plan");
+        stored.Metadata["entity_id"].ShouldBe("org-b");
     }
 
     [Test]
