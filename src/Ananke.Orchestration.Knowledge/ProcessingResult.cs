@@ -11,9 +11,14 @@ namespace Ananke.Orchestration.Knowledge;
 /// automatically via <see cref="Documents.DocumentSummarizer.AutoDescribeAsync"/>.
 /// </param>
 /// <param name="Records">Number of records stored by <see cref="Documents.DocumentProcessor.Records"/>; 0 without it.</param>
+/// <param name="RecordsRefused">
+/// Number of records <see cref="Documents.DocumentProcessor.Records"/> read from the document but didn't store, such as
+/// those whose quote wasn't found in it or that the product's own check refused; 0 without it.
+/// </param>
 public sealed record ProcessingResult(
     int Sections,
     int Chunks,
     string Source,
     string Description = "",
-    int Records = 0);
+    int Records = 0,
+    int RecordsRefused = 0);

@@ -1,9 +1,9 @@
 <!-- topic: roadmap, tags: roadmap, versioning, releases, roadmap, open source, Apache-2.0, license, free, commercial -->
 ## Roadmap
 
-### Where We Are — v0.9.2
+### Where We Are — v0.9.3
 
-**0.9.2 is the current release.**
+**0.9.3 is the current release.**
 
 The core framework is feature-complete. Workflows, agents, state machines, empirical
 memory, distributed infrastructure, MCP/A2A interop, observability, design tooling,
@@ -48,6 +48,7 @@ targeted.
 | **0.9.0** | Enterprise cloud surfaces — Amazon Bedrock and Microsoft Foundry reached through the existing adapters, with a conformance suite every adapter is subject to — plus the gaps found by stressing the framework for small, self-hosted models: model classification and licence policy, catalogue coverage for the open-weight families, and honest handling of local context windows and zero-cost routing. |
 | **0.9.1** | Fewer packages and a marked plan tier. The Bedrock adapter, the federation packages with their vendor adapters, emulators and `nnke-platform`, the chat platform adapters and `Ananke.Roles` are removed; the plan tier is `[Experimental]` (`ANNKEEXP001`); an agent reply reports why it stopped (`AgentResponse.StopReason`); and the code backlog is fixed. |
 | **0.9.2** | Reliable across servers: state machines, locks and stored values stay correct when several servers share Redis and MQTT and through an outage of either; secure Redis and MQTT connections; `Ananke.Redis` without the AI packages (its checkpoint store is the new `KeyValueCheckpointStore`); better document search on Postgres and Qdrant; GPT-6 and Gemini 4; every package tested as it is installed. |
+| **0.9.3** | Knowledge stores behave the same: the in-memory, Postgres and Qdrant stores read dates, filters, ids and deletes alike, and a delete with an empty filter is refused; weights for the two halves of hybrid search; records that cite their passage, several record types in one store, and records people write kept beside extracted ones; linked knowledge on every store; superseded marks that follow the documents that replace them. |
 | **0.9.\*** | Bug fixes and minor improvements. Most likely the last line before 1.0. |
 | **1.0.0** | API lock — semantic versioning honoured from this point forward. |
 

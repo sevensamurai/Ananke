@@ -4,7 +4,7 @@ using Shouldly;
 
 #pragma warning disable ANNKEEXP004 // KnowledgeFilter.AnyOf and listing are experimental
 
-namespace Ananke.Qdrant.Tests;
+namespace Ananke.Qdrant.Tests.Containers;
 
 /// <summary>
 /// <see cref="KnowledgeFilter.AnyOf"/> on <see cref="QdrantKnowledgeStore"/> against Qdrant: a key holding several

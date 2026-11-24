@@ -287,6 +287,23 @@ public async Task Handoff_round_trip()
 
 ---
 
+## Ananke's Own Adapter Tests
+
+Ananke tests its Redis, MQTT, Qdrant, Postgres and Memgraph adapters against the real services:
+Valkey, Mosquitto, Qdrant, pgvector and Memgraph with MAGE (`memgraph/memgraph-mage`) in Testcontainers.
+Those tests are in the category `Containers` and are explicit, so `dotnet test src/Ananke.slnx`
+and `bash scripts/ci.sh` leave them out and start no container. Run them with Docker running:
+
+```bash
+bash scripts/ci.sh --containers                                     # every check, then these tests
+dotnet test src/Ananke.slnx -c Release --filter TestCategory=Containers   # only these tests
+```
+
+Without Docker these tests are ignored. With Docker, a container that cannot start fails its
+tests, and `bash scripts/ci.sh --containers` fails, naming them, when any of these tests was skipped.
+
+---
+
 ## Test Patterns Summary
 
 | What you're testing | Key technique |

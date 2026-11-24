@@ -12,6 +12,8 @@ namespace Ananke.Redis.Tests;
 /// requires a password and one that requires none. The tests are ignored when Docker isn't available.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class RedisDistributedLockTests
 {
     private const string Password = "s3cret";

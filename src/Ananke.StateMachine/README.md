@@ -45,6 +45,30 @@ services.AddStateMachine<OrderMachine, OrderCtx, OrderState, OrderTransition, Or
 
 `AddStateMachine` registers an in-memory `IDistributedLock` by default. Add `Ananke.Redis` to replace it with Redis-backed locking — call order doesn't matter.
 
+### One call: machine, lock, state store and channels
+
+```csharp
+using Ananke.MQTT;
+using Ananke.Redis;
+using Ananke.StateMachine.Extensions;
+
+services.AddStateMachine<OrderMachine, OrderCtx, OrderState, OrderTransition, OrderEvent>(b => b
+    .UseRedis(c => c.Host = "localhost")
+    .UseMqtt(c =>
+    {
+        c.Host = "localhost";
+        c.Port = 1883;
+        c.Namespace = "orders";
+    }));
+```
+
+This registers the machine, a Redis `IDistributedLock` and `IKeyValueDataAdapter` (`UseRedis`, from `Ananke.Redis`),
+and an MQTT `IChannelReader` and `IChannelWriter` for both the transition and the notification enum
+(`UseMqtt`, from `Ananke.MQTT`, one config for both). Leave either out and that part stays in memory: an
+`InMemoryDistributedLock`, and an `InMemoryChannelReader` with an `InMemoryChannelWriter` linked to it for each enum
+that has neither a reader nor a writer registered. Registrations made before the call, such as `AddStateMachine(o => ...)`
+options, are kept, except those `UseRedis` and `UseMqtt` replace.
+
 ## Features
 
 - **Distributed locking** — safe coordination across instances via `IDistributedLock`

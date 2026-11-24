@@ -29,4 +29,16 @@ public class InMemoryDatedRecordListingTests
     [Test]
     public Task ListAsync_ByDate_OrdersAndBoundsInTheStore() =>
         DatedRecordListingCases.ListAsync_ByDate_OrdersAndBoundsInTheStore(_store);
+
+    [Test]
+    public Task ListAsync_DateWithoutAnOffset_IsReadAsUtc() =>
+        DatedRecordListingCases.ListAsync_DateWithoutAnOffset_IsReadAsUtc(new InMemoryKnowledgeStore(new InMemoryEmbedder()));
+
+    [Test]
+    public Task ListAsync_ValuesThatArentIsoDates_AreNoDate() =>
+        DatedRecordListingCases.ListAsync_ValuesThatArentIsoDates_AreNoDate(new InMemoryKnowledgeStore(new InMemoryEmbedder()));
+
+    [Test]
+    public Task ListAsync_OffsetsAndDatesOutOfRange_AreNoDate() =>
+        DatedRecordListingCases.ListAsync_OffsetsAndDatesOutOfRange_AreNoDate(new InMemoryKnowledgeStore(new InMemoryEmbedder()));
 }

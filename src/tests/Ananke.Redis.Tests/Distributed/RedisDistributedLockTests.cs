@@ -11,6 +11,8 @@ namespace Ananke.Redis.Tests.Distributed;
 /// Docker isn't available.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class RedisDistributedLockTests : DistributedLockContractTests
 {
     private ValkeyServer? _server;

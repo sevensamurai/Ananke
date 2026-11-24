@@ -85,21 +85,44 @@ public sealed class PostgresKnowledgeCatalog : IKnowledgeCatalog
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<CatalogEntry>> GetManyAsync(IEnumerable<string> sources, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var names = sources.Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var source in names)
+            ArgumentException.ThrowIfNullOrWhiteSpace(source, nameof(sources));
+        if (names.Length == 0)
+            return [];
+
+        await EnsureAsync(ct).ConfigureAwait(false);
+        await using var command = _dataSource.CreateCommand($"SELECT {Columns}, 0 FROM {_schema.Table} WHERE source = ANY($1)");
+        command.Parameters.Add(new NpgsqlParameter { Value = names });
+        return [.. (await ReadAsync(command, ct).ConfigureAwait(false)).Select(r => r.Entry)];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CatalogEntry>> GetReplacingAsync(string source, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        await EnsureAsync(ct).ConfigureAwait(false);
+        await using var command = _dataSource.CreateCommand($"SELECT {Columns}, 0 FROM {_schema.Table} WHERE $1 = ANY(replaces)");
+        command.Parameters.Add(new NpgsqlParameter { Value = source });
+        return [.. (await ReadAsync(command, ct).ConfigureAwait(false)).Select(r => r.Entry)];
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<CatalogSearchResult>> DiscoverAsync(string query, int topK = 5, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         await EnsureAsync(ct).ConfigureAwait(false);
         var embedding = await _embedder.EmbedAsync(query, ct).ConfigureAwait(false);
 
-        var rows = await _schema.NearestAsync(topK, command =>
-        {
-            command.CommandText =
-                $"SELECT {Columns}, 1 - (embedding <=> $1::vector) FROM {_schema.Table} " +
-                "WHERE superseded_by IS NULL ORDER BY embedding <=> $1::vector LIMIT $2";
-            command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
-            command.Parameters.Add(new NpgsqlParameter { Value = topK });
-            return ReadAsync(command, ct);
-        }, ct).ConfigureAwait(false);
+        var command = new NpgsqlBatchCommand(
+            $"SELECT {Columns}, 1 - (embedding <=> $1::vector) FROM {_schema.Table} " +
+            "WHERE superseded_by IS NULL ORDER BY embedding <=> $1::vector LIMIT $2");
+        command.Parameters.Add(new NpgsqlParameter { Value = PostgresSchema.VectorText(embedding) });
+        command.Parameters.Add(new NpgsqlParameter { Value = topK });
+        var rows = await _schema.NearestAsync(topK, command, reader => ReadAsync(reader, ct), ct).ConfigureAwait(false);
         return [.. rows.Select(r => new CatalogSearchResult { Entry = r.Entry, Score = r.Score })];
     }
 
@@ -147,8 +170,13 @@ public sealed class PostgresKnowledgeCatalog : IKnowledgeCatalog
 
     private static async Task<List<(CatalogEntry Entry, float Score)>> ReadAsync(NpgsqlCommand command, CancellationToken ct)
     {
-        var rows = new List<(CatalogEntry, float)>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        return await ReadAsync(reader, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<List<(CatalogEntry Entry, float Score)>> ReadAsync(NpgsqlDataReader reader, CancellationToken ct)
+    {
+        var rows = new List<(CatalogEntry, float)>();
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             var entry = new CatalogEntry

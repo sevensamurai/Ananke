@@ -61,10 +61,29 @@ public sealed class DocumentProcessor
 
     /// <summary>
     /// A step run after a document's chunks are stored, that replaces its records with those read from it, if any.
-    /// It is given the header's fields, so a record can take the document's date.
+    /// It is given the header's fields, so a record can take the document's date. Several steps, one per record type,
+    /// go in a <see cref="CompositeDocumentRecords"/>. The records need a store of their own: each indexing deletes
+    /// every chunk of the source in the processor's store, records included.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// The step writes to the processor's store (<see cref="IDocumentRecords.WritesTo"/>), directly or through a
+    /// <see cref="Linking.LinkedKnowledgeStore"/> or <see cref="Catalog.CatalogAwareKnowledgeStore"/> on either side.
+    /// </exception>
     [Experimental(ExperimentalApis.KnowledgeBase, Message = ExperimentalApis.KnowledgeBaseMessage, UrlFormat = ExperimentalApis.UrlFormat)]
-    public IDocumentRecords? Records { get; init; }
+    public IDocumentRecords? Records
+    {
+        get;
+        init
+        {
+            var own = CompositeDocumentRecords.Decorated(_store);
+            if (value?.WritesTo.Any(store => ReferenceEquals(CompositeDocumentRecords.Decorated(store), own)) == true)
+                throw new ArgumentException(
+                    $"The records step ({value.GetType().Name.Split('`')[0]}) writes to the processor's own store ({own.GetType().Name}), "
+                    + "where each indexing deletes every chunk of the source, its records included: "
+                    + "give the records a store of their own.", nameof(Records));
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Patterns, by the kind of thing each finds, whose matches in a chunk's text are written into its metadata as links,
@@ -268,19 +287,20 @@ public sealed class DocumentProcessor
 
         // 8. Records, when the host asked for them: after the chunks, from the same document and header.
 #pragma warning disable ANNKEEXP004 // Records is experimental; calling it here is the processor's own business.
-        var records = Records is null ? 0 : await Records.ExtractAsync(sourceId, extracted, headerFields, ct);
+        var records = Records is null ? (Stored: 0, Refused: 0) : await Records.ExtractAsync(sourceId, extracted, headerFields, ct);
 #pragma warning restore ANNKEEXP004
 
         _logger.LogInformation(
-            "Processed '{SourceId}': {SectionCount} sections, {ChunkCount} chunks stored",
-            sourceId, extracted.Sections.Count, documents.Count);
+            "Processed '{SourceId}': {SectionCount} sections, {ChunkCount} chunks stored, {RecordCount} records stored, {RecordsRefused} refused",
+            sourceId, extracted.Sections.Count, documents.Count, records.Stored, records.Refused);
 
         return new ProcessingResult(
             Sections: extracted.Sections.Count,
             Chunks: documents.Count,
             Source: sourceId,
             Description: description ?? string.Empty,
-            Records: records);
+            Records: records.Stored,
+            RecordsRefused: records.Refused);
     }
 
     /// <summary>

@@ -22,6 +22,14 @@ Each has zero-config in-memory alternatives for dev/test. `Ananke.Redis` and `An
 `Ananke.Abstractions` only. Workflow checkpoints in Redis use `KeyValueCheckpointStore` (in `Ananke.Orchestration`) over the
 `IKeyValueDataAdapter` that `AddRedis` registers.
 
+A state machine takes both in one call; either left out stays in memory:
+
+```csharp
+services.AddStateMachine<OrderMachine, OrderCtx, OrderState, OrderTransition, OrderEvent>(b => b
+    .UseRedis(c => c.Host = "localhost")                         // lock and state store
+    .UseMqtt(c => { c.Host = "localhost"; c.Namespace = "orders"; })); // transition and notification channels
+```
+
 ---
 
 ## Redis Distributed Lock

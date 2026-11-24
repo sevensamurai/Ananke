@@ -11,7 +11,13 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
 {
     private readonly ConcurrentDictionary<string, CellEntry> _cells = new();
 
+    // Held while a cell is added and while DisposeAsync marks the host disposed, so every cell
+    // is either added before DisposeAsync reads _cells or refused.
+    private readonly Lock _startGate = new();
+    private bool _disposed;
+
     /// <inheritdoc />
+    /// <exception cref="ObjectDisposedException">The host has been disposed, or is being disposed.</exception>
     public Task StartAsync(string name, Func<CancellationToken, Task> workflowLoop, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -19,15 +25,19 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
 
         var cts = new CancellationTokenSource();
         var entry = new CellEntry(cts, workflowLoop);
-        var task = Task.Run(() => RunLoop(name, workflowLoop, cts.Token, entry), CancellationToken.None);
-        entry.SetLoop(task);
+        var run = CreateLoop(name, entry);
 
-        if (!_cells.TryAdd(name, entry))
+        lock (_startGate)
         {
-            cts.Dispose();
-            throw new InvalidOperationException($"A cell named '{name}' is already alive.");
+            if (_disposed || !_cells.TryAdd(name, entry))
+            {
+                cts.Dispose();
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                throw new InvalidOperationException($"A cell named '{name}' is already alive.");
+            }
         }
 
+        run.Start(TaskScheduler.Default);
         return Task.CompletedTask;
     }
 
@@ -39,7 +49,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         if (!_cells.TryRemove(name, out var entry))
             return;
 
-        await CancelAndDispose(entry, ct).ConfigureAwait(false);
+        await StopEntry(entry, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -50,6 +60,10 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
     /// Pauses a running cell by cancelling its current loop. The cell
     /// remains in <see cref="ListActive"/> but stops executing. Call
     /// <see cref="ResumeAsync"/> to restart it with a fresh token.
+    /// A loop that ends on its own, by returning before its token is cancelled or by throwing
+    /// other than by its cancellation, leaves the cell instead, as it would if not paused.
+    /// If <paramref name="ct"/> fires before the loop has unwound, the cell stays paused and
+    /// the pause settles once the loop ends.
     /// </summary>
     public async Task PauseAsync(string name, CancellationToken ct = default)
     {
@@ -63,52 +77,51 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         if (!_cells.TryUpdate(name, pausedEntry, entry))
             return;
 
-        // Cancel the current loop and wait for it to fully unwind. Only the loop's own
-        // cancellation is swallowed here — if the caller's ct fires first, propagate it
-        // rather than falsely reporting the pause as fully settled below.
-        await entry.Cts.CancelAsync().ConfigureAwait(false);
-        try { await entry.Loop.WaitAsync(ct).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* expected */ }
-        catch (Exception) when (!ct.IsCancellationRequested) { /* swallow crash during pause */ }
-        entry.Cts.Dispose();
-
-        // Signal that the pause has fully taken effect
-        pausedEntry.PausedTcs.TrySetResult();
+        // The pause settles when the loop has unwound, whether or not the caller still waits:
+        // the token source is disposed then, and PausedTcs completed.
+        try { await entry.Cts.CancelAsync().ConfigureAwait(false); }
+        finally { _ = SettlePause(entry); }
+        await entry.PausedTcs.Task.WaitAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Resumes a previously paused cell. Restarts the loop with a fresh
-    /// cancellation token. No-op if the cell is not paused.
+    /// cancellation token, once the pause has settled. No-op if the cell is not paused.
     /// </summary>
-    public Task ResumeAsync(string name, CancellationToken ct = default)
+    public async Task ResumeAsync(string name, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!_cells.TryGetValue(name, out var entry) || !entry.Paused)
-            return Task.CompletedTask;
+            return;
+
+        // A pause still unwinding (or one whose caller gave up waiting) leaves the old loop
+        // running: starting the new one now would run two loops of the same cell at once.
+        await entry.PausedTcs.Task.WaitAsync(ct).ConfigureAwait(false);
 
         var cts = new CancellationTokenSource();
-        var loop = entry.WorkflowLoop;
-        var newEntry = new CellEntry(cts, loop);
-        var task = Task.Run(() => RunLoop(name, loop, cts.Token, newEntry), CancellationToken.None);
-        newEntry.SetLoop(task);
+        var newEntry = new CellEntry(cts, entry.WorkflowLoop);
+        var run = CreateLoop(name, newEntry);
 
-        _cells.TryUpdate(name, newEntry, entry);
-        return Task.CompletedTask;
+        if (!_cells.TryUpdate(name, newEntry, entry))
+        {
+            cts.Dispose();
+            return;
+        }
+
+        run.Start(TaskScheduler.Default);
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        var entries = _cells.ToArray();
-        _cells.Clear();
+        lock (_startGate)
+            _disposed = true;
 
-        foreach (var (_, entry) in entries)
+        foreach (var name in _cells.Keys)
         {
-            if (!entry.Paused)
-                await CancelAndDispose(entry).ConfigureAwait(false);
-            else
-                entry.Cts.Dispose();
+            if (_cells.TryRemove(name, out var entry))
+                await StopEntry(entry).ConfigureAwait(false);
         }
     }
 
@@ -138,12 +151,27 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
     internal Task WhenStoppedAsync(string name) =>
         _cells.TryGetValue(name, out var e) ? e.StoppedTcs.Task : Task.CompletedTask;
 
+    // The loop is created unstarted and started only once its entry is in _cells: a loop that
+    // ends at once would otherwise run RunLoop's removal before the entry is added, and the
+    // ended cell would stay in ListActive. The token is read here, while the source is not yet
+    // shared: a stop or pause before the loop starts may dispose it.
+    private Task<Task> CreateLoop(string name, CellEntry entry)
+    {
+        var token = entry.Cts.Token;
+        var run = new Task<Task>(
+            () => RunLoop(name, entry.WorkflowLoop, token, entry), TaskCreationOptions.DenyChildAttach);
+        entry.SetLoop(run.Unwrap());
+        return run;
+    }
+
     private async Task RunLoop(string name, Func<CancellationToken, Task> loop, CancellationToken ct, CellEntry entry)
     {
+        var ended = false;
         try
         {
             entry.StartedTcs.TrySetResult();
             await loop(ct).ConfigureAwait(false);
+            ended = !ct.IsCancellationRequested;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -152,31 +180,43 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         catch (Exception)
         {
             // Cell crashed — remove from alive list so it's not sensed.
+            ended = true;
         }
         finally
         {
-            // Only remove if not paused (paused cells stay in _cells)
-            if (_cells.TryGetValue(name, out var current) && !current.Paused)
-                _cells.TryRemove(name, out _);
+            // Removes only this loop's own entry, by record equality: a cell started or resumed
+            // under the same name since differs. Its paused copy (paused cells stay in _cells)
+            // differs too, and is removed only when the loop ended on its own: it crashed, or
+            // returned before its token was cancelled.
+            if (!_cells.TryRemove(KeyValuePair.Create(name, entry)) && ended)
+                _cells.TryRemove(KeyValuePair.Create(name, entry with { Paused = true }));
 
             entry.StoppedTcs.TrySetResult();
         }
     }
 
-    private static async Task CancelAndDispose(CellEntry entry, CancellationToken ct = default)
+    // RunLoop catches every exception of the loop, so Loop never faults.
+    private static async Task SettlePause(CellEntry entry)
+    {
+        await entry.Loop.ConfigureAwait(false);
+        entry.Cts.Dispose();
+        entry.PausedTcs.TrySetResult();
+    }
+
+    // A paused cell's loop is already cancelled, and its token source is disposed by the pause.
+    private static Task StopEntry(CellEntry entry, CancellationToken ct = default) =>
+        entry.Paused ? entry.PausedTcs.Task.WaitAsync(ct) : CancelAndDispose(entry, ct);
+
+    private static async Task CancelAndDispose(CellEntry entry, CancellationToken ct)
     {
         try
         {
             await entry.Cts.CancelAsync().ConfigureAwait(false);
             await entry.Loop.WaitAsync(ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (AggregateException)
         {
-            // Expected.
-        }
-        catch (Exception) when (!ct.IsCancellationRequested)
-        {
-            // Cell threw during shutdown — swallow.
+            // A callback registered on the loop's token threw.
         }
         finally
         {
@@ -190,7 +230,7 @@ public sealed class InProcessWorkflowHost : IWorkflowHost
         bool Paused = false)
     {
         // Loop task is set immediately after construction, before the entry is
-        // visible to other threads (TryAdd acts as the publish barrier).
+        // visible to other threads (TryAdd / TryUpdate act as the publish barrier).
         private Task _loop = Task.CompletedTask;
         internal Task Loop => _loop;
         internal void SetLoop(Task t) => _loop = t;

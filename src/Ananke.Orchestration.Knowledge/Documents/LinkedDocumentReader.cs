@@ -83,7 +83,7 @@ public sealed class LinkedDocumentReader
     private static DateTimeOffset? Date(KnowledgeChunk? chunk) =>
         chunk is not null
         && chunk.Metadata.TryGetValue(DocumentHeaderOptions.EffectiveAtKey, out var text)
-        && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)
+        && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
             ? date
             : null;
 }

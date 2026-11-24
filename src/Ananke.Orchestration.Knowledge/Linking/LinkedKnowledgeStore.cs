@@ -1,3 +1,5 @@
+using Ananke.Orchestration.Knowledge.Catalog;
+
 namespace Ananke.Orchestration.Knowledge.Linking;
 
 /// <summary>
@@ -21,8 +23,17 @@ namespace Ananke.Orchestration.Knowledge.Linking;
 /// var catalogAware = new CatalogAwareKnowledgeStore(inner, catalog, extractor);
 /// var linked = new LinkedKnowledgeStore(catalogAware, linkGraph);
 /// </code>
+/// <para>
+/// On <see cref="DeleteAsync"/>, a chunk's links are removed before the chunk. A filter naming only ids (<c>id</c>)
+/// removes their links, whether the chunks are still stored or not. Any other filter, over an inner store that is an
+/// <see cref="IListableKnowledgeStore"/>, removes the links of the chunks it lists for that filter; over one that is
+/// not, or wraps one that can't list, only those of the ids the filter names, whether or not another key keeps the
+/// chunk.
+/// </para>
 /// </remarks>
-public sealed class LinkedKnowledgeStore : IKnowledgeStore
+#pragma warning disable ANNKEEXP004 // implements the experimental listing
+public sealed class LinkedKnowledgeStore : IListableKnowledgeStore
+#pragma warning restore ANNKEEXP004
 {
     private readonly IKnowledgeStore _inner;
     private readonly IDocumentLinkGraph _graph;
@@ -50,6 +61,9 @@ public sealed class LinkedKnowledgeStore : IKnowledgeStore
         _linkOptions = linkOptions ?? new LinkedSearchOptions();
     }
 
+    /// <summary>The store this one decorates.</summary>
+    internal IKnowledgeStore Inner => _inner;
+
     /// <inheritdoc />
     public async Task<IReadOnlyList<KnowledgeChunk>> SearchAsync(
         string query, SearchOptions? options = null, CancellationToken ct = default)
@@ -66,36 +80,66 @@ public sealed class LinkedKnowledgeStore : IKnowledgeStore
         foreach (var chunk in results)
             merged.TryAdd(chunk.Id, chunk);
 
+        // A linked chunk the caller's filter would not match is not added; its id is checked here and every other key
+        // by the inner store.
+        var allowedIds = options?.Filter?.ValuesOf("id");
+
+        // A seed's linked chunks are read by id, within the caller's filter, through one listing of the inner store,
+        // which embeds nothing; over a store that can't list, each by a search of one with the caller's options and no
+        // score threshold, since a linked chunk unlike the query (a negative cosine) is still linked.
+        var canList = true;
+        SearchOptions? lookup = null;
+
         // Expand from top seeds via graph traversal
         var seeds = results.Take(_linkOptions.ExpansionSeeds).ToList();
         foreach (var seed in seeds)
         {
             var links = await _graph.GetLinksAsync(seed.Id, _linkOptions.MaxHops, ct);
+            var targets = links.Select(l => l.TargetId)
+                .Where(id => !merged.ContainsKey(id) && (allowedIds is null || allowedIds.Contains(id, StringComparer.Ordinal)))
+                .ToHashSet(StringComparer.Ordinal);
+            if (targets.Count == 0)
+                continue;
+
+            // Through a catalog-aware store, marked from its catalog as its search marks results.
+            var byIds = ById([.. targets], options?.Filter);
+            var listed = !canList ? null
+                : _inner is CatalogAwareKnowledgeStore catalogAware
+                    ? await catalogAware.TryListMarkedAsync(byIds, targets.Count, ct).ConfigureAwait(false)
+                    : await _inner.TryListAsync(byIds, targets.Count, ct).ConfigureAwait(false);
+            canList = listed is not null;
+            var found = listed?.DistinctBy(c => c.Id, StringComparer.Ordinal).ToDictionary(c => c.Id, StringComparer.Ordinal);
 
             foreach (var link in links)
             {
-                if (merged.ContainsKey(link.TargetId))
+                if (merged.ContainsKey(link.TargetId) || !targets.Contains(link.TargetId))
                     continue;
 
-                // Retrieve the linked chunk from the inner store by ID filter
-                var linked = await _inner.SearchAsync(
-                    query,
-                    new SearchOptions
+                KnowledgeChunk? chunk;
+                if (found is not null)
+                {
+                    chunk = found.GetValueOrDefault(link.TargetId);
+                }
+                else
+                {
+                    lookup ??= (options ?? new SearchOptions()) with
                     {
                         TopK = 1,
-                        Filter = new KnowledgeFilter { ["id"] = link.TargetId }
-                    },
-                    ct);
-
-                if (linked.Count == 0)
-                {
-                    // Fallback: search with a minimal query scoped to the ID.
-                    // Some stores don't support id-based filtering; skip gracefully.
-                    continue;
+                        ScoreThreshold = float.MinValue,
+                        MaxPerSource = null,
+                        JoinPerSource = false,
+                    };
+                    var searched = await _inner.SearchAsync(
+                        query, lookup with { Filter = ById([link.TargetId], options?.Filter) }, ct).ConfigureAwait(false);
+                    chunk = searched.Count > 0 ? searched[0] : null;
                 }
 
+                // Not found within the filter, or the store can't filter by id: the link is not followed.
+                if (chunk is null)
+                    continue;
+
                 var graphScore = seed.Score * link.Weight * _linkOptions.GraphScoreDiscount;
-                merged.TryAdd(link.TargetId, linked[0] with { Score = graphScore });
+                merged.TryAdd(link.TargetId, chunk with { Score = graphScore });
             }
         }
 
@@ -106,6 +150,24 @@ public sealed class LinkedKnowledgeStore : IKnowledgeStore
             .ToList();
     }
 
+    /// <summary>
+    /// The caller's filter, entries and <see cref="KnowledgeFilter.AnyOf"/>, with its id one of <paramref name="ids"/>:
+    /// an entry for one id, <see cref="KnowledgeFilter.AnyOf"/> for several.
+    /// </summary>
+    private static KnowledgeFilter ById(IReadOnlyList<string> ids, KnowledgeFilter? filter)
+    {
+        var byId = filter?.Copy() ?? new KnowledgeFilter();
+#pragma warning disable ANNKEEXP004 // writes AnyOf, experimental outside this assembly
+        byId.Remove("id");
+        byId.AnyOf.Remove("id");
+        if (ids.Count == 1)
+            byId["id"] = ids[0];
+        else
+            byId.AnyOf["id"] = ids;
+#pragma warning restore ANNKEEXP004
+        return byId;
+    }
+
     /// <inheritdoc />
     public Task UpsertAsync(IEnumerable<KnowledgeDocument> documents, CancellationToken ct = default) =>
         _inner.UpsertAsync(documents, ct);
@@ -113,15 +175,34 @@ public sealed class LinkedKnowledgeStore : IKnowledgeStore
     /// <inheritdoc />
     public async Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
-        // Best-effort link cleanup: when the filter targets specific chunk IDs,
-        // remove their links before deleting from the inner store.
-        // Source-level link cleanup is not attempted here because the IKnowledgeStore
-        // contract does not support listing chunks by filter without a query.
-        // Callers who need full graph cleanup on source deletion should remove links
-        // explicitly via IDocumentLinkGraph.RemoveLinksAsync for each known chunk ID.
-        foreach (var id in filter.ValuesOf("id") ?? [])
-            await _graph.RemoveLinksAsync(id, ct);
+        // Refused before the listing below, which an empty filter would make read the whole store.
+        KnowledgeFilter.ThrowIfEmptyForDelete(filter);
 
-        await _inner.DeleteAsync(filter, ct);
+        // Links go first, so a failure leaves the chunks in place and a retry finds them again. A filter naming only ids
+        // unlinks them, stored or not; another filter unlinks the chunks the inner store lists for it, when it can list.
+        var namedIds = filter.ValuesOf("id");
+#pragma warning disable ANNKEEXP004 // reads AnyOf, experimental outside this assembly
+        var onlyIds = namedIds is not null && filter.Keys.Concat(filter.AnyOf.Keys).All(k => k == "id");
+#pragma warning restore ANNKEEXP004
+        var ids = !onlyIds && await _inner.TryListAsync(filter, int.MaxValue, ct).ConfigureAwait(false) is { } listed
+            ? listed.Select(c => c.Id)
+            : namedIds ?? [];
+
+        foreach (var id in ids)
+            await _graph.RemoveLinksAsync(id, ct).ConfigureAwait(false);
+
+        await _inner.DeleteAsync(filter, ct).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+#pragma warning disable ANNKEEXP004 // lists through the experimental listing
+    public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
+        KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default) =>
+        _inner.ListThroughAsync(filter, limit, order, ct);
+
+    /// <inheritdoc />
+    /// <remarks>Through the inner store; links are left as they are.</remarks>
+    public Task UpdateMetadataAsync(KnowledgeChunk listed, IReadOnlyDictionary<string, string> metadata, CancellationToken ct = default) =>
+        _inner.UpdateMetadataThroughAsync(listed, metadata, ct);
+#pragma warning restore ANNKEEXP004
 }

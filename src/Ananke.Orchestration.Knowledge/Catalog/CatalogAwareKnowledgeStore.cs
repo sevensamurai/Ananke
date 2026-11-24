@@ -15,9 +15,18 @@ namespace Ananke.Orchestration.Knowledge.Catalog;
 /// </para>
 /// <para>
 /// On <see cref="DeleteAsync"/>: if the filter targets a specific <c>source</c>, or several through
-/// <see cref="KnowledgeFilter.AnyOf"/>, the corresponding catalog entries are removed. When a newer document that
-/// still lists a source in its <see cref="CatalogEntry.Replaces"/> had marked it superseded, an empty entry keeps that
-/// mark.
+/// <see cref="KnowledgeFilter.AnyOf"/>, the corresponding catalog entries are removed. When another key narrows the
+/// delete (a <c>page</c> as well as a <c>source</c>), a source's entry stays while chunks of it remain, and goes with
+/// its last chunk; over an inner store that is not an <see cref="IListableKnowledgeStore"/>, or wraps one that can't
+/// list, the entries of every source the filter names are removed. When a superseded source is deleted while a newer
+/// document still lists it in its <see cref="CatalogEntry.Replaces"/>, an empty entry keeps it superseded by that one,
+/// so deleting a document before indexing it again doesn't lose the mark. A deleted document's own
+/// <see cref="CatalogEntry.Replaces"/> marks are cleared from the sources it replaced, as are those of a document
+/// indexed again on the sources it no longer lists, unless a source's own header names it as what supersedes it (its
+/// chunks carry <c>superseded_by</c>). Telling the two apart takes listing the source's chunks: over an inner store
+/// that is not an <see cref="IListableKnowledgeStore"/>, or wraps one that can't list, those marks stay. A source
+/// another document still lists in its <see cref="CatalogEntry.Replaces"/> is marked superseded by that one instead
+/// (<see cref="IKnowledgeCatalog.GetReplacingAsync"/>).
 /// </para>
 /// <para>
 /// On <see cref="SearchAsync"/>: each result's metadata gets its document's date and what supersedes it from the
@@ -85,6 +94,9 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>The store this one decorates.</summary>
+    internal IKnowledgeStore Inner => _inner;
+
     /// <summary>The underlying catalog maintained by this decorator.</summary>
     public IKnowledgeCatalog Catalog => _catalog;
 
@@ -128,6 +140,21 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
 #pragma warning restore ANNKEEXP004
 
     /// <summary>
+    /// The chunks the store this one wraps lists for <paramref name="filter"/>, at most <paramref name="limit"/>, marked
+    /// from the catalog as <see cref="SearchAsync"/> marks its results, and under <see cref="SupersededResults.Exclude"/>
+    /// without the superseded ones; <see langword="null"/> when that store can't list.
+    /// </summary>
+#pragma warning disable ANNKEEXP004 // reads the experimental SupersededResults
+    internal async Task<IReadOnlyList<KnowledgeChunk>?> TryListMarkedAsync(KnowledgeFilter filter, int limit, CancellationToken ct)
+    {
+        if (await _inner.TryListAsync(filter, limit, ct).ConfigureAwait(false) is not { } listed)
+            return null;
+        var marked = await MarkAsync(listed, new Dictionary<string, CatalogEntry?>(StringComparer.Ordinal), ct).ConfigureAwait(false);
+        return SupersededResults == SupersededResults.Exclude ? [.. marked.Where(c => !IsSuperseded(c))] : marked;
+    }
+#pragma warning restore ANNKEEXP004
+
+    /// <summary>
     /// The results with their documents' dates and superseding written in from the catalog, reranked by time decay when
     /// it is set.
     /// </summary>
@@ -137,24 +164,21 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
         if (results.Count == 0)
             return results;
 
+        // One catalog read for the sources this round brings that earlier rounds didn't.
+        var unread = results.Select(Source).OfType<string>().Where(s => !entries.ContainsKey(s)).ToList();
+        if (unread.Count > 0)
+        {
+            foreach (var source in unread)
+                entries[source] = null;
+            foreach (var found in await _catalog.GetManyAsync(unread, ct).ConfigureAwait(false))
+                entries[found.Source] = found;
+        }
+
         var now = _timeProvider.GetUtcNow();
         var marked = new List<KnowledgeChunk>(results.Count);
         foreach (var chunk in results)
         {
-            // A catalog has no entry for a blank source, and its GetAsync rejects one.
-            if (chunk.Metadata.GetValueOrDefault("source") is not { } source || string.IsNullOrWhiteSpace(source))
-            {
-                marked.Add(chunk);
-                continue;
-            }
-
-            if (!entries.TryGetValue(source, out var entry))
-            {
-                entry = await _catalog.GetAsync(source, ct).ConfigureAwait(false);
-                entries[source] = entry;
-            }
-
-            if (entry is null)
+            if (Source(chunk) is not { } source || entries[source] is not { } entry)
             {
                 marked.Add(chunk);
                 continue;
@@ -170,6 +194,10 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
             marked.Sort((a, b) => b.Score.CompareTo(a.Score));
         return marked;
     }
+
+    /// <summary>The chunk's <c>source</c>, or <see langword="null"/> when it is blank: a catalog has no entry for one, and rejects it.</summary>
+    private static string? Source(KnowledgeChunk chunk) =>
+        chunk.Metadata.GetValueOrDefault("source") is { } source && !string.IsNullOrWhiteSpace(source) ? source : null;
 
     /// <summary>The chunk with its catalog entry's <c>effective_at</c> and <c>superseded_by</c>, where the chunk has none of its own.</summary>
     private static KnowledgeChunk WithEntry(KnowledgeChunk chunk, CatalogEntry entry)
@@ -241,6 +269,8 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
 
             await _catalog.IndexAsync(entry, ct);
             await MarkReplacedAsync(source, replaces, ct);
+            if (existing is not null)
+                await ClearMarksAsync(source, [.. existing.Replaces.Except(replaces, StringComparer.Ordinal)], ct);
         }
     }
 
@@ -306,24 +336,42 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
     /// <inheritdoc />
     public async Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default)
     {
+        KnowledgeFilter.ThrowIfEmptyForDelete(filter);
         await _inner.DeleteAsync(filter, ct);
 
-        // A filter that targets sources removes their catalog entries.
+        // A filter that targets sources removes their catalog entries, but one that another key narrows only those of
+        // sources it took the last chunk of.
+#pragma warning disable ANNKEEXP004 // reads the experimental AnyOf
+        var narrowed = filter.Keys.Any(k => k != "source") || filter.AnyOf.Keys.Any(k => k != "source");
+#pragma warning restore ANNKEEXP004
         foreach (var source in filter.ValuesOf("source") ?? [])
+        {
+            if (narrowed && await HasChunksAsync(source, ct).ConfigureAwait(false))
+                continue;
             await RemoveEntryAsync(source, ct);
+        }
     }
 
     /// <summary>
-    /// Removes a source's catalog entry. A newer document's mark is kept on an empty entry while that document still
-    /// says it replaces this one, so deleting before indexing again doesn't lose it.
+    /// Whether the inner store still holds a chunk of <paramref name="source"/>; <see langword="false"/> when it can't
+    /// list.
+    /// </summary>
+    private async Task<bool> HasChunksAsync(string source, CancellationToken ct) =>
+        await _inner.TryListAsync(new KnowledgeFilter { ["source"] = source }, limit: 1, ct).ConfigureAwait(false) is { Count: > 0 };
+
+    /// <summary>
+    /// Removes a source's catalog entry. A superseded source keeps a mark on an empty entry while a newer document still
+    /// says it replaces this one (<see cref="ReplacedByAsync"/>), so deleting before indexing again doesn't lose it. The
+    /// marks this document left on the ones it replaces are cleared (<see cref="ClearMarksAsync"/>).
     /// </summary>
     private async Task RemoveEntryAsync(string source, CancellationToken ct)
     {
         var existing = await _catalog.GetAsync(source, ct).ConfigureAwait(false);
         await _catalog.RemoveAsync(source, ct).ConfigureAwait(false);
-        if (existing?.SupersededBy is { Length: > 0 } newer
-            && await _catalog.GetAsync(newer, ct).ConfigureAwait(false) is { } replacing
-            && replacing.Replaces.Contains(source, StringComparer.Ordinal))
+        if (existing is not null)
+            await ClearMarksAsync(source, existing.Replaces, ct).ConfigureAwait(false);
+        if (existing?.SupersededBy is { Length: > 0 } marked
+            && await ReplacedByAsync(source, preferred: marked, except: null, ct).ConfigureAwait(false) is { } newer)
         {
             await _catalog.IndexAsync(new CatalogEntry
             {
@@ -337,20 +385,68 @@ public sealed class CatalogAwareKnowledgeStore : IListableKnowledgeStore
         }
     }
 
+    /// <summary>
+    /// Clears the mark <paramref name="newer"/> left on each source it replaced, unless a chunk of that source carries
+    /// <c>superseded_by</c> naming it (its own header said so), which only a store that lists can show. Over a store
+    /// that can't list, the marks stay. Where another document still lists the source in its
+    /// <see cref="CatalogEntry.Replaces"/>, the mark names that one instead (<see cref="ReplacedByAsync"/>); else an
+    /// empty entry that only carried the mark is removed.
+    /// </summary>
+    private async Task ClearMarksAsync(string newer, IReadOnlyList<string> replaced, CancellationToken ct)
+    {
+        foreach (var source in replaced.Where(s => s != newer).Distinct(StringComparer.Ordinal))
+        {
+            if (await _catalog.GetAsync(source, ct).ConfigureAwait(false) is not { } entry || entry.SupersededBy != newer)
+                continue;
+
+            var named = await _inner.TryListAsync(
+                new KnowledgeFilter { ["source"] = source, [SupersededByKey] = newer }, limit: 1, ct).ConfigureAwait(false);
+            if (named is null)
+                return;
+            if (named.Count > 0)
+                continue;
+
+            if (await ReplacedByAsync(source, preferred: null, except: newer, ct).ConfigureAwait(false) is { } other)
+                await _catalog.IndexAsync(entry with { SupersededBy = other }, ct).ConfigureAwait(false);
+            else if (entry.ChunkCount == 0)
+                await _catalog.RemoveAsync(source, ct).ConfigureAwait(false);
+            else
+                await _catalog.IndexAsync(entry with { SupersededBy = null }, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The document, other than <paramref name="except"/>, that still lists <paramref name="source"/> in its
+    /// <see cref="CatalogEntry.Replaces"/>: <paramref name="preferred"/> when it is one, else the newest by its own date
+    /// or else when it was indexed; <see langword="null"/> when none does.
+    /// </summary>
+    private async Task<string?> ReplacedByAsync(string source, string? preferred, string? except, CancellationToken ct)
+    {
+        var replacing = (await _catalog.GetReplacingAsync(source, ct).ConfigureAwait(false))
+            .Where(e => e.Source != source && e.Source != except)
+            .ToList();
+        return replacing.Any(e => e.Source == preferred)
+            ? preferred
+            : replacing.OrderByDescending(e => e.EffectiveAt ?? e.IndexedAt).ThenBy(e => e.Source, StringComparer.Ordinal).FirstOrDefault()?.Source;
+    }
+
     /// <inheritdoc />
 #pragma warning disable ANNKEEXP004 // lists through the experimental listing
     public Task<IReadOnlyList<KnowledgeChunk>> ListAsync(
         KnowledgeFilter filter, int limit = 1000, KnowledgeDateOrder? order = null, CancellationToken ct = default) =>
-        _inner is IListableKnowledgeStore listable
-            ? listable.ListAsync(filter, limit, order, ct)
-            : throw new NotSupportedException($"The store this one wraps ({_inner.GetType().Name}) can't list.");
+        _inner.ListThroughAsync(filter, limit, order, ct);
+
+    /// <inheritdoc />
+    /// <remarks>Through the inner store; the catalog is left as it is.</remarks>
+    public Task UpdateMetadataAsync(KnowledgeChunk listed, IReadOnlyDictionary<string, string> metadata, CancellationToken ct = default) =>
+        _inner.UpdateMetadataThroughAsync(listed, metadata, ct);
 #pragma warning restore ANNKEEXP004
 
     /// <summary>The document's own date, from its chunks' <c>effective_at</c> metadata, when it is there and parses.</summary>
     private static DateTimeOffset? EffectiveAt(IEnumerable<KnowledgeDocument> chunks) =>
         chunks.Select(c => c.Metadata.TryGetValue(EffectiveAtKey, out var value) ? value : null)
             .FirstOrDefault(v => v is not null) is { } text
-        && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var date)
+        && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var date)
             ? date
             : null;
 }

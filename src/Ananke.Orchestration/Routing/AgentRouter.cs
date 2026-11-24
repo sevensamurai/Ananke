@@ -29,17 +29,19 @@ public sealed class AgentRouter<TState> : IRouter<TState>
     private readonly IReadOnlyList<string> _options;
     private readonly string? _systemPrompt;
     private readonly IReadOnlyList<AgentTool>? _tools;
-    private readonly IReadOnlyDictionary<string, ToolDefinition>? _toolExecutors;
+    private readonly ToolKit? _toolKit;
     private readonly int _maxToolRounds;
     private readonly int _maxRoutingRetries;
+
+    // A router has no agent name of its own; this is the agent id an unknown tool call is reported under.
+    private const string RouterAgentId = "agent-router";
 
     internal AgentRouter(
         IAgentModel model,
         Func<TState, string> promptBuilder,
         IReadOnlyList<string> options,
         string? systemPrompt,
-        IReadOnlyList<AgentTool>? tools,
-        IReadOnlyDictionary<string, ToolDefinition>? toolExecutors,
+        ToolKit? toolKit,
         int maxToolRounds,
         int maxRoutingRetries)
     {
@@ -47,8 +49,10 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         _promptBuilder = promptBuilder;
         _options = options;
         _systemPrompt = systemPrompt;
-        _tools = tools;
-        _toolExecutors = toolExecutors;
+        _tools = toolKit?.Tools.Values
+            .Select(t => new AgentTool(t.Name, t.Description, t.ParametersJsonSchema))
+            .ToList();
+        _toolKit = toolKit;
         _maxToolRounds = maxToolRounds;
         _maxRoutingRetries = maxRoutingRetries;
     }
@@ -75,7 +79,7 @@ public sealed class AgentRouter<TState> : IRouter<TState>
         await UsageRecording.ReportAsync(response, ct);
 
         var round = 0;
-        while (response.RequiresAction && _toolExecutors is not null)
+        while (response.RequiresAction && _toolKit is not null)
         {
             if (++round > _maxToolRounds)
                 break;
@@ -87,10 +91,12 @@ public sealed class AgentRouter<TState> : IRouter<TState>
                 ToolResult toolResult;
                 if (!ToolDispatch.TryParseArguments(call.Arguments, call.FunctionName, out var args, out var parseError))
                     toolResult = parseError;
+                else if (_toolKit.Tools.TryGetValue(call.FunctionName, out var executor))
+                    toolResult = await ToolDispatch.InvokeAsync(executor, args, ct);
                 else
-                    toolResult = _toolExecutors.TryGetValue(call.FunctionName, out var exec)
-                        ? await exec.ExecuteAsync(args, ct)
-                        : ToolResult.Error($"Unknown tool: {call.FunctionName}");
+                    toolResult = await UnknownTools.ReportAsync(
+                        _toolKit.HallucinationObserver, call.FunctionName, _toolKit.Name, RouterAgentId,
+                        episodeId: string.Empty, TimeProvider.System, ct);
                 messages.Add(AgentMessage.ToolResult(call.Id, toolResult.Value));
             }
 
@@ -216,20 +222,9 @@ public sealed class AgentRouter<TState> : IRouter<TState>
                         $"Duplicate routing option '{opt}'. Each option name must be unique (case-insensitive).");
             }
 
-            IReadOnlyList<AgentTool>? tools = null;
-            IReadOnlyDictionary<string, ToolDefinition>? toolExecutors = null;
-
-            if (_toolKit is not null)
-            {
-                tools = _toolKit.Tools.Values
-                    .Select(t => new AgentTool(t.Name, t.Description, t.ParametersJsonSchema))
-                    .ToList();
-                toolExecutors = _toolKit.Tools;
-            }
-
             return new AgentRouter<TState>(
                 _model, _promptBuilder, _options, _systemPrompt,
-                tools, toolExecutors, _maxToolRounds, _maxRoutingRetries);
+                _toolKit, _maxToolRounds, _maxRoutingRetries);
         }
     }
 }

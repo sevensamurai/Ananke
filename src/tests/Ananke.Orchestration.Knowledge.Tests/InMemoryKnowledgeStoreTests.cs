@@ -170,18 +170,8 @@ public class InMemoryKnowledgeStoreTests
     }
 
     [Test]
-    public async Task DeleteAsync_EmptyFilter_MatchesEverything()
-    {
-        await _store.UpsertAsync(
-        [
-            new KnowledgeDocument { Id = "a", Text = "text a" },
-            new KnowledgeDocument { Id = "b", Text = "text b" }
-        ]);
-
-        await _store.DeleteAsync(new KnowledgeFilter());
-
-        _store.Count.ShouldBe(0);
-    }
+    public Task DeleteAsync_EmptyFilter_ThrowsAndDeletesNothing() =>
+        EmptyFilterDeleteCases.Delete_AnEmptyFilter_ThrowsAndDeletesNothing(_store);
 
     [Test]
     public async Task UpsertAsync_DocumentWithoutExplicitMetadata_DefaultsToEmptyDictionary()

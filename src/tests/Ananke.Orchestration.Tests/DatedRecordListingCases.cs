@@ -104,4 +104,107 @@ public static class DatedRecordListingCases
         var since = await store.ListAsync(filter, limit: Count, order: order with { Since = DateOf(Count - 3) });
         since.Select(c => c.Metadata["source"]).ShouldBe(["note-1499.md", "note-1498.md", "note-1497.md"]);
     }
+
+    /// <summary>
+    /// A date written without an offset is read as UTC by the store and by <see cref="DatedRecordReader{TRecord}"/>,
+    /// with the process ahead of UTC: it sorts between dates an hour either side of it in UTC, and a lower bound at that
+    /// instant keeps it. <paramref name="store"/> is empty; for Postgres, its session time zone is ahead of UTC too.
+    /// </summary>
+    public static async Task ListAsync_DateWithoutAnOffset_IsReadAsUtc(IListableKnowledgeStore store)
+    {
+        using var _ = new ProcessTimeZone("Asia/Kolkata");
+        await store.UpsertAsync(
+        [
+            Record("before", "An hour before", "2026-11-01T04:00:00+05:00"),
+            Record("no-offset", "No offset", "2026-11-01T00:00:00"),
+            Record("after", "An hour after", "2026-11-01T01:00:00Z"),
+        ]);
+        var midnight = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var order = new KnowledgeDateOrder(DocumentHeaderOptions.EffectiveAtKey);
+
+        var listed = await store.ListAsync(new KnowledgeFilter(), order: order);
+        listed.Select(c => c.Metadata["source"]).ShouldBe(["after.md", "no-offset.md", "before.md"]);
+        var listedSince = await store.ListAsync(new KnowledgeFilter(), order: order with { Since = midnight });
+        listedSince.Select(c => c.Metadata["source"]).ShouldBe(["after.md", "no-offset.md"]);
+
+        var reader = new DatedRecordReader<Note>(store);
+        var all = await reader.ListAsync();
+        all.Select(r => r.Source).ShouldBe(["after.md", "no-offset.md", "before.md"]);
+        all[1].EffectiveAt.ShouldBe(midnight);
+        all[1].EffectiveAt!.Value.Offset.ShouldBe(TimeSpan.Zero);
+
+        var since = await reader.ListAsync(since: midnight);
+        since.Select(r => r.Source).ShouldBe(["after.md", "no-offset.md"]);
+    }
+
+    /// <summary>
+    /// Only an ISO 8601 date and time is a date: values a database or parser may read as one (<c>infinity</c>,
+    /// <c>epoch</c>, <c>today</c>, <c>03/04/2026</c>) are listed after the dated chunks, left out by a lower bound, and
+    /// read as no date by <see cref="DatedRecordReader{TRecord}"/>. <paramref name="store"/> is empty.
+    /// </summary>
+    public static async Task ListAsync_ValuesThatArentIsoDates_AreNoDate(IListableKnowledgeStore store)
+    {
+        string[] notDates = ["infinity", "-infinity", "epoch", "today", "03/04/2026"];
+        await store.UpsertAsync(
+        [
+            Record("dated", "Dated", "2026-03-04T10:00:00Z"),
+            Record("day", "A day", "2026-03-01"),
+            .. notDates.Select(value => Record(value, value, value)),
+        ]);
+        var order = new KnowledgeDateOrder(DocumentHeaderOptions.EffectiveAtKey);
+
+        var listed = await store.ListAsync(new KnowledgeFilter(), order: order);
+        listed.Take(2).Select(c => c.Metadata["source"]).ShouldBe(["dated.md", "day.md"]);
+        listed.Skip(2).Select(c => c.Metadata["source"]).ShouldBe([.. notDates.Select(v => $"{v}.md")], ignoreOrder: true);
+        var since = await store.ListAsync(new KnowledgeFilter(), order: order with { Since = DateTimeOffset.MinValue });
+        since.Select(c => c.Metadata["source"]).ShouldBe(["dated.md", "day.md"]);
+
+        var records = await new DatedRecordReader<Note>(store).ListAsync();
+        records.Where(r => r.EffectiveAt is null).Select(r => r.Source).ShouldBe([.. notDates.Select(v => $"{v}.md")], ignoreOrder: true);
+    }
+
+    /// <summary>
+    /// An offset over 14 hours, or a date and time outside <see cref="DateTimeOffset"/>'s range in UTC, is no date, though
+    /// PostgreSQL reads it as one. Qdrant reads some of these as dates. <paramref name="store"/> is empty.
+    /// </summary>
+    public static async Task ListAsync_OffsetsAndDatesOutOfRange_AreNoDate(IListableKnowledgeStore store)
+    {
+        string[] notDates = ["2026-03-04T10:00:00+14:30", "2026-03-04T10:00:00-15:00", "0001-01-01T00:00:00+05:00", "9999-12-31T23:00:00-05:00"];
+        await store.UpsertAsync(
+        [
+            Record("dated", "Dated", "2026-03-04T10:00:00+14:00"),
+            Record("first", "First", "0001-01-01T05:00:00+05:00"),
+            .. notDates.Select((value, i) => Record($"not-a-date-{i}", value, value)),
+        ]);
+        var order = new KnowledgeDateOrder(DocumentHeaderOptions.EffectiveAtKey);
+
+        var listed = await store.ListAsync(new KnowledgeFilter(), order: order);
+        listed.Take(2).Select(c => c.Metadata["source"]).ShouldBe(["dated.md", "first.md"]);
+        listed.Skip(2).Select(c => c.Metadata["source"]).ShouldBe([.. notDates.Select((_, i) => $"not-a-date-{i}.md")], ignoreOrder: true);
+        var since = await store.ListAsync(new KnowledgeFilter(), order: order with { Since = DateTimeOffset.MinValue });
+        since.Select(c => c.Metadata["source"]).ShouldBe(["dated.md", "first.md"]);
+    }
+
+    /// <summary>Sets the process's local time zone until disposed, and checks it is away from UTC.</summary>
+    private sealed class ProcessTimeZone : IDisposable
+    {
+        private readonly string? _previous = Environment.GetEnvironmentVariable("TZ");
+
+        public ProcessTimeZone(string id)
+        {
+            Environment.SetEnvironmentVariable("TZ", id);
+            TimeZoneInfo.ClearCachedData();
+            if (TimeZoneInfo.Local.BaseUtcOffset == TimeSpan.Zero)
+            {
+                Dispose();
+                Assert.Fail($"the local time zone should be {id}");
+            }
+        }
+
+        public void Dispose()
+        {
+            Environment.SetEnvironmentVariable("TZ", _previous);
+            TimeZoneInfo.ClearCachedData();
+        }
+    }
 }

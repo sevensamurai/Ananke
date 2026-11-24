@@ -2,7 +2,7 @@ using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Catalog;
 using Shouldly;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary><see cref="PostgresKnowledgeCatalog"/> against Postgres with pgvector.</summary>
 [TestFixture]
@@ -40,6 +40,20 @@ public class PostgresKnowledgeCatalogTests
         entry.Keywords.ShouldBe(["identity", "0001.md"]);
         entry.IndexedAt.ShouldBe(Now);
         entry.ChunkCount.ShouldBe(3);
+    }
+
+    [Test]
+    public async Task GetManyAsync_SeveralSources_ReturnsTheEntriesFoundAndLeavesOutTheMissing()
+    {
+        await _catalog.IndexAsync(Entry("0001.md"));
+        await _catalog.IndexAsync(Entry("0002.md", supersededBy: "0003.md"));
+        await _catalog.IndexAsync(Entry("0003.md"));
+
+        var entries = await _catalog.GetManyAsync(["0002.md", "missing.md", "0001.md", "0002.md"]);
+
+        entries.Select(e => e.Source).ShouldBe(["0001.md", "0002.md"], ignoreOrder: true);
+        entries.Single(e => e.Source == "0002.md").SupersededBy.ShouldBe("0003.md");
+        (await _catalog.GetManyAsync([])).ShouldBeEmpty();
     }
 
     private static CatalogEntry Plan(string source, string type, string status, DateTimeOffset indexedAt, DateTimeOffset? effectiveAt = null) =>
@@ -99,6 +113,18 @@ public class PostgresKnowledgeCatalogTests
         await _catalog.IndexAsync(Entry("9110.md") with { Replaces = ["7230.md", "7231.md"] });
 
         (await _catalog.GetAsync("9110.md"))!.Replaces.ShouldBe(["7230.md", "7231.md"]);
+    }
+
+    [Test]
+    public async Task GetReplacingAsync_SeveralEntriesNameTheSource_ReturnsThoseEntries()
+    {
+        await _catalog.IndexAsync(Entry("7230.md") with { Replaces = ["2616.md"] });
+        await _catalog.IndexAsync(Entry("7231.md", supersededBy: "9110.md") with { Replaces = ["2616.md", "2617.md"] });
+        await _catalog.IndexAsync(Entry("9110.md") with { Replaces = ["7231.md", "2616.md.bak"] });
+
+        (await _catalog.GetReplacingAsync("2616.md")).Select(e => e.Source).ShouldBe(["7230.md", "7231.md"], ignoreOrder: true);
+        (await _catalog.GetReplacingAsync("2617.md")).Single().Replaces.ShouldBe(["2616.md", "2617.md"]);
+        (await _catalog.GetReplacingAsync("2618.md")).ShouldBeEmpty();
     }
 
     [Test]

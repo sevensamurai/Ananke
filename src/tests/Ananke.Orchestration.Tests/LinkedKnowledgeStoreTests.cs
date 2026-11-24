@@ -199,6 +199,89 @@ public class LinkedKnowledgeStoreTests
         results.Count.ShouldBeLessThanOrEqualTo(2);
     }
 
+    // ── Caller's filter ──────────────────────────────────────────
+
+    [Test]
+    public async Task SearchAsync_WithFilter_FollowsOnlyLinksToChunksTheFilterMatches()
+    {
+        await UpsertOutletsAsync();
+        var store = new LinkedKnowledgeStore(new SeedOnlyStore(_inner), _graph);
+
+        var results = await store.SearchAsync("cats are great pets",
+            new SearchOptions { Filter = new KnowledgeFilter { ["outlet"] = "a" } });
+
+        results.Select(r => r.Id).ShouldBe(["1", "3"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task SearchAsync_WithAnyOfFilter_FollowsOnlyLinksToChunksTheFilterMatches()
+    {
+        await UpsertOutletsAsync();
+        var store = new LinkedKnowledgeStore(new SeedOnlyStore(_inner), _graph);
+#pragma warning disable ANNKEEXP004 // KnowledgeFilter.AnyOf is experimental
+        var filter = new KnowledgeFilter { AnyOf = { ["outlet"] = ["a", "c"] } };
+#pragma warning restore ANNKEEXP004
+
+        var results = await store.SearchAsync("cats are great pets", new SearchOptions { Filter = filter });
+
+        results.Select(r => r.Id).ShouldBe(["1", "3", "4"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task SearchAsync_WithIdFilter_FollowsOnlyLinksToTheIdsItAllows()
+    {
+        await UpsertOutletsAsync();
+        var store = new LinkedKnowledgeStore(new SeedOnlyStore(_inner), _graph);
+#pragma warning disable ANNKEEXP004 // KnowledgeFilter.AnyOf is experimental
+        var filter = new KnowledgeFilter { AnyOf = { ["id"] = ["1", "4"] } };
+#pragma warning restore ANNKEEXP004
+
+        var results = await store.SearchAsync("cats are great pets", new SearchOptions { Filter = filter });
+
+        results.Select(r => r.Id).ShouldBe(["1", "4"], ignoreOrder: true);
+    }
+
+    /// <summary>Seed 1 (outlet a) links to 2 (outlet b), 3 (outlet a) and 4 (outlet c).</summary>
+    private async Task UpsertOutletsAsync()
+    {
+        await _inner.UpsertAsync(
+        [
+            Doc("1", "cats are great pets", "a"),
+            Doc("2", "completely unrelated gamma delta", "b"),
+            Doc("3", "another unrelated epsilon zeta", "a"),
+            Doc("4", "yet another unrelated eta theta", "c")
+        ]).ConfigureAwait(false);
+        await _graph.AddLinkAsync("1", "2", "references").ConfigureAwait(false);
+        await _graph.AddLinkAsync("1", "3", "references").ConfigureAwait(false);
+        await _graph.AddLinkAsync("1", "4", "references").ConfigureAwait(false);
+
+        static KnowledgeDocument Doc(string id, string text, string outlet) => new()
+        {
+            Id = id,
+            Text = text,
+            Metadata = new Dictionary<string, string> { ["id"] = id, ["outlet"] = outlet }
+        };
+    }
+
+    /// <summary>
+    /// Returns only the top vector result, so a chunk among the results that is not that seed came from a link; a
+    /// lookup by id goes to the inner store as asked.
+    /// </summary>
+    private sealed class SeedOnlyStore(IKnowledgeStore inner) : IKnowledgeStore
+    {
+        public Task<IReadOnlyList<KnowledgeChunk>> SearchAsync(
+            string query, SearchOptions? options = null, CancellationToken ct = default) =>
+            options?.Filter?.ContainsKey("id") == true
+                ? inner.SearchAsync(query, options, ct)
+                : inner.SearchAsync(query, (options ?? new SearchOptions()) with { TopK = 1 }, ct);
+
+        public Task UpsertAsync(IEnumerable<KnowledgeDocument> documents, CancellationToken ct = default) =>
+            inner.UpsertAsync(documents, ct);
+
+        public Task DeleteAsync(KnowledgeFilter filter, CancellationToken ct = default) =>
+            inner.DeleteAsync(filter, ct);
+    }
+
     // ── Delete cleans links ──────────────────────────────────────
 
     [Test]

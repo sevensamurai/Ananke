@@ -1,3 +1,4 @@
+using System.Globalization;
 using Ananke.Abstractions.Agents;
 using Ananke.Orchestration.Knowledge.Catalog;
 using Qdrant.Client;
@@ -120,6 +121,49 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
 
         var point = points.FirstOrDefault();
         return point is null ? null : MapRetrievedPoint(point);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CatalogEntry>> GetManyAsync(IEnumerable<string> sources, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var names = sources.Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var source in names)
+            ArgumentException.ThrowIfNullOrWhiteSpace(source, nameof(sources));
+        if (names.Length == 0)
+            return [];
+
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
+        var points = await _client.RetrieveAsync(
+            _collectionName,
+            [.. names.Select(ToPointId)],
+            withPayload: true,
+            cancellationToken: ct).ConfigureAwait(false);
+        return [.. points.Select(MapRetrievedPoint)];
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <c>replaces</c> holds the sources as a JSON array in one string, so the query matches the source as JSON writes it,
+    /// quotes included, within that string, and each entry found is checked against its <see cref="CatalogEntry.Replaces"/>.
+    /// </remarks>
+    public async Task<IReadOnlyList<CatalogEntry>> GetReplacingAsync(string source, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        await EnsureCollectionAsync(ct).ConfigureAwait(false);
+
+        var filter = new Filter { Must = { Conditions.MatchText(ReplacesPayloadKey, System.Text.Json.JsonSerializer.Serialize(source)) } };
+        var entries = new List<CatalogEntry>();
+        PointId? offset = null;
+        do
+        {
+            var page = await _client.ScrollAsync(
+                _collectionName, filter: filter, limit: 256, offset: offset, payloadSelector: true, cancellationToken: ct).ConfigureAwait(false);
+            entries.AddRange(page.Result.Select(MapRetrievedPoint).Where(e => e.Replaces.Contains(source, StringComparer.Ordinal)));
+            offset = page.NextPageOffset;
+        }
+        while (offset is not null);
+        return entries;
     }
 
     /// <inheritdoc />
@@ -336,7 +380,7 @@ public sealed class QdrantKnowledgeCatalog : IKnowledgeCatalog
                 indexedAt = DateTimeOffset.FromUnixTimeSeconds(ts.IntegerValue);
             else if (ts.KindCase == Value.KindOneofCase.DoubleValue)
                 indexedAt = DateTimeOffset.FromUnixTimeSeconds((long)ts.DoubleValue);
-            else if (ts.KindCase == Value.KindOneofCase.StringValue && DateTimeOffset.TryParse(ts.StringValue, out var parsed))
+            else if (ts.KindCase == Value.KindOneofCase.StringValue && DateTimeOffset.TryParse(ts.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
                 indexedAt = parsed;
         }
 

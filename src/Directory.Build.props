@@ -26,7 +26,7 @@
   <!-- Coordinated version across all packages. MsExtensionsVersion, the Microsoft.Extensions.*
        version, is pinned in Directory.Packages.props. -->
   <PropertyGroup>
-    <VersionPrefix>0.9.2</VersionPrefix>
+    <VersionPrefix>0.9.3</VersionPrefix>
   </PropertyGroup>
 
   <!-- NuGet package metadata (applies when IsPackable=true in individual csproj) -->

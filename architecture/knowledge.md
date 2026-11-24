@@ -50,10 +50,21 @@ flowchart TD
 |---|---|---|
 | `IKnowledgeStore` | Knowledge | Store and search vector-indexed chunks |
 | `InMemoryKnowledgeStore` | Knowledge | In-memory impl (cosine similarity) |
+| `IListableKnowledgeStore` | Knowledge | Lists chunks by filter, newest first by a date; updates a listed chunk's metadata without embedding it again |
 | `IKnowledgeCatalog` | Knowledge | Document-level metadata, keywords, summaries |
 | `InMemoryKnowledgeCatalog` | Knowledge | In-memory impl |
 | `CatalogAwareKnowledgeStore` | Knowledge | Decorator that auto-updates catalog on ingest |
 | `CatalogKeywordExtractor` | Knowledge | Extract keywords from chunks for catalog |
+
+### Records
+
+| Type | Assembly | Purpose |
+|---|---|---|
+| `IDocumentRecords` | Knowledge | A step `DocumentProcessor.Records` runs on a document's records after its chunks are stored |
+| `CompositeDocumentRecords` | Knowledge | Several records steps on one document; refuses steps that would delete each other's records |
+| `DatedRecordExtractor<TRecord>` | Orchestration | Reads dated records from a document with a model, kept only when their quote is in it |
+| `DatedRecordWriter<TRecord>` | Orchestration | Stores records people write, with no model call, and marks those whose passage is gone |
+| `DatedRecordReader<TRecord>` | Orchestration | Searches and lists records newest first, saying which are replaced |
 
 ### Document Linking
 
@@ -72,6 +83,7 @@ flowchart TD
 | Package | Implements | Backend |
 |---|---|---|
 | `Ananke.Qdrant` | `IKnowledgeStore`, `IKnowledgeCatalog`, `IEmpiricalMemory` | Qdrant vector DB |
+| `Ananke.Postgres` | `IKnowledgeStore`, `IKnowledgeCatalog` | PostgreSQL with pgvector |
 
 ## `KnowledgeBase` Facade
 

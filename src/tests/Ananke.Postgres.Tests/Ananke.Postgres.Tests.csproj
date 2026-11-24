@@ -21,6 +21,13 @@
     <ProjectReference Include="..\..\Ananke.Postgres\Ananke.Postgres.csproj" />
     <ProjectReference Include="..\..\Ananke.Orchestration\Ananke.Orchestration.csproj" />
     <Compile Include="..\Ananke.Orchestration.Tests\DatedRecordListingCases.cs" Link="DatedRecordListingCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\Search\FilteredKeywordSearchCases.cs" Link="FilteredKeywordSearchCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\Search\WeightedHybridSearchCases.cs" Link="WeightedHybridSearchCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\ChunkIdCases.cs" Link="ChunkIdCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\DottedKeyFilterCases.cs" Link="DottedKeyFilterCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\IdFilterCases.cs" Link="IdFilterCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\EmptyFilterDeleteCases.cs" Link="EmptyFilterDeleteCases.cs" />
+    <Compile Include="..\Ananke.Orchestration.Knowledge.Tests\MetadataUpdateCases.cs" Link="MetadataUpdateCases.cs" />
   </ItemGroup>
 
   <ItemGroup>

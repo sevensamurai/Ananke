@@ -32,6 +32,43 @@ public interface IKnowledgeCatalog
     Task<CatalogEntry?> GetAsync(string source, CancellationToken ct = default);
 
     /// <summary>
+    /// Retrieves the catalog entries for several sources at once. A source with no entry is left out, and each entry
+    /// comes once however often its source is named; the order is not defined. Each entry's
+    /// <see cref="CatalogEntry.Source"/> is its source as named (ordinal), since callers match entries to sources by it.
+    /// A blank source is rejected, as <see cref="GetAsync"/> rejects it.
+    /// </summary>
+    /// <remarks>
+    /// The default calls <see cref="GetAsync"/> once per source. The built-in catalogs answer in one query.
+    /// </remarks>
+    async Task<IReadOnlyList<CatalogEntry>> GetManyAsync(IEnumerable<string> sources, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var entries = new List<CatalogEntry>();
+        foreach (var source in sources.Distinct(StringComparer.Ordinal))
+        {
+            if (await GetAsync(source, ct).ConfigureAwait(false) is { } entry)
+                entries.Add(entry);
+        }
+        return entries;
+    }
+
+    /// <summary>
+    /// Retrieves the entries whose <see cref="CatalogEntry.Replaces"/> names <paramref name="source"/> (ordinal), superseded
+    /// ones included; the order is not defined. A blank source is rejected, as <see cref="GetAsync"/> rejects it.
+    /// </summary>
+    /// <remarks>
+    /// The default browses every entry (<see cref="BrowseAsync"/> with no limit) and keeps those that name the source, so
+    /// over a catalog whose browsing leaves entries out it finds only those listed. The built-in catalogs answer in one
+    /// query.
+    /// </remarks>
+    async Task<IReadOnlyList<CatalogEntry>> GetReplacingAsync(string source, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        var entries = await BrowseAsync(new CatalogBrowseOptions { Limit = int.MaxValue }, ct).ConfigureAwait(false);
+        return [.. entries.Where(e => e.Replaces.Contains(source, StringComparer.Ordinal))];
+    }
+
+    /// <summary>
     /// Semantic search over catalog summaries and keywords. Returns document-level matches
     /// ranked by relevance. Superseded entries are excluded.
     /// </summary>

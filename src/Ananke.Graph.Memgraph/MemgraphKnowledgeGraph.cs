@@ -42,12 +42,14 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory, TimeP
     /// </summary>
     public async Task EnsureSchemaAsync(CancellationToken ct = default)
     {
+        // Memgraph refuses index changes inside an explicit transaction, so each runs on its own (auto-commit).
         await using var session = factory.OpenSession();
-        await session.ExecuteWriteAsync(async tx =>
+        foreach (var statement in (string[])["CREATE INDEX ON :Node(id);", "CREATE INDEX ON :Node(kind);"])
         {
-            await tx.RunAsync("CREATE INDEX ON :Node(id);").ConfigureAwait(false);
-            await tx.RunAsync("CREATE INDEX ON :Node(kind);").ConfigureAwait(false);
-        }).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            var cursor = await session.RunAsync(statement).ConfigureAwait(false);
+            await cursor.ConsumeAsync().ConfigureAwait(false);
+        }
     }
 
     // ── IKnowledgeGraph ───────────────────────────────────────────────────────
@@ -77,7 +79,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory, TimeP
 
         var relation = ValidateRelationLabel(edge.Relation);
 
-        // Provenance ordinal: Inferred=0, Extracted=1.  We only allow promotion.
+        // Provenance ordinal: Extracted=0, Inferred=1, Ambiguous=2. A lower one wins, so an edge is never demoted.
         var provOrdinal = (int)edge.Provenance;
 
         await session.ExecuteWriteAsync(async tx =>
@@ -93,7 +95,7 @@ public sealed class MemgraphKnowledgeGraph(MemgraphSessionFactory factory, TimeP
                     r += $props
                 ON MATCH SET
                     r.weight      = CASE WHEN $weight > r.weight THEN $weight ELSE r.weight END,
-                    r.provenance  = CASE WHEN $prov  > r.provenance THEN $prov ELSE r.provenance END,
+                    r.provenance  = CASE WHEN $prov  < r.provenance THEN $prov ELSE r.provenance END,
                     r += $props
                 """,
                 new

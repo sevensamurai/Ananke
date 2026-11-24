@@ -183,6 +183,29 @@ public class DatedRecordReaderTests
     }
 
     [Test]
+    public async Task SearchAsync_WithTheCatalogAndARecordWithoutASource_ReturnsItUnreplaced()
+    {
+        await _records.UpsertAsync(
+        [
+            new KnowledgeDocument
+            {
+                Id = "loose:record:0",
+                Text = "HTTP/1.1 keeps connections open by default",
+                Metadata = new Dictionary<string, string>
+                {
+                    [DatedRecordExtractor<Decision>.RecordKey] = System.Text.Json.JsonSerializer.Serialize(
+                        new Decision("HTTP/1.1 keeps connections open by default", null, null)),
+                },
+            },
+        ]);
+
+        var results = await new DatedRecordReader<Decision>(_records, new InMemoryKnowledgeCatalog(new InMemoryEmbedder()))
+            .SearchAsync("HTTP connections open", new SearchOptions { Mode = SearchMode.Sparse, TopK = 10 });
+
+        results.Single().ReplacedBy.ShouldBeNull();
+    }
+
+    [Test]
     public async Task UpsertAsync_ChunksOfASupersededDocument_SetTheCatalogEntrysSupersededBy()
     {
         var catalog = new InMemoryKnowledgeCatalog(new InMemoryEmbedder());
@@ -200,6 +223,32 @@ public class DatedRecordReaderTests
 
         (await catalog.GetAsync("otel.md"))!.SupersededBy.ShouldBe("signoz.md");
         (await catalog.DiscoverAsync("telemetry")).ShouldBeEmpty();
+    }
+
+    public sealed record QuotedDecision(string Statement, string Quote);
+
+    [Test]
+    public async Task SearchAsyncAndListAsync_AQuotedRecord_ReturnItsQuoteAndSection()
+    {
+        var reply = """{"records": [{"Statement": "Telemetry goes to SigNoz", "Quote": "we send telemetry to SigNoz"}]}""";
+        var extractor = new DatedRecordExtractor<QuotedDecision>(new Scripted(reply), _records, new DatedRecordOptions<QuotedDecision>
+        {
+            Instructions = "Extract the decisions, each with the passage that says it.",
+            Text = d => d.Statement,
+            Quote = d => d.Quote,
+        });
+        await extractor.ExtractAsync(
+            "otel.md", new ExtractedDocument([new ExtractedSection("From November we send telemetry to SigNoz.", SectionTitle: "Decision")]),
+            new Dictionary<string, string>());
+        var reader = new DatedRecordReader<QuotedDecision>(_records);
+
+        var found = (await reader.SearchAsync(Query, new SearchOptions { Mode = SearchMode.Sparse })).Single();
+        var listed = (await reader.ListAsync()).Single();
+
+        found.Quote.ShouldBe("we send telemetry to SigNoz");
+        found.Section.ShouldBe("Decision");
+        listed.Quote.ShouldBe("we send telemetry to SigNoz");
+        listed.Section.ShouldBe("Decision");
     }
 
     private sealed class Scripted(string reply) : IAgentModel

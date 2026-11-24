@@ -3,7 +3,7 @@ using Ananke.Orchestration.Knowledge;
 using Npgsql;
 using Shouldly;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary>
 /// The lexeme counts <see cref="PostgresKnowledgeStore"/> keeps for keyword search, in <c>&lt;table&gt;_lexemes</c>,
@@ -39,7 +39,7 @@ public class PostgresLexemeCountTests
         await store.DeleteAsync(new KnowledgeFilter { ["group"] = "two" });
         await ShouldMatchTsStatAsync(table, rows: 2);
 
-        await store.DeleteAsync(new KnowledgeFilter());
+        await store.DeleteAsync(new KnowledgeFilter { ["group"] = "one" });
         await ShouldMatchTsStatAsync(table, rows: 0);
     }
 
@@ -99,7 +99,7 @@ public class PostgresLexemeCountTests
     [Test]
     public async Task Counts_UnderConcurrentWrites_MatchTsStat()
     {
-        var table = PostgresDatabase.NewTable("lexemes_concurrent");
+        var table = PostgresDatabase.NewTable("lex_concurrent");
         var store = new PostgresKnowledgeStore(PostgresDatabase.Require(), Embedder, new PostgresKnowledgeOptions { Table = table });
 
         // Eight writers upsert overlapping ids with overlapping words, in different orders, and delete by filter.

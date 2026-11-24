@@ -3,7 +3,7 @@ using Ananke.Orchestration.Knowledge.Catalog;
 using Npgsql;
 using Shouldly;
 
-namespace Ananke.Postgres.Tests;
+namespace Ananke.Postgres.Tests.Containers;
 
 /// <summary>
 /// Dense search on tables large enough for the planner to read them through the HNSW index, where pgvector reads a
@@ -114,17 +114,6 @@ public class PostgresHnswSearchTests
     }
 
     [Test]
-    public void HnswSettings_MoreRowsThanTheLeastEfSearch_RaisesEfSearchToTheRowsAskedUpToOneThousand()
-    {
-        using var dataSource = NpgsqlDataSource.Create("Host=unused");
-        var schema = new PostgresSchema(dataSource, new HashedEmbedder(Dimensions), new PostgresKnowledgeOptions { HnswEfSearch = 100 });
-
-        schema.HnswSettings(5).ShouldBe("SET LOCAL hnsw.ef_search = 100");
-        schema.HnswSettings(200).ShouldBe("SET LOCAL hnsw.ef_search = 200");
-        schema.HnswSettings(5000).ShouldBe("SET LOCAL hnsw.ef_search = 1000");
-    }
-
-    [Test]
     public async Task HnswSettings_OnPgvectorWithIterativeScan_SetsItAsTheOptionsSay()
     {
         var strict = new PostgresSchema(PostgresDatabase.Require(), new HashedEmbedder(Dimensions), new PostgresKnowledgeOptions { Table = _storeTable });
@@ -134,17 +123,25 @@ public class PostgresHnswSearchTests
         await off.EnsureAsync(Columns, [], default);
 
         strict.HasIterativeScan.ShouldBeTrue();
-        strict.HnswSettings(5).ShouldBe("SET LOCAL hnsw.ef_search = 40; SET LOCAL hnsw.iterative_scan = strict_order");
-        off.HnswSettings(5).ShouldBe("SET LOCAL hnsw.ef_search = 40; SET LOCAL hnsw.iterative_scan = off");
+        strict.HnswSettings(5).ShouldBe(["SET LOCAL hnsw.ef_search = 40", "SET LOCAL hnsw.iterative_scan = strict_order"]);
+        off.HnswSettings(5).ShouldBe(["SET LOCAL hnsw.ef_search = 40", "SET LOCAL hnsw.iterative_scan = off"]);
     }
 
-    [TestCase(0)]
-    [TestCase(1001)]
-    public void Constructor_EfSearchOutsidePgvectorsLimits_IsRefused(int efSearch)
+    [Test]
+    public async Task NearestAsync_QueryInTheSettingsBatch_RunsWithTheSettings()
     {
-        using var dataSource = NpgsqlDataSource.Create("Host=unused");
+        var schema = new PostgresSchema(PostgresDatabase.Require(), new HashedEmbedder(Dimensions), new PostgresKnowledgeOptions { Table = _storeTable });
+        await schema.EnsureAsync(Columns, [], default);
 
-        Should.Throw<ArgumentOutOfRangeException>(() => new PostgresKnowledgeStore(
-            dataSource, new HashedEmbedder(Dimensions), new PostgresKnowledgeOptions { HnswEfSearch = efSearch }));
+        var settings = await schema.NearestAsync(200,
+            new NpgsqlBatchCommand("SELECT current_setting('hnsw.ef_search'), current_setting('hnsw.iterative_scan')"),
+            async reader =>
+            {
+                (await reader.ReadAsync()).ShouldBeTrue();
+                return (reader.GetString(0), reader.GetString(1));
+            },
+            default);
+
+        settings.ShouldBe(("200", "strict_order"));
     }
 }

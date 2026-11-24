@@ -87,3 +87,27 @@ public class InMemoryKnowledgeStoreAnyOfTests
         (await _store.ListAsync(filter)).Select(c => c.Id).ShouldBe(["wired"]);
     }
 }
+
+[TestFixture]
+public class KnowledgeFilterCopyTests
+{
+    [Test]
+    public void Copy_holds_entries_and_AnyOf_and_leaves_the_original_alone()
+    {
+        var original = new KnowledgeFilter { ["kind"] = "news", AnyOf = { ["outlet"] = ["Wired", "The Verge"] } };
+
+        var copy = original.Copy();
+        copy.ShouldBe(original);
+        copy.AnyOf["outlet"].ShouldBe(["Wired", "The Verge"]);
+
+        copy["kind"] = "review";
+        copy["extra"] = "x";
+        copy.AnyOf["outlet"] = ["Wired"];
+        copy.AnyOf["other"] = ["y"];
+
+        original.Count.ShouldBe(1);
+        original["kind"].ShouldBe("news");
+        original.AnyOf.Count.ShouldBe(1);
+        original.AnyOf["outlet"].ShouldBe(["Wired", "The Verge"]);
+    }
+}

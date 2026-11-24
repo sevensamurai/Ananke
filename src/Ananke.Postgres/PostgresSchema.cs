@@ -21,7 +21,7 @@ internal sealed partial class PostgresSchema(NpgsqlDataSource dataSource, IEmbed
     // Read without the lock: volatile, so a reader that sees it true also sees Dimensions and HasIterativeScan.
     private volatile bool _ready;
 
-    public string Table { get; } = Checked(options.Table, nameof(options.Table));
+    public string Table { get; } = CheckedTable(options.Table);
 
     public string TextSearchConfiguration { get; } = Checked(options.TextSearchConfiguration, nameof(options.TextSearchConfiguration));
 
@@ -95,33 +95,45 @@ internal sealed partial class PostgresSchema(NpgsqlDataSource dataSource, IEmbed
     /// <c>hnsw.ef_search</c> at least <paramref name="rows"/> (up to 1,000) and, when pgvector has it,
     /// <c>hnsw.iterative_scan</c> as the options say. Both are <c>SET LOCAL</c>, so they end with the transaction.
     /// </summary>
+    /// <remarks>The settings and the query go as one batch, so the server gets them in one round trip.</remarks>
     /// <param name="rows">How many rows the query asks for.</param>
-    /// <param name="query">Runs the query on the connection and transaction it is given.</param>
+    /// <param name="query">The query, sent after the settings in the same batch.</param>
+    /// <param name="read">Reads the query's rows.</param>
     /// <param name="ct">Cancellation token.</param>
     public async Task<TResult> NearestAsync<TResult>(
-        int rows, Func<NpgsqlCommand, Task<TResult>> query, CancellationToken ct)
+        int rows, NpgsqlBatchCommand query, Func<NpgsqlDataReader, Task<TResult>> read, CancellationToken ct)
     {
         await using var connection = await dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-        await ExecuteAsync(connection, HnswSettings(rows), ct).ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(null, connection, transaction);
-        var result = await query(command).ConfigureAwait(false);
+        await using var batch = new NpgsqlBatch(connection, transaction);
+        foreach (var setting in HnswSettings(rows))
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(setting));
+        batch.BatchCommands.Add(query);
+        TResult result;
+        await using (var reader = await batch.ExecuteReaderAsync(ct).ConfigureAwait(false))
+            result = await read(reader).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
         return result;
     }
 
     /// <summary>The <c>SET LOCAL</c> statements for a nearest-neighbour query of <paramref name="rows"/> rows.</summary>
-    internal string HnswSettings(int rows)
+    internal IReadOnlyList<string> HnswSettings(int rows)
     {
         var efSearch = Math.Clamp(rows, _efSearch, MaxEfSearch).ToString(CultureInfo.InvariantCulture);
-        var settings = $"SET LOCAL hnsw.ef_search = {efSearch}";
-        if (HasIterativeScan)
-            settings += $"; SET LOCAL hnsw.iterative_scan = {(_iterativeScan == PostgresIterativeScan.StrictOrder ? "strict_order" : "off")}";
-        return settings;
+        var efSetting = $"SET LOCAL hnsw.ef_search = {efSearch}";
+        return HasIterativeScan
+            ? [efSetting, $"SET LOCAL hnsw.iterative_scan = {(_iterativeScan == PostgresIterativeScan.StrictOrder ? "strict_order" : "off")}"]
+            : [efSetting];
     }
 
     /// <summary>An index name for this table: its name with dots made underscores, and a suffix.</summary>
-    public string IndexName(string suffix) => $"{Table.Replace('.', '_')}_{suffix}";
+    /// <param name="suffix">At most as long as <see cref="LongestIndexSuffix"/>, which <see cref="CheckedTable"/> checks the name for.</param>
+    public string IndexName(string suffix) =>
+        suffix.Length <= LongestIndexSuffix.Length
+            ? IndexName(Table, suffix)
+            : throw new ArgumentException($"'{suffix}' is longer than '{LongestIndexSuffix}', the longest suffix the table's name is checked for.", nameof(suffix));
+
+    private static string IndexName(string table, string suffix) => $"{table.Replace('.', '_')}_{suffix}";
 
     /// <summary>A vector as pgvector's text form, <c>[0.1,0.2]</c>, cast with <c>::vector</c> in SQL.</summary>
     public static string VectorText(ReadOnlyMemory<float> vector) =>
@@ -170,6 +182,33 @@ internal sealed partial class PostgresSchema(NpgsqlDataSource dataSource, IEmbed
     {
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    // Postgres cuts identifiers at 63 bytes, and CREATE ... IF NOT EXISTS then skips a name cut to one that exists.
+    private const int MaxIdentifierLength = 63;
+
+    // The store adds "_lexemes" and "_lexemes_count" to the table's name; a longer name would make them collide with
+    // each other or with the table.
+    private const int MaxTableNameLength = 49;
+
+    // The longest suffix IndexName is given; index names hold the schema too.
+    private const string LongestIndexSuffix = "embedding";
+
+    private static string CheckedTable(string table)
+    {
+        var name = Checked(table, nameof(PostgresKnowledgeOptions.Table));
+        if (name[(name.IndexOf('.') + 1)..].Length > MaxTableNameLength)
+        {
+            throw new ArgumentException(
+                $"'{name}': the table's name, without its schema, may have at most {MaxTableNameLength} characters, as the store adds '_lexemes_count' to it and Postgres cuts names at {MaxIdentifierLength}.",
+                nameof(PostgresKnowledgeOptions.Table));
+        }
+
+        return IndexName(name, LongestIndexSuffix).Length <= MaxIdentifierLength
+            ? name
+            : throw new ArgumentException(
+                $"'{name}': the schema and table together, without the dot, may have at most {MaxIdentifierLength - LongestIndexSuffix.Length - 2} characters, as the indexes are named '<schema>_<table>_{LongestIndexSuffix}' and Postgres cuts names at {MaxIdentifierLength}.",
+                nameof(PostgresKnowledgeOptions.Table));
     }
 
     private static string Checked(string name, string option) =>

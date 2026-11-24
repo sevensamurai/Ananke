@@ -8,6 +8,8 @@ namespace Ananke.Redis.Tests;
 /// <see cref="RedisConversationMemory"/> on a Valkey container. The tests are ignored when Docker isn't available.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class RedisConversationMemoryContainerTests
 {
     private ValkeyServer? _server;

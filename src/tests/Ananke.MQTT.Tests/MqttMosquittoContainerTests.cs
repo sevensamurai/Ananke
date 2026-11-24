@@ -16,6 +16,8 @@ namespace Ananke.MQTT.Tests;
 /// available, and fail when it is but the container doesn't start.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 [NonParallelizable]
 public sealed class MqttMosquittoContainerTests
 {

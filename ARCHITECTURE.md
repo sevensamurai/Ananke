@@ -309,7 +309,7 @@ flowchart LR
     DOC[Document<br/>PDF/MD/Text] --> EXT[IDocumentExtractor]
     EXT --> CHUNK[IDocumentChunker<br/>SlidingWindow]
     CHUNK --> EMB[IEmbeddingModel]
-    EMB --> STORE[IKnowledgeStore<br/>InMemory / Qdrant]
+    EMB --> STORE[IKnowledgeStore<br/>InMemory / Qdrant / Postgres]
     STORE --> CAT[IKnowledgeCatalog<br/>metadata + keywords]
     CAT --> SEARCH[Semantic Search<br/>+ time-decay reranking]
 ```
@@ -360,8 +360,8 @@ These are the **interface boundaries** that define the system. Any redesign shou
 | `IChannelReader<T>` / `IChannelWriter<T>` | Abstractions | Pub/sub messaging | `InMemoryChannelReader/Writer`, MQTT |
 | `IConversationMemory` | Abstractions | Chat history storage | `InMemoryConversationMemory`, `RedisConversationMemory` |
 | `IWorkflowTracer` | Abstractions | Distributed tracing | `NullTracer`, OpenTelemetry |
-| `IKnowledgeStore` | Knowledge | Vector-indexed chunk storage | `InMemoryKnowledgeStore`, Qdrant |
-| `IKnowledgeCatalog` | Knowledge | Enriched document metadata | `InMemoryKnowledgeCatalog`, Qdrant |
+| `IKnowledgeStore` | Knowledge | Vector-indexed chunk storage | `InMemoryKnowledgeStore`, Qdrant, Postgres |
+| `IKnowledgeCatalog` | Knowledge | Enriched document metadata | `InMemoryKnowledgeCatalog`, Qdrant, Postgres |
 | `IDocumentExtractor` | Knowledge | Extract text from documents | PDF, Markdown (Documents pkg) |
 | `IDocumentChunker` | Knowledge | Split text into chunks | `SlidingWindowChunker` |
 | `ICheckpointStore` | Orchestration | Workflow state persistence | `InMemoryCheckpointStore`, `KeyValueCheckpointStore` |

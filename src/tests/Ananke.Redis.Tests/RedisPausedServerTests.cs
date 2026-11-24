@@ -13,6 +13,8 @@ namespace Ananke.Redis.Tests;
 /// it ends; the tests are ignored when Docker isn't available.
 /// </summary>
 [TestFixture]
+[Category("Containers")]
+[Explicit("Starts a container. Run with: bash scripts/ci.sh --containers")]
 public sealed class RedisPausedServerTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);

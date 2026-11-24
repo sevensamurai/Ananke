@@ -38,13 +38,19 @@ var both = await store.SearchAsync("Which library is Core.Identity built on?", n
 ```
 
 - **Search modes.** `Dense` ranks by cosine distance (HNSW index). `Sparse` searches a generated `tsvector` column
-  (GIN index) and ranks by BM25. `Hybrid` fuses both by reciprocal rank.
+  (GIN index) and ranks by BM25. `Hybrid` runs both at the same time, each on a pooled connection of its own (so one
+  search holds two of the data source's connections), and fuses them by reciprocal rank, weighted by
+  `SearchOptions.DenseWeight` and `KeywordWeight` (1 each; a weight of 0 skips that ranking, both 0 throws
+  `ArgumentException`).
 - **Keyword search ranks by BM25 from the table's own counts.** How many rows hold each lexeme, and the table's rows
   and length, are kept in `<table>_lexemes` by triggers on the table, so a word common in your documents counts
   little, in any language and with no stop list (k1 1.2, b 0.75, as `InMemoryKnowledgeStore`). Only rows holding a
   rare query term, one found in at most `RareTermShare` of rows (5%), are scored; a query with no rare term requires
   all its terms. So *what is the telemetry backend* scores the rows holding `telemetry` or `backend`, not every row
-  holding *the*. The counts are over the whole table, not the rows a filter keeps.
+  holding *the*. The counts are over the whole table, not the rows a filter keeps, so the rule goes on when a filter
+  leaves the match empty: rare terms first, then all terms, then every term the rows it keeps hold, then any term.
+  *the SigNoz plan* filtered to a source that never mentions SigNoz scores that source's rows holding *the* and *plan*
+  (when one holds both), not its rows holding only *the*.
 - **Writes to one table run one at a time** (a transaction-level advisory lock), so the counts stay right and two
   writes can't deadlock. Upsert writes a batch in one statement; the last document given for an id is kept.
 - **Dense search returns the rows asked, under a filter too.** pgvector reads at most `hnsw.ef_search` candidates
@@ -57,10 +63,16 @@ var both = await store.SearchAsync("Which library is Core.Identity built on?", n
   than asked.
 - **Metadata** is `jsonb`; a `KnowledgeFilter` matches rows whose metadata contains every key and value given, and
   for each key in `KnowledgeFilter.AnyOf` any one of its values.
-- **Lists by date in the query.** `ListAsync` with a `KnowledgeDateOrder` casts the key's value to `timestamptz`,
-  orders newest first and applies the lower bound and the limit in SQL; a row whose value isn't a date and time
-  (`pg_input_is_valid`, PostgreSQL 16 or later) comes after the dated ones. Without an order it lists by id.
-- **Deletes remove rows.** `DeleteAsync` with an empty filter empties the table.
+- **Lists by date in the query.** `ListAsync` with a `KnowledgeDateOrder` casts the key's value to `timestamptz`
+  (as UTC when it has no offset, whatever the session's time zone), orders newest first and applies the lower bound
+  and the limit in SQL; a row whose value isn't an ISO 8601 date and time comes after the dated ones, as in the other
+  stores (`infinity`, `today` or `03/04/2026` too, though PostgreSQL reads them).
+  Without an order it lists by id.
+- **PostgreSQL 16 or later** for `ListAsync` with a `KnowledgeDateOrder` (which `DatedRecordReader` and
+  `list_records` always pass): on an earlier server it throws `NotSupportedException`, naming the server's version.
+  Search, writes, deletes and listing without an order work on earlier versions and don't check it.
+- **Deletes remove rows.** `DeleteAsync` with an empty filter throws `ArgumentException`, as on every store, and
+  removes nothing.
 - **One embedder per table.** The table is stamped with the embedder's `Identity` and vector length in
   `ananke_embedders`; a store whose embedder differs is refused, naming both.
 - **Created on first use:** the `vector` extension, the table and its indexes, and `<table>_lexemes` with its
@@ -72,7 +84,7 @@ var both = await store.SearchAsync("Which library is Core.Identity built on?", n
 
 | Option | Default | What it does |
 |---|---|---|
-| `Table` | `ananke_knowledge` (`ananke_catalog` for the catalog) | The table, optionally schema-qualified; lower-case letters, digits, underscores |
+| `Table` | `ananke_knowledge` (`ananke_catalog` for the catalog) | The table, optionally schema-qualified; lower-case letters, digits, underscores; at most 49 characters without the schema (the store adds `_lexemes_count`, and Postgres cuts names at 63), and at most 52 for schema and table together, without the dot (indexes are named `<schema>_<table>_embedding`) |
 | `TextSearchConfiguration` | `simple` | How keyword search reads text: `simple` keeps words as they are; `english` stems them |
 | `RareTermShare` | 0.05 | Keyword search scores only rows holding a query term found in at most this share of rows (rounded up to whole rows); with none, rows holding every term. 1 scores every row holding any term |
 | `Dimensions` | from the embedder | The vectors' length, when the embedder's identity doesn't say |

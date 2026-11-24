@@ -30,6 +30,9 @@ Or with simple parameters:
 services.AddMqtt<MyContext, MyAction>("localhost", 1883, "my-app");
 ```
 
+For a state machine, `UseMqtt` on the one-call `AddStateMachine<TImpl, TContext, TState, TTransition, TNotification>(b => b.UseMqtt(c => ...))`
+runs `AddMqtt` for both its transition and its notification enum from one config (see the `Ananke.StateMachine` README).
+
 Each `AddMqtt` configures its own named `ChannelConfig` options; pass them to `ConfigureAsync`:
 
 ```csharp
